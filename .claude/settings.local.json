@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npx nest build:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

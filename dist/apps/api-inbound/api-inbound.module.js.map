@@ -1,0 +1,1 @@
+{"version":3,"file":"api-inbound.module.js","sourceRoot":"","sources":["../../../src/apps/api-inbound/src/api-inbound.module.ts"],"names":[],"mappings":";;;;;;;;;AAAA,2CAAwC;AACxC,qEAAgE;AAMzD,IAAM,gBAAgB,GAAtB,MAAM,gBAAgB;CAAG,CAAA;AAAnB,4CAAgB;2BAAhB,gBAAgB;IAJ5B,IAAA,eAAM,EAAC;QACN,OAAO,EAAE,EAAE;QACX,WAAW,EAAE,CAAC,6CAAoB,CAAC;KACpC,CAAC;GACW,gBAAgB,CAAG"}

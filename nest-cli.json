@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "monorepo": true,
+  "root": "src/apps/api-inbound",
+  "sourceRoot": "src/apps/api-inbound/src",
+  "projects": {
+    "api-inbound": {
+      "type": "application",
+      "root": "src/apps/api-inbound",
+      "entryFile": "main",
+      "sourceRoot": "src/apps/api-inbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/apps/api-inbound/tsconfig.app.json"
+      }
+    },
+    "api-outbound": {
+      "type": "application",
+      "root": "src/apps/api-outbound",
+      "entryFile": "main",
+      "sourceRoot": "src/apps/api-outbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/apps/api-outbound/tsconfig.app.json"
+      }
+    },
+    "app-audit-subscriber": {
+      "type": "application",
+      "root": "src/apps/app-audit-subscriber",
+      "entryFile": "main",
+      "sourceRoot": "src/apps/app-audit-subscriber/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/apps/app-audit-subscriber/tsconfig.app.json"
+      }
+    },
+    "app-fsp-subscriber": {
+      "type": "application",
+      "root": "src/apps/app-fsp-subscriber",
+      "entryFile": "main",
+      "sourceRoot": "src/apps/app-fsp-subscriber/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/apps/app-fsp-subscriber/tsconfig.app.json"
+      }
+    }
+  }
+}
