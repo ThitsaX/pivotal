@@ -65,6 +65,7 @@ hs_err_pid*
 **/app/release
 **/.cache/*
 **/node_modules/*
+**/dist/*
 
 *.factorypath
 .qodo

@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HandlePutTransfersErrorCommand } from './handle-put-transfers-error.command';
+import { HandlePutTransfersErrorCommand } from '@core/inbound/src';
 
 @CommandHandler(HandlePutTransfersErrorCommand)
 export class HandlePutTransfersErrorHandler

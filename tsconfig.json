@@ -19,6 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@core/*": ["src/core/*"],
+      "@usecase/*": ["src/usecase/*"],
       "@shared/*": ["src/shared/*"]
     }
   }

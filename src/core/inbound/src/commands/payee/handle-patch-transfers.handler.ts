@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HandlePatchTransfersCommand } from '@core/inbound/src/commands';
+import { HandlePatchTransfersCommand } from '@core/inbound/src';
 
 @CommandHandler(HandlePatchTransfersCommand)
 export class HandlePatchTransfersHandler

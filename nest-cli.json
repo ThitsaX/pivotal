@@ -40,6 +40,69 @@
       "compilerOptions": {
         "tsConfigPath": "src/apps/app-fsp-subscriber/tsconfig.app.json"
       }
+    },
+    "core-inbound": {
+      "type": "library",
+      "root": "src/core/inbound",
+      "entryFile": "index",
+      "sourceRoot": "src/core/inbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/core/inbound/tsconfig.app.json"
+      }
+    },
+    "core-outbound": {
+      "type": "library",
+      "root": "src/core/outbound",
+      "entryFile": "index",
+      "sourceRoot": "src/core/outbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/core/outbound/tsconfig.app.json"
+      }
+    },
+    "core-audit": {
+      "type": "library",
+      "root": "src/core/audit",
+      "entryFile": "index",
+      "sourceRoot": "src/core/audit/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/core/audit/tsconfig.app.json"
+      }
+    },
+    "usecase-inbound": {
+      "type": "library",
+      "root": "src/usecase/inbound",
+      "entryFile": "index",
+      "sourceRoot": "src/usecase/inbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/usecase/inbound/tsconfig.app.json"
+      }
+    },
+    "usecase-outbound": {
+      "type": "library",
+      "root": "src/usecase/outbound",
+      "entryFile": "index",
+      "sourceRoot": "src/usecase/outbound/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/usecase/outbound/tsconfig.app.json"
+      }
+    },
+    "usecase-audit": {
+      "type": "library",
+      "root": "src/usecase/audit",
+      "entryFile": "index",
+      "sourceRoot": "src/usecase/audit/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/usecase/audit/tsconfig.app.json"
+      }
+    },
+    "shared": {
+      "type": "library",
+      "root": "src/shared",
+      "entryFile": "index",
+      "sourceRoot": "src/shared/src",
+      "compilerOptions": {
+        "tsConfigPath": "src/shared/tsconfig.app.json"
+      }
     }
   }
 }

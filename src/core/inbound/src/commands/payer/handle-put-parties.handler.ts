@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HandlePutPartiesCommand } from './handle-put-parties.command';
+import { HandlePutPartiesCommand } from '@core/inbound/src';
 
 @CommandHandler(HandlePutPartiesCommand)
 export class HandlePutPartiesHandler

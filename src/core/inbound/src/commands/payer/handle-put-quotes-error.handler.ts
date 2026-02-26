@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HandlePutQuotesErrorCommand } from './handle-put-quotes-error.command';
+import { HandlePutQuotesErrorCommand } from '@core/inbound/src';
 
 @CommandHandler(HandlePutQuotesErrorCommand)
 export class HandlePutQuotesErrorHandler
