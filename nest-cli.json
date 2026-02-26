@@ -2,106 +2,124 @@
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
   "monorepo": true,
-  "root": "src/apps/api-inbound",
-  "sourceRoot": "src/apps/api-inbound/src",
+  "root": "packages/apps/api-inbound",
+  "sourceRoot": "packages/apps/api-inbound",
   "projects": {
     "api-inbound": {
       "type": "application",
-      "root": "src/apps/api-inbound",
+      "root": "packages/apps/api-inbound",
       "entryFile": "main",
-      "sourceRoot": "src/apps/api-inbound/src",
+      "sourceRoot": "packages/apps/api-inbound",
       "compilerOptions": {
-        "tsConfigPath": "src/apps/api-inbound/tsconfig.app.json"
+        "tsConfigPath": "packages/apps/api-inbound/tsconfig.app.json"
       }
     },
     "api-outbound": {
       "type": "application",
-      "root": "src/apps/api-outbound",
+      "root": "packages/apps/api-outbound",
       "entryFile": "main",
-      "sourceRoot": "src/apps/api-outbound/src",
+      "sourceRoot": "packages/apps/api-outbound",
       "compilerOptions": {
-        "tsConfigPath": "src/apps/api-outbound/tsconfig.app.json"
+        "tsConfigPath": "packages/apps/api-outbound/tsconfig.app.json"
       }
     },
     "app-audit-subscriber": {
       "type": "application",
-      "root": "src/apps/app-audit-subscriber",
+      "root": "packages/apps/app-audit-subscriber",
       "entryFile": "main",
-      "sourceRoot": "src/apps/app-audit-subscriber/src",
+      "sourceRoot": "packages/apps/app-audit-subscriber",
       "compilerOptions": {
-        "tsConfigPath": "src/apps/app-audit-subscriber/tsconfig.app.json"
+        "tsConfigPath": "packages/apps/app-audit-subscriber/tsconfig.app.json"
       }
     },
     "app-fsp-subscriber": {
       "type": "application",
-      "root": "src/apps/app-fsp-subscriber",
+      "root": "packages/apps/app-fsp-subscriber",
       "entryFile": "main",
-      "sourceRoot": "src/apps/app-fsp-subscriber/src",
+      "sourceRoot": "packages/apps/app-fsp-subscriber",
       "compilerOptions": {
-        "tsConfigPath": "src/apps/app-fsp-subscriber/tsconfig.app.json"
+        "tsConfigPath": "packages/apps/app-fsp-subscriber/tsconfig.app.json"
       }
     },
     "core-inbound": {
       "type": "library",
-      "root": "src/core/inbound",
+      "root": "packages/core/inbound",
       "entryFile": "index",
-      "sourceRoot": "src/core/inbound/src",
+      "sourceRoot": "packages/core/inbound",
       "compilerOptions": {
-        "tsConfigPath": "src/core/inbound/tsconfig.app.json"
+        "tsConfigPath": "packages/core/inbound/tsconfig.app.json"
       }
     },
     "core-outbound": {
       "type": "library",
-      "root": "src/core/outbound",
+      "root": "packages/core/outbound",
       "entryFile": "index",
-      "sourceRoot": "src/core/outbound/src",
+      "sourceRoot": "packages/core/outbound",
       "compilerOptions": {
-        "tsConfigPath": "src/core/outbound/tsconfig.app.json"
+        "tsConfigPath": "packages/core/outbound/tsconfig.app.json"
       }
     },
     "core-audit": {
       "type": "library",
-      "root": "src/core/audit",
+      "root": "packages/core/audit",
       "entryFile": "index",
-      "sourceRoot": "src/core/audit/src",
+      "sourceRoot": "packages/core/audit",
       "compilerOptions": {
-        "tsConfigPath": "src/core/audit/tsconfig.app.json"
+        "tsConfigPath": "packages/core/audit/tsconfig.app.json"
       }
     },
     "usecase-inbound": {
       "type": "library",
-      "root": "src/usecase/inbound",
+      "root": "packages/usecase/inbound",
       "entryFile": "index",
-      "sourceRoot": "src/usecase/inbound/src",
+      "sourceRoot": "packages/usecase/inbound",
       "compilerOptions": {
-        "tsConfigPath": "src/usecase/inbound/tsconfig.app.json"
+        "tsConfigPath": "packages/usecase/inbound/tsconfig.app.json"
       }
     },
     "usecase-outbound": {
       "type": "library",
-      "root": "src/usecase/outbound",
+      "root": "packages/usecase/outbound",
       "entryFile": "index",
-      "sourceRoot": "src/usecase/outbound/src",
+      "sourceRoot": "packages/usecase/outbound",
       "compilerOptions": {
-        "tsConfigPath": "src/usecase/outbound/tsconfig.app.json"
+        "tsConfigPath": "packages/usecase/outbound/tsconfig.app.json"
       }
     },
     "usecase-audit": {
       "type": "library",
-      "root": "src/usecase/audit",
+      "root": "packages/usecase/audit",
       "entryFile": "index",
-      "sourceRoot": "src/usecase/audit/src",
+      "sourceRoot": "packages/usecase/audit",
       "compilerOptions": {
-        "tsConfigPath": "src/usecase/audit/tsconfig.app.json"
+        "tsConfigPath": "packages/usecase/audit/tsconfig.app.json"
       }
     },
-    "shared": {
+    "shared-fspiop": {
       "type": "library",
-      "root": "src/shared",
+      "root": "packages/shared/fspiop",
       "entryFile": "index",
-      "sourceRoot": "src/shared/src",
+      "sourceRoot": "packages/shared/fspiop",
       "compilerOptions": {
-        "tsConfigPath": "src/shared/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/fspiop/tsconfig.app.json"
+      }
+    },
+    "shared-snowflake": {
+      "type": "library",
+      "root": "packages/shared/snowflake",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/snowflake",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/snowflake/tsconfig.app.json"
+      }
+    },
+    "shared-keystore": {
+      "type": "library",
+      "root": "packages/shared/keystore",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/keystore",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/keystore/tsconfig.app.json"
       }
     }
   }

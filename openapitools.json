@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.12.0",
+    "generators": {
+      "fspiop-dtos": {
+        "generatorName": "typescript-nestjs",
+        "inputSpec": "packages/shared/fspiop/spec/fspiop_v2.yaml",
+        "output": "packages/shared/fspiop/dto",
+        "globalProperty": "models",
+        "additionalProperties": {
+          "modelSuffix": "",
+          "fileNaming": "camelCase"
+        }
+      }
+    }
+  }
+}

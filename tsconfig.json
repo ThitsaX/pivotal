@@ -18,9 +18,9 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@core/*": ["src/core/*"],
-      "@usecase/*": ["src/usecase/*"],
-      "@shared/*": ["src/shared/*"]
+      "@core/*": ["packages/core/*"],
+      "@usecase/*": ["packages/usecase/*"],
+      "@shared/*": ["packages/shared/*"]
     }
   }
 }

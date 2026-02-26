@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install)",
       "Bash(npx nest build:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:openapi-generator.tech)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
