@@ -9,28 +9,20 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { U2FPinValue } from './u2-f-pin-value';
 
 
 /**
- * Data model for the complex type Party.
+ * Contains the authentication value. The format depends on the authentication type used in the AuthenticationInfo complex type.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface AuthenticationValue { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * U2F challenge-response.
      */
-    merchantClassificationCode?: string;
+    pinValue: string;
     /**
-     * Name of the Party. Could be a real name or a nickname.
+     * Sequential counter used for cloning detection. Present only for U2F authentication.
      */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    counter: string;
 }
 

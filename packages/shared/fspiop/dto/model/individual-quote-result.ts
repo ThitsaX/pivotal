@@ -9,38 +9,34 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ErrorInformation } from './error-information';
 import { Money } from './money';
-import { QuotesPostRequestCurrencyConversion } from './quotes-post-request-currency-conversion';
-import { TransactionType } from './transaction-type';
 import { Party } from './party';
-import { TransactionPayeeReceiveAmount } from './transaction-payee-receive-amount';
 import { ExtensionList } from './extension-list';
-import { CurrencyConverter } from './currency-converter';
 
 
 /**
- * Data model for the complex type Transaction. The Transaction type is used to carry end-to-end data between the Payer FSP and the Payee FSP in the ILP Packet. Both the transactionId and the quoteId in the data model are decided by the Payer FSP in the POST /quotes request.
+ * Data model for the complex type IndividualQuoteResult.
  */
-export interface Transaction { 
-    /**
-     * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
-     */
-    transactionId: string;
+export interface IndividualQuoteResult { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
     quoteId: string;
-    payee: Party;
-    payer: Party;
-    amount: Money;
-    payeeReceiveAmount?: TransactionPayeeReceiveAmount;
-    converter?: CurrencyConverter;
-    currencyConversion?: QuotesPostRequestCurrencyConversion;
-    transactionType: TransactionType;
+    payee?: Party;
+    transferAmount?: Money;
+    payeeReceiveAmount?: Money;
+    payeeFspFee?: Money;
+    payeeFspCommission?: Money;
     /**
-     * Memo assigned to transaction.
+     * Information for recipient (transport layer information).
      */
-    note?: string;
+    ilpPacket?: string;
+    /**
+     * Condition that must be attached to the transfer by the Payer.
+     */
+    condition?: string;
+    errorInformation?: ErrorInformation;
     extensionList?: ExtensionList;
 }
 

@@ -9,28 +9,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { ErrorInformation } from './error-information';
 
 
 /**
- * Data model for the complex type Party.
+ * Data model for the complex type object that contains an optional element ErrorInformation used along with 4xx and 5xx responses.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
-    /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
-     */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+export interface ErrorInformationResponse { 
+    errorInformation?: ErrorInformation;
 }
 

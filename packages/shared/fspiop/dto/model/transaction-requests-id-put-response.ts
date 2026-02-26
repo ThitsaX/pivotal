@@ -9,28 +9,22 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { TransactionRequestState } from './transaction-request-state';
+import { ExtensionList } from './extension-list';
 
 
 /**
- * Data model for the complex type Party.
+ * The object sent in the PUT /transactionRequests/{ID} callback.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface TransactionRequestsIDPutResponse { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    transactionId?: string;
+    transactionRequestState: TransactionRequestState;
+    extensionList?: ExtensionList;
 }
+export namespace TransactionRequestsIDPutResponse {
+}
+
 

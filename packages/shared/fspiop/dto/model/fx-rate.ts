@@ -9,28 +9,15 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { FxRateSourceAmount } from './fx-rate-source-amount';
+import { FxRateTargetAmount } from './fx-rate-target-amount';
 
 
 /**
- * Data model for the complex type Party.
+ * The FxRate object contains information about a currency conversion in the transfer. It can be used by parties to the transfer to exchange information with each other about the exchange rate for the transfer, to ensure that the best rate can be agreed on.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
-    /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
-     */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+export interface FxRate { 
+    sourceAmount: FxRateSourceAmount;
+    targetAmount: FxRateTargetAmount;
 }
 

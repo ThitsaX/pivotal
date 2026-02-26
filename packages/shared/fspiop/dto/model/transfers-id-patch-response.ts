@@ -9,28 +9,22 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { ExtensionList } from './extension-list';
+import { TransferState } from './transfer-state';
 
 
 /**
- * Data model for the complex type Party.
+ * PATCH /transfers/{ID} object
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface TransfersIDPatchResponse { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * The API data type DateTime is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons. The format is according to [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html), expressed in a combined date, time and time zone format. A more readable version of the format is yyyy-MM-ddTHH:mm:ss.SSS[-HH:MM]. Examples are \"2016-05-24T08:38:08.699-04:00\", \"2016-05-24T08:38:08.699Z\" (where Z indicates Zulu time zone, same as UTC).
      */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    completedTimestamp: string;
+    transferState: TransferState;
+    extensionList?: ExtensionList;
 }
+export namespace TransfersIDPatchResponse {
+}
+
 

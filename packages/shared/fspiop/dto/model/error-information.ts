@@ -9,28 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { ExtensionList } from './extension-list';
 
 
 /**
- * Data model for the complex type Party.
+ * Data model for the complex type ErrorInformation.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface ErrorInformation { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * The API data type ErrorCode is a JSON String of four characters, consisting of digits only. Negative numbers are not allowed. A leading zero is not allowed. Each error code in the API is a four-digit number, for example, 1234, where the first number (1 in the example) represents the high-level error category, the second number (2 in the example) represents the low-level error category, and the last two numbers (34 in the example) represent the specific error.
      */
-    merchantClassificationCode?: string;
+    errorCode: string;
     /**
-     * Name of the Party. Could be a real name or a nickname.
+     * Error description string.
      */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    errorDescription: string;
+    extensionList?: ExtensionList;
 }
 

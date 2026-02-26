@@ -13,15 +13,20 @@ import { Money } from './money';
 import { QuotesPostRequestCurrencyConversion } from './quotes-post-request-currency-conversion';
 import { TransactionType } from './transaction-type';
 import { Party } from './party';
-import { TransactionPayeeReceiveAmount } from './transaction-payee-receive-amount';
+import { AmountType } from './amount-type';
 import { ExtensionList } from './extension-list';
+import { GeoCode } from './geo-code';
 import { CurrencyConverter } from './currency-converter';
 
 
 /**
- * Data model for the complex type Transaction. The Transaction type is used to carry end-to-end data between the Payer FSP and the Payee FSP in the ILP Packet. Both the transactionId and the quoteId in the data model are decided by the Payer FSP in the POST /quotes request.
+ * The object sent in the POST /quotes request.
  */
-export interface Transaction { 
+export interface QuotesPostRequest { 
+    /**
+     * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
+     */
+    quoteId: string;
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
@@ -29,18 +34,27 @@ export interface Transaction {
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    quoteId: string;
+    transactionRequestId?: string;
     payee: Party;
     payer: Party;
+    amountType: AmountType;
     amount: Money;
-    payeeReceiveAmount?: TransactionPayeeReceiveAmount;
+    fees?: Money;
+    transactionType: TransactionType;
     converter?: CurrencyConverter;
     currencyConversion?: QuotesPostRequestCurrencyConversion;
-    transactionType: TransactionType;
+    geoCode?: GeoCode;
     /**
      * Memo assigned to transaction.
      */
     note?: string;
+    /**
+     * The API data type DateTime is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons. The format is according to [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html), expressed in a combined date, time and time zone format. A more readable version of the format is yyyy-MM-ddTHH:mm:ss.SSS[-HH:MM]. Examples are \"2016-05-24T08:38:08.699-04:00\", \"2016-05-24T08:38:08.699Z\" (where Z indicates Zulu time zone, same as UTC).
+     */
+    expiration?: string;
     extensionList?: ExtensionList;
 }
+export namespace QuotesPostRequest {
+}
+
 

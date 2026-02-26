@@ -9,28 +9,30 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { Refund } from './refund';
+import { TransactionScenario } from './transaction-scenario';
+import { TransactionInitiatorType } from './transaction-initiator-type';
+import { TransactionInitiator } from './transaction-initiator';
 
 
 /**
- * Data model for the complex type Party.
+ * Data model for the complex type TransactionType.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface TransactionType { 
+    scenario: TransactionScenario;
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * Possible sub-scenario, defined locally within the scheme (UndefinedEnum Type).
      */
-    merchantClassificationCode?: string;
+    subScenario?: string;
+    initiator: TransactionInitiator;
+    initiatorType: TransactionInitiatorType;
+    refundInfo?: Refund;
     /**
-     * Name of the Party. Could be a real name or a nickname.
+     * (BopCode) The API data type [BopCode](https://www.imf.org/external/np/sta/bopcode/) is a JSON String of 3 characters, consisting of digits only. Negative numbers are not allowed. A leading zero is not allowed.
      */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    balanceOfPayments?: string;
 }
+export namespace TransactionType {
+}
+
 

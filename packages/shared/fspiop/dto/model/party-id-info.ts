@@ -9,28 +9,30 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { PartyIdType } from './party-id-type';
+import { ExtensionList } from './extension-list';
 
 
 /**
- * Data model for the complex type Party.
+ * Data model for the complex type PartyIdInfo. An ExtensionList element has been added to this reqeust in version v1.1
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface PartyIdInfo { 
+    partyIdType: PartyIdType;
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * Identifier of the Party.
      */
-    merchantClassificationCode?: string;
+    partyIdentifier: string;
     /**
-     * Name of the Party. Could be a real name or a nickname.
+     * Either a sub-identifier of a PartyIdentifier, or a sub-type of the PartyIdType, normally a PersonalIdentifierType.
      */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
+    partySubIdOrType?: string;
     /**
-     * Currencies in which the party can receive funds.
+     * FSP identifier.
      */
-    supportedCurrencies?: Array<Currency>;
+    fspId?: string;
+    extensionList?: ExtensionList;
 }
+export namespace PartyIdInfo {
+}
+
 

@@ -9,28 +9,16 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { ExtensionList } from './extension-list';
+import { TransferState } from './transfer-state';
 
 
 /**
- * Data model for the complex type Party.
+ * PATCH /fxTransfers/{ID} object
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
-    /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
-     */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+export interface FxTransfersIDPatchResponse { 
+    completedTimestamp?: string;
+    conversionState: TransferState;
+    extensionList?: ExtensionList;
 }
 

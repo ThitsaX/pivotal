@@ -9,28 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { PartyComplexName } from './party-complex-name';
 
 
 /**
- * Data model for the complex type Party.
+ * Data model for the complex type PartyPersonalInfo.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface PartyPersonalInfo { 
+    complexName?: PartyComplexName;
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * Date of Birth of the Party.
      */
-    merchantClassificationCode?: string;
+    dateOfBirth?: string;
     /**
-     * Name of the Party. Could be a real name or a nickname.
+     * KYC information for the party in a form mandated by an individual scheme.
      */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    kycInformation?: string;
 }
 

@@ -9,28 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PartyResult } from './party-result';
 import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
 
 
 /**
- * Data model for the complex type Party.
+ * The object sent in the PUT /participants/{ID} callback.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface ParticipantsIDPutResponse { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * List of PartyResult elements that were either created or failed to be created.
      */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    partyList: Array<PartyResult>;
+    currency?: Currency;
 }
+export namespace ParticipantsIDPutResponse {
+}
+
 

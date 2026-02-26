@@ -9,28 +9,19 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { PartyIdInfo } from './party-id-info';
-import { PartyPersonalInfo } from './party-personal-info';
+import { FxChargeTargetAmount } from './fx-charge-target-amount';
+import { FxChargeSourceAmount } from './fx-charge-source-amount';
 
 
 /**
- * Data model for the complex type Party.
+ * An FXP will be able to specify a charge which it proposes to levy on the currency conversion operation using a FxCharge object.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export interface FxCharge { 
     /**
-     * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
+     * A description of the charge which is being levied.
      */
-    merchantClassificationCode?: string;
-    /**
-     * Name of the Party. Could be a real name or a nickname.
-     */
-    name?: string;
-    personalInfo?: PartyPersonalInfo;
-    /**
-     * Currencies in which the party can receive funds.
-     */
-    supportedCurrencies?: Array<Currency>;
+    chargeType: string;
+    sourceAmount?: FxChargeSourceAmount;
+    targetAmount?: FxChargeTargetAmount;
 }
 
