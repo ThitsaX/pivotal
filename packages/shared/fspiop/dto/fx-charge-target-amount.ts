@@ -9,7 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
+import {Currency} from './currency';
 
 
 export interface FxChargeTargetAmount { 
@@ -19,7 +19,6 @@ export interface FxChargeTargetAmount {
      */
     amount: string;
 }
-export namespace FxChargeTargetAmount {
-}
+
 
 

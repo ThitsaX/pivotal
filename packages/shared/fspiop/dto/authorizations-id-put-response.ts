@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { AuthenticationInfo } from './authentication-info';
-import { AuthorizationResponse } from './authorization-response';
+import {AuthenticationInfo} from './authentication-info';
+import {AuthorizationResponse} from './authorization-response';
 
 
 /**
@@ -20,7 +20,6 @@ export interface AuthorizationsIDPutResponse {
     authenticationInfo?: AuthenticationInfo;
     responseType: AuthorizationResponse;
 }
-export namespace AuthorizationsIDPutResponse {
-}
+
 
 

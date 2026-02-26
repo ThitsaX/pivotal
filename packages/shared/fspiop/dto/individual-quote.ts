@@ -9,11 +9,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Money } from './money';
-import { TransactionType } from './transaction-type';
-import { Party } from './party';
-import { AmountType } from './amount-type';
-import { ExtensionList } from './extension-list';
+import {Money} from './money';
+import {TransactionType} from './transaction-type';
+import {Party} from './party';
+import {AmountType} from './amount-type';
+import {ExtensionList} from './extension-list';
 
 
 /**
@@ -39,7 +39,6 @@ export interface IndividualQuote {
     note?: string;
     extensionList?: ExtensionList;
 }
-export namespace IndividualQuote {
-}
+
 
 

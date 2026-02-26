@@ -23,49 +23,67 @@
         "tsConfigPath": "packages/apps/api-outbound/tsconfig.app.json"
       }
     },
-    "app-audit-subscriber": {
-      "type": "application",
-      "root": "packages/apps/app-audit-subscriber",
-      "entryFile": "main",
-      "sourceRoot": "packages/apps/app-audit-subscriber",
-      "compilerOptions": {
-        "tsConfigPath": "packages/apps/app-audit-subscriber/tsconfig.app.json"
-      }
-    },
-    "app-fsp-subscriber": {
-      "type": "application",
-      "root": "packages/apps/app-fsp-subscriber",
-      "entryFile": "main",
-      "sourceRoot": "packages/apps/app-fsp-subscriber",
-      "compilerOptions": {
-        "tsConfigPath": "packages/apps/app-fsp-subscriber/tsconfig.app.json"
-      }
-    },
-    "core-inbound": {
+    "core-inbound-domain": {
       "type": "library",
-      "root": "packages/core/inbound",
+      "root": "packages/core/inbound/domain",
       "entryFile": "index",
-      "sourceRoot": "packages/core/inbound",
+      "sourceRoot": "packages/core/inbound/domain",
       "compilerOptions": {
-        "tsConfigPath": "packages/core/inbound/tsconfig.app.json"
+        "tsConfigPath": "packages/core/inbound/domain/tsconfig.app.json"
       }
     },
-    "core-outbound": {
+    "core-outbound-domain": {
       "type": "library",
-      "root": "packages/core/outbound",
+      "root": "packages/core/outbound/domain",
       "entryFile": "index",
-      "sourceRoot": "packages/core/outbound",
+      "sourceRoot": "packages/core/outbound/domain",
       "compilerOptions": {
-        "tsConfigPath": "packages/core/outbound/tsconfig.app.json"
+        "tsConfigPath": "packages/core/outbound/domain/tsconfig.app.json"
       }
     },
-    "core-audit": {
+    "core-outbound-subscriber": {
       "type": "library",
-      "root": "packages/core/audit",
+      "root": "packages/core/outbound/subscriber",
       "entryFile": "index",
-      "sourceRoot": "packages/core/audit",
+      "sourceRoot": "packages/core/outbound/subscriber",
       "compilerOptions": {
-        "tsConfigPath": "packages/core/audit/tsconfig.app.json"
+        "tsConfigPath": "packages/core/outbound/subscriber/tsconfig.app.json"
+      }
+    },
+    "core-outbound-publisher": {
+      "type": "library",
+      "root": "packages/core/outbound/publisher",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/outbound/publisher",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/outbound/publisher/tsconfig.app.json"
+      }
+    },
+    "core-audit-domain": {
+      "type": "library",
+      "root": "packages/core/audit/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/audit/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/audit/domain/tsconfig.app.json"
+      }
+    },
+    "core-audit-subscriber": {
+      "type": "library",
+      "root": "packages/core/audit/subscriber",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/audit/subscriber",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/audit/subscriber/tsconfig.app.json"
+      }
+    },
+    "core-audit-publisher": {
+      "type": "library",
+      "root": "packages/core/audit/publisher",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/audit/publisher",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/audit/publisher/tsconfig.app.json"
       }
     },
     "usecase-inbound": {
@@ -120,6 +138,24 @@
       "sourceRoot": "packages/shared/keystore",
       "compilerOptions": {
         "tsConfigPath": "packages/shared/keystore/tsconfig.app.json"
+      }
+    },
+    "shared-interledger": {
+      "type": "library",
+      "root": "packages/shared/interledger",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/interledger",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/interledger/tsconfig.app.json"
+      }
+    },
+    "shared-pgtype": {
+      "type": "library",
+      "root": "packages/shared/pgtype",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/pgtype",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/pgtype/tsconfig.app.json"
       }
     }
   }

@@ -14,11 +14,9 @@
 /**
  * Below are the allowed values for the enumeration. - ENTERED - Consumer entered the authentication value. - REJECTED - Consumer rejected the transaction. - RESEND - Consumer requested to resend the authentication value.
  */
-export type AuthorizationResponse = 'ENTERED' | 'REJECTED' | 'RESEND';
-
-export const AuthorizationResponse = {
-    Entered: 'ENTERED' as AuthorizationResponse,
-    Rejected: 'REJECTED' as AuthorizationResponse,
-    Resend: 'RESEND' as AuthorizationResponse
-};
+export enum AuthorizationResponse {
+    Entered = 'ENTERED',
+    Rejected = 'REJECTED',
+    Resend = 'RESEND'
+}
 

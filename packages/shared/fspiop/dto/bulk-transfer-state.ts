@@ -14,14 +14,12 @@
 /**
  * Below are the allowed values for the enumeration. - RECEIVED - Payee FSP has received the bulk transfer from the Payer FSP. - PENDING - Payee FSP has validated the bulk transfer. - ACCEPTED - Payee FSP has accepted to process the bulk transfer. - PROCESSING - Payee FSP has started to transfer fund to the Payees. - COMPLETED - Payee FSP has completed transfer of funds to the Payees. - REJECTED - Payee FSP has rejected to process the bulk transfer.
  */
-export type BulkTransferState = 'RECEIVED' | 'PENDING' | 'ACCEPTED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
-
-export const BulkTransferState = {
-    Received: 'RECEIVED' as BulkTransferState,
-    Pending: 'PENDING' as BulkTransferState,
-    Accepted: 'ACCEPTED' as BulkTransferState,
-    Processing: 'PROCESSING' as BulkTransferState,
-    Completed: 'COMPLETED' as BulkTransferState,
-    Rejected: 'REJECTED' as BulkTransferState
-};
+export enum BulkTransferState {
+    Received = 'RECEIVED',
+    Pending = 'PENDING',
+    Accepted = 'ACCEPTED',
+    Processing = 'PROCESSING',
+    Completed = 'COMPLETED',
+    Rejected = 'REJECTED'
+}
 

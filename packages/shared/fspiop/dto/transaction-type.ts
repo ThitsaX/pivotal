@@ -9,10 +9,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Refund } from './refund';
-import { TransactionScenario } from './transaction-scenario';
-import { TransactionInitiatorType } from './transaction-initiator-type';
-import { TransactionInitiator } from './transaction-initiator';
+import {Refund} from './refund';
+import {TransactionScenario} from './transaction-scenario';
+import {TransactionInitiatorType} from './transaction-initiator-type';
+import {TransactionInitiator} from './transaction-initiator';
 
 
 /**
@@ -32,7 +32,6 @@ export interface TransactionType {
      */
     balanceOfPayments?: string;
 }
-export namespace TransactionType {
-}
+
 
 

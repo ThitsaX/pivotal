@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TransactionRequestState } from './transaction-request-state';
-import { ExtensionList } from './extension-list';
+import {TransactionRequestState} from './transaction-request-state';
+import {ExtensionList} from './extension-list';
 
 
 /**
@@ -24,7 +24,6 @@ export interface TransactionRequestsIDPutResponse {
     transactionRequestState: TransactionRequestState;
     extensionList?: ExtensionList;
 }
-export namespace TransactionRequestsIDPutResponse {
-}
+
 
 

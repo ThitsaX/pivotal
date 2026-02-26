@@ -4,7 +4,7 @@
   "generator-cli": {
     "version": "7.12.0",
     "generators": {
-      "fspiop-dtos": {
+      "fspiop-dto": {
         "generatorName": "typescript-nestjs",
         "inputSpec": "packages/shared/fspiop/spec/fspiop_v2.yaml",
         "output": "packages/shared/fspiop/dto",
@@ -12,7 +12,8 @@
         "additionalProperties": {
           "modelSuffix": "",
           "fileNaming": "kebab-case",
-          "modelPackage": "."
+          "modelPackage": ".",
+          "stringEnums": true
         }
       }
     }

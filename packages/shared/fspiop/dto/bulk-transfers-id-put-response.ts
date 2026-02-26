@@ -9,9 +9,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { BulkTransferState } from './bulk-transfer-state';
-import { IndividualTransferResult } from './individual-transfer-result';
-import { ExtensionList } from './extension-list';
+import {BulkTransferState} from './bulk-transfer-state';
+import {IndividualTransferResult} from './individual-transfer-result';
+import {ExtensionList} from './extension-list';
 
 
 /**
@@ -29,7 +29,6 @@ export interface BulkTransfersIDPutResponse {
     bulkTransferState: BulkTransferState;
     extensionList?: ExtensionList;
 }
-export namespace BulkTransfersIDPutResponse {
-}
+
 
 

@@ -9,13 +9,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Money } from './money';
-import { TransactionType } from './transaction-type';
-import { Party } from './party';
-import { ExtensionList } from './extension-list';
-import { PartyIdInfo } from './party-id-info';
-import { GeoCode } from './geo-code';
-import { AuthenticationType } from './authentication-type';
+import {Money} from './money';
+import {TransactionType} from './transaction-type';
+import {Party} from './party';
+import {ExtensionList} from './extension-list';
+import {PartyIdInfo} from './party-id-info';
+import {GeoCode} from './geo-code';
+import {AuthenticationType} from './authentication-type';
 
 
 /**
@@ -42,7 +42,6 @@ export interface TransactionRequestsPostRequest {
     expiration?: string;
     extensionList?: ExtensionList;
 }
-export namespace TransactionRequestsPostRequest {
-}
+
 
 

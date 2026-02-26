@@ -14,12 +14,10 @@
 /**
  * Below are the allowed values for the enumeration. - RECEIVED - Payer FSP has received the transaction from the Payee FSP. - PENDING - Payer FSP has sent the transaction request to the Payer. - ACCEPTED - Payer has approved the transaction. - REJECTED - Payer has rejected the transaction.
  */
-export type TransactionRequestState = 'RECEIVED' | 'PENDING' | 'ACCEPTED' | 'REJECTED';
-
-export const TransactionRequestState = {
-    Received: 'RECEIVED' as TransactionRequestState,
-    Pending: 'PENDING' as TransactionRequestState,
-    Accepted: 'ACCEPTED' as TransactionRequestState,
-    Rejected: 'REJECTED' as TransactionRequestState
-};
+export enum TransactionRequestState {
+    Received = 'RECEIVED',
+    Pending = 'PENDING',
+    Accepted = 'ACCEPTED',
+    Rejected = 'REJECTED'
+}
 

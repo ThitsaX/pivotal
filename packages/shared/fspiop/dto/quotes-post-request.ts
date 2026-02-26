@@ -9,14 +9,14 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Money } from './money';
-import { QuotesPostRequestCurrencyConversion } from './quotes-post-request-currency-conversion';
-import { TransactionType } from './transaction-type';
-import { Party } from './party';
-import { AmountType } from './amount-type';
-import { ExtensionList } from './extension-list';
-import { GeoCode } from './geo-code';
-import { CurrencyConverter } from './currency-converter';
+import {Money} from './money';
+import {QuotesPostRequestCurrencyConversion} from './quotes-post-request-currency-conversion';
+import {TransactionType} from './transaction-type';
+import {Party} from './party';
+import {AmountType} from './amount-type';
+import {ExtensionList} from './extension-list';
+import {GeoCode} from './geo-code';
+import {CurrencyConverter} from './currency-converter';
 
 
 /**
@@ -54,7 +54,6 @@ export interface QuotesPostRequest {
     expiration?: string;
     extensionList?: ExtensionList;
 }
-export namespace QuotesPostRequest {
-}
+
 
 

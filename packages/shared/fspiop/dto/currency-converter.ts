@@ -14,10 +14,8 @@
 /**
  * Below are the allowed values for the enumeration CurrencyConverter. - PAYER - Currency conversion should be performed by the payer. - PAYEE - Currency conversion should be performed by the payee.
  */
-export type CurrencyConverter = 'PAYER' | 'PAYEE';
-
-export const CurrencyConverter = {
-    Payer: 'PAYER' as CurrencyConverter,
-    Payee: 'PAYEE' as CurrencyConverter
-};
+export enum CurrencyConverter {
+    Payer = 'PAYER',
+    Payee = 'PAYEE'
+}
 

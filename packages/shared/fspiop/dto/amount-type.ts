@@ -14,10 +14,8 @@
 /**
  * Below are the allowed values for the enumeration AmountType. - SEND - Amount the Payer would like to send, that is, the amount that should be withdrawn from the Payer account including any fees. - RECEIVE - Amount the Payer would like the Payee to receive, that is, the amount that should be sent to the receiver exclusive of any fees.
  */
-export type AmountType = 'SEND' | 'RECEIVE';
-
-export const AmountType = {
-    Send: 'SEND' as AmountType,
-    Receive: 'RECEIVE' as AmountType
-};
+export enum AmountType {
+    Send = 'SEND',
+    Receive = 'RECEIVE'
+}
 

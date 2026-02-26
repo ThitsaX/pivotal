@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { AuthenticationValue } from './authentication-value';
-import { AuthenticationType } from './authentication-type';
+import {AuthenticationValue} from './authentication-value';
+import {AuthenticationType} from './authentication-type';
 
 
 /**
@@ -20,7 +20,6 @@ export interface AuthenticationInfo {
     authentication: AuthenticationType;
     authenticationValue: AuthenticationValue;
 }
-export namespace AuthenticationInfo {
-}
+
 
 

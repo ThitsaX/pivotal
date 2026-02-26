@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ExtensionList } from './extension-list';
-import { TransferState } from './transfer-state';
+import {ExtensionList} from './extension-list';
+import {TransferState} from './transfer-state';
 
 
 /**
@@ -28,7 +28,6 @@ export interface TransfersIDPutResponse {
     transferState: TransferState;
     extensionList?: ExtensionList;
 }
-export namespace TransfersIDPutResponse {
-}
+
 
 

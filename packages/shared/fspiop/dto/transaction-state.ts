@@ -14,12 +14,10 @@
 /**
  * Below are the allowed values for the enumeration. - RECEIVED - Payee FSP has received the transaction from the Payer FSP. - PENDING - Payee FSP has validated the transaction. - COMPLETED - Payee FSP has successfully performed the transaction. - REJECTED - Payee FSP has failed to perform the transaction.
  */
-export type TransactionState = 'RECEIVED' | 'PENDING' | 'COMPLETED' | 'REJECTED';
-
-export const TransactionState = {
-    Received: 'RECEIVED' as TransactionState,
-    Pending: 'PENDING' as TransactionState,
-    Completed: 'COMPLETED' as TransactionState,
-    Rejected: 'REJECTED' as TransactionState
-};
+export enum TransactionState {
+    Received = 'RECEIVED',
+    Pending = 'PENDING',
+    Completed = 'COMPLETED',
+    Rejected = 'REJECTED'
+}
 

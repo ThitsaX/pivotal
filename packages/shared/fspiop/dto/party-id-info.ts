@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { PartyIdType } from './party-id-type';
-import { ExtensionList } from './extension-list';
+import {PartyIdType} from './party-id-type';
+import {ExtensionList} from './extension-list';
 
 
 /**
@@ -32,7 +32,6 @@ export interface PartyIdInfo {
     fspId?: string;
     extensionList?: ExtensionList;
 }
-export namespace PartyIdInfo {
-}
+
 
 

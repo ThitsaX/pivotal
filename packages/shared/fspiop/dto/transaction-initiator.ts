@@ -14,10 +14,8 @@
 /**
  * Below are the allowed values for the enumeration. - PAYER - Sender of funds is initiating the transaction. The account to send from is either owned by the Payer or is connected to the Payer in some way. - PAYEE - Recipient of the funds is initiating the transaction by sending a transaction request. The Payer must approve the transaction, either automatically by a pre-generated OTP or by pre-approval of the Payee, or by manually approving in his or her own Device.
  */
-export type TransactionInitiator = 'PAYER' | 'PAYEE';
-
-export const TransactionInitiator = {
-    Payer: 'PAYER' as TransactionInitiator,
-    Payee: 'PAYEE' as TransactionInitiator
-};
+export enum TransactionInitiator {
+    Payer = 'PAYER',
+    Payee = 'PAYEE'
+}
 

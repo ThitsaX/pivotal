@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { PartyResult } from './party-result';
-import { Currency } from './currency';
+import {PartyResult} from './party-result';
+import {Currency} from './currency';
 
 
 /**
@@ -23,7 +23,6 @@ export interface ParticipantsIDPutResponse {
     partyList: Array<PartyResult>;
     currency?: Currency;
 }
-export namespace ParticipantsIDPutResponse {
-}
+
 
 

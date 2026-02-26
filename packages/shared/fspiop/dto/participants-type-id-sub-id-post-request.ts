@@ -9,8 +9,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
-import { ExtensionList } from './extension-list';
+import {Currency} from './currency';
+import {ExtensionList} from './extension-list';
 
 
 /**
@@ -24,7 +24,6 @@ export interface ParticipantsTypeIDSubIDPostRequest {
     currency?: Currency;
     extensionList?: ExtensionList;
 }
-export namespace ParticipantsTypeIDSubIDPostRequest {
-}
+
 
 

@@ -9,7 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
+import {Currency} from './currency';
 
 
 export interface TransactionPayeeReceiveAmount { 
@@ -19,7 +19,6 @@ export interface TransactionPayeeReceiveAmount {
      */
     amount: string;
 }
-export namespace TransactionPayeeReceiveAmount {
-}
+
 
 

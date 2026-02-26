@@ -14,12 +14,10 @@
 /**
  * Below are the allowed values for the enumeration. - CONSUMER - Consumer is the initiator of the transaction. - AGENT - Agent is the initiator of the transaction. - BUSINESS - Business is the initiator of the transaction. - DEVICE - Device is the initiator of the transaction.
  */
-export type TransactionInitiatorType = 'CONSUMER' | 'AGENT' | 'BUSINESS' | 'DEVICE';
-
-export const TransactionInitiatorType = {
-    Consumer: 'CONSUMER' as TransactionInitiatorType,
-    Agent: 'AGENT' as TransactionInitiatorType,
-    Business: 'BUSINESS' as TransactionInitiatorType,
-    Device: 'DEVICE' as TransactionInitiatorType
-};
+export enum TransactionInitiatorType {
+    Consumer = 'CONSUMER',
+    Agent = 'AGENT',
+    Business = 'BUSINESS',
+    Device = 'DEVICE'
+}
 

@@ -14,21 +14,19 @@
 /**
  * Below are the allowed values for the enumeration. - PASSPORT - A passport number is used as reference to a Party. - NATIONAL_REGISTRATION - A national registration number is used as reference to a Party. - DRIVING_LICENSE - A driving license is used as reference to a Party. - ALIEN_REGISTRATION - An alien registration number is used as reference to a Party. - NATIONAL_ID_CARD - A national ID card number is used as reference to a Party. - EMPLOYER_ID - A tax identification number is used as reference to a Party. - TAX_ID_NUMBER - A tax identification number is used as reference to a Party. - SENIOR_CITIZENS_CARD - A senior citizens card number is used as reference to a Party. - MARRIAGE_CERTIFICATE - A marriage certificate number is used as reference to a Party. - HEALTH_CARD - A health card number is used as reference to a Party. - VOTERS_ID - A voter’s identification number is used as reference to a Party. - UNITED_NATIONS - An UN (United Nations) number is used as reference to a Party. - OTHER_ID - Any other type of identification type number is used as reference to a Party.
  */
-export type PersonalIdentifierType = 'PASSPORT' | 'NATIONAL_REGISTRATION' | 'DRIVING_LICENSE' | 'ALIEN_REGISTRATION' | 'NATIONAL_ID_CARD' | 'EMPLOYER_ID' | 'TAX_ID_NUMBER' | 'SENIOR_CITIZENS_CARD' | 'MARRIAGE_CERTIFICATE' | 'HEALTH_CARD' | 'VOTERS_ID' | 'UNITED_NATIONS' | 'OTHER_ID';
-
-export const PersonalIdentifierType = {
-    Passport: 'PASSPORT' as PersonalIdentifierType,
-    NationalRegistration: 'NATIONAL_REGISTRATION' as PersonalIdentifierType,
-    DrivingLicense: 'DRIVING_LICENSE' as PersonalIdentifierType,
-    AlienRegistration: 'ALIEN_REGISTRATION' as PersonalIdentifierType,
-    NationalIdCard: 'NATIONAL_ID_CARD' as PersonalIdentifierType,
-    EmployerId: 'EMPLOYER_ID' as PersonalIdentifierType,
-    TaxIdNumber: 'TAX_ID_NUMBER' as PersonalIdentifierType,
-    SeniorCitizensCard: 'SENIOR_CITIZENS_CARD' as PersonalIdentifierType,
-    MarriageCertificate: 'MARRIAGE_CERTIFICATE' as PersonalIdentifierType,
-    HealthCard: 'HEALTH_CARD' as PersonalIdentifierType,
-    VotersId: 'VOTERS_ID' as PersonalIdentifierType,
-    UnitedNations: 'UNITED_NATIONS' as PersonalIdentifierType,
-    OtherId: 'OTHER_ID' as PersonalIdentifierType
-};
+export enum PersonalIdentifierType {
+    Passport = 'PASSPORT',
+    NationalRegistration = 'NATIONAL_REGISTRATION',
+    DrivingLicense = 'DRIVING_LICENSE',
+    AlienRegistration = 'ALIEN_REGISTRATION',
+    NationalIdCard = 'NATIONAL_ID_CARD',
+    EmployerId = 'EMPLOYER_ID',
+    TaxIdNumber = 'TAX_ID_NUMBER',
+    SeniorCitizensCard = 'SENIOR_CITIZENS_CARD',
+    MarriageCertificate = 'MARRIAGE_CERTIFICATE',
+    HealthCard = 'HEALTH_CARD',
+    VotersId = 'VOTERS_ID',
+    UnitedNations = 'UNITED_NATIONS',
+    OtherId = 'OTHER_ID'
+}
 

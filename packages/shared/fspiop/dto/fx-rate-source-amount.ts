@@ -9,7 +9,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Currency } from './currency';
+import {Currency} from './currency';
 
 
 export interface FxRateSourceAmount { 
@@ -19,7 +19,6 @@ export interface FxRateSourceAmount {
      */
     amount: string;
 }
-export namespace FxRateSourceAmount {
-}
+
 
 

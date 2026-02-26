@@ -14,12 +14,10 @@
 /**
  * Below are the allowed values for the enumeration. - RECEIVED - Next ledger has received the transfer. - RESERVED - Next ledger has reserved the transfer. - COMMITTED - Next ledger has successfully performed the transfer. - ABORTED - Next ledger has aborted the transfer due to a rejection or failure to perform the transfer.
  */
-export type TransferState = 'RECEIVED' | 'RESERVED' | 'COMMITTED' | 'ABORTED';
-
-export const TransferState = {
-    Received: 'RECEIVED' as TransferState,
-    Reserved: 'RESERVED' as TransferState,
-    Committed: 'COMMITTED' as TransferState,
-    Aborted: 'ABORTED' as TransferState
-};
+export enum TransferState {
+    Received = 'RECEIVED',
+    Reserved = 'RESERVED',
+    Committed = 'COMMITTED',
+    Aborted = 'ABORTED'
+}
 

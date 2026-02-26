@@ -8,14 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiOutboundModule = void 0;
 const common_1 = require("@nestjs/common");
-const api_outbound_controller_1 = require("./api-outbound.controller");
+const domain_1 = require("../../core/outbound/domain");
+const controller_1 = require("./controller");
 let ApiOutboundModule = class ApiOutboundModule {
 };
 exports.ApiOutboundModule = ApiOutboundModule;
 exports.ApiOutboundModule = ApiOutboundModule = __decorate([
     (0, common_1.Module)({
-        imports: [],
-        controllers: [api_outbound_controller_1.ApiOutboundController],
+        imports: [domain_1.OutboundDomainModule],
+        controllers: [controller_1.LookupController, controller_1.QuotingController, controller_1.TransferController],
     })
 ], ApiOutboundModule);
 //# sourceMappingURL=api-outbound.module.js.map
