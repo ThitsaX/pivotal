@@ -10,22 +10,21 @@
  * Do not edit the class manually.
  */
 import { FxConversionExtensionList } from './fx-conversion-extension-list';
-import { string &amp; object } from './string-object';
 import { FxConversionTargetAmount } from './fx-conversion-target-amount';
 import { FxCharge } from './fx-charge';
 import { FxConversionSourceAmount } from './fx-conversion-source-amount';
-import { AmountType &amp; object } from './amount-type-object';
+import { AmountType } from './amount-type';
 
 
 export interface FxQuotesPostRequestConversionTerms { 
-    conversionId: string & object;
-    determiningTransferId?: string & object;
-    initiatingFsp: string & object;
-    counterPartyFsp: string & object;
-    amountType: AmountType & object;
+    conversionId: string;
+    determiningTransferId?: string;
+    initiatingFsp: string;
+    counterPartyFsp: string;
+    amountType: AmountType;
     sourceAmount: FxConversionSourceAmount;
     targetAmount: FxConversionTargetAmount;
-    expiration: string & object;
+    expiration: string;
     /**
      * One or more charges which the FXP intends to levy as part of the currency conversion, or which the payee DFSP intends to add to the amount transferred.
      */

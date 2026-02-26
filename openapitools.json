@@ -11,7 +11,8 @@
         "globalProperty": "models",
         "additionalProperties": {
           "modelSuffix": "",
-          "fileNaming": "kebab-case"
+          "fileNaming": "kebab-case",
+          "modelPackage": "."
         }
       }
     }
