@@ -2,27 +2,9 @@
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
   "monorepo": true,
-  "root": "packages/apps/api-inbound",
-  "sourceRoot": "packages/apps/api-inbound",
+  "root": "packages",
+  "sourceRoot": "packages",
   "projects": {
-    "api-inbound": {
-      "type": "application",
-      "root": "packages/apps/api-inbound",
-      "entryFile": "main",
-      "sourceRoot": "packages/apps/api-inbound",
-      "compilerOptions": {
-        "tsConfigPath": "packages/apps/api-inbound/tsconfig.app.json"
-      }
-    },
-    "api-outbound": {
-      "type": "application",
-      "root": "packages/apps/api-outbound",
-      "entryFile": "main",
-      "sourceRoot": "packages/apps/api-outbound",
-      "compilerOptions": {
-        "tsConfigPath": "packages/apps/api-outbound/tsconfig.app.json"
-      }
-    },
     "core-inbound-domain": {
       "type": "library",
       "root": "packages/core/inbound/domain",
@@ -122,6 +104,15 @@
         "tsConfigPath": "packages/shared/fspiop/tsconfig.app.json"
       }
     },
+    "shared-flyway": {
+      "type": "library",
+      "root": "packages/shared/flyway",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/flyway",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/flyway/tsconfig.app.json"
+      }
+    },
     "shared-snowflake": {
       "type": "library",
       "root": "packages/shared/snowflake",
@@ -149,13 +140,22 @@
         "tsConfigPath": "packages/shared/interledger/tsconfig.app.json"
       }
     },
-    "shared-pgtype": {
+    "shared-persistence": {
       "type": "library",
-      "root": "packages/shared/pgtype",
+      "root": "packages/shared/persistence",
       "entryFile": "index",
-      "sourceRoot": "packages/shared/pgtype",
+      "sourceRoot": "packages/shared/persistence",
       "compilerOptions": {
-        "tsConfigPath": "packages/shared/pgtype/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/persistence/tsconfig.app.json"
+      }
+    },
+    "shared-security": {
+      "type": "library",
+      "root": "packages/shared/security",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/security",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/security/tsconfig.app.json"
       }
     }
   }

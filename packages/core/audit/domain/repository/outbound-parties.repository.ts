@@ -1,6 +1,6 @@
 import {Injectable} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {MtpaDbTarget} from '@shared/pgtype';
+import {MtpaDbTarget} from '@shared/persistence';
 import {Repository} from 'typeorm';
 import {OutboundParties} from '../model';
 import {MTPA_DB_READ_CONNECTION_NAME, MTPA_DB_WRITE_CONNECTION_NAME} from './mtpa-connection-name';
@@ -32,6 +32,7 @@ export class OutboundPartiesRepository {
     }
 
     private getRepository(target: MtpaDbTarget): Repository<OutboundParties> {
+
         if (target === MtpaDbTarget.Write) {
             return this.writeRepository;
         }

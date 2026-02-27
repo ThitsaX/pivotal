@@ -1,4 +1,4 @@
-import { PartiesTypeIdPutResponse, PartyIdType } from '@shared/fspiop';
+import { PartiesTypeIDPutResponse, PartyIdType } from '@shared/fspiop';
 
 export class HandlePutPartiesCommand {
   constructor(public readonly input: HandlePutPartiesCommand.Input) {}
@@ -9,7 +9,7 @@ export namespace HandlePutPartiesCommand {
     constructor(
       public readonly type: PartyIdType,
       public readonly id: string,
-      public readonly body: PartiesTypeIdPutResponse,
+      public readonly body: PartiesTypeIDPutResponse,
     ) {}
   }
 

@@ -3,6 +3,7 @@ export class DoQuotingCommand {
 }
 
 export namespace DoQuotingCommand {
+
   export class Input {}
 
   export class Output {}

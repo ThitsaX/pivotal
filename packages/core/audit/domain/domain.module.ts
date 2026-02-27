@@ -1,16 +1,16 @@
 import {Module} from '@nestjs/common';
 import {TypeOrmModule} from '@nestjs/typeorm';
 import {
-    PgTypeConfigurer,
-    PgTypeModule,
-} from '@shared/pgtype';
+    PersistenceConfigurer,
+    PersistenceModule,
+} from '@shared/persistence';
 import {OutboundParties} from './model';
 import {MTPA_DB_READ_CONNECTION_NAME, MTPA_DB_WRITE_CONNECTION_NAME, OutboundPartiesRepository} from './repository';
 
 @Module({
     imports: [
-        PgTypeModule,
-        ...PgTypeConfigurer.createTypeOrmRootModules(
+        PersistenceModule,
+        ...PersistenceConfigurer.createTypeOrmRootModules(
             MTPA_DB_WRITE_CONNECTION_NAME,
             MTPA_DB_READ_CONNECTION_NAME,
             [OutboundParties],
