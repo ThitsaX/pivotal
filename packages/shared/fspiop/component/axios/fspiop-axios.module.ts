@@ -1,5 +1,8 @@
 import { DynamicModule, FactoryProvider, Module, ModuleMetadata } from '@nestjs/common';
 import { FspiopAxios, FspiopAxiosInterceptor, FspiopAxiosParams } from './fspiop-axios';
+import { FspiopSigningInterceptor } from './interceptor';
+import { FspiopSettings } from '../fspiop-settings';
+import { KeystoreModule, PrivateKeyStore } from '@shared/security/component/key';
 
 export type FspiopAxiosToken = string | symbol | typeof FspiopAxios;
 
@@ -18,60 +21,62 @@ export class FspiopAxiosModule {
 
     /**
      * Register a FspiopAxios instance synchronously.
+     * FspiopSettings is resolved from env variables automatically.
+     * FspiopSigningInterceptor is prepended when settings.signJws is true.
      *
-     * @example — default token (inject as FspiopAxios)
-     * FspiopAxiosModule.forRoot({ params: { basePath: 'http://switch.local' } })
-     *
-     * @example — with interceptors
+     * @example
      * FspiopAxiosModule.forRoot({
-     *   params: { basePath: 'http://switch.local' },
-     *   interceptors: [myAuthInterceptor],
+     *   params: { socketTimeoutMs: 30_000, connectionTimeoutMs: 3_000 },
      * })
      *
-     * @example — named token (inject with @Inject('PEER_FSP'))
-     * FspiopAxiosModule.forRoot({ params: { basePath: 'http://peer.local' } }, 'PEER_FSP')
+     * @example — named token
+     * FspiopAxiosModule.forRoot({ params: { socketTimeoutMs: 30_000 } }, 'PEER_FSP')
      */
     static forRoot(
         options: FspiopAxiosModuleOptions = {},
         token: FspiopAxiosToken = FspiopAxios,
     ): DynamicModule {
-        const provider = {
+        const provider: FactoryProvider = {
             provide: token,
-            useValue: new FspiopAxios(options.params, options.interceptors),
+            useFactory: (privateKeyStore: PrivateKeyStore, settings: FspiopSettings) => {
+                const interceptors = FspiopAxiosModule.buildInterceptors(privateKeyStore, settings, options.interceptors);
+                return new FspiopAxios(settings, options.params, interceptors);
+            },
+            inject: [PrivateKeyStore, FspiopSettings],
         };
 
         return {
             module: FspiopAxiosModule,
-            providers: [provider],
+            imports: [KeystoreModule],
+            providers: [FspiopSettings, provider],
             exports: [provider],
         };
     }
 
     /**
-     * Register a FspiopAxios instance asynchronously (e.g. using ConfigService).
+     * Register a FspiopAxios instance asynchronously.
+     * FspiopSettings is resolved from env variables automatically.
+     * FspiopSigningInterceptor is prepended when settings.signJws is true.
      *
-     * @example — default token
+     * @example
+     * FspiopAxiosModule.forRootAsync({
+     *   useFactory: () => ({
+     *     params: { socketTimeoutMs: 30_000, connectionTimeoutMs: 3_000 },
+     *   }),
+     * })
+     *
+     * @example — with extra deps
      * FspiopAxiosModule.forRootAsync({
      *   imports: [ConfigModule],
-     *   useFactory: (config: ConfigService, auth: AuthService) => ({
-     *     params: { basePath: config.get('SWITCH_URL') },
-     *     interceptors: [
-     *       async (req) => {
-     *         req.headers['Authorization'] = `Bearer ${await auth.getToken()}`;
-     *         return req;
-     *       },
-     *     ],
+     *   useFactory: (config: ConfigService) => ({
+     *     params: { socketTimeoutMs: config.get('TIMEOUT') },
      *   }),
-     *   inject: [ConfigService, AuthService],
+     *   inject: [ConfigService],
      * })
      *
      * @example — named token
      * FspiopAxiosModule.forRootAsync({
-     *   imports: [ConfigModule],
-     *   useFactory: (config: ConfigService) => ({
-     *     params: { basePath: config.get('PEER_URL') },
-     *   }),
-     *   inject: [ConfigService],
+     *   useFactory: () => ({ params: { socketTimeoutMs: 30_000 } }),
      * }, 'PEER_FSP')
      */
     static forRootAsync(
@@ -81,17 +86,37 @@ export class FspiopAxiosModule {
         const provider: FactoryProvider = {
             provide: token,
             useFactory: async (...args: any[]) => {
-                const options = await asyncOptions.useFactory(...args);
-                return new FspiopAxios(options.params, options.interceptors);
+                // PrivateKeyStore and FspiopSettings are always appended last
+                const settings         = args[args.length - 1] as FspiopSettings;
+                const privateKeyStore  = args[args.length - 2] as PrivateKeyStore;
+                const userArgs         = args.slice(0, -2);
+                const options          = await asyncOptions.useFactory(...userArgs);
+                const interceptors     = FspiopAxiosModule.buildInterceptors(privateKeyStore, settings, options.interceptors);
+                return new FspiopAxios(settings, options.params, interceptors);
             },
-            inject: asyncOptions.inject ?? [],
+            inject: [...(asyncOptions.inject ?? []), PrivateKeyStore, FspiopSettings],
         };
 
         return {
             module: FspiopAxiosModule,
-            imports: asyncOptions.imports ?? [],
-            providers: [provider],
+            imports: [...(asyncOptions.imports ?? []), KeystoreModule],
+            providers: [FspiopSettings, provider],
             exports: [provider],
         };
+    }
+
+    /**
+     * Prepends FspiopSigningInterceptor when settings.signJws is true,
+     * then appends any caller-supplied interceptors.
+     */
+    private static buildInterceptors(
+        privateKeyStore: PrivateKeyStore,
+        settings: FspiopSettings,
+        userInterceptors: FspiopAxiosInterceptor[] = [],
+    ): FspiopAxiosInterceptor[] {
+        const signingInterceptors: FspiopAxiosInterceptor[] = settings.signJws
+            ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+            : [];
+        return [...signingInterceptors, ...userInterceptors];
     }
 }

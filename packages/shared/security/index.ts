@@ -1,2 +1,2 @@
 export * from './security.module';
-export * from './component/jwt/index';
+export * from './component/index';

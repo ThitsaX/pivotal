@@ -1,11 +1,14 @@
 import {Jwt} from '@shared/security/component/jwt';
+import {PrivateKey} from '@shared/security/component/key/private-key';
+import {PublicKey} from '@shared/security/component/key/public-key';
 
-type FspiopSignatureKey = Parameters<typeof Jwt.sign>[0];
+type FspiopPrivateKey = PrivateKey;
+type FspiopPublicKey = PublicKey;
 
 export class FspiopSignature {
 
     static sign(
-        privateKey: FspiopSignatureKey,
+        privateKey: FspiopPrivateKey,
         headers: Record<string, string>,
         payload: string,
     ): FspiopSignature.Header {
@@ -18,7 +21,7 @@ export class FspiopSignature {
         };
     }
 
-    static verify(publicKey: FspiopSignatureKey, token: Jwt.Token): boolean {
+    static verify(publicKey: FspiopPublicKey, token: Jwt.Token): boolean {
         return Jwt.verify(publicKey, token);
     }
 }

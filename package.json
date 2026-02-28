@@ -19,18 +19,16 @@
     "build:shared-fspiop": "nest build shared-fspiop",
     "build:shared-flyway": "nest build shared-flyway",
     "build:shared-snowflake": "nest build shared-snowflake",
-    "build:shared-keystore": "nest build shared-keystore",
     "build:shared-interledger": "nest build shared-interledger",
     "build:shared-persistence": "nest build shared-persistence",
     "build:shared-security": "nest build shared-security",
+    "test:shared-security:jwt": "node --test -r ts-node/register tests/shared/security/component/jwt/jwt-test.ts",
+    "test:shared-security": "node --test -r ts-node/register \"tests/shared/security/**/*-test.ts\"",
     "clean:fspiop-dto": "rm -rf packages/shared/fspiop/dto && mkdir -p packages/shared/fspiop/dto",
     "fix:fspiop-dto": "node scripts/fix-fspiop-dto.mjs",
     "generate:fspiop-dto:index": "node scripts/generate-fspiop-dto-index.mjs",
     "generate:fspiop-dto": "openapi-generator-cli generate --generator-key fspiop-dto && npm run fix:fspiop-dto && npm run generate:fspiop-dto:index",
-    "regenerate:fspiop-dto": "npm run clean:fspiop-dto && npm run generate:fspiop-dto",
-    "clean:fspiop-axios": "rm -rf packages/shared/fspiop/component/axios/api && rm -rf packages/shared/fspiop/component/axios/model",
-    "generate:fspiop-axios": "openapi-generator-cli generate --generator-key fspiop-axios",
-    "regenerate:fspiop-axios": "npm run clean:fspiop-axios && npm run generate:fspiop-axios"
+    "regenerate:fspiop-dto": "npm run clean:fspiop-dto && npm run generate:fspiop-dto"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

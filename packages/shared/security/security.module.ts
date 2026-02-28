@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
+import { KeystoreModule } from './component/key/keystore.module';
 
 @Module({
-  imports: [],
+  imports: [KeystoreModule],
   providers: [],
-  exports: [],
+  exports: [KeystoreModule],
 })
 export class SecurityModule {}

@@ -15,20 +15,6 @@
           "modelPackage": ".",
           "stringEnums": true
         }
-      },
-      "fspiop-axios": {
-        "generatorName": "typescript-axios",
-        "inputSpec": "packages/shared/fspiop/spec/fspiop_v2.yaml",
-        "output": "packages/shared/fspiop/component/axios",
-        "globalProperty": "apis,supportingFiles",
-        "additionalProperties": {
-          "withSeparateModelsAndApi": true,
-          "apiPackage": "api",
-          "modelPackage": "model",
-          "fileNaming": "kebab-case",
-          "stringEnums": true,
-          "useSingleRequestParameter": false
-        }
       }
     }
   }

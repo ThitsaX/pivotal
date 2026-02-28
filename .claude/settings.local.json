@@ -10,7 +10,8 @@
       "WebFetch(domain:github.com)",
       "Bash(npm run generate:fspiop-axios)",
       "Bash(grep \"^export class.*Api \" /Users/aungthawaye/Development/ThitsaWorks/mtpa/packages/shared/fspiop/axios/api/*.ts)",
-      "Bash(npm run build:shared-fspiop)"
+      "Bash(npm run build:shared-fspiop)",
+      "Bash(/Users/aungthawaye/Development/ThitsaWorks/mtpa/packages/shared/fspiop/component/axios/index.ts:*)"
     ]
   }
 }

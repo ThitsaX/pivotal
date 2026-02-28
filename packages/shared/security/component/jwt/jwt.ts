@@ -1,6 +1,10 @@
 import * as JsonWebToken from 'jsonwebtoken';
+import {PrivateKey} from '../key/private-key';
+import {PublicKey} from '../key/public-key';
 
 export class Jwt {
+
+    private static readonly INVALID_JSON_PAYLOAD_ERROR = 'JWT payload must be a valid JSON object.';
 
     private constructor() {
     }
@@ -14,18 +18,18 @@ export class Jwt {
     }
 
     static sign(
-        privateKey: JsonWebToken.Secret,
+        privateKey: PrivateKey,
         headers: Record<string, string>,
         payload: string,
     ): Jwt.Token;
     static sign(
-        privateKey: JsonWebToken.Secret,
+        privateKey: PrivateKey,
         algorithm: JsonWebToken.Algorithm,
         headers: Record<string, string>,
         payload: string,
     ): Jwt.Token;
     static sign(
-        privateKey: JsonWebToken.Secret,
+        privateKey: PrivateKey,
         algorithmOrHeaders: JsonWebToken.Algorithm | Record<string, string>,
         headersOrPayload: Record<string, string> | string,
         payloadArg?: string,
@@ -38,8 +42,9 @@ export class Jwt {
             : headersOrPayload as Record<string, string>;
 
         const payload = payloadArg == null ? headersOrPayload as string : payloadArg;
+        const parsedPayload = Jwt.parseJsonPayload(payload);
 
-        const token = JsonWebToken.sign(payload, privateKey, {
+        const signOptions: JsonWebToken.SignOptions = {
             algorithm,
             noTimestamp: true,
             header: {
@@ -47,7 +52,9 @@ export class Jwt {
                 typ: 'JWT',
                 ...headers,
             },
-        });
+        };
+
+        const token = JsonWebToken.sign(parsedPayload, Jwt.toSecret(privateKey), signOptions);
 
         const parts = token.split('.');
 
@@ -58,10 +65,10 @@ export class Jwt {
         return new Jwt.Token(parts[0], parts[1], parts[2], token);
     }
 
-    static verify(secretKey: JsonWebToken.Secret, token: string, payload: string): boolean;
-    static verify(publicKey: JsonWebToken.Secret, token: Jwt.Token): boolean;
+    static verify(privateKey: PrivateKey, token: string, payload: string): boolean;
+    static verify(publicKey: PublicKey, token: Jwt.Token): boolean;
     static verify(
-        key: JsonWebToken.Secret,
+        key: PrivateKey | PublicKey,
         tokenOrTokenObject: string | Jwt.Token,
         payload?: string,
     ): boolean {
@@ -73,18 +80,57 @@ export class Jwt {
                     return false;
                 }
 
-                const content = JsonWebToken.verify(tokenOrTokenObject, key);
+                const parsedPayload = Jwt.parseJsonPayload(payload);
+                const content = JsonWebToken.verify(tokenOrTokenObject, Jwt.toSecret(key));
 
-                return typeof content === 'string' && content === payload;
+                if (typeof content !== 'object' || content == null || Array.isArray(content)) {
+                    return false;
+                }
+
+                return Jwt.toCanonicalJson(content) === Jwt.toCanonicalJson(parsedPayload);
             }
 
-            JsonWebToken.verify(tokenOrTokenObject.full, key);
+            JsonWebToken.verify(tokenOrTokenObject.full, Jwt.toSecret(key));
 
             return true;
 
         } catch {
             return false;
         }
+    }
+
+    private static toSecret(key: PrivateKey | PublicKey): JsonWebToken.Secret {
+        return key.toBuffer();
+    }
+
+    private static parseJsonPayload(payload: string): Record<string, unknown> {
+        try {
+            const parsed = JSON.parse(payload) as unknown;
+
+            if (typeof parsed !== 'object' || parsed == null || Array.isArray(parsed)) {
+                throw new Error(Jwt.INVALID_JSON_PAYLOAD_ERROR);
+            }
+
+            return parsed as Record<string, unknown>;
+        } catch {
+            throw new Error(Jwt.INVALID_JSON_PAYLOAD_ERROR);
+        }
+    }
+
+    private static toCanonicalJson(value: unknown): string {
+        if (Array.isArray(value)) {
+            return `[${value.map((item) => Jwt.toCanonicalJson(item)).join(',')}]`;
+        }
+
+        if (typeof value === 'object' && value != null) {
+            const entries = Object.entries(value as Record<string, unknown>)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, item]) => `${JSON.stringify(key)}:${Jwt.toCanonicalJson(item)}`);
+
+            return `{${entries.join(',')}}`;
+        }
+
+        return JSON.stringify(value);
     }
 }
 

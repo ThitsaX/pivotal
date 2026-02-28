@@ -122,15 +122,6 @@
         "tsConfigPath": "packages/shared/snowflake/tsconfig.app.json"
       }
     },
-    "shared-keystore": {
-      "type": "library",
-      "root": "packages/shared/keystore",
-      "entryFile": "index",
-      "sourceRoot": "packages/shared/keystore",
-      "compilerOptions": {
-        "tsConfigPath": "packages/shared/keystore/tsconfig.app.json"
-      }
-    },
     "shared-interledger": {
       "type": "library",
       "root": "packages/shared/interledger",

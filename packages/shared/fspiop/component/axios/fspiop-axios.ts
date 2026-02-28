@@ -1,30 +1,29 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { Configuration } from './configuration';
-import { AuthorizationsApi } from './api/authorizations-api';
-import { BulkQuotesApi } from './api/bulk-quotes-api';
-import { BulkTransfersApi } from './api/bulk-transfers-api';
-import { FxQuotesApi } from './api/fx-quotes-api';
-import { FxTransfersApi } from './api/fx-transfers-api';
-import { ParticipantsApi } from './api/participants-api';
-import { PartiesApi } from './api/parties-api';
-import { QuotesApi } from './api/quotes-api';
-import { ServicesFXPApi } from './api/services-fxpapi';
-import { TransactionRequestsApi } from './api/transaction-requests-api';
-import { TransactionsApi } from './api/transactions-api';
-import { TransfersApi } from './api/transfers-api';
-import { FspiopHeadersMap } from '../fspiop-headers';
-import { ErrorInformationResponse } from '../../dto/error-information-response';
+import * as http from 'http';
+import * as https from 'https';
+import axios, {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
+import {FspiopHeadersMap} from '../fspiop-headers';
+import {FspiopSettings} from '../fspiop-settings';
+import {
+    ErrorInformationObject,
+    FxQuotesIDPutResponse,
+    FxQuotesPostRequest,
+    FxTransfersIDPatchResponse,
+    FxTransfersIDPutResponse,
+    FxTransfersPostRequest,
+    PartiesTypeIDPutResponse,
+    PartyIdType,
+    QuotesIDPutResponse,
+    QuotesPostRequest,
+    TransfersIDPatchResponse,
+    TransfersIDPutResponse,
+    TransfersPostRequest,
+} from '../../dto';
 
-/**
- * Connection parameters for FspiopAxios.
- * Auth values (apiKey, token, etc.) are intentionally excluded — inject them
- * dynamically at call time via FspiopAxiosInterceptor instead.
- */
 export interface FspiopAxiosParams {
-    basePath?: string;
-    serverIndex?: number;
-    baseOptions?: any;
-    formDataCtor?: new () => any;
+    /** Timeout (ms) waiting for response data after the connection is established. */
+    socketTimeoutMs?: number;
+    /** Timeout (ms) to establish the TCP connection. */
+    connectionTimeoutMs?: number;
 }
 
 /**
@@ -37,12 +36,6 @@ export interface FspiopAxiosParams {
  *   config.headers['Authorization'] = `Bearer ${await tokenService.getToken()}`;
  *   return config;
  * };
- *
- * @example — add a request signature
- * const interceptor: FspiopAxiosInterceptor = (config) => {
- *   config.headers['X-Signature'] = sign(config);
- *   return config;
- * };
  */
 export type FspiopAxiosInterceptor = (
     config: InternalAxiosRequestConfig,
@@ -51,7 +44,7 @@ export type FspiopAxiosInterceptor = (
 export class FspiopAxiosError extends Error {
     constructor(
         public readonly status: number,
-        public readonly errorInformation: ErrorInformationResponse,
+        public readonly errorInformation: ErrorInformationObject,
     ) {
         const desc = errorInformation.errorInformation?.errorDescription ?? 'unknown';
         const code = errorInformation.errorInformation?.errorCode ?? '0000';
@@ -65,66 +58,147 @@ export class FspiopAxiosError extends Error {
 }
 
 export class FspiopAxios {
-    readonly authorizations: AuthorizationsApi;
-    readonly bulkQuotes: BulkQuotesApi;
-    readonly bulkTransfers: BulkTransfersApi;
-    readonly fxQuotes: FxQuotesApi;
-    readonly fxTransfers: FxTransfersApi;
-    readonly participants: ParticipantsApi;
-    readonly parties: PartiesApi;
-    readonly quotes: QuotesApi;
-    readonly servicesFxp: ServicesFXPApi;
-    readonly transactionRequests: TransactionRequestsApi;
-    readonly transactions: TransactionsApi;
-    readonly transfers: TransfersApi;
 
+    readonly settings: FspiopSettings;
+
+    private readonly client: AxiosInstance;
     private readonly params: FspiopAxiosParams;
     private readonly interceptors: FspiopAxiosInterceptor[];
+    private readonly defaultHeaders: FspiopHeadersMap;
 
     constructor(
+        settings: FspiopSettings,
         params: FspiopAxiosParams = {},
         interceptors: FspiopAxiosInterceptor[] = [],
         headers: FspiopHeadersMap = {},
+        client?: AxiosInstance,
     ) {
+        this.settings = settings;
         this.params = params;
         this.interceptors = interceptors;
-
-        const axiosInstance = FspiopAxios.createAxiosInstance(interceptors);
-        const config = FspiopAxios.createConfig(params, headers);
-
-        this.authorizations = new AuthorizationsApi(config, undefined, axiosInstance);
-        this.bulkQuotes = new BulkQuotesApi(config, undefined, axiosInstance);
-        this.bulkTransfers = new BulkTransfersApi(config, undefined, axiosInstance);
-        this.fxQuotes = new FxQuotesApi(config, undefined, axiosInstance);
-        this.fxTransfers = new FxTransfersApi(config, undefined, axiosInstance);
-        this.participants = new ParticipantsApi(config, undefined, axiosInstance);
-        this.parties = new PartiesApi(config, undefined, axiosInstance);
-        this.quotes = new QuotesApi(config, undefined, axiosInstance);
-        this.servicesFxp = new ServicesFXPApi(config, undefined, axiosInstance);
-        this.transactionRequests = new TransactionRequestsApi(config, undefined, axiosInstance);
-        this.transactions = new TransactionsApi(config, undefined, axiosInstance);
-        this.transfers = new TransfersApi(config, undefined, axiosInstance);
+        this.defaultHeaders = headers;
+        this.client = client ?? FspiopAxios.buildClient(params, interceptors);
     }
 
     withHeaders(headers: FspiopHeadersMap): FspiopAxios {
-        return new FspiopAxios(this.params, this.interceptors, headers);
+        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, this.client);
     }
 
-    private static createConfig(params: FspiopAxiosParams, headers: FspiopHeadersMap): Configuration {
-        return new Configuration({
-            ...params,
-            baseOptions: {
-                ...params.baseOptions,
-                headers: {
-                    ...params.baseOptions?.headers,
-                    ...headers,
-                },
-            },
+    // ─── Parties ────────────────────────────────────────────────────────────────
+
+    async getParties(baseUrl: string, type: PartyIdType, id: string, subId?: string): Promise<void> {
+        const url = subId
+            ? `${baseUrl}/parties/${type}/${id}/${subId}`
+            : `${baseUrl}/parties/${type}/${id}`;
+        await this.get(url);
+    }
+
+    async putParties(baseUrl: string, type: PartyIdType, id: string, body: PartiesTypeIDPutResponse, subId?: string): Promise<void> {
+        const url = subId
+            ? `${baseUrl}/parties/${type}/${id}/${subId}`
+            : `${baseUrl}/parties/${type}/${id}`;
+        await this.put(url, body);
+    }
+
+    async putPartiesError(baseUrl: string, type: PartyIdType, id: string, body: ErrorInformationObject, subId?: string): Promise<void> {
+        const url = subId
+            ? `${baseUrl}/parties/${type}/${id}/${subId}/error`
+            : `${baseUrl}/parties/${type}/${id}/error`;
+        await this.put(url, body);
+    }
+
+    // ─── Quotes ─────────────────────────────────────────────────────────────────
+
+    async postQuotes(baseUrl: string, body: QuotesPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/quotes`, body);
+    }
+
+    async putQuotes(baseUrl: string, id: string, body: QuotesIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/quotes/${id}`, body);
+    }
+
+    async putQuotesError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
+        await this.put(`${baseUrl}/quotes/${id}/error`, body);
+    }
+
+    // ─── Transfers ──────────────────────────────────────────────────────────────
+
+    async postTransfers(baseUrl: string, body: TransfersPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/transfers`, body);
+    }
+
+    async putTransfers(baseUrl: string, id: string, body: TransfersIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/transfers/${id}`, body);
+    }
+
+    async patchTransfers(baseUrl: string, id: string, body: TransfersIDPatchResponse): Promise<void> {
+        await this.patch(`${baseUrl}/transfers/${id}`, body);
+    }
+
+    async putTransfersError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
+        await this.put(`${baseUrl}/transfers/${id}/error`, body);
+    }
+
+    // ─── FX Quotes ──────────────────────────────────────────────────────────────
+
+    async postFxQuotes(baseUrl: string, body: FxQuotesPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/fxQuotes`, body);
+    }
+
+    async putFxQuotes(baseUrl: string, id: string, body: FxQuotesIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxQuotes/${id}`, body);
+    }
+
+    async putFxQuotesError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
+        await this.put(`${baseUrl}/fxQuotes/${id}/error`, body);
+    }
+
+    // ─── FX Transfers ───────────────────────────────────────────────────────────
+
+    async postFxTransfers(baseUrl: string, body: FxTransfersPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/fxTransfers`, body);
+    }
+
+    async putFxTransfers(baseUrl: string, id: string, body: FxTransfersIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxTransfers/${id}`, body);
+    }
+
+    async patchFxTransfers(baseUrl: string, id: string, body: FxTransfersIDPatchResponse): Promise<void> {
+        await this.patch(`${baseUrl}/fxTransfers/${id}`, body);
+    }
+
+    async putFxTransfersError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
+        await this.put(`${baseUrl}/fxTransfers/${id}/error`, body);
+    }
+
+    // ─── Internal ───────────────────────────────────────────────────────────────
+
+    private async get(url: string): Promise<void> {
+        await this.client.get(url, {headers: this.defaultHeaders});
+    }
+
+    private async post(url: string, body: unknown): Promise<void> {
+        await this.client.post(url, body, {headers: this.defaultHeaders});
+    }
+
+    private async put(url: string, body: unknown): Promise<void> {
+        await this.client.put(url, body, {headers: this.defaultHeaders});
+    }
+
+    private async patch(url: string, body: unknown): Promise<void> {
+        await this.client.patch(url, body, {headers: this.defaultHeaders});
+    }
+
+    private static buildClient(params: FspiopAxiosParams, interceptors: FspiopAxiosInterceptor[]): AxiosInstance {
+        const instance = axios.create({
+            timeout: params.socketTimeoutMs,
+            httpAgent: params.connectionTimeoutMs
+                ? new http.Agent({timeout: params.connectionTimeoutMs})
+                : undefined,
+            httpsAgent: params.connectionTimeoutMs
+                ? new https.Agent({timeout: params.connectionTimeoutMs})
+                : undefined,
         });
-    }
-
-    private static createAxiosInstance(interceptors: FspiopAxiosInterceptor[]): AxiosInstance {
-        const instance = axios.create();
 
         for (const interceptor of interceptors) {
             instance.interceptors.request.use(interceptor);
@@ -136,7 +210,7 @@ export class FspiopAxios {
                 if (error.response) {
                     throw new FspiopAxiosError(
                         error.response.status,
-                        error.response.data as ErrorInformationResponse,
+                        error.response.data as ErrorInformationObject,
                     );
                 }
                 throw error;
