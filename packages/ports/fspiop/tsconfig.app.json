@@ -1,7 +1,7 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../../dist/usecase/audit"
+    "outDir": "../../../dist/ports/fspiop"
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]

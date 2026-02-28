@@ -8,10 +8,15 @@ import {Column, Entity, Index, PrimaryGeneratedColumn} from 'typeorm';
 @Index('outbound_parties_04_idx', ['createdAt'])
 @Index('outbound_parties_05_idx', ['completedAt'])
 @Index('outbound_parties_06_idx', ['payerFsp', 'payeeFsp'])
+@Index('outbound_parties_07_idx', ['rail'])
+@Index('outbound_parties_08_idx', ['failed'])
 export class OutboundParties {
 
     @PrimaryGeneratedColumn({type: 'bigint', name: 'id'})
     public id: string;
+
+    @Column({type: 'varchar', length: 32, name: 'rail'})
+    public rail: string;
 
     @Column({type: 'varchar', length: 32, name: 'payer_fsp'})
     public payerFsp: string;
@@ -20,7 +25,7 @@ export class OutboundParties {
     public payeeFsp: string;
 
     @Column({type: 'bigint', name: 'correlation_id'})
-    public correlationId: number;
+    public correlationId: bigint;
 
     @Column({type: 'varchar', length: 32, name: 'party_id_type'})
     public partyIdType: PartyIdType;
@@ -37,6 +42,9 @@ export class OutboundParties {
     @Column({type: 'jsonb', name: 'error', nullable: true})
     public error: ErrorInformationObject | null;
 
+    @Column({type: 'boolean', name: 'failed', default: false})
+    public failed: boolean = false;
+
     @Column({type: 'timestamptz', name: 'created_at'})
     public createdAt: Date;
 
@@ -46,24 +54,24 @@ export class OutboundParties {
     constructor(
         payerFsp: string,
         payeeFsp: string,
-        correlationId: number,
+        correlationId: bigint,
         partyIdType: PartyIdType,
         partyId: string,
-        subId?: string,
-        response?: PartiesTypeIDPutResponse | null,
+        subId?: string
     ) {
 
+        this.payerFsp = payerFsp;
+        this.payeeFsp = payeeFsp;
         this.correlationId = correlationId;
         this.partyIdType = partyIdType;
         this.partyId = partyId;
         this.subId = subId ?? null;
-        this.response = response ?? null;
         this.createdAt = new Date();
     }
 
     public complete(response: PartiesTypeIDPutResponse | null): void {
 
-        this.response = response;
+        this.response = response ?? null;
         this.completedAt = new Date();
         this.error = null;
     }
@@ -73,5 +81,6 @@ export class OutboundParties {
         this.error = error;
         this.completedAt = new Date();
         this.response = null;
+        this.failed = true;
     }
 }

@@ -68,31 +68,22 @@
         "tsConfigPath": "packages/core/audit/publisher/tsconfig.app.json"
       }
     },
-    "usecase-inbound": {
-      "type": "library",
-      "root": "packages/usecase/inbound",
-      "entryFile": "index",
-      "sourceRoot": "packages/usecase/inbound",
+    "ports-fspiop": {
+      "type": "application",
+      "root": "packages/ports/fspiop",
+      "entryFile": "main",
+      "sourceRoot": "packages/ports/fspiop",
       "compilerOptions": {
-        "tsConfigPath": "packages/usecase/inbound/tsconfig.app.json"
+        "tsConfigPath": "packages/ports/fspiop/tsconfig.app.json"
       }
     },
-    "usecase-outbound": {
-      "type": "library",
-      "root": "packages/usecase/outbound",
-      "entryFile": "index",
-      "sourceRoot": "packages/usecase/outbound",
+    "ports-iso20022": {
+      "type": "application",
+      "root": "packages/ports/iso20022",
+      "entryFile": "main",
+      "sourceRoot": "packages/ports/iso20022",
       "compilerOptions": {
-        "tsConfigPath": "packages/usecase/outbound/tsconfig.app.json"
-      }
-    },
-    "usecase-audit": {
-      "type": "library",
-      "root": "packages/usecase/audit",
-      "entryFile": "index",
-      "sourceRoot": "packages/usecase/audit",
-      "compilerOptions": {
-        "tsConfigPath": "packages/usecase/audit/tsconfig.app.json"
+        "tsConfigPath": "packages/ports/iso20022/tsconfig.app.json"
       }
     },
     "shared-fspiop": {

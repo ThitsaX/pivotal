@@ -1,35 +1,37 @@
 import {TypeOrmModule, TypeOrmModuleOptions} from '@nestjs/typeorm';
 
-export enum MtpaDbTarget {
+export enum DbTarget {
     Read = 'read',
     Write = 'write',
 }
 
-type MtpaEntities = NonNullable<TypeOrmModuleOptions['entities']>;
+type DomainEntities = NonNullable<TypeOrmModuleOptions['entities']>;
 
 export class PersistenceConfigurer {
 
-    static createWriteTypeOrmOptions(entities: MtpaEntities): TypeOrmModuleOptions {
+    static createWriteTypeOrmOptions(entities: DomainEntities): TypeOrmModuleOptions {
         return {
             type: 'postgres',
-            host: process.env.MTPA_DB_WRITE_HOST ?? 'localhost',
-            port: Number(process.env.MTPA_DB_WRITE_PORT ?? '5432'),
-            username: process.env.MTPA_DB_WRITE_USERNAME ?? 'postgres',
-            password: process.env.MTPA_DB_WRITE_PASSWORD ?? 'postgres',
-            database: process.env.MTPA_DB_WRITE_NAME ?? 'mtpa_audit',
+            host: process.env.DB_WRITE_HOST ?? 'localhost',
+            port: Number(process.env.DB_WRITE_PORT ?? '5432'),
+            username: process.env.DB_WRITE_USERNAME ?? 'postgres',
+            password: process.env.DB_WRITE_PASSWORD ?? 'postgres',
+            database: process.env.DB_WRITE_NAME ?? 'audit',
+            schema: process.env.DB_WRITE_SCHEMA ?? 'public',
             entities,
             synchronize: false,
         };
     }
 
-    static createReadTypeOrmOptions(entities: MtpaEntities): TypeOrmModuleOptions {
+    static createReadTypeOrmOptions(entities: DomainEntities): TypeOrmModuleOptions {
         return {
             type: 'postgres',
-            host: process.env.MTPA_DB_READ_HOST ?? process.env.MTPA_DB_WRITE_HOST ?? 'localhost',
-            port: Number(process.env.MTPA_DB_READ_PORT ?? process.env.MTPA_DB_WRITE_PORT ?? '5432'),
-            username: process.env.MTPA_DB_READ_USERNAME ?? process.env.MTPA_DB_WRITE_USERNAME ?? 'postgres',
-            password: process.env.MTPA_DB_READ_PASSWORD ?? process.env.MTPA_DB_WRITE_PASSWORD ?? 'postgres',
-            database: process.env.MTPA_DB_READ_NAME ?? process.env.MTPA_DB_WRITE_NAME ?? 'mtpa_audit',
+            host: process.env.DB_READ_HOST ?? process.env.DB_WRITE_HOST ?? 'localhost',
+            port: Number(process.env.DB_READ_PORT ?? process.env.DB_WRITE_PORT ?? '5432'),
+            username: process.env.DB_READ_USERNAME ?? process.env.DB_WRITE_USERNAME ?? 'postgres',
+            password: process.env.DB_READ_PASSWORD ?? process.env.DB_WRITE_PASSWORD ?? 'postgres',
+            database: process.env.DB_READ_NAME ?? process.env.DB_WRITE_NAME ?? 'audit',
+            schema: process.env.DB_READ_SCHEMA ?? process.env.DB_WRITE_SCHEMA ?? 'public',
             entities,
             synchronize: false,
         };
@@ -38,7 +40,7 @@ export class PersistenceConfigurer {
     static createTypeOrmRootModules(
         writeConnectionName: string,
         readConnectionName: string,
-        entities: MtpaEntities,
+        entities: DomainEntities,
     ) {
         return [
             TypeOrmModule.forRootAsync({

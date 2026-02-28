@@ -1,5 +1,6 @@
-import { Money } from '../dto/money';
-import { FspiopCurrencies } from '../component/fspiop-currencies';
+import {Money} from '../dto/money';
+import {FspiopCurrencies} from '../component/fspiop-currencies';
+import {FspiopErrors, FspiopException} from "@shared/fspiop";
 
 export enum FspiopRoundingMode {
     Up = 'UP',
@@ -76,7 +77,7 @@ export class FspiopMoney {
         const submittedScale = FspiopMoney.scaleOf(money.amount);
 
         if (submittedScale > currencyProfile.scale) {
-            throw new Error(
+            throw new FspiopException(FspiopErrors.GENERIC_VALIDATION_ERROR,
                 `Currency scale does not match. ${money.currency} supports only ${currencyProfile.scale} decimal places.`,
             );
         }
