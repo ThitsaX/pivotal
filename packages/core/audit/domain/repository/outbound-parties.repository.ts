@@ -25,7 +25,7 @@ export class OutboundPartiesRepository {
     }
 
     async findByCorrelationId(
-        correlationId: number,
+        correlationId: bigint,
         target: DbTarget = DbTarget.Read,
     ): Promise<OutboundParties[]> {
         return this.getRepository(target).find({where: {correlationId}});

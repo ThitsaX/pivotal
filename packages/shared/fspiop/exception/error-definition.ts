@@ -1,5 +1,6 @@
 import { ErrorInformationObject } from '@shared/fspiop';
 import { FspiopErrorType } from '@shared/fspiop';
+import { ExtensionList } from '../dto/extension-list';
 
 export class ErrorDefinition {
 
@@ -12,12 +13,24 @@ export class ErrorDefinition {
         this.description = description;
     }
 
-    toErrorObject(): ErrorInformationObject {
+    toErrorObject(extensionList?: ExtensionList): ErrorInformationObject {
+
+        const errorInformation = {
+            errorCode: this.errorType.code,
+            errorDescription: this.description,
+        };
+
+        if (extensionList != null) {
+            return {
+                errorInformation: {
+                    ...errorInformation,
+                    extensionList,
+                },
+            };
+        }
+
         return {
-            errorInformation: {
-                errorCode: this.errorType.code,
-                errorDescription: this.description,
-            },
+            errorInformation,
         };
     }
 }

@@ -4,7 +4,7 @@ import axios, {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axio
 import {FspiopHeadersMap} from '../fspiop-headers';
 import {FspiopSettings} from '../fspiop-settings';
 import {
-    ErrorInformationObject,
+    ErrorInformationObject, ErrorInformationResponse,
     FxQuotesIDPutResponse,
     FxQuotesPostRequest,
     FxTransfersIDPatchResponse,
@@ -44,10 +44,10 @@ export type FspiopAxiosInterceptor = (
 export class FspiopAxiosError extends Error {
     constructor(
         public readonly status: number,
-        public readonly errorInformation: ErrorInformationObject,
+        public readonly errorInformationResponse: ErrorInformationResponse,
     ) {
-        const desc = errorInformation.errorInformation?.errorDescription ?? 'unknown';
-        const code = errorInformation.errorInformation?.errorCode ?? '0000';
+        const desc = errorInformationResponse.errorInformation?.errorDescription ?? 'unknown';
+        const code = errorInformationResponse.errorInformation?.errorCode ?? '0000';
         super(`FSPIOP error [${status}] ${code}: ${desc}`);
         this.name = 'FspiopAxiosError';
     }
