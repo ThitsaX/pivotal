@@ -2,7 +2,7 @@ import { DynamicModule, FactoryProvider, Module, ModuleMetadata } from '@nestjs/
 import { FspiopAxios, FspiopAxiosInterceptor, FspiopAxiosParams } from './fspiop-axios';
 import { FspiopSigningInterceptor } from './interceptor';
 import { FspiopSettings } from '../fspiop-settings';
-import { KeystoreModule, PrivateKeyStore } from '@shared/security/component/key';
+import { KeyStoreModule, PrivateKeyStore } from '@shared/security/component/key';
 
 export type FspiopAxiosToken = string | symbol | typeof FspiopAxios;
 
@@ -47,7 +47,7 @@ export class FspiopAxiosModule {
 
         return {
             module: FspiopAxiosModule,
-            imports: [KeystoreModule],
+            imports: [KeyStoreModule],
             providers: [FspiopSettings, provider],
             exports: [provider],
         };
@@ -99,7 +99,7 @@ export class FspiopAxiosModule {
 
         return {
             module: FspiopAxiosModule,
-            imports: [...(asyncOptions.imports ?? []), KeystoreModule],
+            imports: [...(asyncOptions.imports ?? []), KeyStoreModule],
             providers: [FspiopSettings, provider],
             exports: [provider],
         };

@@ -1,30 +1,16 @@
-import {Injectable, Optional} from '@nestjs/common';
+import {Injectable} from '@nestjs/common';
 import {PrivateKey} from '../private-key';
 import {PrivateKeyLoader} from '../private-key-loader';
-
-type JsonPrivateKeySource = Record<string, string> | string | null | undefined;
 
 @Injectable()
 export class JsonBasedPrivateKeyLoader extends PrivateKeyLoader {
 
-    private readonly source: JsonPrivateKeySource;
-
-    constructor(source: JsonPrivateKeySource) {
-        super();
-        this.source = source;
-    }
-
-    static fromObject(source: Record<string, string>): JsonBasedPrivateKeyLoader {
-        return new JsonBasedPrivateKeyLoader(source);
-    }
-
-    static fromJson(source: string): JsonBasedPrivateKeyLoader {
-        return new JsonBasedPrivateKeyLoader(source);
-    }
+    private static readonly ENV_JSON_PRIVATE_KEYS = 'JSON_PRIVATE_KEYS';
 
     load(): Map<string, PrivateKey> {
         const keysByFspId = new Map<string, PrivateKey>();
-        const sourceObject = this.resolveSourceObject(this.source);
+        const raw = process.env[JsonBasedPrivateKeyLoader.ENV_JSON_PRIVATE_KEYS];
+        const sourceObject = this.resolveSourceObject(raw);
 
         for (const [fspId, privateKeyValue] of Object.entries(sourceObject)) {
             const normalizedFspId = fspId.trim();
@@ -45,21 +31,17 @@ export class JsonBasedPrivateKeyLoader extends PrivateKeyLoader {
         return keysByFspId;
     }
 
-    private resolveSourceObject(source: JsonPrivateKeySource): Record<string, string> {
-        if (source == null) {
+    private resolveSourceObject(source: string | null | undefined): Record<string, string> {
+        if (source == null || source.trim().length === 0) {
             return {};
         }
 
-        if (typeof source === 'string') {
-            const parsed = JSON.parse(source) as unknown;
+        const parsed = JSON.parse(source) as unknown;
 
-            if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
-                throw new Error('JSON private key source must be an object.');
-            }
-
-            return parsed as Record<string, string>;
+        if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
+            throw new Error('JSON_PRIVATE_KEYS must be a JSON object.');
         }
 
-        return source;
+        return parsed as Record<string, string>;
     }
 }

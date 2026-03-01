@@ -1,30 +1,16 @@
-import { Injectable, Optional } from '@nestjs/common';
-import { PublicKey } from '../public-key';
-import { PublicKeyLoader } from '../public-key-loader';
-
-type JsonPublicKeySource = Record<string, string> | string | null | undefined;
+import {Injectable} from '@nestjs/common';
+import {PublicKey} from '../public-key';
+import {PublicKeyLoader} from '../public-key-loader';
 
 @Injectable()
 export class JsonBasedPublicKeyLoader extends PublicKeyLoader {
 
-    private readonly source: JsonPublicKeySource;
-
-    constructor(source: JsonPublicKeySource) {
-        super();
-        this.source = source;
-    }
-
-    static fromObject(source: Record<string, string>): JsonBasedPublicKeyLoader {
-        return new JsonBasedPublicKeyLoader(source);
-    }
-
-    static fromJson(source: string): JsonBasedPublicKeyLoader {
-        return new JsonBasedPublicKeyLoader(source);
-    }
+    private static readonly ENV_JSON_PUBLIC_KEYS = 'JSON_PUBLIC_KEYS';
 
     load(): Map<string, PublicKey> {
         const keysByFspId = new Map<string, PublicKey>();
-        const sourceObject = this.resolveSourceObject(this.source);
+        const raw = process.env[JsonBasedPublicKeyLoader.ENV_JSON_PUBLIC_KEYS];
+        const sourceObject = this.resolveSourceObject(raw);
 
         for (const [fspId, publicKeyValue] of Object.entries(sourceObject)) {
             const normalizedFspId = fspId.trim();
@@ -45,21 +31,17 @@ export class JsonBasedPublicKeyLoader extends PublicKeyLoader {
         return keysByFspId;
     }
 
-    private resolveSourceObject(source: JsonPublicKeySource): Record<string, string> {
-        if (source == null) {
+    private resolveSourceObject(source: string | null | undefined): Record<string, string> {
+        if (source == null || source.trim().length === 0) {
             return {};
         }
 
-        if (typeof source === 'string') {
-            const parsed = JSON.parse(source) as unknown;
+        const parsed = JSON.parse(source) as unknown;
 
-            if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
-                throw new Error('JSON public key source must be an object.');
-            }
-
-            return parsed as Record<string, string>;
+        if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
+            throw new Error('JSON_PUBLIC_KEYS must be a JSON object.');
         }
 
-        return source;
+        return parsed as Record<string, string>;
     }
 }
