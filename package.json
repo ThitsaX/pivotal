@@ -21,7 +21,7 @@
     "build:shared-interledger": "nest build shared-interledger",
     "build:shared-persistence": "nest build shared-persistence",
     "build:shared-security": "nest build shared-security",
-    "test:core-audit-domain:command": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/audit/domain/command/**/*-test.ts\"",
+    "test:core-audit-domain:command": "node --test -r ts-node/register -r tsconfig-paths/register -r ./tests/core/audit/domain/command/env-setup.ts \"tests/core/audit/domain/command/**/*-test.ts\"",
     "test:shared-security:jwt": "node --test -r ts-node/register tests/shared/security/component/jwt/jwt-test.ts",
     "test:shared-security": "node --test -r ts-node/register \"tests/shared/security/**/*-test.ts\"",
     "clean:fspiop-dto": "rm -rf packages/shared/fspiop/dto && mkdir -p packages/shared/fspiop/dto",

@@ -1,21 +1,21 @@
-import {PartyIdType} from '@shared/fspiop';
+import {QuotesPostRequest} from '@shared/fspiop';
 
-export class InitiateOutboundPartiesCommand {
-    constructor(public readonly input: InitiateOutboundPartiesCommand.Input) {
+export class InitiateInboundQuotesCommand {
+    constructor(public readonly input: InitiateInboundQuotesCommand.Input) {
     }
 }
 
-export namespace InitiateOutboundPartiesCommand {
+export namespace InitiateInboundQuotesCommand {
 
     export class Input {
         constructor(
+            public readonly id: string,
             public readonly rail: string,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly correlationId: bigint,
-            public readonly partyIdType: PartyIdType,
-            public readonly partyId: string,
-            public readonly subId?: string,
+            public readonly quoteId: string,
+            public readonly request: QuotesPostRequest,
         ) {
         }
     }
