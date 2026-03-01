@@ -1,1 +1,1 @@
-export * from './flyway-migration';
+export * from './pg-flyway-migration';
