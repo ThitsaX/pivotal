@@ -11,6 +11,7 @@ export namespace DoLookupCommand {
         constructor(
             public readonly correlationId: string,
             public readonly source: string,
+            public readonly destination: string,
             public readonly type: PartyIdType,
             public readonly id: string,
             public readonly subId?: string,
