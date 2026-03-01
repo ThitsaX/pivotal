@@ -4,7 +4,7 @@ import {
     PersistenceConfigurer,
     PersistenceModule,
 } from '@shared/persistence';
-import {OutboundParties} from './model';
+import {OutboundParties, OutboundQuotes, OutboundTransfers} from './model';
 import {MTPA_DB_READ_CONNECTION_NAME, MTPA_DB_WRITE_CONNECTION_NAME, OutboundPartiesRepository} from './repository';
 
 @Module({
@@ -13,10 +13,10 @@ import {MTPA_DB_READ_CONNECTION_NAME, MTPA_DB_WRITE_CONNECTION_NAME, OutboundPar
         ...PersistenceConfigurer.createTypeOrmRootModules(
             MTPA_DB_WRITE_CONNECTION_NAME,
             MTPA_DB_READ_CONNECTION_NAME,
-            [OutboundParties],
+            [OutboundParties, OutboundQuotes, OutboundTransfers],
         ),
-        TypeOrmModule.forFeature([OutboundParties], MTPA_DB_WRITE_CONNECTION_NAME),
-        TypeOrmModule.forFeature([OutboundParties], MTPA_DB_READ_CONNECTION_NAME),
+        TypeOrmModule.forFeature([OutboundParties, OutboundQuotes, OutboundTransfers], MTPA_DB_WRITE_CONNECTION_NAME),
+        TypeOrmModule.forFeature([OutboundParties, OutboundQuotes, OutboundTransfers], MTPA_DB_READ_CONNECTION_NAME),
     ],
     providers: [OutboundPartiesRepository],
     exports: [TypeOrmModule, OutboundPartiesRepository],

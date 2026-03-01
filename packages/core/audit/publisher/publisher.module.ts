@@ -1,12 +1,18 @@
-import { Module } from '@nestjs/common';
-import { NatsModule } from '@shared/nats';
-import { OutboundPartiesAuditPublisher } from './component';
+import {Module} from '@nestjs/common';
+import {NATS_URL, NatsClientService} from '@shared/nats';
+import {OutboundPartiesAuditPublisher} from './component';
 
 const Publishers = [OutboundPartiesAuditPublisher];
 
 @Module({
-  imports: [NatsModule],
-  providers: [...Publishers],
-  exports: [...Publishers],
+    providers: [
+        {
+            provide: NATS_URL,
+            useFactory: (): string => process.env['NATS_URL'] ?? 'nats://localhost:4222',
+        },
+        NatsClientService,
+        ...Publishers,
+    ],
+    exports: [...Publishers],
 })
 export class AuditPublisherModule {}

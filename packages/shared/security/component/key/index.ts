@@ -1,4 +1,3 @@
-export * from './key-store.module';
 export * from './loader/index';
 export * from './private-key-loader';
 export * from './public-key-loader';

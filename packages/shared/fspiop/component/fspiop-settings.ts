@@ -1,36 +1,32 @@
 import {Injectable} from '@nestjs/common';
 
 /**
- * FSPIOP runtime settings resolved from environment variables.
+ * FSPIOP runtime settings.
  *
- * | Property       | Env variable              | Default |
- * |----------------|---------------------------|---------|
- * | switchBaseUrl  | FSPIOP_SWITCH_BASE_URL    | ''      |
- * | switchId       | FSPIOP_SWITCH_ID          | ''      |
- * | signJws        | FSPIOP_SIGN_JWS           | false   |
- * | verifyJws      | FSPIOP_VERIFY_JWS         | false   |
- * | mutualTls      | FSPIOP_MUTUAL_TLS         | false   |
+ * Plain value holder — the consumer is responsible for constructing it
+ * with values from any source (env, config service, database, etc.) and
+ * registering it as a NestJS provider.
+ *
+ * @example — env-based provider in a consumer module
+ * {
+ *   provide: FspiopSettings,
+ *   useFactory: () => new FspiopSettings(
+ *     process.env['FSPIOP_SWITCH_BASE_URL'] ?? '',
+ *     process.env['FSPIOP_SWITCH_ID']       ?? '',
+ *     process.env['FSPIOP_SIGN_JWS']        === 'true',
+ *     process.env['FSPIOP_VERIFY_JWS']      === 'true',
+ *     process.env['FSPIOP_MUTUAL_TLS']      === 'true',
+ *   ),
+ * }
  */
 @Injectable()
 export class FspiopSettings {
-
-    readonly switchBaseUrl: string;
-    readonly switchId: string;
-    readonly signJws: boolean;
-    readonly verifyJws: boolean;
-    readonly mutualTls: boolean;
-
-    constructor() {
-        this.switchBaseUrl = process.env[FspiopSettings.ENV_SWITCH_BASE_URL] ?? '';
-        this.switchId = process.env[FspiopSettings.ENV_SWITCH_ID] ?? '';
-        this.signJws = process.env[FspiopSettings.ENV_SIGN_JWS] === 'true';
-        this.verifyJws = process.env[FspiopSettings.ENV_VERIFY_JWS] === 'true';
-        this.mutualTls = process.env[FspiopSettings.ENV_MUTUAL_TLS] === 'true';
+    constructor(
+        public readonly switchBaseUrl: string,
+        public readonly switchId: string,
+        public readonly signJws: boolean,
+        public readonly verifyJws: boolean,
+        public readonly mutualTls: boolean,
+    ) {
     }
-
-    private static readonly ENV_SWITCH_BASE_URL = 'FSPIOP_SWITCH_BASE_URL';
-    private static readonly ENV_SWITCH_ID = 'FSPIOP_SWITCH_ID';
-    private static readonly ENV_SIGN_JWS = 'FSPIOP_SIGN_JWS';
-    private static readonly ENV_VERIFY_JWS = 'FSPIOP_VERIFY_JWS';
-    private static readonly ENV_MUTUAL_TLS = 'FSPIOP_MUTUAL_TLS';
 }

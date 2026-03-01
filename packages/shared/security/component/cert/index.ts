@@ -2,7 +2,6 @@ export * from './ca-cert';
 export * from './ca-cert-loader';
 export * from './ca-store';
 export * from './ca-store-factory';
-export * from './cert-store.module';
 export * from './client-cert';
 export * from './client-cert-loader';
 export * from './client-cert-store';
