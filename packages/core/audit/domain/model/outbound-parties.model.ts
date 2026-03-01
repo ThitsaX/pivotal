@@ -52,6 +52,7 @@ export class OutboundParties {
     public completedAt: Date;
 
     constructor(
+        rail: string,
         payerFsp: string,
         payeeFsp: string,
         correlationId: bigint,
@@ -60,6 +61,7 @@ export class OutboundParties {
         subId?: string
     ) {
 
+        this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
         this.correlationId = correlationId;

@@ -48,6 +48,7 @@ export class OutboundQuotes {
     public completedAt: Date;
 
     constructor(
+        rail: string,
         payerFsp: string,
         payeeFsp: string,
         correlationId: bigint,
@@ -55,6 +56,7 @@ export class OutboundQuotes {
         request: QuotesPostRequest,
     ) {
 
+        this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
         this.correlationId = correlationId;
