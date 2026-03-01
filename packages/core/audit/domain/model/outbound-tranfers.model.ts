@@ -48,6 +48,7 @@ export class OutboundTransfers {
     public completedAt: Date;
 
     constructor(
+        rail: string,
         payerFsp: string,
         payeeFsp: string,
         correlationId: bigint,
@@ -55,6 +56,7 @@ export class OutboundTransfers {
         request: TransfersPostRequest,
     ) {
 
+        this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
         this.correlationId = correlationId;
