@@ -50,12 +50,12 @@ export namespace FspiopPubSubSubjects {
          */
         static forError(
             payer: string,
-            payee: string,
+            payeeOrHub: string,
             partyIdType: PartyIdType,
             partyId: string,
             subId?: string,
         ): string {
-            const base = `parties-error:${payer}:${payee}:${partyIdType}:${partyId}`;
+            const base = `parties-error:${payer}:${payeeOrHub}:${partyIdType}:${partyId}`;
             return subId != null && subId.length > 0 ? `${base}:${subId}` : base;
         }
     }

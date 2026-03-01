@@ -12,7 +12,7 @@ import {Column, Entity, Index, PrimaryGeneratedColumn} from 'typeorm';
 @Index('outbound_parties_08_idx', ['failed'])
 export class OutboundParties {
 
-    @PrimaryGeneratedColumn({type: 'bigint', name: 'id'})
+    @PrimaryGeneratedColumn('increment', {type: 'bigint', name: 'id'})
     public id: string;
 
     @Column({type: 'varchar', length: 32, name: 'rail'})

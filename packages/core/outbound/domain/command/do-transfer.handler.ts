@@ -1,12 +1,72 @@
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { DoTransferCommand } from './do-transfer.command';
+import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
+import {
+    FspiopAxios,
+    FspiopAxiosError,
+    FspiopErrors,
+    FspiopException,
+    FspiopHeaders,
+    FspiopPubSubSubjects,
+    FspiopResponseSubscriber,
+    TransfersIDPutResponse,
+} from '@shared/fspiop';
+import {DoTransferCommand} from './do-transfer.command';
 
 @CommandHandler(DoTransferCommand)
 export class DoTransferHandler
-  implements ICommandHandler<DoTransferCommand, DoTransferCommand.Output>
-{
-  async execute(command: DoTransferCommand): Promise<DoTransferCommand.Output> {
-    // TODO: implement
-    return new DoTransferCommand.Output();
-  }
+    implements ICommandHandler<DoTransferCommand, DoTransferCommand.Output> {
+
+    constructor(
+        private readonly fspiopAxios: FspiopAxios,
+        private readonly subscriber: FspiopResponseSubscriber,
+    ) {
+    }
+
+    async execute(command: DoTransferCommand): Promise<DoTransferCommand.Output> {
+        const {source, destination, transferId, request} = command.input;
+        const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
+
+        const headers = FspiopHeaders.Values.Transfers.forRequest(source, switchId);
+
+        // Transfers carry a unique transferId — a single error subject is sufficient,
+        // no hub error subject is needed (unlike Parties).
+        const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, destination, transferId);
+        const errorSubject   = FspiopPubSubSubjects.Transfers.forError(source, destination, transferId);
+
+        // ── Step 1: Subscribe to NATS BEFORE sending the request ─────────────
+        // nc.subscribe() is synchronous — subscriptions are active immediately.
+        // Even if the switch responds before we reach Step 3, NATS buffers the
+        // message for the active subscription, eliminating the race condition.
+        const waitPromise = this.subscriber.waitFor<TransfersIDPutResponse>(
+            successSubject,
+            errorSubject,
+        );
+
+        // ── Step 2: Fire the POST /transfers request ──────────────────────────
+        try {
+            await this.fspiopAxios
+                .withHeaders(headers)
+                .postTransfers(switchBaseUrl, request);
+        } catch (error) {
+            // Cancel the NATS subscriptions immediately — no callback will arrive.
+            this.subscriber.cancel(successSubject);
+
+            if (FspiopAxiosError.is(error)) {
+                const info = error.errorInformationResponse?.errorInformation;
+                const code = info?.errorCode ?? '';
+                const desc = info?.errorDescription ?? 'Communication error';
+                const extensionList = info?.extensionList;
+                const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
+                throw new FspiopException(errorDef, desc, extensionList);
+            }
+
+            throw error;
+        }
+
+        // ── Step 3: Await the callback ────────────────────────────────────────
+        // Resolves on PUT /transfers/{ID} success, rejects with FspiopException
+        // on error or timeout (SERVER_TIMED_OUT after DEFAULT_TIMEOUT_MS).
+        const response = await waitPromise;
+
+        return new DoTransferCommand.Output(response);
+    }
 }

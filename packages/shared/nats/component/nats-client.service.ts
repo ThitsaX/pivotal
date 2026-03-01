@@ -1,22 +1,37 @@
-import {Injectable, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
+import {Inject, Injectable, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {connect, JSONCodec, NatsConnection} from 'nats';
+
+/**
+ * Injection token for the NATS server URL.
+ *
+ * Consumer modules must provide this token alongside NatsClientService:
+ *
+ * @example
+ * {
+ *   provide: NATS_URL,
+ *   useFactory: () => process.env['NATS_URL'] ?? 'nats://localhost:4222',
+ * },
+ * NatsClientService,
+ */
+export const NATS_URL = Symbol('NATS_URL');
 
 /**
  * Manages a single NATS connection for the lifetime of the NestJS module.
  *
- * Env variable  : NATS_URL
- * Default       : nats://localhost:4222
+ * The URL is injected via the NATS_URL token — the consumer decides the source
+ * (env, config service, Vault, etc.).
  */
 @Injectable()
 export class NatsClientService implements OnModuleInit, OnModuleDestroy {
 
-    private connection: NatsConnection | undefined;
-
     readonly codec = JSONCodec();
 
+    private connection: NatsConnection | undefined;
+
+    constructor(@Inject(NATS_URL) private readonly url: string) {}
+
     async onModuleInit(): Promise<void> {
-        const url = process.env[NatsClientService.ENV_NATS_URL] ?? 'nats://localhost:4222';
-        this.connection = await connect({servers: url});
+        this.connection = await connect({servers: this.url});
     }
 
     async onModuleDestroy(): Promise<void> {
@@ -30,6 +45,4 @@ export class NatsClientService implements OnModuleInit, OnModuleDestroy {
         }
         return this.connection;
     }
-
-    private static readonly ENV_NATS_URL = 'NATS_URL';
 }
