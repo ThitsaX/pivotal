@@ -4,5 +4,7 @@ export * from './fspiop-headers';
 export * from './fspiop-money';
 export * from './fspiop-settings';
 export * from './fspiop-signature';
+export * from './fspiop-status-translator';
 export * from './fspiop-urls';
 export * from './axios/index';
+export * from './nest/index';
