@@ -14,7 +14,7 @@ export class DoLookupHandler
     }
 
     async execute(command: DoLookupCommand): Promise<DoLookupCommand.Output> {
-        const {correlationId, source, type, id, subId} = command.input;
+        const {correlationId, source, destination, type, id, subId} = command.input;
         const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
 
         const headers = FspiopHeaders.Values.Parties.forRequest(source, switchId);
