@@ -1,19 +1,20 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {OutboundParties} from '../model';
-import {OutboundPartiesRepository} from '../repository';
+import {OutboundPartiesRequest} from '../../../model';
+import {OutboundPartiesRequestRepository} from '../../../repository';
 import {InitiateOutboundPartiesCommand} from './initiate-outbound-parties.command';
 
 @CommandHandler(InitiateOutboundPartiesCommand)
 export class InitiateOutboundPartiesHandler
     implements ICommandHandler<InitiateOutboundPartiesCommand, InitiateOutboundPartiesCommand.Output> {
 
-    constructor(private readonly repository: OutboundPartiesRepository) {
+    constructor(private readonly requestRepository: OutboundPartiesRequestRepository) {
     }
 
     async execute(command: InitiateOutboundPartiesCommand): Promise<InitiateOutboundPartiesCommand.Output> {
-        const {rail, payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId} = command.input;
+        const {id, rail, payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId} = command.input;
 
-        const entity = new OutboundParties(
+        const entity = new OutboundPartiesRequest(
+            id,
             rail,
             payerFsp,
             payeeFsp,
@@ -23,7 +24,7 @@ export class InitiateOutboundPartiesHandler
             subId,
         );
 
-        const saved = await this.repository.save(entity);
+        const saved = await this.requestRepository.save(entity);
 
         return new InitiateOutboundPartiesCommand.Output(saved.id);
     }

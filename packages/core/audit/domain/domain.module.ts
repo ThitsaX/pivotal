@@ -10,14 +10,66 @@ import {
     FailOutboundPartiesHandler,
     InitiateOutboundPartiesHandler,
 } from './command';
-import {OutboundParties, OutboundQuotes, OutboundTransfers} from './model';
 import {
+    InboundPartiesRequest,
+    InboundPartiesResponse,
+    InboundQuotesRequest,
+    InboundQuotesResponse,
+    InboundTransfersRequest,
+    InboundTransfersResponse,
+    OutboundPartiesRequest,
+    OutboundPartiesResponse,
+    OutboundQuotesRequest,
+    OutboundQuotesResponse,
+    OutboundTransfersRequest,
+    OutboundTransfersResponse,
+} from './model';
+import {
+    InboundPartiesRequestRepository,
+    InboundPartiesResponseRepository,
+    InboundQuotesRequestRepository,
+    InboundQuotesResponseRepository,
+    InboundTransfersRequestRepository,
+    InboundTransfersResponseRepository,
     MTPA_DB_READ_CONNECTION_NAME,
     MTPA_DB_WRITE_CONNECTION_NAME,
-    OutboundPartiesRepository,
-    OutboundQuotesRepository,
-    OutboundTransfersRepository,
+    OutboundPartiesRequestRepository,
+    OutboundPartiesResponseRepository,
+    OutboundQuotesRequestRepository,
+    OutboundQuotesResponseRepository,
+    OutboundTransfersRequestRepository,
+    OutboundTransfersResponseRepository,
 } from './repository';
+
+const Entities = [
+    InboundPartiesRequest,
+    InboundPartiesResponse,
+    InboundQuotesRequest,
+    InboundQuotesResponse,
+    InboundTransfersRequest,
+    InboundTransfersResponse,
+    OutboundPartiesRequest,
+    OutboundPartiesResponse,
+    OutboundQuotesRequest,
+    OutboundQuotesResponse,
+    OutboundTransfersRequest,
+    OutboundTransfersResponse,
+];
+
+const Repositories = [
+    InboundPartiesRequestRepository,
+    InboundPartiesResponseRepository,
+    InboundQuotesRequestRepository,
+    InboundQuotesResponseRepository,
+    InboundTransfersRequestRepository,
+    InboundTransfersResponseRepository,
+    OutboundPartiesRequestRepository,
+    OutboundPartiesResponseRepository,
+    OutboundQuotesRequestRepository,
+    OutboundQuotesResponseRepository,
+    OutboundTransfersRequestRepository,
+    OutboundTransfersResponseRepository,
+];
 
 const CommandHandlers = [
     InitiateOutboundPartiesHandler,
@@ -32,12 +84,12 @@ const CommandHandlers = [
         ...PersistenceConfigurer.createTypeOrmRootModules(
             MTPA_DB_WRITE_CONNECTION_NAME,
             MTPA_DB_READ_CONNECTION_NAME,
-            [OutboundParties, OutboundQuotes, OutboundTransfers],
+            Entities,
         ),
-        TypeOrmModule.forFeature([OutboundParties, OutboundQuotes, OutboundTransfers], MTPA_DB_WRITE_CONNECTION_NAME),
-        TypeOrmModule.forFeature([OutboundParties, OutboundQuotes, OutboundTransfers], MTPA_DB_READ_CONNECTION_NAME),
+        TypeOrmModule.forFeature(Entities, MTPA_DB_WRITE_CONNECTION_NAME),
+        TypeOrmModule.forFeature(Entities, MTPA_DB_READ_CONNECTION_NAME),
     ],
-    providers: [OutboundPartiesRepository, OutboundQuotesRepository, OutboundTransfersRepository, ...CommandHandlers],
-    exports: [TypeOrmModule, CqrsModule, OutboundPartiesRepository, OutboundQuotesRepository, OutboundTransfersRepository],
+    providers: [...Repositories, ...CommandHandlers],
+    exports: [TypeOrmModule, CqrsModule, ...Repositories],
 })
 export class AuditDomainModule {}
