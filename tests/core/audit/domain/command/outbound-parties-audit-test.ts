@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CommandBus } from '@nestjs/cqrs';
-import { FlywayMigration } from '@shared/flyway';
+import { PgFlywayMigration } from '@shared/flyway';
 import { DbTarget } from '@shared/persistence';
 import { PartyIdType } from '@shared/fspiop';
 import { AuditDomainModule } from '../../../../../packages/core/audit/domain/domain.module';
@@ -30,15 +30,12 @@ describe('OutboundParties audit command handlers', () => {
         const user = process.env['DB_WRITE_USERNAME'] ?? 'postgres';
         const password = process.env['DB_WRITE_PASSWORD'] ?? 'postgres';
 
-        const flyway = new FlywayMigration();
-
-        await flyway.migrate({
-            config: FlywayMigration.buildConfig({
-                url: `jdbc:postgresql://${host}:${port}/${db}`,
-                user,
-                password,
-                migrationLocations: ['classpath:core/audit/domain/sql'],
-            }),
+        await PgFlywayMigration.migrate({
+            url: `${host}:${port}`,
+            username: user,
+            password,
+            database: db,
+            locations: ['classpath:core/audit/domain/sql'],
         });
 
         app = await Test.createTestingModule({
