@@ -71,17 +71,19 @@ export class FspiopAxios {
         params: FspiopAxiosParams = {},
         interceptors: FspiopAxiosInterceptor[] = [],
         headers: FspiopHeadersMap = {},
+        httpsAgent?: https.Agent,
         client?: AxiosInstance,
     ) {
         this.settings = settings;
         this.params = params;
         this.interceptors = interceptors;
         this.defaultHeaders = headers;
-        this.client = client ?? FspiopAxios.buildClient(params, interceptors);
+        this.client = client ?? FspiopAxios.buildClient(params, interceptors, httpsAgent);
     }
 
     withHeaders(headers: FspiopHeadersMap): FspiopAxios {
-        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, this.client);
+        // client is already built with the agent baked in — pass it through directly
+        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, undefined, this.client);
     }
 
     // ─── Parties ────────────────────────────────────────────────────────────────
@@ -189,15 +191,19 @@ export class FspiopAxios {
         await this.client.patch(url, body, {headers: this.defaultHeaders});
     }
 
-    private static buildClient(params: FspiopAxiosParams, interceptors: FspiopAxiosInterceptor[]): AxiosInstance {
+    private static buildClient(
+        params: FspiopAxiosParams,
+        interceptors: FspiopAxiosInterceptor[],
+        httpsAgent?: https.Agent,
+    ): AxiosInstance {
         const instance = axios.create({
             timeout: params.socketTimeoutMs,
             httpAgent: params.connectionTimeoutMs
                 ? new http.Agent({timeout: params.connectionTimeoutMs})
                 : undefined,
-            httpsAgent: params.connectionTimeoutMs
+            httpsAgent: httpsAgent ?? (params.connectionTimeoutMs
                 ? new https.Agent({timeout: params.connectionTimeoutMs})
-                : undefined,
+                : undefined),
         });
 
         for (const interceptor of interceptors) {

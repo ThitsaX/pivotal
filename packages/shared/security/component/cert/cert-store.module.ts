@@ -26,21 +26,11 @@ import {JsonBasedClientCertLoader} from './loader/json-based-client-cert-loader'
                 const mode = process.env[CertStoreModule.ENV_CLIENT_CERT_STORE_FACTORY] ?? 'env';
                 return ClientCertStoreFactory.create(mode);
             },
-        },
-
-        // ── Individual loaders (available for direct injection if needed) ─────
-        EnvBasedCaCertLoader,
-        JsonBasedCaCertLoader,
-        EnvBasedClientCertLoader,
-        JsonBasedClientCertLoader,
+        }
     ],
     exports: [
         CaStore,
-        ClientCertStore,
-        EnvBasedCaCertLoader,
-        JsonBasedCaCertLoader,
-        EnvBasedClientCertLoader,
-        JsonBasedClientCertLoader,
+        ClientCertStore
     ],
 })
 export class CertStoreModule {
