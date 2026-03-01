@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
-import { KeystoreModule } from './component/key/keystore.module';
+import { CertStoreModule } from './component/cert/cert-store.module';
+import { KeyStoreModule } from './component/key/key-store.module';
 
 @Module({
-  imports: [KeystoreModule],
+  imports: [KeyStoreModule, CertStoreModule],
   providers: [],
-  exports: [KeystoreModule],
+  exports: [KeyStoreModule, CertStoreModule],
 })
 export class SecurityModule {}
