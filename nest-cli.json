@@ -122,13 +122,13 @@
         "tsConfigPath": "packages/shared/interledger/tsconfig.app.json"
       }
     },
-    "shared-persistence": {
+    "shared-typeorm": {
       "type": "library",
-      "root": "packages/shared/persistence",
+      "root": "packages/shared/typeorm",
       "entryFile": "index",
-      "sourceRoot": "packages/shared/persistence",
+      "sourceRoot": "packages/shared/typeorm",
       "compilerOptions": {
-        "tsConfigPath": "packages/shared/persistence/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/typeorm/tsconfig.app.json"
       }
     },
     "shared-security": {

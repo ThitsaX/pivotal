@@ -1,95 +1,106 @@
-import {Module} from '@nestjs/common';
+import {DynamicModule, Module} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
-import {TypeOrmModule} from '@nestjs/typeorm';
+import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
+import {TypeOrmModule, TypeOrmSettings} from '@shared/typeorm';
 import {
-    PersistenceConfigurer,
-    PersistenceModule,
-} from '@shared/persistence';
-import {
-    CompleteOutboundPartiesHandler,
-    FailOutboundPartiesHandler,
-    InitiateOutboundPartiesHandler,
+    AuditInboundPartiesHandler,
+    AuditInboundQuotesHandler,
+    AuditInboundTransfersHandler,
+    AuditOutboundPartiesHandler,
+    AuditOutboundQuotesHandler,
+    AuditOutboundTransfersHandler,
 } from './command';
 import {
-    InboundPartiesRequest,
-    InboundPartiesResponse,
-    InboundQuotesRequest,
-    InboundQuotesResponse,
-    InboundTransfersRequest,
-    InboundTransfersResponse,
-    OutboundPartiesRequest,
-    OutboundPartiesResponse,
-    OutboundQuotesRequest,
-    OutboundQuotesResponse,
-    OutboundTransfersRequest,
-    OutboundTransfersResponse,
+    InboundParties,
+    InboundQuotes,
+    InboundTransfers,
+    OutboundParties,
+    OutboundQuotes,
+    OutboundTransfers,
 } from './model';
 import {
-    InboundPartiesRequestRepository,
-    InboundPartiesResponseRepository,
-    InboundQuotesRequestRepository,
-    InboundQuotesResponseRepository,
-    InboundTransfersRequestRepository,
-    InboundTransfersResponseRepository,
+    InboundPartiesRepository,
+    InboundQuotesRepository,
+    InboundTransfersRepository,
     MTPA_DB_READ_CONNECTION_NAME,
     MTPA_DB_WRITE_CONNECTION_NAME,
-    OutboundPartiesRequestRepository,
-    OutboundPartiesResponseRepository,
-    OutboundQuotesRequestRepository,
-    OutboundQuotesResponseRepository,
-    OutboundTransfersRequestRepository,
-    OutboundTransfersResponseRepository,
+    OutboundPartiesRepository,
+    OutboundQuotesRepository,
+    OutboundTransfersRepository,
 } from './repository';
 
 const Entities = [
-    InboundPartiesRequest,
-    InboundPartiesResponse,
-    InboundQuotesRequest,
-    InboundQuotesResponse,
-    InboundTransfersRequest,
-    InboundTransfersResponse,
-    OutboundPartiesRequest,
-    OutboundPartiesResponse,
-    OutboundQuotesRequest,
-    OutboundQuotesResponse,
-    OutboundTransfersRequest,
-    OutboundTransfersResponse,
+    InboundParties,
+    InboundQuotes,
+    InboundTransfers,
+    OutboundParties,
+    OutboundQuotes,
+    OutboundTransfers,
 ];
 
 const Repositories = [
-    InboundPartiesRequestRepository,
-    InboundPartiesResponseRepository,
-    InboundQuotesRequestRepository,
-    InboundQuotesResponseRepository,
-    InboundTransfersRequestRepository,
-    InboundTransfersResponseRepository,
-    OutboundPartiesRequestRepository,
-    OutboundPartiesResponseRepository,
-    OutboundQuotesRequestRepository,
-    OutboundQuotesResponseRepository,
-    OutboundTransfersRequestRepository,
-    OutboundTransfersResponseRepository,
+    InboundPartiesRepository,
+    InboundQuotesRepository,
+    InboundTransfersRepository,
+    OutboundPartiesRepository,
+    OutboundQuotesRepository,
+    OutboundTransfersRepository,
 ];
 
 const CommandHandlers = [
-    InitiateOutboundPartiesHandler,
-    CompleteOutboundPartiesHandler,
-    FailOutboundPartiesHandler,
+    AuditInboundPartiesHandler,
+    AuditInboundQuotesHandler,
+    AuditInboundTransfersHandler,
+    AuditOutboundPartiesHandler,
+    AuditOutboundQuotesHandler,
+    AuditOutboundTransfersHandler,
 ];
 
-@Module({
-    imports: [
-        PersistenceModule,
-        CqrsModule,
-        ...PersistenceConfigurer.createTypeOrmRootModules(
-            MTPA_DB_WRITE_CONNECTION_NAME,
-            MTPA_DB_READ_CONNECTION_NAME,
-            Entities,
-        ),
-        TypeOrmModule.forFeature(Entities, MTPA_DB_WRITE_CONNECTION_NAME),
-        TypeOrmModule.forFeature(Entities, MTPA_DB_READ_CONNECTION_NAME),
-    ],
-    providers: [...Repositories, ...CommandHandlers],
-    exports: [TypeOrmModule, CqrsModule, ...Repositories],
-})
-export class AuditDomainModule {}
+@Module({})
+export class AuditDomainModule {
+
+    static forRootAsync(asyncOptions: AuditDomainModule.AsyncOptions): DynamicModule {
+        return {
+            module: AuditDomainModule,
+            imports: [
+                CqrsModule,
+                TypeOrmModule.forRootAsync({
+                    connectionName: MTPA_DB_WRITE_CONNECTION_NAME,
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: async (...args) => {
+                        const deps = await asyncOptions.useFactory(...args);
+                        return {typeOrmSettings: () => deps.writeTypeOrmSettings()};
+                    },
+                }),
+                TypeOrmModule.forRootAsync({
+                    connectionName: MTPA_DB_READ_CONNECTION_NAME,
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: async (...args) => {
+                        const deps = await asyncOptions.useFactory(...args);
+                        return {typeOrmSettings: () => deps.readTypeOrmSettings()};
+                    },
+                }),
+                NestJsTypeOrmModule.forFeature(Entities, MTPA_DB_WRITE_CONNECTION_NAME),
+                NestJsTypeOrmModule.forFeature(Entities, MTPA_DB_READ_CONNECTION_NAME),
+            ],
+            providers: [...Repositories, ...CommandHandlers],
+            exports: [CqrsModule, ...Repositories],
+        };
+    }
+}
+
+export namespace AuditDomainModule {
+
+    export interface RequiredDependencies {
+        writeTypeOrmSettings(): TypeOrmSettings;
+        readTypeOrmSettings(): TypeOrmSettings;
+    }
+
+    export type AsyncOptions = {
+        imports?: any[];
+        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        inject?: any[];
+    };
+}
