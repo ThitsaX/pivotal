@@ -50,6 +50,15 @@
         "tsConfigPath": "packages/core/audit/domain/tsconfig.app.json"
       }
     },
+    "core-audit-consumer": {
+      "type": "application",
+      "root": "packages/core/audit/consumer",
+      "entryFile": "main",
+      "sourceRoot": "packages/core/audit/consumer",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/audit/consumer/tsconfig.app.json"
+      }
+    },
     "core-audit-subscriber": {
       "type": "library",
       "root": "packages/core/audit/subscriber",
@@ -95,13 +104,13 @@
         "tsConfigPath": "packages/shared/fspiop/tsconfig.app.json"
       }
     },
-    "shared-flyway": {
+    "shared-pg-migration": {
       "type": "library",
-      "root": "packages/shared/flyway",
+      "root": "packages/shared/pg-migration",
       "entryFile": "index",
-      "sourceRoot": "packages/shared/flyway",
+      "sourceRoot": "packages/shared/pg-migration",
       "compilerOptions": {
-        "tsConfigPath": "packages/shared/flyway/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/pg-migration/tsconfig.app.json"
       }
     },
     "shared-snowflake": {

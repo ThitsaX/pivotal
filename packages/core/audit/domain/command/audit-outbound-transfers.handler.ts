@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {OutboundTransfers} from '../model';
 import {OutboundTransfersRepository} from '../repository';
@@ -7,7 +8,10 @@ import {AuditOutboundTransfersCommand} from './audit-outbound-transfers.command'
 export class AuditOutboundTransfersHandler
     implements ICommandHandler<AuditOutboundTransfersCommand, AuditOutboundTransfersCommand.Output> {
 
-    constructor(private readonly repository: OutboundTransfersRepository) {
+    constructor(
+        @Inject(OutboundTransfersRepository)
+        private readonly repository: OutboundTransfersRepository,
+    ) {
     }
 
     async execute(command: AuditOutboundTransfersCommand): Promise<AuditOutboundTransfersCommand.Output> {

@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {InboundQuotes} from '../model';
 import {InboundQuotesRepository} from '../repository';
@@ -7,7 +8,10 @@ import {AuditInboundQuotesCommand} from './audit-inbound-quotes.command';
 export class AuditInboundQuotesHandler
     implements ICommandHandler<AuditInboundQuotesCommand, AuditInboundQuotesCommand.Output> {
 
-    constructor(private readonly repository: InboundQuotesRepository) {
+    constructor(
+        @Inject(InboundQuotesRepository)
+        private readonly repository: InboundQuotesRepository,
+    ) {
     }
 
     async execute(command: AuditInboundQuotesCommand): Promise<AuditInboundQuotesCommand.Output> {

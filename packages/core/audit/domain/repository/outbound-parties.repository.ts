@@ -3,15 +3,15 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {DbTarget} from '@shared/typeorm';
 import {Repository} from 'typeorm';
 import {OutboundParties} from '../model';
-import {MTPA_DB_READ_CONNECTION_NAME, MTPA_DB_WRITE_CONNECTION_NAME} from './mtpa-connection-name';
+import {PAYPORT_DB_READ_CONNECTION_NAME, PAYPORT_DB_WRITE_CONNECTION_NAME} from './payport-connection-name';
 
 @Injectable()
 export class OutboundPartiesRepository {
 
     constructor(
-        @InjectRepository(OutboundParties, MTPA_DB_WRITE_CONNECTION_NAME)
+        @InjectRepository(OutboundParties, PAYPORT_DB_WRITE_CONNECTION_NAME)
         private readonly writeRepository: Repository<OutboundParties>,
-        @InjectRepository(OutboundParties, MTPA_DB_READ_CONNECTION_NAME)
+        @InjectRepository(OutboundParties, PAYPORT_DB_READ_CONNECTION_NAME)
         private readonly readRepository: Repository<OutboundParties>,
     ) {
     }

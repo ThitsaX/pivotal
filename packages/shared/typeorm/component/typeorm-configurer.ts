@@ -13,6 +13,7 @@ export class TypeOrmConfigurer {
             database: settings.database,
             schema: settings.schema,
             synchronize: false,
+            autoLoadEntities: true,
         };
     }
 }
