@@ -59,6 +59,24 @@
         "tsConfigPath": "packages/core/audit/consumer/tsconfig.app.json"
       }
     },
+    "apps-web-outbound": {
+      "type": "application",
+      "root": "packages/apps/web-outbound",
+      "entryFile": "main",
+      "sourceRoot": "packages/apps/web-outbound",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-outbound/tsconfig.app.json"
+      }
+    },
+    "apps-web-inbound": {
+      "type": "application",
+      "root": "packages/apps/web-inbound",
+      "entryFile": "main",
+      "sourceRoot": "packages/apps/web-inbound",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-inbound/tsconfig.app.json"
+      }
+    },
     "core-audit-subscriber": {
       "type": "library",
       "root": "packages/core/audit/subscriber",

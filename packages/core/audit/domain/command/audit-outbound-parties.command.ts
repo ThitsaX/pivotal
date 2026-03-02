@@ -16,11 +16,11 @@ export namespace AuditOutboundPartiesCommand {
             public readonly correlationId: string,
             public readonly partyIdType: PartyIdType,
             public readonly partyId: string,
-            public readonly subId?: string,
+            public readonly subId: string | null | undefined,
             public readonly response: PartiesTypeIDPutResponse | null = null,
             public readonly error: ErrorInformationObject | null = null,
-            public readonly createdAt?: Date,
-            public readonly completedAt?: Date,
+            public readonly createdAt: Date,
+            public readonly completedAt: Date | null | undefined,
         ) {
         }
     }
