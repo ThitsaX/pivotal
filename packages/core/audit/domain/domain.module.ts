@@ -22,8 +22,8 @@ import {
     InboundPartiesRepository,
     InboundQuotesRepository,
     InboundTransfersRepository,
-    MTPA_DB_READ_CONNECTION_NAME,
-    MTPA_DB_WRITE_CONNECTION_NAME,
+    PAYPORT_DB_READ_CONNECTION_NAME,
+    PAYPORT_DB_WRITE_CONNECTION_NAME,
     OutboundPartiesRepository,
     OutboundQuotesRepository,
     OutboundTransfersRepository,
@@ -65,7 +65,7 @@ export class AuditDomainModule {
             imports: [
                 CqrsModule,
                 TypeOrmModule.forRootAsync({
-                    connectionName: MTPA_DB_WRITE_CONNECTION_NAME,
+                    connectionName: PAYPORT_DB_WRITE_CONNECTION_NAME,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: async (...args) => {
@@ -74,7 +74,7 @@ export class AuditDomainModule {
                     },
                 }),
                 TypeOrmModule.forRootAsync({
-                    connectionName: MTPA_DB_READ_CONNECTION_NAME,
+                    connectionName: PAYPORT_DB_READ_CONNECTION_NAME,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: async (...args) => {
@@ -82,8 +82,8 @@ export class AuditDomainModule {
                         return {typeOrmSettings: () => deps.readTypeOrmSettings()};
                     },
                 }),
-                NestJsTypeOrmModule.forFeature(Entities, MTPA_DB_WRITE_CONNECTION_NAME),
-                NestJsTypeOrmModule.forFeature(Entities, MTPA_DB_READ_CONNECTION_NAME),
+                NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_WRITE_CONNECTION_NAME),
+                NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_READ_CONNECTION_NAME),
             ],
             providers: [...Repositories, ...CommandHandlers],
             exports: [CqrsModule, ...Repositories],

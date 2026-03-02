@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 import {CommandBus} from '@nestjs/cqrs';
 import {Test, TestingModule} from '@nestjs/testing';
 import {Client} from 'pg';
-import {PgFlywayMigration} from '@shared/flyway';
+import {PgMigration} from '@shared/pg-migration';
 import {DbTarget} from '@shared/typeorm';
 import {PartyIdType} from '@shared/fspiop';
 import {AuditOutboundPartiesCommand} from '@core/audit/domain';
@@ -54,7 +54,7 @@ describe('AuditOutboundPartiesCommand', () => {
     before(async () => {
         const host = process.env['DB_WRITE_HOST'] ?? 'localhost';
         const port = process.env['DB_WRITE_PORT'] ?? '5432';
-        const db = process.env['DB_WRITE_NAME'] ?? 'mtpa';
+        const db = process.env['DB_WRITE_NAME'] ?? 'payport';
         const user = process.env['DB_WRITE_USERNAME'] ?? 'postgres';
         const password = process.env['DB_WRITE_PASSWORD'] ?? 'postgres';
         const schema = process.env['DB_WRITE_SCHEMA'] ?? 'public';
@@ -62,8 +62,9 @@ describe('AuditOutboundPartiesCommand', () => {
 
         await ensureDatabaseExists(host, port, db, user, password);
 
-        await PgFlywayMigration.migrate({
-            url: `${host}:${port}`,
+        await PgMigration.migrate({
+            host,
+            port: Number(port),
             username: user,
             password,
             database: db,

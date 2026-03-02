@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {OutboundParties} from '../model';
 import {OutboundPartiesRepository} from '../repository';
@@ -7,7 +8,10 @@ import {AuditOutboundPartiesCommand} from './audit-outbound-parties.command';
 export class AuditOutboundPartiesHandler
     implements ICommandHandler<AuditOutboundPartiesCommand, AuditOutboundPartiesCommand.Output> {
 
-    constructor(private readonly repository: OutboundPartiesRepository) {
+    constructor(
+        @Inject(OutboundPartiesRepository)
+        private readonly repository: OutboundPartiesRepository,
+    ) {
     }
 
     async execute(command: AuditOutboundPartiesCommand): Promise<AuditOutboundPartiesCommand.Output> {

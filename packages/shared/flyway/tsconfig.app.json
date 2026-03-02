@@ -1,8 +1,0 @@
-{
-  "extends": "../../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "../../../dist/shared/flyway"
-  },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
-}
