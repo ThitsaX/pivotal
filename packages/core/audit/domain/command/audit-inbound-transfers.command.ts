@@ -19,8 +19,8 @@ export namespace AuditInboundTransfersCommand {
             public readonly response: TransfersIDPutResponse | null = null,
             public readonly error: ErrorInformationObject | null = null,
             public readonly fspError: string | null = null,
-            public readonly createdAt?: Date,
-            public readonly completedAt?: Date,
+            public readonly createdAt: Date,
+            public readonly completedAt: Date | null | undefined,
         ) {
         }
     }

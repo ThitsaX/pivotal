@@ -1,5 +1,5 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
-import {type NatsClientService, NatsClientServiceModule} from '@shared/nats';
+import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
 import {FspiopResponsePublisher} from './fspiop-response-publisher';
 import {FspiopResponseSubscriber} from './fspiop-response-subscriber';
 
@@ -11,7 +11,14 @@ export class FspiopPubSubModule {
     static forRootAsync(asyncOptions: FspiopPubSubModule.AsyncOptions): DynamicModule {
         return {
             module: FspiopPubSubModule,
-            imports: asyncOptions.imports ?? [],
+            imports: [
+                NatsClientServiceModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
+                ...(asyncOptions.imports ?? []),
+            ],
             providers: [
                 {
                     provide: REQUIRED_DEPENDENCIES,
@@ -31,14 +38,14 @@ export class FspiopPubSubModule {
                 useFactory: (ncs: NatsClientService): FspiopResponsePublisher => {
                     return new FspiopResponsePublisher(ncs);
                 },
-                inject: [REQUIRED_DEPENDENCIES],
+                inject: [NatsClientService],
             },
             {
                 provide: FspiopResponseSubscriber,
                 useFactory: (ncs: NatsClientService): FspiopResponseSubscriber => {
                     return new FspiopResponseSubscriber(ncs);
                 },
-                inject: [REQUIRED_DEPENDENCIES],
+                inject: [NatsClientService],
             },
         ];
     }

@@ -18,8 +18,8 @@ export namespace AuditOutboundTransfersCommand {
             public readonly request: TransfersPostRequest,
             public readonly response: TransfersIDPutResponse | null = null,
             public readonly error: ErrorInformationObject | null = null,
-            public readonly createdAt?: Date,
-            public readonly completedAt?: Date,
+            public readonly createdAt: Date,
+            public readonly completedAt: Date | null | undefined,
         ) {
         }
     }

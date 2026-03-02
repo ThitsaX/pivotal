@@ -16,7 +16,7 @@ export namespace AuditInboundPartiesCommand {
             public readonly correlationId: string,
             public readonly partyIdType: PartyIdType,
             public readonly partyId: string,
-            public readonly subId?: string,
+            public readonly subId: string | null | undefined,
             public readonly response: PartiesTypeIDPutResponse | null = null,
             public readonly error: ErrorInformationObject | null = null,
             public readonly fspError: string | null = null,

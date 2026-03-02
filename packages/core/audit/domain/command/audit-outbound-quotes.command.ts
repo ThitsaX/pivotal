@@ -18,8 +18,8 @@ export namespace AuditOutboundQuotesCommand {
             public readonly request: QuotesPostRequest,
             public readonly response: QuotesIDPutResponse | null = null,
             public readonly error: ErrorInformationObject | null = null,
-            public readonly createdAt?: Date,
-            public readonly completedAt?: Date,
+            public readonly createdAt: Date,
+            public readonly completedAt: Date | null | undefined,
         ) {
         }
     }

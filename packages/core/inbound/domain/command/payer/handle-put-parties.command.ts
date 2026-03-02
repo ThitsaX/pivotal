@@ -1,17 +1,24 @@
-import { PartiesTypeIDPutResponse, PartyIdType } from '@shared/fspiop';
+import {PartiesTypeIDPutResponse, PartyIdType} from '@shared/fspiop';
 
 export class HandlePutPartiesCommand {
-  constructor(public readonly input: HandlePutPartiesCommand.Input) {}
+    constructor(public readonly input: HandlePutPartiesCommand.Input) {
+    }
 }
 
 export namespace HandlePutPartiesCommand {
-  export class Input {
-    constructor(
-      public readonly type: PartyIdType,
-      public readonly id: string,
-      public readonly body: PartiesTypeIDPutResponse,
-    ) {}
-  }
+    export class Input {
+        constructor(
+            public readonly payerFsp: string,
+            public readonly payeeFsp: string,
+            public readonly correlationId: string,
+            public readonly partyIdType: PartyIdType,
+            public readonly partyId: string,
+            public readonly subId: string | null | undefined,
+            public readonly response: PartiesTypeIDPutResponse | null,
+        ) {
+        }
+    }
 
-  export class Output {}
+    export class Output {
+    }
 }
