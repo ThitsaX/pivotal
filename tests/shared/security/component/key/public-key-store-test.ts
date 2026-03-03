@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { PublicKeyLoader } from '../../../../../packages/shared/security/component/key/public-key-loader';
 import { PublicKeyStore } from '../../../../../packages/shared/security/component/key/public-key-store';
 import { PublicKey } from '../../../../../packages/shared/security/component/key/public-key';
+import { TEST_PUBLIC_KEY_PEM } from './test-key-fixtures';
 
 class StubPublicKeyLoader extends PublicKeyLoader {
 
@@ -22,8 +23,8 @@ describe('PublicKeyStore', () => {
 
     it('should load keys from loader and return loaded count', () => {
         const store = new PublicKeyStore();
-        const publicKeyA = PublicKey.fromBuffer(Buffer.from('public-key-a', 'utf-8'));
-        const publicKeyB = PublicKey.fromBuffer(Buffer.from('public-key-b', 'utf-8'));
+        const publicKeyA = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
+        const publicKeyB = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
         const loader = new StubPublicKeyLoader(new Map([
             ['fsp-a', publicKeyA],
             ['fsp-b', publicKeyB],
@@ -38,7 +39,7 @@ describe('PublicKeyStore', () => {
 
     it('should return defensive copy from get and getBuffer', () => {
         const store = new PublicKeyStore();
-        const sourceKey = PublicKey.fromBuffer(Buffer.from('public-key-a', 'utf-8'));
+        const sourceKey = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
         const loader = new StubPublicKeyLoader(new Map([['fsp-a', sourceKey]]));
         store.load(loader);
 
@@ -51,14 +52,14 @@ describe('PublicKeyStore', () => {
 
         keyBuffer.write('X', 0, 'utf-8');
 
-        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), 'public-key-a');
+        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), TEST_PUBLIC_KEY_PEM);
     });
 
     it('should support delete and clear', () => {
         const store = new PublicKeyStore();
         const loader = new StubPublicKeyLoader(new Map([
-            ['fsp-a', PublicKey.fromBuffer(Buffer.from('public-key-a', 'utf-8'))],
-            ['fsp-b', PublicKey.fromBuffer(Buffer.from('public-key-b', 'utf-8'))],
+            ['fsp-a', PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'))],
+            ['fsp-b', PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'))],
         ]));
         store.load(loader);
 

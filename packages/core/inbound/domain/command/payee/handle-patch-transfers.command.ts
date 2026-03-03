@@ -8,8 +8,11 @@ export class HandlePatchTransfersCommand {
 export namespace HandlePatchTransfersCommand {
     export class Input {
         constructor(
-            public readonly id: string,
-            public readonly body: TransfersIDPatchResponse,
+            public readonly payerFsp: string,
+            public readonly payeeFsp: string,
+            public readonly correlationId: string,
+            public readonly transferId: string,
+            public readonly response: TransfersIDPatchResponse,
         ) {
         }
     }

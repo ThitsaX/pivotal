@@ -1,21 +1,10 @@
 import * as assert from 'node:assert/strict';
-import { generateKeyPairSync } from 'node:crypto';
 import { describe, it } from 'node:test';
 import { Jwt } from '../../../../../packages/shared/security/component/jwt/jwt';
-import { PrivateKey } from '../../../../../packages/shared/security/component/key/private-key';
-import { PublicKey } from '../../../../../packages/shared/security/component/key/public-key';
+import { PrivateKey, RsaKeyPair } from '../../../../../packages/shared/security/component/key';
 
-function createRsaKeyPair(): { privateKey: PrivateKey; publicKey: PublicKey } {
-    const { privateKey, publicKey } = generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        privateKeyEncoding: { format: 'pem', type: 'pkcs8' },
-        publicKeyEncoding: { format: 'pem', type: 'spki' },
-    });
-
-    return {
-        privateKey: PrivateKey.fromBuffer(Buffer.from(privateKey, 'utf-8')),
-        publicKey: PublicKey.fromBuffer(Buffer.from(publicKey, 'utf-8')),
-    };
+function createRsaKeyPair(): RsaKeyPair.KeyPair {
+    return RsaKeyPair.generate();
 }
 
 describe('Jwt', () => {

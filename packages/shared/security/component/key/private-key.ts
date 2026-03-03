@@ -1,3 +1,5 @@
+import {createPrivateKey} from 'node:crypto';
+
 export class PrivateKey {
 
     private readonly value: Buffer;
@@ -7,7 +9,21 @@ export class PrivateKey {
     }
 
     static fromBuffer(value: Buffer): PrivateKey {
+        PrivateKey.assertPrivateKey(value);
+
         return new PrivateKey(value);
+    }
+
+    private static assertPrivateKey(value: Buffer): void {
+        if (value == null || value.length === 0) {
+            throw new Error('Private key buffer cannot be empty.');
+        }
+
+        try {
+            createPrivateKey(value);
+        } catch {
+            throw new Error('Invalid private key buffer. Expected a valid private key.');
+        }
     }
 
     toBuffer(): Buffer {

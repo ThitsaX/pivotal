@@ -27,7 +27,7 @@ export class FspiopPubSubModule {
                 },
                 ...FspiopPubSubModule.createProviders(),
             ],
-            exports: [FspiopResponsePublisher, FspiopResponseSubscriber],
+            exports: [FspiopResponsePublisher, FspiopResponseSubscriber, NatsClientService],
         };
     }
 

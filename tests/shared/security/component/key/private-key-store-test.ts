@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { PrivateKeyLoader } from '../../../../../packages/shared/security/component/key/private-key-loader';
 import { PrivateKeyStore } from '../../../../../packages/shared/security/component/key/private-key-store';
 import { PrivateKey } from '../../../../../packages/shared/security/component/key/private-key';
+import { TEST_PRIVATE_KEY_PEM } from './test-key-fixtures';
 
 class StubPrivateKeyLoader extends PrivateKeyLoader {
 
@@ -22,8 +23,8 @@ describe('PrivateKeyStore', () => {
 
     it('should load keys from loader and return loaded count', () => {
         const store = new PrivateKeyStore();
-        const privateKeyA = PrivateKey.fromBuffer(Buffer.from('private-key-a', 'utf-8'));
-        const privateKeyB = PrivateKey.fromBuffer(Buffer.from('private-key-b', 'utf-8'));
+        const privateKeyA = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
+        const privateKeyB = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
         const loader = new StubPrivateKeyLoader(new Map([
             ['fsp-a', privateKeyA],
             ['fsp-b', privateKeyB],
@@ -38,7 +39,7 @@ describe('PrivateKeyStore', () => {
 
     it('should return defensive copy from get and getBuffer', () => {
         const store = new PrivateKeyStore();
-        const sourceKey = PrivateKey.fromBuffer(Buffer.from('private-key-a', 'utf-8'));
+        const sourceKey = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
         const loader = new StubPrivateKeyLoader(new Map([['fsp-a', sourceKey]]));
         store.load(loader);
 
@@ -51,14 +52,14 @@ describe('PrivateKeyStore', () => {
 
         keyBuffer.write('X', 0, 'utf-8');
 
-        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), 'private-key-a');
+        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), TEST_PRIVATE_KEY_PEM);
     });
 
     it('should support delete and clear', () => {
         const store = new PrivateKeyStore();
         const loader = new StubPrivateKeyLoader(new Map([
-            ['fsp-a', PrivateKey.fromBuffer(Buffer.from('private-key-a', 'utf-8'))],
-            ['fsp-b', PrivateKey.fromBuffer(Buffer.from('private-key-b', 'utf-8'))],
+            ['fsp-a', PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'))],
+            ['fsp-b', PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'))],
         ]));
         store.load(loader);
 

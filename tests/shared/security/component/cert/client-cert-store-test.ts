@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { ClientCert } from '../../../../../packages/shared/security/component/cert/client-cert';
 import { ClientCertLoader } from '../../../../../packages/shared/security/component/cert/client-cert-loader';
 import { ClientCertStore } from '../../../../../packages/shared/security/component/cert/client-cert-store';
+import { TEST_CERT_PEM, TEST_PRIVATE_KEY_PEM } from './test-cert-fixtures';
 
 class StubClientCertLoader extends ClientCertLoader {
 
@@ -23,8 +24,8 @@ describe('ClientCertStore', () => {
     it('should load and return client cert pair', () => {
         const store = new ClientCertStore();
         const source = ClientCert.fromBuffers(
-            Buffer.from('client-cert', 'utf-8'),
-            Buffer.from('client-key', 'utf-8'),
+            Buffer.from(TEST_CERT_PEM, 'utf-8'),
+            Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'),
         );
 
         store.load(new StubClientCertLoader(source));
@@ -32,8 +33,8 @@ describe('ClientCertStore', () => {
 
         assert.ok(loaded);
         assert.equal(store.isEmpty(), false);
-        assert.equal(loaded?.certBuffer().toString('utf-8'), 'client-cert');
-        assert.equal(loaded?.keyBuffer().toString('utf-8'), 'client-key');
+        assert.equal(loaded?.certBuffer().toString('utf-8'), TEST_CERT_PEM);
+        assert.equal(loaded?.keyBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
     });
 
     it('should stay empty when loader returns undefined', () => {
@@ -48,8 +49,8 @@ describe('ClientCertStore', () => {
     it('should support clear', () => {
         const store = new ClientCertStore();
         store.load(new StubClientCertLoader(ClientCert.fromBuffers(
-            Buffer.from('client-cert', 'utf-8'),
-            Buffer.from('client-key', 'utf-8'),
+            Buffer.from(TEST_CERT_PEM, 'utf-8'),
+            Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'),
         )));
 
         store.clear();

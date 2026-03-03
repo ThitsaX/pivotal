@@ -7,7 +7,12 @@ export class HandleGetPartiesCommand {
 
 export namespace HandleGetPartiesCommand {
     export class Input {
-        constructor(public readonly type: PartyIdType, public readonly id: string,) {
+        constructor(public readonly payerFsp: string,
+                    public readonly payeeFsp: string,
+                    public readonly correlationId: string,
+                    public readonly partyIdType: PartyIdType,
+                    public readonly partyId: string,
+                    public readonly subId: string | null | undefined) {
         }
     }
 
