@@ -33,10 +33,18 @@ export class PartiesController {
     async getParties(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
+        @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
     ): Promise<void> {
+        const payerFsp = PartiesController.headerValue(destinationHeader);
+        const payeeFsp = PartiesController.headerValue(sourceHeader);
+        const correlationId = PartiesController.headerValue(correlationIdHeader, id);
+
         await this.commandBus.execute(
             new HandleGetPartiesCommand(
-                new HandleGetPartiesCommand.Input(type, id),
+                new HandleGetPartiesCommand.Input(payerFsp, payeeFsp, correlationId, type, id, subId ?? null),
             ),
         );
     }
@@ -51,7 +59,7 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
-        @Body() body: PartiesTypeIDPutResponse,
+        @Body() request: PartiesTypeIDPutResponse,
     ): Promise<void> {
         const payerFsp = PartiesController.headerValue(destinationHeader);
         const payeeFsp = PartiesController.headerValue(sourceHeader);
@@ -66,7 +74,7 @@ export class PartiesController {
                     type,
                     id,
                     subId ?? null,
-                    body,
+                    request,
                 ),
             ),
         );
@@ -82,7 +90,7 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
-        @Body() body: ErrorInformationObject,
+        @Body() request: ErrorInformationObject,
     ): Promise<void> {
         const payerFsp = PartiesController.headerValue(destinationHeader);
         const payeeFsp = PartiesController.headerValue(sourceHeader);
@@ -97,7 +105,7 @@ export class PartiesController {
                     type,
                     id,
                     subId ?? null,
-                    body,
+                    request,
                 ),
             ),
         );

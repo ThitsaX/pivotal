@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { CaCert } from '../../../../../packages/shared/security/component/cert/ca-cert';
 import { CaCertLoader } from '../../../../../packages/shared/security/component/cert/ca-cert-loader';
 import { CaStore } from '../../../../../packages/shared/security/component/cert/ca-store';
+import { TEST_CERT_PEM } from './test-cert-fixtures';
 
 class StubCaCertLoader extends CaCertLoader {
 
@@ -22,21 +23,21 @@ describe('CaStore', () => {
 
     it('should load certs from loader and return loaded count', () => {
         const store = new CaStore();
-        const certA = CaCert.fromBuffer(Buffer.from('cert-a\n', 'utf-8'));
-        const certB = CaCert.fromBuffer(Buffer.from('cert-b\n', 'utf-8'));
+        const certA = CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8'));
+        const certB = CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8'));
         const loader = new StubCaCertLoader([certA, certB]);
 
         const loadedCount = store.load(loader);
 
         assert.equal(loadedCount, 2);
         assert.equal(store.isEmpty(), false);
-        assert.equal(store.toBuffer()?.toString('utf-8'), 'cert-a\ncert-b\n');
+        assert.equal(store.toBuffer()?.toString('utf-8'), `${TEST_CERT_PEM}${TEST_CERT_PEM}`);
     });
 
     it('should return defensive copy from toBuffer', () => {
         const store = new CaStore();
         const loader = new StubCaCertLoader([
-            CaCert.fromBuffer(Buffer.from('cert-a\n', 'utf-8')),
+            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]);
         store.load(loader);
 
@@ -46,16 +47,16 @@ describe('CaStore', () => {
 
         certBuffer.write('X', 0, 'utf-8');
 
-        assert.equal(store.toBuffer()?.toString('utf-8'), 'cert-a\n');
+        assert.equal(store.toBuffer()?.toString('utf-8'), TEST_CERT_PEM);
     });
 
     it('should append certs across multiple load calls', () => {
         const store = new CaStore();
         const firstLoader = new StubCaCertLoader([
-            CaCert.fromBuffer(Buffer.from('cert-a\n', 'utf-8')),
+            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]);
         const secondLoader = new StubCaCertLoader([
-            CaCert.fromBuffer(Buffer.from('cert-b\n', 'utf-8')),
+            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]);
 
         const firstLoadedCount = store.load(firstLoader);
@@ -63,7 +64,7 @@ describe('CaStore', () => {
 
         assert.equal(firstLoadedCount, 1);
         assert.equal(secondLoadedCount, 1);
-        assert.equal(store.toBuffer()?.toString('utf-8'), 'cert-a\ncert-b\n');
+        assert.equal(store.toBuffer()?.toString('utf-8'), `${TEST_CERT_PEM}${TEST_CERT_PEM}`);
     });
 
     it('should support clear and empty state accessors', () => {
@@ -71,7 +72,7 @@ describe('CaStore', () => {
         const loadedCount = store.load(new StubCaCertLoader([]));
 
         store.load(new StubCaCertLoader([
-            CaCert.fromBuffer(Buffer.from('cert-a\n', 'utf-8')),
+            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]));
         store.clear();
 

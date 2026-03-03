@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { JsonBasedCaCertLoader } from '../../../../../../packages/shared/security/component/cert/loader/json-based-ca-cert-loader';
+import { TEST_CERT_ENV_VALUE, TEST_CERT_PEM } from '../test-cert-fixtures';
 
 const originalEnv = { ...process.env };
 
@@ -20,28 +21,28 @@ describe('JsonBasedCaCertLoader', () => {
     });
 
     it('should load certs from json array source', () => {
-        process.env.JSON_CA_CERTS = '["line1\\\\nline2","line3\\\\nline4"]';
+        process.env.JSON_CA_CERTS = JSON.stringify([TEST_CERT_ENV_VALUE, TEST_CERT_ENV_VALUE]);
         const loader = new JsonBasedCaCertLoader();
 
         const certs = loader.load();
 
         assert.equal(certs.length, 2);
-        assert.equal(certs[0]?.toBuffer().toString('utf-8'), 'line1\nline2');
-        assert.equal(certs[1]?.toBuffer().toString('utf-8'), 'line3\nline4');
+        assert.equal(certs[0]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
+        assert.equal(certs[1]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
     });
 
     it('should throw for non-array json source', () => {
-        process.env.JSON_CA_CERTS = '{"ca":"line1\\\\nline2"}';
+        process.env.JSON_CA_CERTS = '{"ca":"line1\\nline2"}';
         const loader = new JsonBasedCaCertLoader();
 
         assert.throws(
             () => loader.load(),
-            /JSON_CA_CERTS must be a JSON array, e.g. \["CA1_PEM", "CA2_PEM"\]./,
+            /JSON_CA_CERTS must be a JSON array, e.g. \["CA1_PEM", "CA2_PEM"\]\./,
         );
     });
 
     it('should throw for blank cert entries', () => {
-        process.env.JSON_CA_CERTS = '["line1\\\\nline2","   "]';
+        process.env.JSON_CA_CERTS = JSON.stringify([TEST_CERT_ENV_VALUE, '   ']);
         const loader = new JsonBasedCaCertLoader();
 
         assert.throws(

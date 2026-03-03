@@ -7,7 +7,10 @@ export class HandlePostQuotesCommand {
 
 export namespace HandlePostQuotesCommand {
     export class Input {
-        constructor(public readonly body: QuotesPostRequest) {
+        constructor(public readonly payerFsp: string,
+                    public readonly payeeFsp: string,
+                    public readonly correlationId: string,
+                    public readonly request: QuotesPostRequest) {
         }
     }
 

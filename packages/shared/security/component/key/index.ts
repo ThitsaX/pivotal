@@ -2,6 +2,7 @@ export * from './loader/index';
 export * from './private-key-loader';
 export * from './public-key-loader';
 export * from './private-key';
+export * from './rsa-key-pair';
 export * from './private-key-store';
 export * from './private-key-store-factory';
 export * from './public-key';

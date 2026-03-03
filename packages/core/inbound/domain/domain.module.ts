@@ -1,6 +1,13 @@
-import {DynamicModule, Module} from '@nestjs/common';
+import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {FspiopPubSubModule} from '@shared/fspiop';
+import {NatsClientService} from '@shared/nats';
+import {
+    InboundPartiesPublisher,
+    InboundQuotesPublisher,
+    InboundTransfersPublisher,
+    InboundPatchTransfersPublisher,
+} from './publisher';
 import {
     HandleGetPartiesHandler,
     HandlePatchTransfersHandler,
@@ -29,6 +36,29 @@ const CommandHandlers = [
     HandlePutTransfersErrorHandler,
 ];
 
+const Publishers: Provider[] = [
+    {
+        provide: InboundPartiesPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundPartiesPublisher(ncs),
+        inject: [NatsClientService],
+    },
+    {
+        provide: InboundQuotesPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundQuotesPublisher(ncs),
+        inject: [NatsClientService],
+    },
+    {
+        provide: InboundTransfersPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundTransfersPublisher(ncs),
+        inject: [NatsClientService],
+    },
+    {
+        provide: InboundPatchTransfersPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundPatchTransfersPublisher(ncs),
+        inject: [NatsClientService],
+    },
+];
+
 @Module({})
 export class InboundDomainModule {
 
@@ -44,7 +74,7 @@ export class InboundDomainModule {
                 }),
                 ...(asyncOptions.imports ?? []),
             ],
-            providers: [...CommandHandlers],
+            providers: [...CommandHandlers, ...Publishers],
             exports: [CqrsModule],
         };
     }

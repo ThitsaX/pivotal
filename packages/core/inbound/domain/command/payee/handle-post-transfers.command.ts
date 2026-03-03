@@ -7,7 +7,10 @@ export class HandlePostTransfersCommand {
 
 export namespace HandlePostTransfersCommand {
     export class Input {
-        constructor(public readonly body: TransfersPostRequest) {
+        constructor(public readonly payerFsp: string,
+                    public readonly payeeFsp: string,
+                    public readonly correlationId: string,
+                    public readonly request: TransfersPostRequest) {
         }
     }
 

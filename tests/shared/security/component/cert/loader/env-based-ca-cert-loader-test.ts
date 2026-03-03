@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { EnvBasedCaCertLoader } from '../../../../../../packages/shared/security/component/cert/loader/env-based-ca-cert-loader';
+import { TEST_CERT_ENV_VALUE, TEST_CERT_PEM } from '../test-cert-fixtures';
 
 const originalEnv = { ...process.env };
 
@@ -36,20 +37,20 @@ describe('EnvBasedCaCertLoader', () => {
 
     it('should load CA certs by count from environment', () => {
         process.env.CA_COUNT = '2';
-        process.env.CA_CONTENT_1 = 'line1\\nline2';
-        process.env.CA_CONTENT_2 = 'line3\\nline4';
+        process.env.CA_CONTENT_1 = TEST_CERT_ENV_VALUE;
+        process.env.CA_CONTENT_2 = TEST_CERT_ENV_VALUE;
         const loader = new EnvBasedCaCertLoader();
 
         const certs = loader.load();
 
         assert.equal(certs.length, 2);
-        assert.equal(certs[0]?.toBuffer().toString('utf-8'), 'line1\nline2');
-        assert.equal(certs[1]?.toBuffer().toString('utf-8'), 'line3\nline4');
+        assert.equal(certs[0]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
+        assert.equal(certs[1]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
     });
 
     it('should throw when expected cert variable is missing', () => {
         process.env.CA_COUNT = '2';
-        process.env.CA_CONTENT_1 = 'line1\\nline2';
+        process.env.CA_CONTENT_1 = TEST_CERT_ENV_VALUE;
         delete process.env.CA_CONTENT_2;
         const loader = new EnvBasedCaCertLoader();
 
