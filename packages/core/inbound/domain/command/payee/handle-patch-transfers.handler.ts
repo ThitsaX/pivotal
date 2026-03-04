@@ -1,16 +1,16 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {InboundPatchTransfersPublisher} from '../../publisher';
+import {InboundConnectorPatchTransfersPublisher} from '../../publisher';
 import {HandlePatchTransfersCommand} from './handle-patch-transfers.command';
 
 @CommandHandler(HandlePatchTransfersCommand)
 export class HandlePatchTransfersHandler
     implements ICommandHandler<HandlePatchTransfersCommand, HandlePatchTransfersCommand.Output> {
 
-    constructor(private readonly publisher: InboundPatchTransfersPublisher) {}
+    constructor(private readonly publisher: InboundConnectorPatchTransfersPublisher) {}
 
     async execute(command: HandlePatchTransfersCommand): Promise<HandlePatchTransfersCommand.Output> {
         const {payerFsp, payeeFsp, correlationId, response} = command.input;
-        await this.publisher.publish(new InboundPatchTransfersPublisher.Input(payerFsp, payeeFsp, correlationId, response));
+        await this.publisher.publish(new InboundConnectorPatchTransfersPublisher.Message(payerFsp, payeeFsp, correlationId, response));
         return new HandlePatchTransfersCommand.Output();
     }
 }

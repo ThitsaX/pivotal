@@ -1,7 +1,7 @@
 import {NatsClientService} from '@shared/nats';
 import {QuotesPostRequest} from '@shared/fspiop';
 
-export class InboundQuotesPublisher {
+export class InboundConnectorQuotesPublisher {
 
     static subjectFor(payeeFsp: string): string {
         return `fspiop.${payeeFsp}.quotes`;
@@ -9,15 +9,15 @@ export class InboundQuotesPublisher {
 
     constructor(private readonly nats: NatsClientService) {}
 
-    async publish(input: InboundQuotesPublisher.Input): Promise<void> {
+    async publish(message: InboundConnectorQuotesPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(InboundQuotesPublisher.subjectFor(input.payeeFsp), this.nats.codec.encode(input.request));
+        await js.publish(InboundConnectorQuotesPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
     }
 }
 
-export namespace InboundQuotesPublisher {
+export namespace InboundConnectorQuotesPublisher {
 
-    export class Input {
+    export class Message {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
