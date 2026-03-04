@@ -1,7 +1,7 @@
 import {NatsClientService} from '@shared/nats';
 import {PartyIdType} from '@shared/fspiop';
 
-export class InboundPartiesPublisher {
+export class InboundConnectorPartiesPublisher {
 
     static subjectFor(payeeFsp: string): string {
         return `fspiop.${payeeFsp}.parties`;
@@ -9,22 +9,22 @@ export class InboundPartiesPublisher {
 
     constructor(private readonly nats: NatsClientService) {}
 
-    async publish(input: InboundPartiesPublisher.Input): Promise<void> {
+    async publish(message: InboundConnectorPartiesPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(InboundPartiesPublisher.subjectFor(input.payeeFsp), this.nats.codec.encode(input));
+        await js.publish(InboundConnectorPartiesPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
     }
 }
 
-export namespace InboundPartiesPublisher {
+export namespace InboundConnectorPartiesPublisher {
 
-    export class Input {
+    export class Message {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly correlationId: string,
             public readonly partyIdType: PartyIdType,
             public readonly partyId: string,
-            public readonly subId: string | null | undefined
+            public readonly subId: string | null | undefined,
         ) {}
     }
 }

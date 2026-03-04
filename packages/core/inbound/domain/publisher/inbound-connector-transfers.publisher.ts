@@ -1,30 +1,28 @@
 import {NatsClientService} from '@shared/nats';
 import {TransfersPostRequest} from '@shared/fspiop';
 
-export class InboundTransfersPublisher {
-
-    constructor(private readonly nats: NatsClientService) {
-    }
+export class InboundConnectorTransfersPublisher {
 
     static subjectFor(payeeFsp: string): string {
         return `fspiop.${payeeFsp}.transfers`;
     }
 
-    async publish(input: InboundTransfersPublisher.Input): Promise<void> {
+    constructor(private readonly nats: NatsClientService) {}
+
+    async publish(message: InboundConnectorTransfersPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(InboundTransfersPublisher.subjectFor(input.payeeFsp), this.nats.codec.encode(input.request));
+        await js.publish(InboundConnectorTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
     }
 }
 
-export namespace InboundTransfersPublisher {
+export namespace InboundConnectorTransfersPublisher {
 
-    export class Input {
+    export class Message {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly correlationId: string,
             public readonly request: TransfersPostRequest,
-        ) {
-        }
+        ) {}
     }
 }

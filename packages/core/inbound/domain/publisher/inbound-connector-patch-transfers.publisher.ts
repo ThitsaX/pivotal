@@ -1,7 +1,7 @@
 import {NatsClientService} from '@shared/nats';
 import {TransfersIDPatchResponse} from '@shared/fspiop';
 
-export class InboundPatchTransfersPublisher {
+export class InboundConnectorPatchTransfersPublisher {
 
     static subjectFor(payeeFsp: string): string {
         return `fspiop.${payeeFsp}.transfers`;
@@ -9,15 +9,15 @@ export class InboundPatchTransfersPublisher {
 
     constructor(private readonly nats: NatsClientService) {}
 
-    async publish(input: InboundPatchTransfersPublisher.Input): Promise<void> {
+    async publish(message: InboundConnectorPatchTransfersPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(InboundPatchTransfersPublisher.subjectFor(input.payeeFsp), this.nats.codec.encode(input.response));
+        await js.publish(InboundConnectorPatchTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
     }
 }
 
-export namespace InboundPatchTransfersPublisher {
+export namespace InboundConnectorPatchTransfersPublisher {
 
-    export class Input {
+    export class Message {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,

@@ -3,10 +3,10 @@ import {CqrsModule} from '@nestjs/cqrs';
 import {FspiopPubSubModule} from '@shared/fspiop';
 import {NatsClientService} from '@shared/nats';
 import {
-    InboundPartiesPublisher,
-    InboundQuotesPublisher,
-    InboundTransfersPublisher,
-    InboundPatchTransfersPublisher,
+    InboundConnectorPartiesPublisher,
+    InboundConnectorQuotesPublisher,
+    InboundConnectorTransfersPublisher,
+    InboundConnectorPatchTransfersPublisher,
 } from './publisher';
 import {
     HandleGetPartiesHandler,
@@ -38,23 +38,23 @@ const CommandHandlers = [
 
 const Publishers: Provider[] = [
     {
-        provide: InboundPartiesPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundPartiesPublisher(ncs),
+        provide: InboundConnectorPartiesPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundConnectorPartiesPublisher(ncs),
         inject: [NatsClientService],
     },
     {
-        provide: InboundQuotesPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundQuotesPublisher(ncs),
+        provide: InboundConnectorQuotesPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundConnectorQuotesPublisher(ncs),
         inject: [NatsClientService],
     },
     {
-        provide: InboundTransfersPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundTransfersPublisher(ncs),
+        provide: InboundConnectorTransfersPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundConnectorTransfersPublisher(ncs),
         inject: [NatsClientService],
     },
     {
-        provide: InboundPatchTransfersPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundPatchTransfersPublisher(ncs),
+        provide: InboundConnectorPatchTransfersPublisher,
+        useFactory: (ncs: NatsClientService) => new InboundConnectorPatchTransfersPublisher(ncs),
         inject: [NatsClientService],
     },
 ];
