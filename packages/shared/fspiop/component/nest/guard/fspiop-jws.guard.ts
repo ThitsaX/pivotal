@@ -11,7 +11,7 @@ import {FspiopSignature} from '../../fspiop-signature';
 /**
  * NestJS Guard that verifies the FSPIOP JWS signature on incoming HTTP requests.
  *
- * When FspiopSettings.verifyJws is false the guard is a no-op and passes every
+ * When FspiopSettings.useJws is false the guard is a no-op and passes every
  * request through unchanged — use this to disable verification in dev/test.
  *
  * Verification steps (mirror of FspiopSigningInterceptor):
@@ -42,7 +42,7 @@ export class FspiopJwsGuard implements CanActivate {
     ) {}
 
     canActivate(context: ExecutionContext): boolean {
-        if (!this.settings.verifyJws) {
+        if (!this.settings.useJws) {
             return true;
         }
 

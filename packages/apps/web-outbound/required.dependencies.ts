@@ -13,9 +13,8 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
     private static readonly DEFAULT_SWITCH_BASE_URL = 'http://localhost:4000';
     private static readonly DEFAULT_SWITCH_ID = 'switch';
-    private static readonly DEFAULT_SIGN_JWS = false;
-    private static readonly DEFAULT_VERIFY_JWS = false;
-    private static readonly DEFAULT_MUTUAL_TLS = false;
+    private static readonly DEFAULT_USE_JWS = false;
+    private static readonly DEFAULT_USE_MUTUAL_TLS = false;
 
     private readonly outboundPublicKeyStore = new PublicKeyStore();
     private readonly outboundPrivateKeyStore = new PrivateKeyStore();
@@ -33,9 +32,8 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
         return new FspiopSettings(
             this.readString('FSPIOP_SWITCH_BASE_URL', WebOutboundDependencies.DEFAULT_SWITCH_BASE_URL),
             this.readString('FSPIOP_SWITCH_ID', WebOutboundDependencies.DEFAULT_SWITCH_ID),
-            this.readBoolean('FSPIOP_SIGN_JWS', WebOutboundDependencies.DEFAULT_SIGN_JWS),
-            this.readBoolean('FSPIOP_VERIFY_JWS', WebOutboundDependencies.DEFAULT_VERIFY_JWS),
-            this.readBoolean('FSPIOP_MUTUAL_TLS', WebOutboundDependencies.DEFAULT_MUTUAL_TLS),
+            this.readBoolean('FSPIOP_USE_JWS', WebOutboundDependencies.DEFAULT_USE_JWS),
+            this.readBoolean('FSPIOP_USE_MUTUAL_TLS', WebOutboundDependencies.DEFAULT_USE_MUTUAL_TLS),
         );
     }
 

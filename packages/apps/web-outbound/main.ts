@@ -4,6 +4,7 @@ import {dirname, resolve} from 'node:path';
 import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
+import {FspiopExceptionFilter} from '@shared/fspiop';
 import {WebOutboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -58,6 +59,7 @@ const bootstrap = async (): Promise<void> => {
 
     const app = await NestFactory.create(WebOutboundAppModule);
     app.enableShutdownHooks();
+    app.useGlobalFilters(new FspiopExceptionFilter());
 
     await app.listen(port);
     Logger.log(`Web outbound is listening on port ${port}.`, 'Bootstrap');

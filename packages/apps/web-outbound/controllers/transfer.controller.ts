@@ -2,28 +2,40 @@ import {
     Body,
     Controller,
     HttpCode,
-    HttpException,
     HttpStatus,
     Post,
 } from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {AuditOutboundTransfersCommand} from '@core/audit/domain';
+import {OutboundTransfersAuditPublisher} from '@core/audit/producer';
 import {DoTransferCommand} from '@core/outbound/domain';
 import {
+    ErrorInformationObject,
+    FspiopErrors,
     FspiopException,
-    FspiopStatusTranslator,
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
+import {Snowflake} from '@shared/snowflake';
 
 @Controller('transfer')
 export class TransferController {
 
-    constructor(private readonly commandBus: CommandBus) {
+    private static readonly RAIL = 'fspiop';
+    private static readonly SNOWFLAKE = Snowflake.get();
+
+    constructor(
+        private readonly commandBus: CommandBus,
+        private readonly auditPublisher: OutboundTransfersAuditPublisher,
+    ) {
     }
 
     @Post()
     @HttpCode(HttpStatus.OK)
     async transfer(@Body() request: TransferController.Request): Promise<TransferController.Response> {
+        const createdAt = new Date();
+        const id = TransferController.nextAuditId();
+
         try {
             const input = new DoTransferCommand.Input(
                 request.correlationId,
@@ -37,25 +49,60 @@ export class TransferController {
                 new DoTransferCommand(input),
             );
 
+            await this.auditPublisher.publish(
+                new AuditOutboundTransfersCommand.Input(
+                    id,
+                    TransferController.RAIL,
+                    request.source,
+                    request.destination,
+                    request.correlationId,
+                    request.transferId,
+                    request.request,
+                    output.response,
+                    null,
+                    createdAt,
+                    new Date(),
+                ),
+            );
+
             return new TransferController.Response(output.response);
         } catch (error) {
-            TransferController.rethrowAsHttp(error);
+            try {
+                await this.auditPublisher.publish(
+                    new AuditOutboundTransfersCommand.Input(
+                        id,
+                        TransferController.RAIL,
+                        request.source,
+                        request.destination,
+                        request.correlationId,
+                        request.transferId,
+                        request.request,
+                        null,
+                        TransferController.toAuditError(error),
+                        createdAt,
+                        new Date(),
+                    ),
+                );
+            } finally {
+                throw error;
+            }
         }
     }
 
-    private static rethrowAsHttp(error: unknown): never {
-        if (error instanceof HttpException) {
-            throw error;
-        }
-
+    private static toAuditError(error: unknown): ErrorInformationObject {
         if (error instanceof FspiopException) {
-            throw new HttpException(
-                error.toErrorObject(),
-                FspiopStatusTranslator.toHttpStatus(error),
-            );
+            return error.toErrorObject();
         }
 
-        throw error;
+        const message = error instanceof Error
+            ? error.message
+            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
+
+        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject();
+    }
+
+    private static nextAuditId(): string {
+        return TransferController.SNOWFLAKE.nextId().toString();
     }
 }
 
