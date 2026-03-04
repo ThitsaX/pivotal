@@ -38,11 +38,11 @@ export class FspiopAxiosModule {
                     const clientCertStore = deps.clientCertStore();
                     const params = deps.fspiopAxiosParams?.() ?? {};
 
-                    const interceptors = settings.signJws
+                    const interceptors = settings.useJws
                         ? [new FspiopSigningInterceptor(privateKeyStore).build()]
                         : [];
 
-                    const httpsAgent = settings.mutualTls
+                    const httpsAgent = settings.useMutualTls
                         ? new https.Agent({
                             ca:   caStore.toBuffer(),
                             cert: clientCertStore.get()?.certBuffer(),

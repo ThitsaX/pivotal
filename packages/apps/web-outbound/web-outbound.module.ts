@@ -1,4 +1,5 @@
 import {DynamicModule, Module} from '@nestjs/common';
+import {AuditProducerModule} from '@core/audit/producer';
 import {OutboundDomainModule} from '@core/outbound/domain';
 import {
     LookupController,
@@ -25,6 +26,11 @@ export class WebOutboundModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                AuditProducerModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
             controllers: [
@@ -38,7 +44,9 @@ export class WebOutboundModule {
 
 export namespace WebOutboundModule {
 
-    export interface RequiredDependencies extends OutboundDomainModule.RequiredDependencies {
+    export interface RequiredDependencies
+        extends OutboundDomainModule.RequiredDependencies,
+            AuditProducerModule.RequiredDependencies {
     }
 
     export type AsyncOptions = {
