@@ -11,13 +11,15 @@
  */
 import { FxRateSourceAmount } from './fx-rate-source-amount';
 import { FxRateTargetAmount } from './fx-rate-target-amount';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The FxRate object contains information about a currency conversion in the transfer. It can be used by parties to the transfer to exchange information with each other about the exchange rate for the transfer, to ensure that the best rate can be agreed on.
  */
-export interface FxRate { 
-    sourceAmount: FxRateSourceAmount;
-    targetAmount: FxRateTargetAmount;
+export class FxRate { 
+    @ApiProperty({type: () => FxRateSourceAmount})
+    sourceAmount!: FxRateSourceAmount;
+    targetAmount!: FxRateTargetAmount;
 }
 

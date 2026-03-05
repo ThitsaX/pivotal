@@ -1,16 +1,16 @@
-import { Injectable } from '@nestjs/common';
 import { PrivateKey } from './private-key';
 import { PrivateKeyLoader } from './private-key-loader';
 
-@Injectable()
 export class PrivateKeyStore {
+
+    constructor(private readonly loader: PrivateKeyLoader) {}
 
     private readonly privateKeysByFspId = new Map<string, PrivateKey>();
 
-    load(loader: PrivateKeyLoader): number {
+    load(): number {
         let loadedCount = 0;
 
-        const keysByFspId = loader.load();
+        const keysByFspId = this.loader.load();
 
         for (const [fspId, privateKey] of keysByFspId.entries()) {
             this.put(fspId, privateKey);

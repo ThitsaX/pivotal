@@ -10,12 +10,14 @@
  * Do not edit the class manually.
  */
 import { ErrorInformation } from './error-information';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type object that contains an optional element ErrorInformation used along with 4xx and 5xx responses.
  */
-export interface ErrorInformationResponse { 
+export class ErrorInformationResponse { 
+    @ApiProperty({type: () => ErrorInformation, required: false})
     errorInformation?: ErrorInformation;
 }
 

@@ -14,28 +14,33 @@ import {TransactionType} from './transaction-type';
 import {Party} from './party';
 import {AmountType} from './amount-type';
 import {ExtensionList} from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type IndividualQuote.
  */
-export interface IndividualQuote { 
+export class IndividualQuote { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    quoteId: string;
+    @ApiProperty({type: String})
+    quoteId!: string;
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    transactionId: string;
-    payee: Party;
-    amountType: AmountType;
-    amount: Money;
+    @ApiProperty({type: String})
+    transactionId!: string;
+    payee!: Party;
+    amountType!: AmountType;
+    @ApiProperty({type: () => Money})
+    amount!: Money;
     fees?: Money;
-    transactionType: TransactionType;
+    transactionType!: TransactionType;
     /**
      * Memo assigned to transaction.
      */
+    @ApiProperty({type: String, required: false})
     note?: string;
     extensionList?: ExtensionList;
 }

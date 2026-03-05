@@ -9,19 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * U2F challenge-response, where payer FSP verifies if the response provided by end-user device matches the previously registered key. 
  */
-export interface U2FPinValue { 
+export class U2FPinValue { 
     /**
      * U2F challenge-response.
      */
-    pinValue: string;
+    @ApiProperty({type: String})
+    pinValue!: string;
     /**
      * Sequential counter used for cloning detection. Present only for U2F authentication.
      */
-    counter: string;
+    @ApiProperty({type: String})
+    counter!: string;
 }
-

@@ -9,19 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type Extension.
  */
-export interface Extension { 
+export class Extension { 
     /**
      * Extension key.
      */
-    key: string;
+    @ApiProperty({type: String})
+    key!: string;
     /**
      * Extension value.
      */
-    value: string;
+    @ApiProperty({type: String})
+    value!: string;
 }
-

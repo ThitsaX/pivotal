@@ -10,15 +10,17 @@
  * Do not edit the class manually.
  */
 import { Extension } from './extension';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type ExtensionList. An optional list of extensions, specific to deployment.
  */
-export interface ExtensionList { 
+export class ExtensionList { 
     /**
      * Number of Extension elements.
      */
-    extension: Array<Extension>;
+    @ApiProperty({type: () => Extension, isArray: true})
+    extension!: Array<Extension>;
 }
 

@@ -1,10 +1,12 @@
 import {
     Body,
     Controller,
+    Headers,
     HttpCode,
     HttpStatus,
     Post,
 } from '@nestjs/common';
+import {ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundQuotesCommand} from '@core/audit/domain';
 import {OutboundQuotesAuditPublisher} from '@core/audit/producer';
@@ -13,11 +15,36 @@ import {
     ErrorInformationObject,
     FspiopErrors,
     FspiopException,
+    FspiopHeaders,
     QuotesIDPutResponse,
     QuotesPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 
+export class QuoteRequest {
+    @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
+    correlationId!: string;
+
+    @ApiProperty({type: String, description: 'The FSP ID of the destination (payee FSP)'})
+    destination!: string;
+
+    @ApiProperty({type: String, description: 'Unique identifier for this quote'})
+    quoteId!: string;
+
+    @ApiProperty({type: () => QuotesPostRequest, description: 'FSPIOP POST /quotes request payload'})
+    request!: QuotesPostRequest;
+}
+
+export class QuoteResponse {
+    @ApiProperty({type: () => QuotesIDPutResponse, description: 'FSPIOP PUT /quotes/{quoteId} response payload'})
+    readonly response: QuotesIDPutResponse;
+
+    constructor(response: QuotesIDPutResponse) {
+        this.response = response;
+    }
+}
+
+@ApiTags('Quote')
 @Controller('quote')
 export class QuoteController {
 
@@ -32,14 +59,21 @@ export class QuoteController {
 
     @Post()
     @HttpCode(HttpStatus.OK)
-    async quote(@Body() request: QuoteController.Request): Promise<QuoteController.Response> {
+    @ApiOperation({summary: 'Initiate a quoting request via FSPIOP'})
+    @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
+    @ApiBody({type: QuoteRequest})
+    @ApiOkResponse({type: QuoteResponse})
+    async quote(
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
+        @Body() request: QuoteRequest,
+    ): Promise<QuoteResponse> {
         const createdAt = new Date();
         const id = QuoteController.nextAuditId();
 
         try {
             const input = new DoQuotingCommand.Input(
                 request.correlationId,
-                request.source,
+                source,
                 request.destination,
                 request.quoteId,
                 request.request,
@@ -53,7 +87,7 @@ export class QuoteController {
                 new AuditOutboundQuotesCommand.Input(
                     id,
                     QuoteController.RAIL,
-                    request.source,
+                    source,
                     request.destination,
                     request.correlationId,
                     request.quoteId,
@@ -65,14 +99,14 @@ export class QuoteController {
                 ),
             );
 
-            return new QuoteController.Response(output.response);
+            return new QuoteResponse(output.response);
         } catch (error) {
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundQuotesCommand.Input(
                         id,
                         QuoteController.RAIL,
-                        request.source,
+                        source,
                         request.destination,
                         request.correlationId,
                         request.quoteId,
@@ -103,21 +137,5 @@ export class QuoteController {
 
     private static nextAuditId(): string {
         return QuoteController.SNOWFLAKE.nextId().toString();
-    }
-}
-
-export namespace QuoteController {
-
-    export class Request {
-        correlationId!: string;
-        source!: string;
-        destination!: string;
-        quoteId!: string;
-        request!: QuotesPostRequest;
-    }
-
-    export class Response {
-        constructor(public readonly response: QuotesIDPutResponse) {
-        }
     }
 }

@@ -10,13 +10,15 @@
  * Do not edit the class manually.
  */
 import { FxQuotesIDPutResponseConversionTerms } from './fx-quotes-id-put-response-conversion-terms';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /fxQuotes/{ID} callback.
  */
-export interface FxQuotesIDPutResponse { 
+export class FxQuotesIDPutResponse { 
+    @ApiProperty({type: String, required: false})
     condition?: string;
-    conversionTerms: FxQuotesIDPutResponseConversionTerms;
+    conversionTerms!: FxQuotesIDPutResponseConversionTerms;
 }
 

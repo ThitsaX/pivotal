@@ -20,9 +20,9 @@ export class ClientCertStoreFactory {
     private constructor() {}
 
     static create(mode: string): ClientCertStore {
-        const store  = new ClientCertStore();
         const loader = ClientCertStoreFactory.createLoader(mode);
-        store.load(loader);
+        const store = new ClientCertStore(loader);
+        store.load();
         return store;
     }
 

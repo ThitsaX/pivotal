@@ -20,9 +20,9 @@ export class PublicKeyStoreFactory {
     private constructor() {}
 
     static create(mode: string): PublicKeyStore {
-        const store  = new PublicKeyStore();
         const loader = PublicKeyStoreFactory.createLoader(mode);
-        store.load(loader);
+        const store = new PublicKeyStore(loader);
+        store.load();
         return store;
     }
 

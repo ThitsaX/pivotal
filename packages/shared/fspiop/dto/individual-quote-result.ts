@@ -13,28 +13,33 @@ import { ErrorInformation } from './error-information';
 import { Money } from './money';
 import { Party } from './party';
 import { ExtensionList } from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type IndividualQuoteResult.
  */
-export interface IndividualQuoteResult { 
+export class IndividualQuoteResult { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    quoteId: string;
+    @ApiProperty({type: String})
+    quoteId!: string;
     payee?: Party;
     transferAmount?: Money;
+    @ApiProperty({type: () => Money, required: false})
     payeeReceiveAmount?: Money;
     payeeFspFee?: Money;
     payeeFspCommission?: Money;
     /**
      * Information for recipient (transport layer information).
      */
+    @ApiProperty({type: String, required: false})
     ilpPacket?: string;
     /**
      * Condition that must be attached to the transfer by the Payer.
      */
+    @ApiProperty({type: String, required: false})
     condition?: string;
     errorInformation?: ErrorInformation;
     extensionList?: ExtensionList;

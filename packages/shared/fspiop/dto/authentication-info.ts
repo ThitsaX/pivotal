@@ -11,14 +11,16 @@
  */
 import {AuthenticationValue} from './authentication-value';
 import {AuthenticationType} from './authentication-type';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type AuthenticationInfo.
  */
-export interface AuthenticationInfo { 
-    authentication: AuthenticationType;
-    authenticationValue: AuthenticationValue;
+export class AuthenticationInfo { 
+    @ApiProperty({enum: AuthenticationType, enumName: 'AuthenticationType'})
+    authentication!: AuthenticationType;
+    authenticationValue!: AuthenticationValue;
 }
 
 

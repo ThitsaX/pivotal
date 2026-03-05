@@ -10,12 +10,14 @@
  * Do not edit the class manually.
  */
 import { Extension } from './extension';
+import { ApiProperty } from '@nestjs/swagger';
 
 
-export interface FxConversionExtensionList { 
+export class FxConversionExtensionList { 
     /**
      * Number of Extension elements.
      */
-    extension: Array<Extension>;
+    @ApiProperty({type: () => Extension, isArray: true})
+    extension!: Array<Extension>;
 }
 

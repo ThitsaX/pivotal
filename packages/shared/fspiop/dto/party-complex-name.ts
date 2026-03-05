@@ -9,23 +9,26 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type PartyComplexName.
  */
-export interface PartyComplexName { 
+export class PartyComplexName { 
     /**
      * First name of the Party (Name Type).
      */
+    @ApiProperty({type: String, required: false})
     firstName?: string;
     /**
      * Middle name of the Party (Name Type).
      */
+    @ApiProperty({type: String, required: false})
     middleName?: string;
     /**
      * Last name of the Party (Name Type).
      */
+    @ApiProperty({type: String, required: false})
     lastName?: string;
 }
-

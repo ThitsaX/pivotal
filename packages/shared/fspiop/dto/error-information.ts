@@ -10,20 +10,23 @@
  * Do not edit the class manually.
  */
 import { ExtensionList } from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type ErrorInformation.
  */
-export interface ErrorInformation { 
+export class ErrorInformation { 
     /**
      * The API data type ErrorCode is a JSON String of four characters, consisting of digits only. Negative numbers are not allowed. A leading zero is not allowed. Each error code in the API is a four-digit number, for example, 1234, where the first number (1 in the example) represents the high-level error category, the second number (2 in the example) represents the low-level error category, and the last two numbers (34 in the example) represent the specific error.
      */
-    errorCode: string;
+    @ApiProperty({type: String})
+    errorCode!: string;
     /**
      * Error description string.
      */
-    errorDescription: string;
+    @ApiProperty({type: String})
+    errorDescription!: string;
     extensionList?: ExtensionList;
 }
 

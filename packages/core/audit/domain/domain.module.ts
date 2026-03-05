@@ -1,7 +1,7 @@
 import {DynamicModule, Module} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
-import {TypeOrmModule, TypeOrmSettings} from '@shared/typeorm';
+import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {
     AuditInboundPartiesHandler,
     AuditInboundQuotesHandler,
@@ -66,21 +66,17 @@ export class AuditDomainModule {
                 CqrsModule,
                 TypeOrmModule.forRootAsync({
                     connectionName: PAYPORT_DB_WRITE_CONNECTION_NAME,
+                    target: DbTarget.Write,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
-                    useFactory: async (...args) => {
-                        const deps = await asyncOptions.useFactory(...args);
-                        return {typeOrmSettings: () => deps.writeTypeOrmSettings()};
-                    },
+                    useFactory: asyncOptions.useFactory,
                 }),
                 TypeOrmModule.forRootAsync({
                     connectionName: PAYPORT_DB_READ_CONNECTION_NAME,
+                    target: DbTarget.Read,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
-                    useFactory: async (...args) => {
-                        const deps = await asyncOptions.useFactory(...args);
-                        return {typeOrmSettings: () => deps.readTypeOrmSettings()};
-                    },
+                    useFactory: asyncOptions.useFactory,
                 }),
                 NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_WRITE_CONNECTION_NAME),
                 NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_READ_CONNECTION_NAME),
@@ -93,9 +89,7 @@ export class AuditDomainModule {
 
 export namespace AuditDomainModule {
 
-    export interface RequiredDependencies {
-        writeTypeOrmSettings(): TypeOrmSettings;
-        readTypeOrmSettings(): TypeOrmSettings;
+    export interface RequiredDependencies extends TypeOrmModule.RequiredDependencies {
     }
 
     export type AsyncOptions = {

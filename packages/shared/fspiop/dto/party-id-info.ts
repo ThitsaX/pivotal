@@ -11,24 +11,29 @@
  */
 import {PartyIdType} from './party-id-type';
 import {ExtensionList} from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type PartyIdInfo. An ExtensionList element has been added to this reqeust in version v1.1
  */
-export interface PartyIdInfo { 
-    partyIdType: PartyIdType;
+export class PartyIdInfo { 
+    @ApiProperty({enum: PartyIdType, enumName: 'PartyIdType'})
+    partyIdType!: PartyIdType;
     /**
      * Identifier of the Party.
      */
-    partyIdentifier: string;
+    @ApiProperty({type: String})
+    partyIdentifier!: string;
     /**
      * Either a sub-identifier of a PartyIdentifier, or a sub-type of the PartyIdType, normally a PersonalIdentifierType.
      */
+    @ApiProperty({type: String, required: false})
     partySubIdOrType?: string;
     /**
      * FSP identifier.
      */
+    @ApiProperty({type: String, required: false})
     fspId?: string;
     extensionList?: ExtensionList;
 }

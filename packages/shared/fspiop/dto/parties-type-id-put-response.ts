@@ -10,12 +10,14 @@
  * Do not edit the class manually.
  */
 import { Party } from './party';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /parties/{Type}/{ID} callback.
  */
-export interface PartiesTypeIDPutResponse { 
-    party: Party;
+export class PartiesTypeIDPutResponse { 
+    @ApiProperty({type: () => Party})
+    party!: Party;
 }
 

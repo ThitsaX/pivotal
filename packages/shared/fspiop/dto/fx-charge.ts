@@ -11,16 +11,18 @@
  */
 import { FxChargeTargetAmount } from './fx-charge-target-amount';
 import { FxChargeSourceAmount } from './fx-charge-source-amount';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * An FXP will be able to specify a charge which it proposes to levy on the currency conversion operation using a FxCharge object.
  */
-export interface FxCharge { 
+export class FxCharge { 
     /**
      * A description of the charge which is being levied.
      */
-    chargeType: string;
+    @ApiProperty({type: String})
+    chargeType!: string;
     sourceAmount?: FxChargeSourceAmount;
     targetAmount?: FxChargeTargetAmount;
 }

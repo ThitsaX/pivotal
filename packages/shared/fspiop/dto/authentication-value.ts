@@ -10,19 +10,22 @@
  * Do not edit the class manually.
  */
 import { U2FPinValue } from './u2-f-pin-value';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Contains the authentication value. The format depends on the authentication type used in the AuthenticationInfo complex type.
  */
-export interface AuthenticationValue { 
+export class AuthenticationValue { 
     /**
      * U2F challenge-response.
      */
-    pinValue: string;
+    @ApiProperty({type: String})
+    pinValue!: string;
     /**
      * Sequential counter used for cloning detection. Present only for U2F authentication.
      */
-    counter: string;
+    @ApiProperty({type: String})
+    counter!: string;
 }
 

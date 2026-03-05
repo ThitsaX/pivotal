@@ -10,20 +10,24 @@
  * Do not edit the class manually.
  */
 import { PartyComplexName } from './party-complex-name';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type PartyPersonalInfo.
  */
-export interface PartyPersonalInfo { 
+export class PartyPersonalInfo { 
+    @ApiProperty({type: () => PartyComplexName, required: false})
     complexName?: PartyComplexName;
     /**
      * Date of Birth of the Party.
      */
+    @ApiProperty({type: String, required: false})
     dateOfBirth?: string;
     /**
      * KYC information for the party in a form mandated by an individual scheme.
      */
+    @ApiProperty({type: String, required: false})
     kycInformation?: string;
 }
 

@@ -53,7 +53,7 @@
     "core-audit-consumer": {
       "type": "application",
       "root": "packages/core/audit/consumer",
-      "entryFile": "main",
+      "entryFile": "core/audit/consumer/main",
       "sourceRoot": "packages/core/audit/consumer",
       "compilerOptions": {
         "tsConfigPath": "packages/core/audit/consumer/tsconfig.app.json"
@@ -62,7 +62,7 @@
     "apps-web-outbound": {
       "type": "application",
       "root": "packages/apps/web-outbound",
-      "entryFile": "main",
+      "entryFile": "apps/web-outbound/main",
       "sourceRoot": "packages/apps/web-outbound",
       "compilerOptions": {
         "tsConfigPath": "packages/apps/web-outbound/tsconfig.app.json"
@@ -71,7 +71,7 @@
     "apps-web-inbound": {
       "type": "application",
       "root": "packages/apps/web-inbound",
-      "entryFile": "main",
+      "entryFile": "apps/web-inbound/main",
       "sourceRoot": "packages/apps/web-inbound",
       "compilerOptions": {
         "tsConfigPath": "packages/apps/web-inbound/tsconfig.app.json"
@@ -98,7 +98,7 @@
     "ports-fspiop": {
       "type": "application",
       "root": "packages/ports/fspiop",
-      "entryFile": "main",
+      "entryFile": "ports/fspiop/main",
       "sourceRoot": "packages/ports/fspiop",
       "compilerOptions": {
         "tsConfigPath": "packages/ports/fspiop/tsconfig.app.json"
@@ -107,7 +107,7 @@
     "ports-iso20022": {
       "type": "application",
       "root": "packages/ports/iso20022",
-      "entryFile": "main",
+      "entryFile": "ports/iso20022/main",
       "sourceRoot": "packages/ports/iso20022",
       "compilerOptions": {
         "tsConfigPath": "packages/ports/iso20022/tsconfig.app.json"
