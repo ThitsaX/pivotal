@@ -27,6 +27,10 @@ export class ErrorInformation {
      */
     @ApiProperty({type: String})
     errorDescription!: string;
+
+    /**
+     * Optional deployment-specific extension metadata.
+     */
+    @ApiProperty({type: () => ExtensionList, required: false})
     extensionList?: ExtensionList;
 }
-

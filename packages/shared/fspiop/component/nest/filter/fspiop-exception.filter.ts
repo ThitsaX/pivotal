@@ -1,5 +1,6 @@
 import {ArgumentsHost, Catch, ExceptionFilter, Logger} from '@nestjs/common';
 import {Response} from 'express';
+import {ErrorInformationResponse} from '../../../dto/error-information-response';
 import {FspiopErrors} from '../../../exception/fspiop-errors';
 import {FspiopException} from '../../../exception/fspiop-exception';
 import {FspiopStatusTranslator} from '../../fspiop-status-translator';
@@ -10,7 +11,7 @@ import {FspiopStatusTranslator} from '../../fspiop-status-translator';
  * Catches every unhandled exception from guards, interceptors and controllers:
  *
  *   FspiopException → translated to the correct HTTP status via FspiopStatusTranslator
- *                     and responded as an FSPIOP ErrorInformationObject body.
+ *                     and responded as an FSPIOP ErrorInformationResponse body.
  *
  *   Any other Error → wrapped in a FspiopException(INTERNAL_SERVER_ERROR) using
  *                     the original error message, then handled the same way.
@@ -42,7 +43,7 @@ export class FspiopExceptionFilter implements ExceptionFilter {
 
         response
             .status(status)
-            .json(fspiopException.toErrorObject());
+            .json(FspiopExceptionFilter.toErrorResponse(fspiopException));
     }
 
     private static toFspiopException(exception: unknown): FspiopException {
@@ -55,5 +56,11 @@ export class FspiopExceptionFilter implements ExceptionFilter {
             : 'An unexpected error occurred.';
 
         return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message);
+    }
+
+    private static toErrorResponse(exception: FspiopException): ErrorInformationResponse {
+        const response = new ErrorInformationResponse();
+        response.errorInformation = exception.toErrorObject().errorInformation;
+        return response;
     }
 }

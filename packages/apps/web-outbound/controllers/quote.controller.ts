@@ -20,6 +20,7 @@ import {
     QuotesPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class QuoteRequest {
     @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
@@ -63,6 +64,7 @@ export class QuoteController {
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiBody({type: QuoteRequest})
     @ApiOkResponse({type: QuoteResponse})
+    @ApiFspiopErrorResponses()
     async quote(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: QuoteRequest,

@@ -63,8 +63,10 @@ const bootstrap = async (): Promise<void> => {
     app.useGlobalFilters(new FspiopExceptionFilter());
 
     const swaggerConfig = new DocumentBuilder()
-        .setTitle('PayPort Web Outbound')
-        .setDescription('Outbound API for initiating FSPIOP lookup, quoting, and transfer flows')
+        .setTitle('PayPort - Outbound')
+        .setDescription(
+            'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows. ',
+        )
         .setVersion('1.0.0')
         .addApiKey({type: 'apiKey', name: FspiopHeaders.Names.FSPIOP_SOURCE, in: 'header'}, FspiopHeaders.Names.FSPIOP_SOURCE)
         .build();

@@ -6,6 +6,7 @@ import {OutboundPartiesAuditPublisher} from '@core/audit/producer';
 import {DoLookupCommand} from '@core/outbound/domain';
 import {ErrorInformationObject, FspiopErrors, FspiopException, FspiopHeaders, PartiesTypeIDPutResponse, PartyIdType,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class LookupRequest {
     @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
@@ -68,6 +69,7 @@ export class LookupController {
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiBody({type: LookupRequest})
     @ApiOkResponse({type: LookupResponse})
+    @ApiFspiopErrorResponses()
     async lookup(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: LookupRequest,
