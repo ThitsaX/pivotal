@@ -16,30 +16,36 @@ import { Party } from './party';
 import { TransactionPayeeReceiveAmount } from './transaction-payee-receive-amount';
 import { ExtensionList } from './extension-list';
 import { CurrencyConverter } from './currency-converter';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type Transaction. The Transaction type is used to carry end-to-end data between the Payer FSP and the Payee FSP in the ILP Packet. Both the transactionId and the quoteId in the data model are decided by the Payer FSP in the POST /quotes request.
  */
-export interface Transaction { 
+export class Transaction { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    transactionId: string;
+    @ApiProperty({type: String})
+    transactionId!: string;
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    quoteId: string;
-    payee: Party;
-    payer: Party;
-    amount: Money;
+    @ApiProperty({type: String})
+    quoteId!: string;
+    payee!: Party;
+    payer!: Party;
+    @ApiProperty({type: () => Money})
+    amount!: Money;
     payeeReceiveAmount?: TransactionPayeeReceiveAmount;
     converter?: CurrencyConverter;
+    @ApiProperty({type: () => QuotesPostRequestCurrencyConversion, required: false})
     currencyConversion?: QuotesPostRequestCurrencyConversion;
-    transactionType: TransactionType;
+    transactionType!: TransactionType;
     /**
      * Memo assigned to transaction.
      */
+    @ApiProperty({type: String, required: false})
     note?: string;
     extensionList?: ExtensionList;
 }

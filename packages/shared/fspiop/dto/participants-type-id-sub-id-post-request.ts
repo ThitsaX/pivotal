@@ -11,16 +11,18 @@
  */
 import {Currency} from './currency';
 import {ExtensionList} from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the POST /participants/{Type}/{ID}/{SubId} and /participants/{Type}/{ID} requests. An additional optional ExtensionList element has been added as part of v1.1 changes.
  */
-export interface ParticipantsTypeIDSubIDPostRequest { 
+export class ParticipantsTypeIDSubIDPostRequest { 
     /**
      * FSP identifier.
      */
-    fspId: string;
+    @ApiProperty({type: String})
+    fspId!: string;
     currency?: Currency;
     extensionList?: ExtensionList;
 }

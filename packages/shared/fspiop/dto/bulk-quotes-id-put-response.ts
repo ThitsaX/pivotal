@@ -11,20 +11,23 @@
  */
 import { IndividualQuoteResult } from './individual-quote-result';
 import { ExtensionList } from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /bulkQuotes/{ID} callback.
  */
-export interface BulkQuotesIDPutResponse { 
+export class BulkQuotesIDPutResponse { 
     /**
      * Fees for each individual transaction, if any of them are charged per transaction.
      */
+    @ApiProperty({type: () => IndividualQuoteResult, isArray: true, required: false})
     individualQuoteResults?: Array<IndividualQuoteResult>;
     /**
      * The API data type DateTime is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons. The format is according to [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html), expressed in a combined date, time and time zone format. A more readable version of the format is yyyy-MM-ddTHH:mm:ss.SSS[-HH:MM]. Examples are \"2016-05-24T08:38:08.699-04:00\", \"2016-05-24T08:38:08.699Z\" (where Z indicates Zulu time zone, same as UTC).
      */
-    expiration: string;
+    @ApiProperty({type: String})
+    expiration!: string;
     extensionList?: ExtensionList;
 }
 

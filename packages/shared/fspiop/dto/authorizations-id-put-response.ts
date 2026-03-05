@@ -11,14 +11,16 @@
  */
 import {AuthenticationInfo} from './authentication-info';
 import {AuthorizationResponse} from './authorization-response';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /authorizations/{ID} callback.
  */
-export interface AuthorizationsIDPutResponse { 
+export class AuthorizationsIDPutResponse { 
+    @ApiProperty({type: () => AuthenticationInfo, required: false})
     authenticationInfo?: AuthenticationInfo;
-    responseType: AuthorizationResponse;
+    responseType!: AuthorizationResponse;
 }
 
 

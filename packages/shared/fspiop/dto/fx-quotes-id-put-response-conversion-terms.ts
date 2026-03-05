@@ -14,20 +14,25 @@ import { FxConversionTargetAmount } from './fx-conversion-target-amount';
 import { FxCharge } from './fx-charge';
 import { FxConversionSourceAmount } from './fx-conversion-source-amount';
 import { AmountType } from './amount-type';
+import { ApiProperty } from '@nestjs/swagger';
 
 
-export interface FxQuotesIDPutResponseConversionTerms { 
-    conversionId: string;
+export class FxQuotesIDPutResponseConversionTerms { 
+    @ApiProperty({type: String})
+    conversionId!: string;
     determiningTransferId?: string;
-    initiatingFsp: string;
-    counterPartyFsp: string;
-    amountType: AmountType;
-    sourceAmount: FxConversionSourceAmount;
-    targetAmount: FxConversionTargetAmount;
-    expiration: string;
+    initiatingFsp!: string;
+    @ApiProperty({type: String})
+    counterPartyFsp!: string;
+    amountType!: AmountType;
+    sourceAmount!: FxConversionSourceAmount;
+    @ApiProperty({type: () => FxConversionTargetAmount})
+    targetAmount!: FxConversionTargetAmount;
+    expiration!: string;
     /**
      * One or more charges which the FXP intends to levy as part of the currency conversion, or which the payee DFSP intends to add to the amount transferred.
      */
+    @ApiProperty({type: () => FxCharge, isArray: true, required: false})
     charges?: Array<FxCharge>;
     extensionList?: FxConversionExtensionList;
 }

@@ -22,13 +22,14 @@ class StubClientCertLoader extends ClientCertLoader {
 describe('ClientCertStore', () => {
 
     it('should load and return client cert pair', () => {
-        const store = new ClientCertStore();
         const source = ClientCert.fromBuffers(
             Buffer.from(TEST_CERT_PEM, 'utf-8'),
             Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'),
         );
+        const loader = new StubClientCertLoader(source);
+        const store = new ClientCertStore(loader);
 
-        store.load(new StubClientCertLoader(source));
+        store.load();
         const loaded = store.get();
 
         assert.ok(loaded);
@@ -38,20 +39,20 @@ describe('ClientCertStore', () => {
     });
 
     it('should stay empty when loader returns undefined', () => {
-        const store = new ClientCertStore();
+        const store = new ClientCertStore(new StubClientCertLoader(undefined));
 
-        store.load(new StubClientCertLoader(undefined));
+        store.load();
 
         assert.equal(store.isEmpty(), true);
         assert.equal(store.get(), undefined);
     });
 
     it('should support clear', () => {
-        const store = new ClientCertStore();
-        store.load(new StubClientCertLoader(ClientCert.fromBuffers(
+        const store = new ClientCertStore(new StubClientCertLoader(ClientCert.fromBuffers(
             Buffer.from(TEST_CERT_PEM, 'utf-8'),
             Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'),
         )));
+        store.load();
 
         store.clear();
 

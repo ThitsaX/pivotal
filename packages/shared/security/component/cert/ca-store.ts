@@ -1,4 +1,3 @@
-import {Injectable} from '@nestjs/common';
 import {CaCert} from './ca-cert';
 import {CaCertLoader} from './ca-cert-loader';
 
@@ -12,8 +11,10 @@ import {CaCertLoader} from './ca-cert-loader';
  * Usage with mTLS:
  *   new https.Agent({ ca: caStore.toBuffer(), cert: ..., key: ... })
  */
-@Injectable()
 export class CaStore {
+
+    constructor(private readonly loader: CaCertLoader) {
+    }
 
     private combined: Buffer | undefined;
 
@@ -22,8 +23,8 @@ export class CaStore {
      * internal combined buffer, appending to any previously loaded certs.
      * Returns the number of certificates loaded in this call.
      */
-    load(loader: CaCertLoader): number {
-        const certs = loader.load();
+    load(): number {
+        const certs = this.loader.load();
 
         if (certs.length === 0) {
             return 0;

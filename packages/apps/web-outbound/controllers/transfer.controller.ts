@@ -1,10 +1,12 @@
 import {
     Body,
     Controller,
+    Headers,
     HttpCode,
     HttpStatus,
     Post,
 } from '@nestjs/common';
+import {ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundTransfersCommand} from '@core/audit/domain';
 import {OutboundTransfersAuditPublisher} from '@core/audit/producer';
@@ -13,11 +15,36 @@ import {
     ErrorInformationObject,
     FspiopErrors,
     FspiopException,
+    FspiopHeaders,
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 
+export class TransferRequest {
+    @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
+    correlationId!: string;
+
+    @ApiProperty({type: String, description: 'The FSP ID of the destination (payee FSP)'})
+    destination!: string;
+
+    @ApiProperty({type: String, description: 'Unique identifier for this transfer'})
+    transferId!: string;
+
+    @ApiProperty({type: () => TransfersPostRequest, description: 'FSPIOP POST /transfers request payload'})
+    request!: TransfersPostRequest;
+}
+
+export class TransferResponse {
+    @ApiProperty({type: () => TransfersIDPutResponse, description: 'FSPIOP PUT /transfers/{transferId} response payload'})
+    readonly response: TransfersIDPutResponse;
+
+    constructor(response: TransfersIDPutResponse) {
+        this.response = response;
+    }
+}
+
+@ApiTags('Transfer')
 @Controller('transfer')
 export class TransferController {
 
@@ -32,14 +59,21 @@ export class TransferController {
 
     @Post()
     @HttpCode(HttpStatus.OK)
-    async transfer(@Body() request: TransferController.Request): Promise<TransferController.Response> {
+    @ApiOperation({summary: 'Initiate a transfer via FSPIOP'})
+    @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
+    @ApiBody({type: TransferRequest})
+    @ApiOkResponse({type: TransferResponse})
+    async transfer(
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
+        @Body() request: TransferRequest,
+    ): Promise<TransferResponse> {
         const createdAt = new Date();
         const id = TransferController.nextAuditId();
 
         try {
             const input = new DoTransferCommand.Input(
                 request.correlationId,
-                request.source,
+                source,
                 request.destination,
                 request.transferId,
                 request.request,
@@ -53,7 +87,7 @@ export class TransferController {
                 new AuditOutboundTransfersCommand.Input(
                     id,
                     TransferController.RAIL,
-                    request.source,
+                    source,
                     request.destination,
                     request.correlationId,
                     request.transferId,
@@ -65,14 +99,14 @@ export class TransferController {
                 ),
             );
 
-            return new TransferController.Response(output.response);
+            return new TransferResponse(output.response);
         } catch (error) {
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundTransfersCommand.Input(
                         id,
                         TransferController.RAIL,
-                        request.source,
+                        source,
                         request.destination,
                         request.correlationId,
                         request.transferId,
@@ -103,21 +137,5 @@ export class TransferController {
 
     private static nextAuditId(): string {
         return TransferController.SNOWFLAKE.nextId().toString();
-    }
-}
-
-export namespace TransferController {
-
-    export class Request {
-        correlationId!: string;
-        source!: string;
-        destination!: string;
-        transferId!: string;
-        request!: TransfersPostRequest;
-    }
-
-    export class Response {
-        constructor(public readonly response: TransfersIDPutResponse) {
-        }
     }
 }

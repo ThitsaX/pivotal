@@ -12,25 +12,30 @@
 import { Currency } from './currency';
 import { PartyIdInfo } from './party-id-info';
 import { PartyPersonalInfo } from './party-personal-info';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type Party.
  */
-export interface Party { 
-    partyIdInfo: PartyIdInfo;
+export class Party { 
+    @ApiProperty({type: () => PartyIdInfo})
+    partyIdInfo!: PartyIdInfo;
     /**
      * A limited set of pre-defined numbers. This list would be a limited set of numbers identifying a set of popular merchant types like School Fees, Pubs and Restaurants, Groceries, etc.
      */
+    @ApiProperty({type: String, required: false})
     merchantClassificationCode?: string;
     /**
      * Name of the Party. Could be a real name or a nickname.
      */
+    @ApiProperty({type: String, required: false})
     name?: string;
     personalInfo?: PartyPersonalInfo;
     /**
      * Currencies in which the party can receive funds.
      */
+    @ApiProperty({enum: Currency, enumName: 'Currency', isArray: true, required: false})
     supportedCurrencies?: Array<Currency>;
 }
 

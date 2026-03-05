@@ -11,17 +11,19 @@
  */
 import {TransactionRequestState} from './transaction-request-state';
 import {ExtensionList} from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /transactionRequests/{ID} callback.
  */
-export interface TransactionRequestsIDPutResponse { 
+export class TransactionRequestsIDPutResponse { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
+    @ApiProperty({type: String, required: false})
     transactionId?: string;
-    transactionRequestState: TransactionRequestState;
+    transactionRequestState!: TransactionRequestState;
     extensionList?: ExtensionList;
 }
 

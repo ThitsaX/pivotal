@@ -10,12 +10,14 @@
  * Do not edit the class manually.
  */
 import { ErrorInformation } from './error-information';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type object that contains ErrorInformation.
  */
-export interface ErrorInformationObject { 
-    errorInformation: ErrorInformation;
+export class ErrorInformationObject { 
+    @ApiProperty({type: () => ErrorInformation})
+    errorInformation!: ErrorInformation;
 }
 

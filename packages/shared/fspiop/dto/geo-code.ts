@@ -9,19 +9,21 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type GeoCode. Indicates the geographic location from where the transaction was initiated.
  */
-export interface GeoCode { 
+export class GeoCode { 
     /**
      * The API data type Latitude is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons.
      */
-    latitude: string;
+    @ApiProperty({type: String})
+    latitude!: string;
     /**
      * The API data type Longitude is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons.
      */
-    longitude: string;
+    @ApiProperty({type: String})
+    longitude!: string;
 }
-

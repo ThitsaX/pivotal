@@ -11,16 +11,18 @@
  */
 import {PartyResult} from './party-result';
 import {Currency} from './currency';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /participants/{ID} callback.
  */
-export interface ParticipantsIDPutResponse { 
+export class ParticipantsIDPutResponse { 
     /**
      * List of PartyResult elements that were either created or failed to be created.
      */
-    partyList: Array<PartyResult>;
+    @ApiProperty({type: () => PartyResult, isArray: true})
+    partyList!: Array<PartyResult>;
     currency?: Currency;
 }
 

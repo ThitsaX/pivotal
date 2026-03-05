@@ -3,6 +3,10 @@ import {FspiopAxiosParams, FspiopSettings} from '@shared/fspiop';
 import {
     CaStore,
     ClientCertStore,
+    EnvBasedCaCertLoader,
+    EnvBasedClientCertLoader,
+    EnvBasedPrivateKeyLoader,
+    EnvBasedPublicKeyLoader,
     PrivateKeyStore,
     PublicKeyStore,
 } from '@shared/security';
@@ -16,12 +20,16 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;
 
-    private readonly outboundPublicKeyStore = new PublicKeyStore();
-    private readonly outboundPrivateKeyStore = new PrivateKeyStore();
-    private readonly outboundCaStore = new CaStore();
-    private readonly outboundClientCertStore = new ClientCertStore();
+    private readonly outboundPublicKeyStore: PublicKeyStore;
+    private readonly outboundPrivateKeyStore: PrivateKeyStore;
+    private readonly outboundCaStore: CaStore;
+    private readonly outboundClientCertStore: ClientCertStore;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
+        this.outboundPublicKeyStore = new PublicKeyStore(new EnvBasedPublicKeyLoader());
+        this.outboundPrivateKeyStore = new PrivateKeyStore(new EnvBasedPrivateKeyLoader());
+        this.outboundCaStore = new CaStore(new EnvBasedCaCertLoader());
+        this.outboundClientCertStore = new ClientCertStore(new EnvBasedClientCertLoader());
     }
 
     natsUrl(): string {

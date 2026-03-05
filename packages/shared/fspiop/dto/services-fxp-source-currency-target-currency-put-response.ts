@@ -9,15 +9,16 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /services/FXP/{SourceCurrency}/{TargetCurrency} callback.
  */
-export interface ServicesFXPSourceCurrencyTargetCurrencyPutResponse { 
+export class ServicesFXPSourceCurrencyTargetCurrencyPutResponse { 
     /**
      * The FSP Id(s) of the participant(s) who offer currency conversion services.
      */
-    providers: Array<string>;
+    @ApiProperty({type: String, isArray: true})
+    providers!: Array<string>;
 }
-

@@ -7,7 +7,7 @@ import { TEST_CERT_PEM } from './test-cert-fixtures';
 
 class StubCaCertLoader extends CaCertLoader {
 
-    private readonly certs: CaCert[];
+    private certs: CaCert[];
 
     constructor(certs: CaCert[]) {
         super();
@@ -17,17 +17,21 @@ class StubCaCertLoader extends CaCertLoader {
     load(): CaCert[] {
         return this.certs;
     }
+
+    setCerts(certs: CaCert[]): void {
+        this.certs = certs;
+    }
 }
 
 describe('CaStore', () => {
 
     it('should load certs from loader and return loaded count', () => {
-        const store = new CaStore();
         const certA = CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8'));
         const certB = CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8'));
         const loader = new StubCaCertLoader([certA, certB]);
+        const store = new CaStore(loader);
 
-        const loadedCount = store.load(loader);
+        const loadedCount = store.load();
 
         assert.equal(loadedCount, 2);
         assert.equal(store.isEmpty(), false);
@@ -35,11 +39,12 @@ describe('CaStore', () => {
     });
 
     it('should return defensive copy from toBuffer', () => {
-        const store = new CaStore();
         const loader = new StubCaCertLoader([
             CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]);
-        store.load(loader);
+        const store = new CaStore(loader);
+
+        store.load();
 
         const certBuffer = store.toBuffer();
 
@@ -51,16 +56,17 @@ describe('CaStore', () => {
     });
 
     it('should append certs across multiple load calls', () => {
-        const store = new CaStore();
-        const firstLoader = new StubCaCertLoader([
+        const loader = new StubCaCertLoader([
             CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
         ]);
-        const secondLoader = new StubCaCertLoader([
-            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
-        ]);
+        const store = new CaStore(loader);
 
-        const firstLoadedCount = store.load(firstLoader);
-        const secondLoadedCount = store.load(secondLoader);
+        const firstLoadedCount = store.load();
+
+        loader.setCerts([
+            CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
+        ]);
+        const secondLoadedCount = store.load();
 
         assert.equal(firstLoadedCount, 1);
         assert.equal(secondLoadedCount, 1);
@@ -68,12 +74,14 @@ describe('CaStore', () => {
     });
 
     it('should support clear and empty state accessors', () => {
-        const store = new CaStore();
-        const loadedCount = store.load(new StubCaCertLoader([]));
+        const loader = new StubCaCertLoader([]);
+        const store = new CaStore(loader);
+        const loadedCount = store.load();
 
-        store.load(new StubCaCertLoader([
+        loader.setCerts([
             CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
-        ]));
+        ]);
+        store.load();
         store.clear();
 
         assert.equal(loadedCount, 0);

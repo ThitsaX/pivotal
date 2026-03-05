@@ -11,20 +11,23 @@
  */
 import {Currency} from './currency';
 import {PartyIdInfo} from './party-id-info';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the POST /participants request.
  */
-export interface ParticipantsPostRequest { 
+export class ParticipantsPostRequest { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    requestId: string;
+    @ApiProperty({type: String})
+    requestId!: string;
     /**
      * List of PartyIdInfo elements that the client would like to update or create FSP information about.
      */
-    partyList: Array<PartyIdInfo>;
+    @ApiProperty({type: () => PartyIdInfo, isArray: true})
+    partyList!: Array<PartyIdInfo>;
     currency?: Currency;
 }
 

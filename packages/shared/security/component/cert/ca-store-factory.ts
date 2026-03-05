@@ -20,9 +20,9 @@ export class CaStoreFactory {
     private constructor() {}
 
     static create(mode: string): CaStore {
-        const store  = new CaStore();
         const loader = CaStoreFactory.createLoader(mode);
-        store.load(loader);
+        const store = new CaStore(loader);
+        store.load();
         return store;
     }
 

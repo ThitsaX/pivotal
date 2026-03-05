@@ -1,7 +1,7 @@
 import {DynamicModule, Module} from '@nestjs/common';
 import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {TypeOrmSettings} from './typeorm-settings';
-import {TypeOrmConfigurer} from './typeorm-configurer';
+import {DbTarget, TypeOrmConfigurer} from './typeorm-configurer';
 
 @Module({})
 export class TypeOrmModule {
@@ -12,7 +12,10 @@ export class TypeOrmModule {
             inject: asyncOptions.inject ?? [],
             useFactory: async (...args: any[]) => {
                 const deps = await asyncOptions.useFactory(...args);
-                return TypeOrmModule.withConnectionName(TypeOrmConfigurer.toTypeOrmOptions(deps.typeOrmSettings()), asyncOptions.connectionName);
+                const settings = asyncOptions.target === DbTarget.Write
+                    ? deps.writeTypeOrmSettings()
+                    : deps.readTypeOrmSettings();
+                return TypeOrmModule.withConnectionName(TypeOrmConfigurer.toTypeOrmOptions(settings), asyncOptions.connectionName);
             },
         };
 
@@ -38,11 +41,13 @@ export class TypeOrmModule {
 export namespace TypeOrmModule {
 
     export interface RequiredDependencies {
-        typeOrmSettings(): TypeOrmSettings;
+        writeTypeOrmSettings(): TypeOrmSettings;
+        readTypeOrmSettings(): TypeOrmSettings;
     }
 
     export type AsyncOptions = {
         connectionName: string;
+        target: DbTarget;
         imports?: any[];
         useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
         inject?: any[];

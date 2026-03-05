@@ -11,10 +11,12 @@
  */
 import { FxRateSourceAmount } from './fx-rate-source-amount';
 import { FxRateTargetAmount } from './fx-rate-target-amount';
+import { ApiProperty } from '@nestjs/swagger';
 
 
-export interface QuotesPostRequestCurrencyConversion { 
-    sourceAmount: FxRateSourceAmount;
-    targetAmount: FxRateTargetAmount;
+export class QuotesPostRequestCurrencyConversion { 
+    @ApiProperty({type: () => FxRateSourceAmount})
+    sourceAmount!: FxRateSourceAmount;
+    targetAmount!: FxRateTargetAmount;
 }
 

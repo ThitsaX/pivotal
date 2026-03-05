@@ -1,4 +1,3 @@
-import {Injectable} from '@nestjs/common';
 import {ClientCert} from './client-cert';
 import {ClientCertLoader} from './client-cert-loader';
 
@@ -12,13 +11,15 @@ import {ClientCertLoader} from './client-cert-loader';
  *     key:  clientCertStore.get()?.keyBuffer(),
  *   })
  */
-@Injectable()
 export class ClientCertStore {
+
+    constructor(private readonly loader: ClientCertLoader) {
+    }
 
     private clientCert: ClientCert | undefined;
 
-    load(loader: ClientCertLoader): void {
-        this.clientCert = loader.load();
+    load(): void {
+        this.clientCert = this.loader.load();
     }
 
     get(): ClientCert | undefined {

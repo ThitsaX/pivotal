@@ -10,13 +10,15 @@
  * Do not edit the class manually.
  */
 import { FxQuotesPostRequestConversionTerms } from './fx-quotes-post-request-conversion-terms';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the POST /fxQuotes request.
  */
-export interface FxQuotesPostRequest { 
-    conversionRequestId: string;
-    conversionTerms: FxQuotesPostRequestConversionTerms;
+export class FxQuotesPostRequest { 
+    @ApiProperty({type: String})
+    conversionRequestId!: string;
+    conversionTerms!: FxQuotesPostRequestConversionTerms;
 }
 

@@ -11,37 +11,44 @@
  */
 import { Money } from './money';
 import { ExtensionList } from './extension-list';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the POST /transfers request.
  */
-export interface TransfersPostRequest { 
+export class TransfersPostRequest { 
     /**
      * Identifier that correlates all messages of the same sequence. The API data type UUID (Universally Unique Identifier) is a JSON String in canonical format, conforming to [RFC 4122](https://tools.ietf.org/html/rfc4122), that is restricted by a regular expression for interoperability reasons. A UUID is always 36 characters long, 32 hexadecimal symbols and 4 dashes (‘-‘).
      */
-    transferId: string;
+    @ApiProperty({type: String})
+    transferId!: string;
     /**
      * FSP identifier.
      */
-    payeeFsp: string;
+    @ApiProperty({type: String})
+    payeeFsp!: string;
     /**
      * FSP identifier.
      */
-    payerFsp: string;
-    amount: Money;
+    @ApiProperty({type: String})
+    payerFsp!: string;
+    amount!: Money;
     /**
      * Information for recipient (transport layer information).
      */
-    ilpPacket: string;
+    @ApiProperty({type: String})
+    ilpPacket!: string;
     /**
      * Condition that must be attached to the transfer by the Payer.
      */
-    condition: string;
+    @ApiProperty({type: String})
+    condition!: string;
     /**
      * The API data type DateTime is a JSON String in a lexical format that is restricted by a regular expression for interoperability reasons. The format is according to [ISO 8601](https://www.iso.org/iso-8601-date-and-time-format.html), expressed in a combined date, time and time zone format. A more readable version of the format is yyyy-MM-ddTHH:mm:ss.SSS[-HH:MM]. Examples are \"2016-05-24T08:38:08.699-04:00\", \"2016-05-24T08:38:08.699Z\" (where Z indicates Zulu time zone, same as UTC).
      */
-    expiration: string;
+    @ApiProperty({type: String})
+    expiration!: string;
     extensionList?: ExtensionList;
 }
 

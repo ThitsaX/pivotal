@@ -11,15 +11,18 @@
  */
 import { ExtensionList } from './extension-list';
 import { TransferState } from './transfer-state';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /fxTransfers/{ID} callback.
  */
-export interface FxTransfersIDPutResponse { 
+export class FxTransfersIDPutResponse { 
+    @ApiProperty({type: String, required: false})
     fulfilment?: string;
     completedTimestamp?: string;
-    conversionState: TransferState;
+    conversionState!: TransferState;
+    @ApiProperty({type: () => ExtensionList, required: false})
     extensionList?: ExtensionList;
 }
 

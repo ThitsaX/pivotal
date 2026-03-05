@@ -3,8 +3,9 @@ import {existsSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
+import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 import {config as loadDotEnv} from 'dotenv';
-import {FspiopExceptionFilter} from '@shared/fspiop';
+import {FspiopExceptionFilter, FspiopHeaders} from '@shared/fspiop';
 import {WebOutboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -60,6 +61,15 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(WebOutboundAppModule);
     app.enableShutdownHooks();
     app.useGlobalFilters(new FspiopExceptionFilter());
+
+    const swaggerConfig = new DocumentBuilder()
+        .setTitle('PayPort Web Outbound')
+        .setDescription('Outbound API for initiating FSPIOP lookup, quoting, and transfer flows')
+        .setVersion('1.0.0')
+        .addApiKey({type: 'apiKey', name: FspiopHeaders.Names.FSPIOP_SOURCE, in: 'header'}, FspiopHeaders.Names.FSPIOP_SOURCE)
+        .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('v1.0.0/api-docs', app, document);
 
     await app.listen(port);
     Logger.log(`Web outbound is listening on port ${port}.`, 'Bootstrap');

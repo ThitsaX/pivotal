@@ -9,15 +9,16 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * The object sent in the PUT /participants/{Type}/{ID}/{SubId} and /participants/{Type}/{ID} callbacks.
  */
-export interface ParticipantsTypeIDPutResponse { 
+export class ParticipantsTypeIDPutResponse { 
     /**
      * FSP identifier.
      */
+    @ApiProperty({type: String, required: false})
     fspId?: string;
 }
-

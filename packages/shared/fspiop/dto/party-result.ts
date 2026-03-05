@@ -11,13 +11,15 @@
  */
 import { ErrorInformation } from './error-information';
 import { PartyIdInfo } from './party-id-info';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type PartyResult.
  */
-export interface PartyResult { 
-    partyId: PartyIdInfo;
+export class PartyResult { 
+    @ApiProperty({type: () => PartyIdInfo})
+    partyId!: PartyIdInfo;
     errorInformation?: ErrorInformation;
 }
 

@@ -11,14 +11,16 @@
  */
 import { ExtensionList } from './extension-list';
 import { TransferState } from './transfer-state';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * PATCH /fxTransfers/{ID} object
  */
-export interface FxTransfersIDPatchResponse { 
+export class FxTransfersIDPatchResponse { 
+    @ApiProperty({type: String, required: false})
     completedTimestamp?: string;
-    conversionState: TransferState;
+    conversionState!: TransferState;
     extensionList?: ExtensionList;
 }
 

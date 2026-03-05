@@ -13,23 +13,28 @@ import {Refund} from './refund';
 import {TransactionScenario} from './transaction-scenario';
 import {TransactionInitiatorType} from './transaction-initiator-type';
 import {TransactionInitiator} from './transaction-initiator';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * Data model for the complex type TransactionType.
  */
-export interface TransactionType { 
-    scenario: TransactionScenario;
+export class TransactionType { 
+    @ApiProperty({enum: TransactionScenario, enumName: 'TransactionScenario'})
+    scenario!: TransactionScenario;
     /**
      * Possible sub-scenario, defined locally within the scheme (UndefinedEnum Type).
      */
+    @ApiProperty({type: String, required: false})
     subScenario?: string;
-    initiator: TransactionInitiator;
-    initiatorType: TransactionInitiatorType;
+    initiator!: TransactionInitiator;
+    initiatorType!: TransactionInitiatorType;
+    @ApiProperty({type: () => Refund, required: false})
     refundInfo?: Refund;
     /**
      * (BopCode) The API data type [BopCode](https://www.imf.org/external/np/sta/bopcode/) is a JSON String of 3 characters, consisting of digits only. Negative numbers are not allowed. A leading zero is not allowed.
      */
+    @ApiProperty({type: String, required: false})
     balanceOfPayments?: string;
 }
 

@@ -14,23 +14,28 @@ import { AmountType } from './amount-type';
 import { FxConversionTargetAmount } from './fx-conversion-target-amount';
 import { FxCharge } from './fx-charge';
 import { FxConversionSourceAmount } from './fx-conversion-source-amount';
+import { ApiProperty } from '@nestjs/swagger';
 
 
 /**
  * A DFSP will be able to request a currency conversion, and an FX provider will be able to describe its involvement in a proposed transfer, using a FxConversion object.
  */
-export interface FxConversion { 
-    conversionId: string;
+export class FxConversion { 
+    @ApiProperty({type: String})
+    conversionId!: string;
     determiningTransferId?: string;
-    initiatingFsp: string;
-    counterPartyFsp: string;
-    amountType: AmountType;
-    sourceAmount: FxConversionSourceAmount;
-    targetAmount: FxConversionTargetAmount;
-    expiration: string;
+    initiatingFsp!: string;
+    @ApiProperty({type: String})
+    counterPartyFsp!: string;
+    amountType!: AmountType;
+    sourceAmount!: FxConversionSourceAmount;
+    @ApiProperty({type: () => FxConversionTargetAmount})
+    targetAmount!: FxConversionTargetAmount;
+    expiration!: string;
     /**
      * One or more charges which the FXP intends to levy as part of the currency conversion, or which the payee DFSP intends to add to the amount transferred.
      */
+    @ApiProperty({type: () => FxCharge, isArray: true, required: false})
     charges?: Array<FxCharge>;
     extensionList?: FxConversionExtensionList;
 }
