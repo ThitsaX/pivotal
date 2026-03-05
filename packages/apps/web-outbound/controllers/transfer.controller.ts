@@ -20,6 +20,7 @@ import {
     TransfersPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class TransferRequest {
     @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
@@ -63,6 +64,7 @@ export class TransferController {
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiBody({type: TransferRequest})
     @ApiOkResponse({type: TransferResponse})
+    @ApiFspiopErrorResponses()
     async transfer(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: TransferRequest,
