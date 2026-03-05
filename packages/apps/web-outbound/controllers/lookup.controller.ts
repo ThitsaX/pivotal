@@ -1,11 +1,12 @@
 import {Body, Controller, Headers, HttpCode, HttpStatus, Post,} from '@nestjs/common';
-import {ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {ApiBearerAuth, ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundPartiesCommand} from '@core/audit/domain';
 import {OutboundPartiesAuditPublisher} from '@core/audit/producer';
 import {DoLookupCommand} from '@core/outbound/domain';
 import {ErrorInformationObject, FspiopErrors, FspiopException, FspiopHeaders, PartiesTypeIDPutResponse, PartyIdType,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class LookupRequest {
@@ -67,13 +68,18 @@ export class LookupController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Perform a party lookup via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
+    @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
+    @ApiBearerAuth('authorization')
     @ApiBody({type: LookupRequest})
     @ApiOkResponse({type: LookupResponse})
     @ApiFspiopErrorResponses()
     async lookup(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
+        @Headers('authorization') authorization: string | undefined,
         @Body() request: LookupRequest,
     ): Promise<LookupResponse> {
+        validateAuthorizationHeader(authorization);
+
         const createdAt = new Date();
         const id = LookupController.nextAuditId();
 
