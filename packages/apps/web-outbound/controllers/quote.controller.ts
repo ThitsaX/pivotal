@@ -6,7 +6,7 @@ import {
     HttpStatus,
     Post,
 } from '@nestjs/common';
-import {ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
+import {ApiBearerAuth, ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundQuotesCommand} from '@core/audit/domain';
 import {OutboundQuotesAuditPublisher} from '@core/audit/producer';
@@ -20,6 +20,7 @@ import {
     QuotesPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class QuoteRequest {
@@ -62,13 +63,18 @@ export class QuoteController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({summary: 'Initiate a quoting request via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
+    @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
+    @ApiBearerAuth('authorization')
     @ApiBody({type: QuoteRequest})
     @ApiOkResponse({type: QuoteResponse})
     @ApiFspiopErrorResponses()
     async quote(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
+        @Headers('authorization') authorization: string | undefined,
         @Body() request: QuoteRequest,
     ): Promise<QuoteResponse> {
+        validateAuthorizationHeader(authorization);
+
         const createdAt = new Date();
         const id = QuoteController.nextAuditId();
 
