@@ -1,3 +1,3 @@
 export * from './domain.module';
-export * from './fsp-client';
+export * from './component';
 export * from './command';

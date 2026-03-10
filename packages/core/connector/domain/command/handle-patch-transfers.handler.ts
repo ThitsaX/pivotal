@@ -1,6 +1,6 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {HandlePatchTransfersCommand} from './handle-patch-transfers.command';
-import {FspClient} from '../fsp-client';
+import {FspClient} from '../component';
 
 @CommandHandler(HandlePatchTransfersCommand)
 export class HandlePatchTransfersHandler

@@ -1,10 +1,16 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundQuotesCommand} from '@core/audit/domain';
 import {InboundQuotesAuditPublisher} from '@core/audit/producer';
-import {ErrorInformationObject, FspiopErrors, FspiopException} from '@shared/fspiop';
+import {
+    ErrorInformationObject,
+    FspiopAxios,
+    FspiopErrors,
+    FspiopException,
+    FspiopHeaders,
+} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandlePostQuotesCommand} from './handle-post-quotes.command';
-import {FspClient} from '../fsp-client';
+import {FspClient} from '../component';
 
 @CommandHandler(HandlePostQuotesCommand)
 export class HandlePostQuotesHandler
@@ -15,17 +21,24 @@ export class HandlePostQuotesHandler
 
     constructor(
         private readonly fspClient: FspClient,
+        private readonly fspiopAxios: FspiopAxios,
         private readonly auditPublisher: InboundQuotesAuditPublisher,
     ) {
     }
 
     async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
         const {payerFsp, payeeFsp, correlationId, request} = command.input;
+        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandlePostQuotesHandler.nextAuditId();
 
         try {
             const response = await this.fspClient.postQuotes(request);
+
+            await this.fspiopAxios
+                .withHeaders(headers)
+                .putQuotes(switchBaseUrl, request.quoteId, response);
 
             await this.auditPublisher.publish(
                 new AuditInboundQuotesCommand.Input(
@@ -44,6 +57,18 @@ export class HandlePostQuotesHandler
                 ),
             );
         } catch (error) {
+            let callbackError = error;
+            let callbackAuditError = HandlePostQuotesHandler.toAuditError(error);
+
+            try {
+                await this.fspiopAxios
+                    .withHeaders(headers)
+                    .putQuotesError(switchBaseUrl, request.quoteId, callbackAuditError);
+            } catch (putError) {
+                callbackError = putError;
+                callbackAuditError = HandlePostQuotesHandler.toAuditError(putError);
+            }
+
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundQuotesCommand.Input(
@@ -55,15 +80,17 @@ export class HandlePostQuotesHandler
                         request.quoteId,
                         request,
                         null,
-                        HandlePostQuotesHandler.toAuditError(error),
+                        callbackAuditError,
                         null,
                         createdAt,
                         new Date(),
                     ),
                 );
-            } finally {
-                throw error;
+            } catch {
+                // Preserve the callback error as the command failure.
             }
+
+            throw callbackError;
         }
 
         return new HandlePostQuotesCommand.Output();

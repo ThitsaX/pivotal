@@ -1,0 +1,12 @@
+import {Injectable} from '@nestjs/common';
+import {Currency} from '@shared/fspiop';
+
+@Injectable()
+export class ConnectorSettings {
+    constructor(
+        public readonly connectorId: string,
+        public readonly supportedCurrencies: Currency[],
+        public readonly ilpSecret: string,
+    ) {
+    }
+}

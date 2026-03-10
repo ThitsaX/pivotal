@@ -1,10 +1,16 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundPartiesCommand} from '@core/audit/domain';
 import {InboundPartiesAuditPublisher} from '@core/audit/producer';
-import {ErrorInformationObject, FspiopErrors, FspiopException} from '@shared/fspiop';
+import {
+    ErrorInformationObject,
+    FspiopAxios,
+    FspiopErrors,
+    FspiopException,
+    FspiopHeaders,
+} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandleGetPartiesCommand} from './handle-get-parties.command';
-import {FspClient} from '../fsp-client';
+import {FspClient} from '../component';
 
 @CommandHandler(HandleGetPartiesCommand)
 export class HandleGetPartiesHandler
@@ -15,12 +21,15 @@ export class HandleGetPartiesHandler
 
     constructor(
         private readonly fspClient: FspClient,
+        private readonly fspiopAxios: FspiopAxios,
         private readonly auditPublisher: InboundPartiesAuditPublisher,
     ) {
     }
 
     async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
         const {payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId} = command.input;
+        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandleGetPartiesHandler.nextAuditId();
 
@@ -28,6 +37,10 @@ export class HandleGetPartiesHandler
             const response = await this.fspClient.getParties(
                 new FspClient.GetPartiesInput(payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId),
             );
+
+            await this.fspiopAxios
+                .withHeaders(headers)
+                .putParties(switchBaseUrl, partyIdType, partyId, response, subId ?? undefined);
 
             await this.auditPublisher.publish(
                 new AuditInboundPartiesCommand.Input(
@@ -47,6 +60,18 @@ export class HandleGetPartiesHandler
                 ),
             );
         } catch (error) {
+            let callbackError = error;
+            let callbackAuditError = HandleGetPartiesHandler.toAuditError(error);
+
+            try {
+                await this.fspiopAxios
+                    .withHeaders(headers)
+                    .putPartiesError(switchBaseUrl, partyIdType, partyId, callbackAuditError, subId ?? undefined);
+            } catch (putError) {
+                callbackError = putError;
+                callbackAuditError = HandleGetPartiesHandler.toAuditError(putError);
+            }
+
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundPartiesCommand.Input(
@@ -59,15 +84,17 @@ export class HandleGetPartiesHandler
                         partyId,
                         subId,
                         null,
-                        HandleGetPartiesHandler.toAuditError(error),
+                        callbackAuditError,
                         null,
                         createdAt,
                         new Date(),
                     ),
                 );
-            } finally {
-                throw error;
+            } catch {
+                // Preserve the callback error as the command failure.
             }
+
+            throw callbackError;
         }
 
         return new HandleGetPartiesCommand.Output();
