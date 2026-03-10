@@ -1,21 +1,21 @@
 import {NatsClientService} from '@shared/nats';
 import {TransfersPostRequest} from '@shared/fspiop';
 
-export class InboundConnectorTransfersPublisher {
+export class ConnectorPostTransfersPublisher {
 
     static subjectFor(payeeFsp: string): string {
-        return `fspiop.${payeeFsp}.transfers`;
+        return `fspiop.${payeeFsp}.post.transfers`;
     }
 
     constructor(private readonly nats: NatsClientService) {}
 
-    async publish(message: InboundConnectorTransfersPublisher.Message): Promise<void> {
+    async publish(message: ConnectorPostTransfersPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(InboundConnectorTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
+        await js.publish(ConnectorPostTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
     }
 }
 
-export namespace InboundConnectorTransfersPublisher {
+export namespace ConnectorPostTransfersPublisher {
 
     export class Message {
         constructor(

@@ -1,17 +1,19 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {ConnectorPostTransfersPublisher} from '@core/connector/publisher';
 import {HandlePostTransfersCommand} from './handle-post-transfers.command';
+import {FspClient} from '../fsp-client';
 
 @CommandHandler(HandlePostTransfersCommand)
 export class HandlePostTransfersHandler
     implements ICommandHandler<HandlePostTransfersCommand, HandlePostTransfersCommand.Output> {
 
-    constructor(private readonly publisher: ConnectorPostTransfersPublisher) {
+    constructor(private readonly fspClient: FspClient) {
     }
 
     async execute(command: HandlePostTransfersCommand): Promise<HandlePostTransfersCommand.Output> {
-        const {payerFsp, payeeFsp, correlationId, request} = command.input;
-        await this.publisher.publish(new ConnectorPostTransfersPublisher.Message(payerFsp, payeeFsp, correlationId, request));
+        const {request} = command.input;
+
+        await this.fspClient.postTransfers(request);
+
         return new HandlePostTransfersCommand.Output();
     }
 }

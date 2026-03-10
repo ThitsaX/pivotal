@@ -14,6 +14,33 @@
         "tsConfigPath": "packages/core/inbound/domain/tsconfig.app.json"
       }
     },
+    "core-connector-domain": {
+      "type": "library",
+      "root": "packages/core/connector/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/connector/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/connector/domain/tsconfig.app.json"
+      }
+    },
+    "core-connector-consumer": {
+      "type": "library",
+      "root": "packages/core/connector/consumer",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/connector/consumer",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/connector/consumer/tsconfig.app.json"
+      }
+    },
+    "core-connector-publisher": {
+      "type": "library",
+      "root": "packages/core/connector/publisher",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/connector/publisher",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/connector/publisher/tsconfig.app.json"
+      }
+    },
     "core-outbound-domain": {
       "type": "library",
       "root": "packages/core/outbound/domain",
@@ -21,15 +48,6 @@
       "sourceRoot": "packages/core/outbound/domain",
       "compilerOptions": {
         "tsConfigPath": "packages/core/outbound/domain/tsconfig.app.json"
-      }
-    },
-    "core-outbound-subscriber": {
-      "type": "library",
-      "root": "packages/core/outbound/subscriber",
-      "entryFile": "index",
-      "sourceRoot": "packages/core/outbound/subscriber",
-      "compilerOptions": {
-        "tsConfigPath": "packages/core/outbound/subscriber/tsconfig.app.json"
       }
     },
     "core-outbound-publisher": {

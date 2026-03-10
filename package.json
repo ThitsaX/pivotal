@@ -7,8 +7,10 @@
   "scripts": {
     "build": "nest build",
     "build:core-inbound-domain": "nest build core-inbound-domain",
+    "build:core-connector-domain": "nest build core-connector-domain",
+    "build:core-connector-consumer": "nest build core-connector-consumer",
+    "build:core-connector-publisher": "nest build core-connector-publisher",
     "build:core-outbound-domain": "nest build core-outbound-domain",
-    "build:core-outbound-subscriber": "nest build core-outbound-subscriber",
     "build:core-outbound-publisher": "nest build core-outbound-publisher",
     "build:core-audit-domain": "nest build core-audit-domain",
     "build:core-audit-consumer": "nest build core-audit-consumer",

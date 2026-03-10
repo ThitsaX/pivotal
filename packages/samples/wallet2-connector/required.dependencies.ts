@@ -1,8 +1,9 @@
 import {ConfigService} from '@nestjs/config';
-import {FspClient, InboundConnectorModule} from '@core/inbound/connector';
+import {ConnectorConsumerModule} from '@core/connector/consumer';
+import {FspClient} from '@core/connector/domain';
 import {Wallet2FspClient} from './wallet2-fsp-client';
 
-export class Wallet2ConnectorDependencies implements InboundConnectorModule.RequiredDependencies {
+export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.RequiredDependencies {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
 
