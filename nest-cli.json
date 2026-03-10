@@ -166,6 +166,24 @@
       "compilerOptions": {
         "tsConfigPath": "packages/shared/security/tsconfig.app.json"
       }
+    },
+    "samples-wallet1-connector": {
+      "type": "application",
+      "root": "packages/samples/wallet1-connector",
+      "entryFile": "samples/wallet1-connector/main",
+      "sourceRoot": "packages/samples/wallet1-connector",
+      "compilerOptions": {
+        "tsConfigPath": "packages/samples/wallet1-connector/tsconfig.app.json"
+      }
+    },
+    "samples-wallet2-connector": {
+      "type": "application",
+      "root": "packages/samples/wallet2-connector",
+      "entryFile": "samples/wallet2-connector/main",
+      "sourceRoot": "packages/samples/wallet2-connector",
+      "compilerOptions": {
+        "tsConfigPath": "packages/samples/wallet2-connector/tsconfig.app.json"
+      }
     }
   }
 }
