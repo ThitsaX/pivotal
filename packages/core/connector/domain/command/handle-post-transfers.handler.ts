@@ -1,10 +1,16 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundTransfersCommand} from '@core/audit/domain';
 import {InboundTransfersAuditPublisher} from '@core/audit/producer';
-import {ErrorInformationObject, FspiopErrors, FspiopException} from '@shared/fspiop';
+import {
+    ErrorInformationObject,
+    FspiopAxios,
+    FspiopErrors,
+    FspiopException,
+    FspiopHeaders,
+} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandlePostTransfersCommand} from './handle-post-transfers.command';
-import {FspClient} from '../fsp-client';
+import {FspClient} from '../component';
 
 @CommandHandler(HandlePostTransfersCommand)
 export class HandlePostTransfersHandler
@@ -15,17 +21,24 @@ export class HandlePostTransfersHandler
 
     constructor(
         private readonly fspClient: FspClient,
+        private readonly fspiopAxios: FspiopAxios,
         private readonly auditPublisher: InboundTransfersAuditPublisher,
     ) {
     }
 
     async execute(command: HandlePostTransfersCommand): Promise<HandlePostTransfersCommand.Output> {
         const {payerFsp, payeeFsp, correlationId, request} = command.input;
+        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const headers = FspiopHeaders.Values.Transfers.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandlePostTransfersHandler.nextAuditId();
 
         try {
             const response = await this.fspClient.postTransfers(request);
+
+            await this.fspiopAxios
+                .withHeaders(headers)
+                .putTransfers(switchBaseUrl, request.transferId, response);
 
             await this.auditPublisher.publish(
                 new AuditInboundTransfersCommand.Input(
@@ -44,6 +57,18 @@ export class HandlePostTransfersHandler
                 ),
             );
         } catch (error) {
+            let callbackError = error;
+            let callbackAuditError = HandlePostTransfersHandler.toAuditError(error);
+
+            try {
+                await this.fspiopAxios
+                    .withHeaders(headers)
+                    .putTransfersError(switchBaseUrl, request.transferId, callbackAuditError);
+            } catch (putError) {
+                callbackError = putError;
+                callbackAuditError = HandlePostTransfersHandler.toAuditError(putError);
+            }
+
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundTransfersCommand.Input(
@@ -55,15 +80,17 @@ export class HandlePostTransfersHandler
                         request.transferId,
                         request,
                         null,
-                        HandlePostTransfersHandler.toAuditError(error),
+                        callbackAuditError,
                         null,
                         createdAt,
                         new Date(),
                     ),
                 );
-            } finally {
-                throw error;
+            } catch {
+                // Preserve the callback error as the command failure.
             }
+
+            throw callbackError;
         }
 
         return new HandlePostTransfersCommand.Output();

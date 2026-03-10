@@ -1,13 +1,14 @@
 import {CqrsModule} from '@nestjs/cqrs';
 import {DynamicModule, Module} from '@nestjs/common';
 import {AuditProducerModule} from '@core/audit/producer';
+import {FspiopAxiosModule} from '@shared/fspiop';
 import {
     HandleGetPartiesHandler,
     HandlePatchTransfersHandler,
     HandlePostQuotesHandler,
     HandlePostTransfersHandler,
 } from './command';
-import {FspClient} from './fsp-client';
+import {ConnectorSettings, FspClient} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('ConnectorDomainRequiredDependencies');
 
@@ -26,6 +27,11 @@ export class ConnectorDomainModule {
             module: ConnectorDomainModule,
             imports: [
                 CqrsModule,
+                FspiopAxiosModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 AuditProducerModule.forRootAsync({
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
@@ -44,11 +50,17 @@ export class ConnectorDomainModule {
                     useFactory: (deps: ConnectorDomainModule.RequiredDependencies) => deps.fspClient(),
                     inject: [REQUIRED_DEPENDENCIES],
                 },
+                {
+                    provide: ConnectorSettings,
+                    useFactory: (deps: ConnectorDomainModule.RequiredDependencies) => deps.connectorSettings(),
+                    inject: [REQUIRED_DEPENDENCIES],
+                },
                 ...CommandHandlers,
             ],
             exports: [
                 CqrsModule,
                 FspClient,
+                ConnectorSettings,
             ],
         };
     }
@@ -56,8 +68,11 @@ export class ConnectorDomainModule {
 
 export namespace ConnectorDomainModule {
 
-    export interface RequiredDependencies extends AuditProducerModule.RequiredDependencies {
+    export interface RequiredDependencies
+        extends FspiopAxiosModule.RequiredDependencies,
+                AuditProducerModule.RequiredDependencies {
         fspClient(): FspClient;
+        connectorSettings(): ConnectorSettings;
     }
 
     export type AsyncOptions = {
