@@ -1,5 +1,5 @@
 import {Logger} from '@nestjs/common';
-import {FspClient} from '@core/inbound/connector';
+import {FspClient} from '@core/connector/domain';
 import {
     PartiesTypeIDPutResponse,
     QuotesIDPutResponse,
@@ -28,5 +28,14 @@ export class Wallet2FspClient extends FspClient {
         this.logger.log(`postTransfers: transferId=${body.transferId}`);
         // TODO: implement wallet2 transfer processing
         throw new Error('Wallet2FspClient.postTransfers: not implemented');
+    }
+
+    async patchTransfers(input: FspClient.PatchTransfersInput): Promise<void> {
+        const {transferId, response} = input;
+        const fulfilment = response.transferState;
+
+        this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}`);
+        // TODO: implement wallet2 transfer patch processing
+        throw new Error('Wallet2FspClient.patchTransfers: not implemented');
     }
 }

@@ -1,7 +1,7 @@
 {
   "extends": "../../../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../../../dist/core/outbound/subscriber"
+    "outDir": "../../../../dist/core/connector/domain"
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]

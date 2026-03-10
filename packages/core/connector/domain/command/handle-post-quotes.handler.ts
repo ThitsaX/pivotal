@@ -1,17 +1,19 @@
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {ConnectorPostQuotesPublisher} from '@core/connector/publisher';
 import {HandlePostQuotesCommand} from './handle-post-quotes.command';
+import {FspClient} from '../fsp-client';
 
 @CommandHandler(HandlePostQuotesCommand)
 export class HandlePostQuotesHandler
     implements ICommandHandler<HandlePostQuotesCommand, HandlePostQuotesCommand.Output> {
 
-    constructor(private readonly publisher: ConnectorPostQuotesPublisher) {
+    constructor(private readonly fspClient: FspClient) {
     }
 
     async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
-        const {payerFsp, payeeFsp, correlationId, request} = command.input;
-        await this.publisher.publish(new ConnectorPostQuotesPublisher.Message(payerFsp, payeeFsp, correlationId, request));
+        const {request} = command.input;
+
+        await this.fspClient.postQuotes(request);
+
         return new HandlePostQuotesCommand.Output();
     }
 }

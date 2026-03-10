@@ -1,6 +1,6 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
-import {InboundConnectorModule} from '@core/inbound/connector';
+import {ConnectorConsumerModule} from '@core/connector/consumer';
 import {Wallet2ConnectorDependencies} from './required.dependencies';
 
 @Module({
@@ -9,10 +9,10 @@ import {Wallet2ConnectorDependencies} from './required.dependencies';
             isGlobal: true,
             ignoreEnvFile: true,
         }),
-        InboundConnectorModule.forRootAsync({
+        ConnectorConsumerModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: (configService: ConfigService): InboundConnectorModule.RequiredDependencies => {
+            useFactory: (configService: ConfigService): ConnectorConsumerModule.RequiredDependencies => {
                 return new Wallet2ConnectorDependencies(configService);
             },
         }),

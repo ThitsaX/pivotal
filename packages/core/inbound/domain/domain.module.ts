@@ -1,13 +1,7 @@
-import {DynamicModule, Module, Provider} from '@nestjs/common';
+import {DynamicModule, Module} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
+import {ConnectorPublisherModule} from '@core/connector/publisher';
 import {FspiopPubSubModule} from '@shared/fspiop';
-import {NatsClientService} from '@shared/nats';
-import {
-    InboundConnectorPartiesPublisher,
-    InboundConnectorQuotesPublisher,
-    InboundConnectorTransfersPublisher,
-    InboundConnectorPatchTransfersPublisher,
-} from './publisher';
 import {
     HandleGetPartiesHandler,
     HandlePatchTransfersHandler,
@@ -36,29 +30,6 @@ const CommandHandlers = [
     HandlePutTransfersErrorHandler,
 ];
 
-const Publishers: Provider[] = [
-    {
-        provide: InboundConnectorPartiesPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundConnectorPartiesPublisher(ncs),
-        inject: [NatsClientService],
-    },
-    {
-        provide: InboundConnectorQuotesPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundConnectorQuotesPublisher(ncs),
-        inject: [NatsClientService],
-    },
-    {
-        provide: InboundConnectorTransfersPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundConnectorTransfersPublisher(ncs),
-        inject: [NatsClientService],
-    },
-    {
-        provide: InboundConnectorPatchTransfersPublisher,
-        useFactory: (ncs: NatsClientService) => new InboundConnectorPatchTransfersPublisher(ncs),
-        inject: [NatsClientService],
-    },
-];
-
 @Module({})
 export class InboundDomainModule {
 
@@ -72,9 +43,14 @@ export class InboundDomainModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                ConnectorPublisherModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
-            providers: [...CommandHandlers, ...Publishers],
+            providers: [...CommandHandlers],
             exports: [CqrsModule],
         };
     }
@@ -82,7 +58,9 @@ export class InboundDomainModule {
 
 export namespace InboundDomainModule {
 
-    export interface RequiredDependencies extends FspiopPubSubModule.RequiredDependencies {
+    export interface RequiredDependencies
+        extends FspiopPubSubModule.RequiredDependencies,
+                ConnectorPublisherModule.RequiredDependencies {
     }
 
     export type AsyncOptions = {
