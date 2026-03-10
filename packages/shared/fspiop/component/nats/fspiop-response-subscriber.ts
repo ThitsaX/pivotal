@@ -10,7 +10,16 @@ export class FspiopResponseSubscriber {
 
     private readonly pending = new Map<string, Subscription[]>();
 
-    constructor(private readonly nats: NatsClientService) {}
+    constructor(private readonly nats: NatsClientService) {
+    }
+
+    private static toFspiopException(body: ErrorInformationObject): FspiopException {
+        const code = body.errorInformation?.errorCode ?? '';
+        const desc = body.errorInformation?.errorDescription ?? 'Unknown FSPIOP error.';
+        const extensionList = body.errorInformation?.extensionList;
+        const errorDef = FspiopErrors.find(code) ?? FspiopErrors.GENERIC_SERVER_ERROR;
+        return new FspiopException(errorDef, desc, extensionList);
+    }
 
     waitFor<T>(
         successSubject: string,
@@ -18,12 +27,12 @@ export class FspiopResponseSubscriber {
         hubErrorSubject?: string,
         timeoutMs = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS,
     ): Promise<T> {
-        const nc    = this.nats.nc;
+        const nc = this.nats.nc;
         const codec = this.nats.codec;
 
-        const successSub     = nc.subscribe(successSubject, {max: 1});
-        const errorSub       = nc.subscribe(errorSubject,   {max: 1});
-        const hubErrorSub    = hubErrorSubject != null
+        const successSub = nc.subscribe(successSubject, {max: 1});
+        const errorSub = nc.subscribe(errorSubject, {max: 1});
+        const hubErrorSub = hubErrorSubject != null
             ? nc.subscribe(hubErrorSubject, {max: 1})
             : null;
 
@@ -85,13 +94,5 @@ export class FspiopResponseSubscriber {
         for (const sub of subs) {
             sub.unsubscribe();
         }
-    }
-
-    private static toFspiopException(body: ErrorInformationObject): FspiopException {
-        const code          = body.errorInformation?.errorCode        ?? '';
-        const desc          = body.errorInformation?.errorDescription ?? 'Unknown FSPIOP error.';
-        const extensionList = body.errorInformation?.extensionList;
-        const errorDef      = FspiopErrors.find(code) ?? FspiopErrors.GENERIC_SERVER_ERROR;
-        return new FspiopException(errorDef, desc, extensionList);
     }
 }
