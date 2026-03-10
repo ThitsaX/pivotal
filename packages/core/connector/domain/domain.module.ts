@@ -1,5 +1,6 @@
 import {CqrsModule} from '@nestjs/cqrs';
 import {DynamicModule, Module} from '@nestjs/common';
+import {AuditProducerModule} from '@core/audit/producer';
 import {
     HandleGetPartiesHandler,
     HandlePatchTransfersHandler,
@@ -25,6 +26,11 @@ export class ConnectorDomainModule {
             module: ConnectorDomainModule,
             imports: [
                 CqrsModule,
+                AuditProducerModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [
@@ -50,7 +56,7 @@ export class ConnectorDomainModule {
 
 export namespace ConnectorDomainModule {
 
-    export interface RequiredDependencies {
+    export interface RequiredDependencies extends AuditProducerModule.RequiredDependencies {
         fspClient(): FspClient;
     }
 
