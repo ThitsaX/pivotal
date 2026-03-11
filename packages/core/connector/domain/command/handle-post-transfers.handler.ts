@@ -1,10 +1,11 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundTransfersCommand} from '@core/audit/domain';
 import {InboundTransfersAuditPublisher} from '@core/audit/producer';
 import {
     ErrorInformationObject,
+    ErrorInformationResponse,
     FspiopAxios,
-    FspiopErrors,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
@@ -20,14 +21,17 @@ export class HandlePostTransfersHandler
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
+        @Inject(FspClient)
         private readonly fspClient: FspClient,
+        @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
+        @Inject(InboundTransfersAuditPublisher)
         private readonly auditPublisher: InboundTransfersAuditPublisher,
     ) {
     }
 
     async execute(command: HandlePostTransfersCommand): Promise<HandlePostTransfersCommand.Output> {
-        const {payerFsp, payeeFsp, correlationId, request} = command.input;
+        const {payerFsp, payeeFsp, request} = command.input;
         const {switchBaseUrl} = this.fspiopAxios.settings;
         const headers = FspiopHeaders.Values.Transfers.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
@@ -46,7 +50,6 @@ export class HandlePostTransfersHandler
                     HandlePostTransfersHandler.RAIL,
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     request.transferId,
                     request,
                     response,
@@ -59,14 +62,16 @@ export class HandlePostTransfersHandler
         } catch (error) {
             let callbackError = error;
             let callbackAuditError = HandlePostTransfersHandler.toAuditError(error);
+            let callbackErrorResponse = HandlePostTransfersHandler.toErrorResponse(callbackAuditError);
 
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putTransfersError(switchBaseUrl, request.transferId, callbackAuditError);
+                    .putTransfersError(switchBaseUrl, request.transferId, callbackErrorResponse);
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = HandlePostTransfersHandler.toAuditError(putError);
+                callbackErrorResponse = HandlePostTransfersHandler.toErrorResponse(callbackAuditError);
             }
 
             try {
@@ -76,7 +81,6 @@ export class HandlePostTransfersHandler
                         HandlePostTransfersHandler.RAIL,
                         payerFsp,
                         payeeFsp,
-                        correlationId,
                         request.transferId,
                         request,
                         null,
@@ -90,22 +94,22 @@ export class HandlePostTransfersHandler
                 // Preserve the callback error as the command failure.
             }
 
-            throw callbackError;
+            FspiopException.rethrow(callbackError);
         }
 
         return new HandlePostTransfersCommand.Output();
     }
 
     private static toAuditError(error: unknown): ErrorInformationObject {
-        if (error instanceof FspiopException) {
-            return error.toErrorObject();
+        try {
+            FspiopException.rethrow(error);
+        } catch (normalizedError) {
+            return (normalizedError as FspiopException).toErrorObject();
         }
+    }
 
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject();
+    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
+        return {errorInformation: error.errorInformation};
     }
 
     private static nextAuditId(): string {

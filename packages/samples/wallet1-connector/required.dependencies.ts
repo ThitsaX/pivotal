@@ -78,7 +78,7 @@ export class Wallet1ConnectorDependencies implements ConnectorConsumerModule.Req
     }
 
     fspClient(): FspClient {
-        return new Wallet1FspClient();
+        return new Wallet1FspClient(this.connectorSettings());
     }
 
     connectorSettings(): ConnectorSettings {

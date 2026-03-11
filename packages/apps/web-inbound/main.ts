@@ -4,6 +4,7 @@ import {dirname, resolve} from 'node:path';
 import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
+import {json} from 'express';
 import {WebInboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -58,6 +59,7 @@ const bootstrap = async (): Promise<void> => {
 
     const app = await NestFactory.create(WebInboundAppModule);
     app.enableShutdownHooks();
+    app.use(json({type: ['application/json', 'application/*+json']}));
 
     await app.listen(port);
     Logger.log(`Web inbound is listening on port ${port}.`, 'Bootstrap');

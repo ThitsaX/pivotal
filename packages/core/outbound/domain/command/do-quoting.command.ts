@@ -8,7 +8,6 @@ export namespace DoQuotingCommand {
 
     export class Input {
         constructor(
-            public readonly correlationId: string,
             public readonly source: string,
             public readonly destination: string,
             public readonly quoteId: string,

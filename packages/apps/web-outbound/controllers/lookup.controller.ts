@@ -1,18 +1,15 @@
-import {Body, Controller, Headers, HttpCode, HttpStatus, Post,} from '@nestjs/common';
+import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Post,} from '@nestjs/common';
 import {ApiBearerAuth, ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
 import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundPartiesCommand} from '@core/audit/domain';
 import {OutboundPartiesAuditPublisher} from '@core/audit/producer';
 import {DoLookupCommand} from '@core/outbound/domain';
-import {ErrorInformationObject, FspiopErrors, FspiopException, FspiopHeaders, PartiesTypeIDPutResponse, PartyIdType,} from '@shared/fspiop';
+import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopException, FspiopHeaders, PartiesTypeIDPutResponse, PartyIdType,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class LookupRequest {
-    @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
-    correlationId!: string;
-
     @ApiProperty({type: String, description: 'The FSP ID of the destination (payee FSP)'})
     destination!: string;
 
@@ -41,23 +38,36 @@ export class LookupController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
+    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
+        @Inject(CommandBus)
         private readonly commandBus: CommandBus,
+        @Inject(OutboundPartiesAuditPublisher)
         private readonly auditPublisher: OutboundPartiesAuditPublisher,
     ) {
     }
 
-    private static toAuditError(error: unknown): ErrorInformationObject {
+    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
+        const response = new ErrorInformationResponse();
+
         if (error instanceof FspiopException) {
-            return error.toErrorObject();
+            response.errorInformation = error.toErrorObject().errorInformation;
+            return response;
         }
 
         const message = error instanceof Error
             ? error.message
             : FspiopErrors.INTERNAL_SERVER_ERROR.description;
 
-        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject();
+        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
+        return response;
+    }
+
+    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
+        return {
+            errorInformation: response.errorInformation ?? LookupController.FALLBACK_ERROR.errorInformation,
+        };
     }
 
     private static nextAuditId(): string {
@@ -85,7 +95,6 @@ export class LookupController {
 
         try {
             const input = new DoLookupCommand.Input(
-                request.correlationId,
                 source,
                 request.destination,
                 request.type,
@@ -103,7 +112,6 @@ export class LookupController {
                     LookupController.RAIL,
                     source,
                     request.destination,
-                    request.correlationId,
                     request.type,
                     request.id,
                     request.subId ?? null,
@@ -116,6 +124,9 @@ export class LookupController {
 
             return new LookupResponse(output.response);
         } catch (error) {
+            const errorResponse = LookupController.toAuditErrorResponse(error);
+            const errorObject = LookupController.toErrorInformationObject(errorResponse);
+
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundPartiesCommand.Input(
@@ -123,12 +134,11 @@ export class LookupController {
                         LookupController.RAIL,
                         source,
                         request.destination,
-                        request.correlationId,
                         request.type,
                         request.id,
                         request.subId ?? null,
                         null,
-                        LookupController.toAuditError(error),
+                        errorObject,
                         createdAt,
                         new Date(),
                     ),

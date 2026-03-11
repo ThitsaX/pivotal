@@ -15,7 +15,7 @@ export class AuditOutboundPartiesHandler
     }
 
     async execute(command: AuditOutboundPartiesCommand): Promise<AuditOutboundPartiesCommand.Output> {
-        const {id, rail, payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId, response, error, createdAt, completedAt} = command.input;
+        const {id, rail, payerFsp, payeeFsp, partyIdType, partyId, subId, response, error, createdAt, completedAt} = command.input;
 
         const finalResponse = response ?? null;
         const finalError = finalResponse ? null : (error ?? null);
@@ -27,7 +27,6 @@ export class AuditOutboundPartiesHandler
             rail,
             payerFsp,
             payeeFsp,
-            correlationId,
             partyIdType,
             partyId,
             subId,

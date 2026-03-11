@@ -24,10 +24,6 @@ export class OutboundQuotesRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
-    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<OutboundQuotes[]> {
-        return this.getRepository(target).find({where: {correlationId}});
-    }
-
     async findByQuoteId(quoteId: string, target: DbTarget = DbTarget.Read): Promise<OutboundQuotes | null> {
         return this.getRepository(target).findOne({where: {quoteId}});
     }

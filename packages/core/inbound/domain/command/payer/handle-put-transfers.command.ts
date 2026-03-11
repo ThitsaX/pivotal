@@ -10,7 +10,6 @@ export namespace HandlePutTransfersCommand {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
-            public readonly correlationId: string,
             public readonly transferId: string,
             public readonly response: TransfersIDPutResponse | null,
         ) {

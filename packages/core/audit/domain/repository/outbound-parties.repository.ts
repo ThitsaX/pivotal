@@ -24,10 +24,6 @@ export class OutboundPartiesRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
-    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<OutboundParties[]> {
-        return this.getRepository(target).find({where: {correlationId}});
-    }
-
     private getRepository(target: DbTarget): Repository<OutboundParties> {
 
         if (target === DbTarget.Write) {

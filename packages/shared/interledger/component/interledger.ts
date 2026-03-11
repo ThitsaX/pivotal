@@ -34,16 +34,6 @@ export class Interledger {
         return encoded + '='.repeat(padLength);
     }
 
-    private static preimage(
-        ilpSecret: string,
-        amount: bigint,
-        destination: string,
-        data: string,
-    ): Buffer {
-        const joined = `${ilpSecret}:${amount.toString()}:${destination}:${data}`;
-        return crypto.createHash('sha256').update(Buffer.from(joined, 'utf-8')).digest();
-    }
-
     static prepare(
         ilpSecret: string,
         peer: string,
@@ -78,18 +68,31 @@ export class Interledger {
         data: string,
         condition: string,
         lifetimeSeconds: number,
-    ): string | null {
+    ): Fulfill {
         const fulfilmentPacket = Interledger.prepare(ilpSecret, peer, amount, data, lifetimeSeconds);
         const fulfilmentCondition = fulfilmentPacket.base64Condition;
         const fulfilment = fulfilmentPacket.base64Fulfillment;
 
         const valid = fulfilmentCondition === condition;
 
-        return valid ? fulfilment : null;
+        return {
+            valid: valid,
+            base64Fulfillment: fulfilment
+        }
     }
 
     static unwrap(base64Packet: string): IlpPacket.IlpPrepare {
         const buffer = Interledger.base64Decode(base64Packet);
         return IlpPacket.deserializeIlpPrepare(buffer);
+    }
+
+    private static preimage(
+        ilpSecret: string,
+        amount: bigint,
+        destination: string,
+        data: string,
+    ): Buffer {
+        const joined = `${ilpSecret}:${amount.toString()}:${destination}:${data}`;
+        return crypto.createHash('sha256').update(Buffer.from(joined, 'utf-8')).digest();
     }
 }

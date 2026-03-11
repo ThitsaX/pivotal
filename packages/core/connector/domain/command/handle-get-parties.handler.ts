@@ -1,10 +1,11 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundPartiesCommand} from '@core/audit/domain';
 import {InboundPartiesAuditPublisher} from '@core/audit/producer';
 import {
     ErrorInformationObject,
+    ErrorInformationResponse,
     FspiopAxios,
-    FspiopErrors,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
@@ -20,14 +21,17 @@ export class HandleGetPartiesHandler
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
+        @Inject(FspClient)
         private readonly fspClient: FspClient,
+        @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
+        @Inject(InboundPartiesAuditPublisher)
         private readonly auditPublisher: InboundPartiesAuditPublisher,
     ) {
     }
 
     async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
-        const {payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId} = command.input;
+        const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
         const {switchBaseUrl} = this.fspiopAxios.settings;
         const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
@@ -35,7 +39,7 @@ export class HandleGetPartiesHandler
 
         try {
             const response = await this.fspClient.getParties(
-                new FspClient.GetPartiesInput(payerFsp, payeeFsp, correlationId, partyIdType, partyId, subId),
+                new FspClient.GetPartiesInput(payerFsp, payeeFsp, partyIdType, partyId, subId),
             );
 
             await this.fspiopAxios
@@ -48,7 +52,6 @@ export class HandleGetPartiesHandler
                     HandleGetPartiesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     partyIdType,
                     partyId,
                     subId,
@@ -62,14 +65,16 @@ export class HandleGetPartiesHandler
         } catch (error) {
             let callbackError = error;
             let callbackAuditError = HandleGetPartiesHandler.toAuditError(error);
+            let callbackErrorResponse = HandleGetPartiesHandler.toErrorResponse(callbackAuditError);
 
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putPartiesError(switchBaseUrl, partyIdType, partyId, callbackAuditError, subId ?? undefined);
+                    .putPartiesError(switchBaseUrl, partyIdType, partyId, callbackErrorResponse, subId ?? undefined);
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = HandleGetPartiesHandler.toAuditError(putError);
+                callbackErrorResponse = HandleGetPartiesHandler.toErrorResponse(callbackAuditError);
             }
 
             try {
@@ -79,7 +84,6 @@ export class HandleGetPartiesHandler
                         HandleGetPartiesHandler.RAIL,
                         payerFsp,
                         payeeFsp,
-                        correlationId,
                         partyIdType,
                         partyId,
                         subId,
@@ -94,22 +98,22 @@ export class HandleGetPartiesHandler
                 // Preserve the callback error as the command failure.
             }
 
-            throw callbackError;
+            FspiopException.rethrow(callbackError);
         }
 
         return new HandleGetPartiesCommand.Output();
     }
 
     private static toAuditError(error: unknown): ErrorInformationObject {
-        if (error instanceof FspiopException) {
-            return error.toErrorObject();
+        try {
+            FspiopException.rethrow(error);
+        } catch (normalizedError) {
+            return (normalizedError as FspiopException).toErrorObject();
         }
+    }
 
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject();
+    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
+        return {errorInformation: error.errorInformation};
     }
 
     private static nextAuditId(): string {

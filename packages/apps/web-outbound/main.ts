@@ -5,6 +5,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 import {config as loadDotEnv} from 'dotenv';
+import {json} from 'express';
 import {FspiopExceptionFilter, FspiopHeaders} from '@shared/fspiop';
 import {WebOutboundAppModule} from './app.module';
 
@@ -60,6 +61,7 @@ const bootstrap = async (): Promise<void> => {
 
     const app = await NestFactory.create(WebOutboundAppModule);
     app.enableShutdownHooks();
+    app.use(json({type: ['application/json', 'application/*+json']}));
     app.useGlobalFilters(new FspiopExceptionFilter());
 
     const swaggerConfig = new DocumentBuilder()

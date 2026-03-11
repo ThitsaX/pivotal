@@ -21,7 +21,6 @@ export namespace ConnectorPatchTransfersPublisher {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
-            public readonly correlationId: string,
             public readonly transferId: string,
             public readonly response: TransfersIDPatchResponse,
         ) {}

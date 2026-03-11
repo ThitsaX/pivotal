@@ -5,6 +5,7 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
+    Inject,
     Param,
     Put,
 } from '@nestjs/common';
@@ -16,6 +17,8 @@ import {
 } from '@core/inbound/domain';
 import {
     ErrorInformationObject,
+    ErrorInformationResponse,
+    FspiopErrors,
     FspiopHeaders,
     PartiesTypeIDPutResponse,
     PartyIdType,
@@ -24,7 +27,12 @@ import {
 @Controller('parties')
 export class PartiesController {
 
-    constructor(private readonly commandBus: CommandBus) {
+    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
+
+    constructor(
+        @Inject(CommandBus)
+        private readonly commandBus: CommandBus,
+    ) {
     }
 
     @Get(':type/:id')
@@ -36,15 +44,13 @@ export class PartiesController {
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
     ): Promise<void> {
-        const payerFsp = PartiesController.headerValue(destinationHeader);
-        const payeeFsp = PartiesController.headerValue(sourceHeader);
-        const correlationId = PartiesController.headerValue(correlationIdHeader, id);
+        const payerFsp = PartiesController.headerValue(sourceHeader);
+        const payeeFsp = PartiesController.headerValue(destinationHeader);
 
         await this.commandBus.execute(
             new HandleGetPartiesCommand(
-                new HandleGetPartiesCommand.Input(payerFsp, payeeFsp, correlationId, type, id, subId ?? null),
+                new HandleGetPartiesCommand.Input(payerFsp, payeeFsp, type, id, subId ?? null),
             ),
         );
     }
@@ -58,19 +64,16 @@ export class PartiesController {
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
     ): Promise<void> {
         const payerFsp = PartiesController.headerValue(destinationHeader);
         const payeeFsp = PartiesController.headerValue(sourceHeader);
-        const correlationId = PartiesController.headerValue(correlationIdHeader, id);
 
         await this.commandBus.execute(
             new HandlePutPartiesCommand(
                 new HandlePutPartiesCommand.Input(
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     type,
                     id,
                     subId ?? null,
@@ -89,23 +92,21 @@ export class PartiesController {
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
-        @Body() request: ErrorInformationObject,
+        @Body() request: ErrorInformationResponse | undefined,
     ): Promise<void> {
         const payerFsp = PartiesController.headerValue(destinationHeader);
         const payeeFsp = PartiesController.headerValue(sourceHeader);
-        const correlationId = PartiesController.headerValue(correlationIdHeader, id);
+        const error = PartiesController.toErrorInformationObject(request);
 
         await this.commandBus.execute(
             new HandlePutPartiesErrorCommand(
                 new HandlePutPartiesErrorCommand.Input(
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     type,
                     id,
                     subId ?? null,
-                    request,
+                    error,
                 ),
             ),
         );
@@ -121,5 +122,11 @@ export class PartiesController {
         }
 
         return value;
+    }
+
+    private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {
+        return {
+            errorInformation: response?.errorInformation ?? PartiesController.FALLBACK_ERROR.errorInformation,
+        };
     }
 }

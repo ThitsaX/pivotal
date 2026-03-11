@@ -4,7 +4,7 @@ import axios, {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axio
 import {FspiopHeadersMap} from '../fspiop-headers';
 import {FspiopSettings} from '../fspiop-settings';
 import {
-    ErrorInformationObject, ErrorInformationResponse,
+    ErrorInformationResponse,
     FxQuotesIDPutResponse,
     FxQuotesPostRequest,
     FxTransfersIDPatchResponse,
@@ -29,7 +29,7 @@ export interface FspiopAxiosParams {
 /**
  * Retrofit-style request interceptor.
  * Receives the outgoing Axios request config and must return it (optionally modified).
- * Use this to inject dynamic values such as auth tokens, signatures, or correlation IDs.
+ * Use this to inject dynamic values such as auth tokens or signatures.
  *
  * @example — inject a bearer token
  * const interceptor: FspiopAxiosInterceptor = async (config) => {
@@ -102,11 +102,11 @@ export class FspiopAxios {
         await this.put(url, body);
     }
 
-    async putPartiesError(baseUrl: string, type: PartyIdType, id: string, body: ErrorInformationObject, subId?: string): Promise<void> {
+    async putPartiesError(baseUrl: string, type: PartyIdType, id: string, response: ErrorInformationResponse, subId?: string): Promise<void> {
         const url = subId
             ? `${baseUrl}/parties/${type}/${id}/${subId}/error`
             : `${baseUrl}/parties/${type}/${id}/error`;
-        await this.put(url, body);
+        await this.put(url, response);
     }
 
     // ─── Quotes ─────────────────────────────────────────────────────────────────
@@ -119,8 +119,8 @@ export class FspiopAxios {
         await this.put(`${baseUrl}/quotes/${id}`, body);
     }
 
-    async putQuotesError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
-        await this.put(`${baseUrl}/quotes/${id}/error`, body);
+    async putQuotesError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/quotes/${id}/error`, response);
     }
 
     // ─── Transfers ──────────────────────────────────────────────────────────────
@@ -137,8 +137,8 @@ export class FspiopAxios {
         await this.patch(`${baseUrl}/transfers/${id}`, body);
     }
 
-    async putTransfersError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
-        await this.put(`${baseUrl}/transfers/${id}/error`, body);
+    async putTransfersError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/transfers/${id}/error`, response);
     }
 
     // ─── FX Quotes ──────────────────────────────────────────────────────────────
@@ -151,8 +151,8 @@ export class FspiopAxios {
         await this.put(`${baseUrl}/fxQuotes/${id}`, body);
     }
 
-    async putFxQuotesError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
-        await this.put(`${baseUrl}/fxQuotes/${id}/error`, body);
+    async putFxQuotesError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxQuotes/${id}/error`, response);
     }
 
     // ─── FX Transfers ───────────────────────────────────────────────────────────
@@ -169,8 +169,8 @@ export class FspiopAxios {
         await this.patch(`${baseUrl}/fxTransfers/${id}`, body);
     }
 
-    async putFxTransfersError(baseUrl: string, id: string, body: ErrorInformationObject): Promise<void> {
-        await this.put(`${baseUrl}/fxTransfers/${id}/error`, body);
+    async putFxTransfersError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxTransfers/${id}/error`, response);
     }
 
     // ─── Internal ───────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ export class FspiopAxios {
                 if (error.response) {
                     throw new FspiopAxiosError(
                         error.response.status,
-                        error.response.data as ErrorInformationObject,
+                        error.response.data as ErrorInformationResponse,
                     );
                 }
                 throw error;

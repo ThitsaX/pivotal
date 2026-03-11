@@ -55,29 +55,37 @@ describe('Interledger', () => {
 
     it('should return fulfilment when condition matches', () => {
         const prepared = Interledger.prepare('secret', 'g.fsp-b', 100n, 'payload', 60);
+        const unwrapped = Interledger.unwrap(prepared.base64PreparePacket);
+        const payload = unwrapped.data.toString('utf-8');
 
         const fulfilment = Interledger.fulfil(
             'secret',
-            'g.fsp-b',
-            100n,
-            'payload',
+            unwrapped.destination,
+            BigInt(unwrapped.amount),
+            payload,
             prepared.base64Condition,
             60,
         );
 
-        assert.equal(fulfilment, prepared.base64Fulfillment);
+        assert.equal(fulfilment.valid, true);
+        assert.equal(fulfilment.base64Fulfillment, prepared.base64Fulfillment);
     });
 
-    it('should return null when condition does not match', () => {
+    it('should mark fulfilment invalid when condition does not match', () => {
+        const prepared = Interledger.prepare('secret', 'g.fsp-b', 100n, 'payload', 60);
+        const unwrapped = Interledger.unwrap(prepared.base64PreparePacket);
+        const payload = unwrapped.data.toString('utf-8');
+
         const fulfilment = Interledger.fulfil(
             'secret',
-            'g.fsp-b',
-            100n,
-            'payload',
+            unwrapped.destination,
+            BigInt(unwrapped.amount),
+            payload,
             'invalid-condition',
             60,
         );
 
-        assert.equal(fulfilment, null);
+        assert.equal(fulfilment.valid, false);
+        assert.equal(typeof fulfilment.base64Fulfillment, 'string');
     });
 });

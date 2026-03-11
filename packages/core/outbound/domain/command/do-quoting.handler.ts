@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {
     FspiopAxios,
@@ -16,7 +17,9 @@ export class DoQuotingHandler
     implements ICommandHandler<DoQuotingCommand, DoQuotingCommand.Output> {
 
     constructor(
+        @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
+        @Inject(FspiopResponseSubscriber)
         private readonly subscriber: FspiopResponseSubscriber,
     ) {
     }
@@ -25,7 +28,7 @@ export class DoQuotingHandler
         const {source, destination, quoteId, request} = command.input;
         const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Quotes.forRequest(source, switchId);
+        const headers = FspiopHeaders.Values.Quotes.forRequest(source, destination);
 
         // Quotes carry a unique quoteId — a single error subject is sufficient,
         // no hub error subject is needed (unlike Parties).

@@ -13,7 +13,6 @@ export namespace AuditInboundTransfersCommand {
             public readonly rail: string,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
-            public readonly correlationId: string,
             public readonly transferId: string,
             public readonly request: TransfersPostRequest,
             public readonly response: TransfersIDPutResponse | null = null,

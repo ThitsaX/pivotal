@@ -8,7 +8,6 @@ import {
 import {DoLookupHandler, DoQuotingHandler, DoTransferHandler} from './command';
 
 const REQUIRED_DEPENDENCIES = Symbol('OutboundDomainRequiredDependencies');
-
 const CommandHandlers = [DoLookupHandler, DoQuotingHandler, DoTransferHandler];
 
 @Module({})

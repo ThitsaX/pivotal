@@ -62,7 +62,6 @@ export class ConnectorPostTransfersListener implements OnModuleInit {
                         new HandlePostTransfersCommand.Input(
                             message.payerFsp,
                             message.payeeFsp,
-                            message.correlationId,
                             message.request,
                         ),
                     ),

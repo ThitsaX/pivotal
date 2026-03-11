@@ -60,12 +60,12 @@ export namespace FspiopHeaders {
 
             static readonly CONTENT_TYPE = 'application/vnd.interoperability.parties+json;version=2.0';
 
-            static forRequest(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(Parties.ACCEPT, Parties.CONTENT_TYPE, source, destination);
+            static forRequest(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(Parties.ACCEPT, Parties.CONTENT_TYPE, payer, payee);
             }
 
-            static forResult(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(null, Parties.CONTENT_TYPE, source, destination);
+            static forResult(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(null, Parties.CONTENT_TYPE, payee, payer);
             }
         }
 
@@ -75,12 +75,12 @@ export namespace FspiopHeaders {
 
             static readonly CONTENT_TYPE = 'application/vnd.interoperability.quotes+json;version=2.0';
 
-            static forRequest(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(Quotes.ACCEPT, Quotes.CONTENT_TYPE, source, destination);
+            static forRequest(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(Quotes.ACCEPT, Quotes.CONTENT_TYPE, payer, payee);
             }
 
-            static forResult(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(null, Quotes.CONTENT_TYPE, source, destination);
+            static forResult(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(null, Quotes.CONTENT_TYPE, payee, payer);
             }
         }
 
@@ -90,12 +90,12 @@ export namespace FspiopHeaders {
 
             static readonly CONTENT_TYPE = 'application/vnd.interoperability.transfers+json;version=2.0';
 
-            static forRequest(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(Transfers.ACCEPT, Transfers.CONTENT_TYPE, source, destination);
+            static forRequest(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(Transfers.ACCEPT, Transfers.CONTENT_TYPE, payer, payee);
             }
 
-            static forResult(source: string, destination?: string | null): FspiopHeadersMap {
-                return createHeaders(null, Transfers.CONTENT_TYPE, source, destination);
+            static forResult(payer: string, payee: string): FspiopHeadersMap {
+                return createHeaders(null, Transfers.CONTENT_TYPE, payee, payer);
             }
         }
 
