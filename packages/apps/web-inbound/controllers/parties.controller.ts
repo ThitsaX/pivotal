@@ -35,8 +35,7 @@ export class PartiesController {
     ) {
     }
 
-    @Get(':type/:id')
-    @Get(':type/:id/:subId')
+    @Get(':type/:id{/:subId}')
     @HttpCode(HttpStatus.ACCEPTED)
     async getParties(
         @Param('type') type: PartyIdType,
@@ -55,8 +54,7 @@ export class PartiesController {
         );
     }
 
-    @Put(':type/:id')
-    @Put(':type/:id/:subId')
+    @Put(':type/:id{/:subId}')
     @HttpCode(HttpStatus.OK)
     async putParties(
         @Param('type') type: PartyIdType,
@@ -83,8 +81,7 @@ export class PartiesController {
         );
     }
 
-    @Put(':type/:id/error')
-    @Put(':type/:id/:subId/error')
+    @Put(':type/:id{/:subId}/error')
     @HttpCode(HttpStatus.OK)
     async putPartiesError(
         @Param('type') type: PartyIdType,
