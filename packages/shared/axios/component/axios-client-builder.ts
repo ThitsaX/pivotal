@@ -2,12 +2,17 @@ import * as http from 'http';
 import * as https from 'https';
 import axios, {AxiosError, AxiosInstance, AxiosResponse, CreateAxiosDefaults, InternalAxiosRequestConfig,} from 'axios';
 import {CaStore, ClientCertStore} from '@shared/security/component/cert';
+import {HttpLoggerInterceptor} from './interceptor';
 
 export interface AxiosClientBuilderParams {
     /** Timeout (ms) waiting for response data after the connection is established. */
     socketTimeoutMs?: number;
     /** Timeout (ms) to establish the TCP connection. */
     connectionTimeoutMs?: number;
+    /** Whether to verify the TLS certificate chain. */
+    verifyServerCertificate?: boolean;
+    /** Whether to verify server hostname/domain against certificate SAN/CN. */
+    verifyDomain?: boolean;
 }
 
 export interface AxiosClientMutualTlsOptions {
@@ -62,6 +67,7 @@ export class AxiosClientBuilder {
     private httpAgent: http.Agent | undefined;
     private httpsAgent: https.Agent | undefined;
     private mutualTlsOptions: AxiosClientMutualTlsOptions | undefined;
+    private httpLoggerEnabled = false;
 
     static newBuilder(): AxiosClientBuilder {
         return new AxiosClientBuilder();
@@ -69,16 +75,31 @@ export class AxiosClientBuilder {
 
     private static createMutualTlsAgent(
         options: AxiosClientMutualTlsOptions,
-        connectionTimeoutMs?: number,
+        params?: AxiosClientBuilderParams,
     ): https.Agent {
+        const checkServerIdentity = AxiosClientBuilder.resolveCheckServerIdentity(params?.verifyDomain);
+
         return new https.Agent({
                                    ca: options.ca,
                                    cert: options.cert,
                                    key: options.key,
                                    passphrase: options.passphrase,
-                                   rejectUnauthorized: options.rejectUnauthorized,
-                                   timeout: connectionTimeoutMs,
+                                   rejectUnauthorized: options.rejectUnauthorized ?? params?.verifyServerCertificate,
+                                   timeout: params?.connectionTimeoutMs,
+                                   ...(checkServerIdentity != null
+                                       ? {checkServerIdentity}
+                                       : {}),
                                });
+    }
+
+    private static resolveCheckServerIdentity(
+        verifyDomain?: boolean,
+    ): https.AgentOptions['checkServerIdentity'] | undefined {
+        if (verifyDomain !== false) {
+            return undefined;
+        }
+
+        return () => undefined;
     }
 
     private static mergeHeaders(
@@ -197,6 +218,13 @@ export class AxiosClientBuilder {
         return this;
     }
 
+    withHttpLogger(enabled: boolean): AxiosClientBuilder {
+
+        this.httpLoggerEnabled = enabled;
+
+        return this;
+    }
+
     withMutualTls(options: AxiosClientMutualTlsOptions): AxiosClientBuilder {
 
         this.mutualTlsOptions = {
@@ -255,15 +283,30 @@ export class AxiosClientBuilder {
         } else if (this.mutualTlsOptions != null) {
             config.httpsAgent = AxiosClientBuilder.createMutualTlsAgent(
                 this.mutualTlsOptions,
-                this.params.connectionTimeoutMs,
+                this.params,
             );
         } else if (config.httpsAgent == null && this.params.connectionTimeoutMs != null) {
+            const checkServerIdentity = AxiosClientBuilder.resolveCheckServerIdentity(this.params.verifyDomain);
+
             config.httpsAgent = new https.Agent({
+                                                    rejectUnauthorized: this.params.verifyServerCertificate,
                                                     timeout: this.params.connectionTimeoutMs,
+                                                    ...(checkServerIdentity != null
+                                                        ? {checkServerIdentity}
+                                                        : {}),
                                                 });
         }
 
         const instance = axios.create(config);
+        const httpLoggerInterceptor = this.httpLoggerEnabled
+            ? new HttpLoggerInterceptor()
+            : undefined;
+
+        if (httpLoggerInterceptor != null) {
+            // Axios request interceptors run in LIFO order.
+            // Register logger first so it logs the final request after user interceptors mutate it.
+            instance.interceptors.request.use(httpLoggerInterceptor.requestInterceptor());
+        }
 
         for (const interceptor of this.requestInterceptors) {
             instance.interceptors.request.use(interceptor.onFulfilled, interceptor.onRejected);
@@ -271,6 +314,15 @@ export class AxiosClientBuilder {
 
         for (const interceptor of this.responseInterceptors) {
             instance.interceptors.response.use(interceptor.onFulfilled, interceptor.onRejected);
+        }
+
+        if (httpLoggerInterceptor != null) {
+            // Axios response interceptors run in FIFO order.
+            // Register logger last so it logs the final response after user interceptors mutate it.
+            instance.interceptors.response.use(
+                httpLoggerInterceptor.responseInterceptor(),
+                httpLoggerInterceptor.responseErrorInterceptor(),
+            );
         }
 
         return instance;

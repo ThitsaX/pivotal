@@ -106,15 +106,71 @@ describe('AxiosClientBuilder', () => {
 
     it('should build default agents when connection timeout is configured', () => {
         const client = AxiosClientBuilder.newBuilder()
-            .withConnectionTimeoutMs(1234)
+            .withParams({
+                connectionTimeoutMs: 1234,
+                verifyServerCertificate: false,
+                verifyDomain: false,
+            })
             .build();
 
+        const httpsAgent = client.defaults.httpsAgent as https.Agent;
+        const agentOptions = (httpsAgent as unknown as { options: https.AgentOptions }).options;
+
         assert.ok(client.defaults.httpAgent instanceof http.Agent);
-        assert.ok(client.defaults.httpsAgent instanceof https.Agent);
+        assert.ok(httpsAgent instanceof https.Agent);
+        assert.equal(agentOptions.rejectUnauthorized, false);
+        assert.equal(typeof agentOptions.checkServerIdentity, 'function');
+    });
+
+    it('should apply http logger interceptor when enabled', async () => {
+        const client = AxiosClientBuilder.newBuilder()
+            .withHttpLogger(true)
+            .withDefaults({
+                adapter: async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => ({
+                    data: 'ok',
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {},
+                    config,
+                }),
+            })
+            .build();
+
+        const response = await client.get('/health');
+        const metadata = AxiosClientBuilderTest.resolveMetadata(response.config);
+
+        assert.ok(metadata != null);
+        assert.equal(typeof metadata?.startedAt, 'number');
+    });
+
+    it('should not apply http logger interceptor when disabled', async () => {
+        const client = AxiosClientBuilder.newBuilder()
+            .withHttpLogger(false)
+            .withDefaults({
+                adapter: async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => ({
+                    data: 'ok',
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {},
+                    config,
+                }),
+            })
+            .build();
+
+        const response = await client.get('/health');
+        const metadata = AxiosClientBuilderTest.resolveMetadata(response.config);
+
+        assert.equal(metadata, undefined);
     });
 });
 
 class AxiosClientBuilderTest {
+
+    static resolveMetadata(
+        config: InternalAxiosRequestConfig,
+    ): { startedAt: number } | undefined {
+        return (config as InternalAxiosRequestConfig & { metadata?: { startedAt: number } }).metadata;
+    }
 
     static mergeHeaders(
         headers: InternalAxiosRequestConfig['headers'],

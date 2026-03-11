@@ -24,6 +24,10 @@ export interface FspiopAxiosParams {
     socketTimeoutMs?: number;
     /** Timeout (ms) to establish the TCP connection. */
     connectionTimeoutMs?: number;
+    /** Whether to verify the TLS certificate chain. */
+    verifyServerCertificate?: boolean;
+    /** Whether to verify server hostname/domain against certificate SAN/CN. */
+    verifyDomain?: boolean;
 }
 
 /**
@@ -69,8 +73,8 @@ export class FspiopAxios {
     constructor(
         settings: FspiopSettings,
         params: FspiopAxiosParams = {},
-        headers: FspiopHeadersMap = {},
         interceptors: FspiopAxiosInterceptor[] = [],
+        headers: FspiopHeadersMap = {},
         httpsAgent?: https.Agent,
         client?: AxiosInstance,
     ) {
@@ -117,7 +121,7 @@ export class FspiopAxios {
 
     withHeaders(headers: FspiopHeadersMap): FspiopAxios {
         // client is already built with the agent baked in — pass it through directly
-        return new FspiopAxios(this.settings, this.params, headers, this.interceptors, undefined, this.client);
+        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, undefined, this.client);
     }
 
     // ─── Parties ────────────────────────────────────────────────────────────────

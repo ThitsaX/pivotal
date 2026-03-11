@@ -5,6 +5,8 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
+import {FspiopJwsGuard} from '@shared/fspiop';
+import {WebInboundDependencies} from './required.dependencies';
 import {WebInboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -39,6 +41,33 @@ const findRepoRoot = (): string => {
     return process.cwd();
 };
 
+const resolveHttpsOptions = (
+    deps: WebInboundDependencies,
+    useMutualTls: boolean,
+): Record<string, unknown> | undefined => {
+    if (!useMutualTls) {
+        return undefined;
+    }
+
+    const ca = deps.caStore().toBuffer();
+    if (ca == null || ca.length === 0) {
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CA certificates (CA_COUNT/CA_CONTENT_N or JSON_CA_CERTS).');
+    }
+
+    const clientCert = deps.clientCertStore().get();
+    if (clientCert == null) {
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CLIENT_CERT_CONTENT and CLIENT_CERT_KEY (or JSON_CLIENT_CERT).');
+    }
+
+    return {
+        ca,
+        cert: clientCert.certBuffer(),
+        key: clientCert.keyBuffer(),
+        requestCert: true,
+        rejectUnauthorized: true,
+    };
+};
+
 const bootstrap = async (): Promise<void> => {
     const repoRoot = findRepoRoot();
 
@@ -56,13 +85,27 @@ const bootstrap = async (): Promise<void> => {
     }
 
     const port = Number(process.env['WEB_INBOUND_PORT'] ?? DEFAULT_HTTP_PORT);
+    const deps = new WebInboundDependencies();
+    const settings = deps.fspiopSettings();
+    const httpsOptions = resolveHttpsOptions(deps, settings.useMutualTls);
+    const nestOptions = httpsOptions == null ? {} : {httpsOptions: httpsOptions as any};
 
-    const app = await NestFactory.create(WebInboundAppModule);
+    const app = await NestFactory.create(WebInboundAppModule, nestOptions);
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
+    app.useGlobalGuards(new FspiopJwsGuard(deps.publicKeyStore(), settings));
+
+    if (settings.useJws) {
+        Logger.log('FspiopJwsGuard is enabled.', 'Bootstrap');
+    }
+
+    if (settings.useMutualTls) {
+        Logger.log('Inbound mTLS is enabled.', 'Bootstrap');
+    }
 
     await app.listen(port);
-    Logger.log(`Web inbound is listening on port ${port}.`, 'Bootstrap');
+    const protocol = settings.useMutualTls ? 'https' : 'http';
+    Logger.log(`Web inbound is listening on ${protocol} port ${port}.`, 'Bootstrap');
 };
 
 void bootstrap();
