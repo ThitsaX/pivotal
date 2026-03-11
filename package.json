@@ -29,6 +29,7 @@
     "start:apps-web-inbound:prod": "node dist/packages/apps/web-inbound/main.js",
     "build:ports-fspiop": "nest build ports-fspiop",
     "build:ports-iso20022": "nest build ports-iso20022",
+    "build:shared-axios": "nest build shared-axios",
     "build:shared-fspiop": "nest build shared-fspiop",
     "build:shared-pg-migration": "nest build shared-pg-migration",
     "build:shared-snowflake": "nest build shared-snowflake",
