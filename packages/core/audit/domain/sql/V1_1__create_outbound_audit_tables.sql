@@ -3,7 +3,6 @@ CREATE TABLE outbound_parties (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     party_id_type VARCHAR(32) NOT NULL,
     party_id VARCHAR(128) NOT NULL,
     sub_id VARCHAR(128),
@@ -14,7 +13,6 @@ CREATE TABLE outbound_parties (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX outbound_parties_01_idx ON outbound_parties (correlation_id);
 CREATE INDEX outbound_parties_02_idx ON outbound_parties (party_id_type, party_id);
 CREATE INDEX outbound_parties_03_idx ON outbound_parties (party_id_type, party_id, sub_id);
 CREATE INDEX outbound_parties_04_idx ON outbound_parties (created_at);
@@ -28,7 +26,6 @@ CREATE TABLE outbound_quotes (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     quote_id VARCHAR(64) NOT NULL,
     request JSONB NOT NULL,
     response JSONB,
@@ -38,7 +35,6 @@ CREATE TABLE outbound_quotes (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX outbound_quotes_01_idx ON outbound_quotes (correlation_id);
 CREATE INDEX outbound_quotes_02_idx ON outbound_quotes (quote_id);
 CREATE INDEX outbound_quotes_03_idx ON outbound_quotes (created_at);
 CREATE INDEX outbound_quotes_04_idx ON outbound_quotes (completed_at);
@@ -51,7 +47,6 @@ CREATE TABLE outbound_transfers (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     transfer_id VARCHAR(64) NOT NULL,
     request JSONB NOT NULL,
     response JSONB,
@@ -61,7 +56,6 @@ CREATE TABLE outbound_transfers (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX outbound_transfers_01_idx ON outbound_transfers (correlation_id);
 CREATE INDEX outbound_transfers_02_idx ON outbound_transfers (transfer_id);
 CREATE INDEX outbound_transfers_03_idx ON outbound_transfers (created_at);
 CREATE INDEX outbound_transfers_04_idx ON outbound_transfers (completed_at);

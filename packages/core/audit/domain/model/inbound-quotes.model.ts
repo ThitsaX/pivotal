@@ -2,7 +2,6 @@ import {ErrorInformationObject, QuotesIDPutResponse, QuotesPostRequest} from '@s
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'inbound_quotes'})
-@Index('inbound_quotes_01_idx', ['correlationId'])
 @Index('inbound_quotes_02_idx', ['quoteId'])
 @Index('inbound_quotes_03_idx', ['createdAt'])
 @Index('inbound_quotes_04_idx', ['completedAt'])
@@ -22,9 +21,6 @@ export class InboundQuotes {
 
     @Column({type: 'varchar', length: 32, name: 'payee_fsp'})
     public payeeFsp: string;
-
-    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
-    public correlationId: string;
 
     @Column({type: 'varchar', length: 64, name: 'quote_id'})
     public quoteId: string;
@@ -55,7 +51,6 @@ export class InboundQuotes {
         rail: string,
         payerFsp: string,
         payeeFsp: string,
-        correlationId: string,
         quoteId: string,
         request: QuotesPostRequest,
         response: QuotesIDPutResponse | null = null,
@@ -70,7 +65,6 @@ export class InboundQuotes {
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
-        this.correlationId = correlationId;
         this.quoteId = quoteId;
         this.request = request;
         this.response = response;

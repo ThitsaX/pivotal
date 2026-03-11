@@ -2,7 +2,6 @@ import {ErrorInformationObject, PartiesTypeIDPutResponse, PartyIdType} from '@sh
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'outbound_parties'})
-@Index('outbound_parties_01_idx', ['correlationId'])
 @Index('outbound_parties_02_idx', ['partyIdType', 'partyId'])
 @Index('outbound_parties_03_idx', ['partyIdType', 'partyId', 'subId'])
 @Index('outbound_parties_04_idx', ['createdAt'])
@@ -23,9 +22,6 @@ export class OutboundParties {
 
     @Column({type: 'varchar', length: 32, name: 'payee_fsp'})
     public payeeFsp: string;
-
-    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
-    public correlationId: string;
 
     @Column({type: 'varchar', length: 32, name: 'party_id_type'})
     public partyIdType: PartyIdType;
@@ -56,7 +52,6 @@ export class OutboundParties {
         rail: string,
         payerFsp: string,
         payeeFsp: string,
-        correlationId: string,
         partyIdType: PartyIdType,
         partyId: string,
         subId: string | undefined | null = null,
@@ -71,7 +66,6 @@ export class OutboundParties {
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
-        this.correlationId = correlationId;
         this.partyIdType = partyIdType;
         this.partyId = partyId;
         this.subId = subId ?? null;

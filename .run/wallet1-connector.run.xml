@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="wallet1-connector" type="NodeJSConfigurationType" node-parameters="-r ts-node/register -r tsconfig-paths/register " path-to-js-file="main.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$/packages/samples/wallet1-connector">
+    <method v="2" />
+  </configuration>
+</component>

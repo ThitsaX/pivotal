@@ -15,7 +15,7 @@ export class AuditInboundQuotesHandler
     }
 
     async execute(command: AuditInboundQuotesCommand): Promise<AuditInboundQuotesCommand.Output> {
-        const {id, rail, payerFsp, payeeFsp, correlationId, quoteId, request, response, error, fspError, createdAt, completedAt} = command.input;
+        const {id, rail, payerFsp, payeeFsp, quoteId, request, response, error, fspError, createdAt, completedAt} = command.input;
 
         const finalResponse = response ?? null;
         const finalError = finalResponse ? null : (error ?? null);
@@ -28,7 +28,6 @@ export class AuditInboundQuotesHandler
             rail,
             payerFsp,
             payeeFsp,
-            correlationId,
             quoteId,
             request,
             finalResponse,

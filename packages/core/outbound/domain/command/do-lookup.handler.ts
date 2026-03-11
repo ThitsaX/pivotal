@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {
     FspiopAxios,
@@ -16,7 +17,9 @@ export class DoLookupHandler
     implements ICommandHandler<DoLookupCommand, DoLookupCommand.Output> {
 
     constructor(
+        @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
+        @Inject(FspiopResponseSubscriber)
         private readonly subscriber: FspiopResponseSubscriber,
     ) {
     }
@@ -25,7 +28,7 @@ export class DoLookupHandler
         const {source, destination, type, id, subId} = command.input;
         const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Parties.forRequest(source, switchId);
+        const headers = FspiopHeaders.Values.Parties.forRequest(source, destination);
 
         // Build NATS pub/sub subjects for this lookup.
         // Success / FSP error: the responding payee DFSP is the source, we are the destination.

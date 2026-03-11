@@ -62,7 +62,6 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
                         new HandleGetPartiesCommand.Input(
                             message.payerFsp,
                             message.payeeFsp,
-                            message.correlationId,
                             message.partyIdType,
                             message.partyId,
                             message.subId,

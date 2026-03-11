@@ -1,6 +1,7 @@
 import { ErrorInformationObject } from '../dto/error-information-object';
 import { ExtensionList } from '../dto/extension-list';
 import { ErrorDefinition } from './error-definition';
+import { FspiopErrors } from './fspiop-errors';
 
 export class FspiopException extends Error {
 
@@ -45,5 +46,21 @@ export class FspiopException extends Error {
 
     toErrorObject(): ErrorInformationObject {
         return this.errorDefinition.toErrorObject(this.extensionList);
+    }
+
+    static rethrow(exception: unknown): never {
+        throw FspiopException.normalize(exception);
+    }
+
+    static normalize(exception: unknown): FspiopException {
+        if (exception instanceof FspiopException) {
+            return exception;
+        }
+
+        const message = exception instanceof Error
+            ? exception.message
+            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
+
+        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message);
     }
 }

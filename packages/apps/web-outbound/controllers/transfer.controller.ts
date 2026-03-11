@@ -4,6 +4,7 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
+    Inject,
     Post,
 } from '@nestjs/common';
 import {ApiBearerAuth, ApiBody, ApiHeader, ApiOkResponse, ApiOperation, ApiProperty, ApiTags} from '@nestjs/swagger';
@@ -13,6 +14,7 @@ import {OutboundTransfersAuditPublisher} from '@core/audit/producer';
 import {DoTransferCommand} from '@core/outbound/domain';
 import {
     ErrorInformationObject,
+    ErrorInformationResponse,
     FspiopErrors,
     FspiopException,
     FspiopHeaders,
@@ -24,9 +26,6 @@ import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class TransferRequest {
-    @ApiProperty({type: String, description: 'End-to-end correlation ID for the request'})
-    correlationId!: string;
-
     @ApiProperty({type: String, description: 'The FSP ID of the destination (payee FSP)'})
     destination!: string;
 
@@ -52,9 +51,12 @@ export class TransferController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
+    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
+        @Inject(CommandBus)
         private readonly commandBus: CommandBus,
+        @Inject(OutboundTransfersAuditPublisher)
         private readonly auditPublisher: OutboundTransfersAuditPublisher,
     ) {
     }
@@ -80,7 +82,6 @@ export class TransferController {
 
         try {
             const input = new DoTransferCommand.Input(
-                request.correlationId,
                 source,
                 request.destination,
                 request.transferId,
@@ -97,7 +98,6 @@ export class TransferController {
                     TransferController.RAIL,
                     source,
                     request.destination,
-                    request.correlationId,
                     request.transferId,
                     request.request,
                     output.response,
@@ -109,6 +109,9 @@ export class TransferController {
 
             return new TransferResponse(output.response);
         } catch (error) {
+            const errorResponse = TransferController.toAuditErrorResponse(error);
+            const errorObject = TransferController.toErrorInformationObject(errorResponse);
+
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundTransfersCommand.Input(
@@ -116,11 +119,10 @@ export class TransferController {
                         TransferController.RAIL,
                         source,
                         request.destination,
-                        request.correlationId,
                         request.transferId,
                         request.request,
                         null,
-                        TransferController.toAuditError(error),
+                        errorObject,
                         createdAt,
                         new Date(),
                     ),
@@ -131,16 +133,26 @@ export class TransferController {
         }
     }
 
-    private static toAuditError(error: unknown): ErrorInformationObject {
+    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
+        const response = new ErrorInformationResponse();
+
         if (error instanceof FspiopException) {
-            return error.toErrorObject();
+            response.errorInformation = error.toErrorObject().errorInformation;
+            return response;
         }
 
         const message = error instanceof Error
             ? error.message
             : FspiopErrors.INTERNAL_SERVER_ERROR.description;
 
-        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject();
+        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
+        return response;
+    }
+
+    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
+        return {
+            errorInformation: response.errorInformation ?? TransferController.FALLBACK_ERROR.errorInformation,
+        };
     }
 
     private static nextAuditId(): string {

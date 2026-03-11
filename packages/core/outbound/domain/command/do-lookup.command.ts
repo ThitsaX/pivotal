@@ -9,7 +9,6 @@ export namespace DoLookupCommand {
 
     export class Input {
         constructor(
-            public readonly correlationId: string,
             public readonly source: string,
             public readonly destination: string,
             public readonly type: PartyIdType,
@@ -20,8 +19,8 @@ export namespace DoLookupCommand {
     }
 
     /**
-     * Resolved once the PUT /parties callback arrives on the
-     * parties:<correlationId> subject via PartiesResponseSubscriber.
+     * Resolved once the PUT /parties callback arrives on the success subject
+     * via PartiesResponseSubscriber.
      * Throws FspiopException if the error callback arrives instead, or on timeout.
      */
     export class Output {

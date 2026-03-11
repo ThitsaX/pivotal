@@ -1,4 +1,5 @@
 export * from './fspiop-currencies';
+export * from './fspiop-agreement';
 export * from './fspiop-dates';
 export * from './fspiop-headers';
 export * from './fspiop-money';

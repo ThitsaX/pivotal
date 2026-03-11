@@ -21,7 +21,6 @@ export namespace ConnectorPostTransfersPublisher {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
-            public readonly correlationId: string,
             public readonly request: TransfersPostRequest,
         ) {}
     }

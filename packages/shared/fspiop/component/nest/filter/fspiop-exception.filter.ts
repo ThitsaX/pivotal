@@ -1,7 +1,6 @@
 import {ArgumentsHost, Catch, ExceptionFilter, Logger} from '@nestjs/common';
 import {Response} from 'express';
 import {ErrorInformationResponse} from '../../../dto/error-information-response';
-import {FspiopErrors} from '../../../exception/fspiop-errors';
 import {FspiopException} from '../../../exception/fspiop-exception';
 import {FspiopStatusTranslator} from '../../fspiop-status-translator';
 
@@ -47,15 +46,7 @@ export class FspiopExceptionFilter implements ExceptionFilter {
     }
 
     private static toFspiopException(exception: unknown): FspiopException {
-        if (exception instanceof FspiopException) {
-            return exception;
-        }
-
-        const message = exception instanceof Error
-            ? exception.message
-            : 'An unexpected error occurred.';
-
-        return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message);
+        return FspiopException.normalize(exception);
     }
 
     private static toErrorResponse(exception: FspiopException): ErrorInformationResponse {

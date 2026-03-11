@@ -2,7 +2,6 @@ import {ErrorInformationObject, TransfersIDPutResponse, TransfersPostRequest} fr
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'inbound_transfers'})
-@Index('inbound_transfers_01_idx', ['correlationId'])
 @Index('inbound_transfers_02_idx', ['transferId'])
 @Index('inbound_transfers_03_idx', ['createdAt'])
 @Index('inbound_transfers_04_idx', ['completedAt'])
@@ -22,9 +21,6 @@ export class InboundTransfers {
 
     @Column({type: 'varchar', length: 32, name: 'payee_fsp'})
     public payeeFsp: string;
-
-    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
-    public correlationId: string;
 
     @Column({type: 'varchar', length: 64, name: 'transfer_id'})
     public transferId: string;
@@ -55,7 +51,6 @@ export class InboundTransfers {
         rail: string,
         payerFsp: string,
         payeeFsp: string,
-        correlationId: string,
         transferId: string,
         request: TransfersPostRequest,
         response: TransfersIDPutResponse | null = null,
@@ -70,7 +65,6 @@ export class InboundTransfers {
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
-        this.correlationId = correlationId;
         this.transferId = transferId;
         this.request = request;
         this.response = response;

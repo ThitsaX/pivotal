@@ -11,7 +11,6 @@ import {
 import {ConnectorSettings, FspClient} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('ConnectorDomainRequiredDependencies');
-
 const CommandHandlers = [
     HandleGetPartiesHandler,
     HandlePostQuotesHandler,

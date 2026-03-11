@@ -1,12 +1,17 @@
-import {Body, Controller, Headers, HttpCode, HttpStatus, Param, Patch, Post, Put,} from '@nestjs/common';
+import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Param, Patch, Post, Put,} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
 import {HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand,} from '@core/inbound/domain';
-import {ErrorInformationObject, FspiopHeaders, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest,} from '@shared/fspiop';
+import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest,} from '@shared/fspiop';
 
 @Controller('transfers')
 export class TransfersController {
 
-    constructor(private readonly commandBus: CommandBus) {
+    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
+
+    constructor(
+        @Inject(CommandBus)
+        private readonly commandBus: CommandBus,
+    ) {
     }
 
     private static headerValue(value: string | string[] | undefined, fallback = ''): string {
@@ -25,16 +30,14 @@ export class TransfersController {
     @HttpCode(HttpStatus.ACCEPTED)
     async postTransfers(@Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
                         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-                        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
                         @Body() request: TransfersPostRequest): Promise<void> {
 
-        const payerFsp = TransfersController.headerValue(destinationHeader);
-        const payeeFsp = TransfersController.headerValue(sourceHeader);
-        const correlationId = TransfersController.headerValue(correlationIdHeader);
+        const payerFsp = TransfersController.headerValue(sourceHeader);
+        const payeeFsp = TransfersController.headerValue(destinationHeader);
 
         await this.commandBus.execute(
             new HandlePostTransfersCommand(
-                new HandlePostTransfersCommand.Input(payerFsp, payeeFsp, correlationId, request),
+                new HandlePostTransfersCommand.Input(payerFsp, payeeFsp, request),
             ),
         );
     }
@@ -45,17 +48,15 @@ export class TransfersController {
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
         @Body() response: TransfersIDPatchResponse,
     ): Promise<void> {
 
         const payerFsp = TransfersController.headerValue(destinationHeader);
         const payeeFsp = TransfersController.headerValue(sourceHeader);
-        const correlationId = TransfersController.headerValue(correlationIdHeader);
 
         await this.commandBus.execute(
             new HandlePatchTransfersCommand(
-                new HandlePatchTransfersCommand.Input(payerFsp, payeeFsp, correlationId, transferId, response),
+                new HandlePatchTransfersCommand.Input(payerFsp, payeeFsp, transferId, response),
             ),
         );
     }
@@ -66,19 +67,16 @@ export class TransfersController {
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
         @Body() request: TransfersIDPutResponse,
     ): Promise<void> {
         const payerFsp = TransfersController.headerValue(destinationHeader);
         const payeeFsp = TransfersController.headerValue(sourceHeader);
-        const correlationId = TransfersController.headerValue(correlationIdHeader, transferId);
 
         await this.commandBus.execute(
             new HandlePutTransfersCommand(
                 new HandlePutTransfersCommand.Input(
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     transferId,
                     request,
                 ),
@@ -92,23 +90,27 @@ export class TransfersController {
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Headers('x-correlation-id') correlationIdHeader: string | string[] | undefined,
-        @Body() request: ErrorInformationObject,
+        @Body() request: ErrorInformationResponse | undefined,
     ): Promise<void> {
         const payerFsp = TransfersController.headerValue(destinationHeader);
         const payeeFsp = TransfersController.headerValue(sourceHeader);
-        const correlationId = TransfersController.headerValue(correlationIdHeader, transferId);
+        const error = TransfersController.toErrorInformationObject(request);
 
         await this.commandBus.execute(
             new HandlePutTransfersErrorCommand(
                 new HandlePutTransfersErrorCommand.Input(
                     payerFsp,
                     payeeFsp,
-                    correlationId,
                     transferId,
-                    request,
+                    error,
                 ),
             ),
         );
+    }
+
+    private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {
+        return {
+            errorInformation: response?.errorInformation ?? TransfersController.FALLBACK_ERROR.errorInformation,
+        };
     }
 }

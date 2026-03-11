@@ -62,7 +62,6 @@ export class ConnectorPostQuotesListener implements OnModuleInit {
                         new HandlePostQuotesCommand.Input(
                             message.payerFsp,
                             message.payeeFsp,
-                            message.correlationId,
                             message.request,
                         ),
                     ),

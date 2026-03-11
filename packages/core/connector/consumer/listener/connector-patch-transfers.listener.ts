@@ -62,7 +62,6 @@ export class ConnectorPatchTransfersListener implements OnModuleInit {
                         new HandlePatchTransfersCommand.Input(
                             message.payerFsp,
                             message.payeeFsp,
-                            message.correlationId,
                             message.transferId,
                             message.response,
                         ),

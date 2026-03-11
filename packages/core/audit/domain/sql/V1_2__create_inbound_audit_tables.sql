@@ -3,7 +3,6 @@ CREATE TABLE inbound_parties (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     party_id_type VARCHAR(32) NOT NULL,
     party_id VARCHAR(128) NOT NULL,
     sub_id VARCHAR(128),
@@ -15,7 +14,6 @@ CREATE TABLE inbound_parties (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX inbound_parties_01_idx ON inbound_parties (correlation_id);
 CREATE INDEX inbound_parties_02_idx ON inbound_parties (party_id_type, party_id);
 CREATE INDEX inbound_parties_03_idx ON inbound_parties (party_id_type, party_id, sub_id);
 CREATE INDEX inbound_parties_04_idx ON inbound_parties (created_at);
@@ -29,7 +27,6 @@ CREATE TABLE inbound_quotes (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     quote_id VARCHAR(64) NOT NULL,
     request JSONB NOT NULL,
     response JSONB,
@@ -40,7 +37,6 @@ CREATE TABLE inbound_quotes (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX inbound_quotes_01_idx ON inbound_quotes (correlation_id);
 CREATE INDEX inbound_quotes_02_idx ON inbound_quotes (quote_id);
 CREATE INDEX inbound_quotes_03_idx ON inbound_quotes (created_at);
 CREATE INDEX inbound_quotes_04_idx ON inbound_quotes (completed_at);
@@ -53,7 +49,6 @@ CREATE TABLE inbound_transfers (
     rail VARCHAR(32) NOT NULL,
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
-    correlation_id VARCHAR(128) NOT NULL,
     transfer_id VARCHAR(64) NOT NULL,
     request JSONB NOT NULL,
     response JSONB,
@@ -64,7 +59,6 @@ CREATE TABLE inbound_transfers (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX inbound_transfers_01_idx ON inbound_transfers (correlation_id);
 CREATE INDEX inbound_transfers_02_idx ON inbound_transfers (transfer_id);
 CREATE INDEX inbound_transfers_03_idx ON inbound_transfers (created_at);
 CREATE INDEX inbound_transfers_04_idx ON inbound_transfers (completed_at);

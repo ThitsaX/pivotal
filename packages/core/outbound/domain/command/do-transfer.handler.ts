@@ -1,3 +1,4 @@
+import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {
     FspiopAxios,
@@ -16,7 +17,9 @@ export class DoTransferHandler
     implements ICommandHandler<DoTransferCommand, DoTransferCommand.Output> {
 
     constructor(
+        @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
+        @Inject(FspiopResponseSubscriber)
         private readonly subscriber: FspiopResponseSubscriber,
     ) {
     }
@@ -25,7 +28,7 @@ export class DoTransferHandler
         const {source, destination, transferId, request} = command.input;
         const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Transfers.forRequest(source, switchId);
+        const headers = FspiopHeaders.Values.Transfers.forRequest(source, destination);
 
         // Transfers carry a unique transferId — a single error subject is sufficient,
         // no hub error subject is needed (unlike Parties).

@@ -15,7 +15,7 @@ export class AuditOutboundTransfersHandler
     }
 
     async execute(command: AuditOutboundTransfersCommand): Promise<AuditOutboundTransfersCommand.Output> {
-        const {id, rail, payerFsp, payeeFsp, correlationId, transferId, request, response, error, createdAt, completedAt} = command.input;
+        const {id, rail, payerFsp, payeeFsp, transferId, request, response, error, createdAt, completedAt} = command.input;
 
         const finalResponse = response ?? null;
         const finalError = finalResponse ? null : (error ?? null);
@@ -27,7 +27,6 @@ export class AuditOutboundTransfersHandler
             rail,
             payerFsp,
             payeeFsp,
-            correlationId,
             transferId,
             request,
             finalResponse,

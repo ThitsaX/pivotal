@@ -10,7 +10,6 @@ export namespace HandlePutQuotesCommand {
         constructor(
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
-            public readonly correlationId: string,
             public readonly quoteId: string,
             public readonly response: QuotesIDPutResponse | null,
         ) {
