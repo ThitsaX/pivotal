@@ -131,6 +131,15 @@
         "tsConfigPath": "packages/ports/iso20022/tsconfig.app.json"
       }
     },
+    "shared-axios": {
+      "type": "library",
+      "root": "packages/shared/axios",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/axios",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/axios/tsconfig.app.json"
+      }
+    },
     "shared-fspiop": {
       "type": "library",
       "root": "packages/shared/fspiop",

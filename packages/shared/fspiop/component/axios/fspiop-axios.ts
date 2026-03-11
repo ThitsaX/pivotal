@@ -1,6 +1,6 @@
-import * as http from 'http';
 import * as https from 'https';
-import axios, {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
+import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
+import {AxiosClientBuilder} from '@shared/axios/component';
 import {FspiopHeadersMap} from '../fspiop-headers';
 import {FspiopSettings} from '../fspiop-settings';
 import {
@@ -69,8 +69,8 @@ export class FspiopAxios {
     constructor(
         settings: FspiopSettings,
         params: FspiopAxiosParams = {},
-        interceptors: FspiopAxiosInterceptor[] = [],
         headers: FspiopHeadersMap = {},
+        interceptors: FspiopAxiosInterceptor[] = [],
         httpsAgent?: https.Agent,
         client?: AxiosInstance,
     ) {
@@ -81,9 +81,43 @@ export class FspiopAxios {
         this.client = client ?? FspiopAxios.buildClient(params, interceptors, httpsAgent);
     }
 
+    private static buildClient(
+        params: FspiopAxiosParams,
+        interceptors: FspiopAxiosInterceptor[],
+        httpsAgent?: https.Agent,
+    ): AxiosInstance {
+
+        const builder = AxiosClientBuilder.newBuilder()
+            .withParams(params);
+
+        if (httpsAgent != null) {
+            builder.withHttpsAgent(httpsAgent);
+        }
+
+        for (const interceptor of interceptors) {
+            builder.withRequestInterceptor(interceptor);
+        }
+
+        builder.withResponseInterceptor(
+            (response) => response,
+            (error: AxiosError) => {
+                if (error.response) {
+                    throw new FspiopAxiosError(
+                        error.response.status,
+                        error.response.data as ErrorInformationResponse,
+                    );
+                }
+                throw error;
+            },
+        );
+
+        return builder.build();
+    }
+
+
     withHeaders(headers: FspiopHeadersMap): FspiopAxios {
         // client is already built with the agent baked in — pass it through directly
-        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, undefined, this.client);
+        return new FspiopAxios(this.settings, this.params, headers, this.interceptors, undefined, this.client);
     }
 
     // ─── Parties ────────────────────────────────────────────────────────────────
@@ -137,11 +171,11 @@ export class FspiopAxios {
         await this.patch(`${baseUrl}/transfers/${id}`, body);
     }
 
+    // ─── FX Quotes ──────────────────────────────────────────────────────────────
+
     async putTransfersError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
         await this.put(`${baseUrl}/transfers/${id}/error`, response);
     }
-
-    // ─── FX Quotes ──────────────────────────────────────────────────────────────
 
     async postFxQuotes(baseUrl: string, body: FxQuotesPostRequest): Promise<void> {
         await this.post(`${baseUrl}/fxQuotes`, body);
@@ -151,11 +185,11 @@ export class FspiopAxios {
         await this.put(`${baseUrl}/fxQuotes/${id}`, body);
     }
 
+    // ─── FX Transfers ───────────────────────────────────────────────────────────
+
     async putFxQuotesError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
         await this.put(`${baseUrl}/fxQuotes/${id}/error`, response);
     }
-
-    // ─── FX Transfers ───────────────────────────────────────────────────────────
 
     async postFxTransfers(baseUrl: string, body: FxTransfersPostRequest): Promise<void> {
         await this.post(`${baseUrl}/fxTransfers`, body);
@@ -173,8 +207,6 @@ export class FspiopAxios {
         await this.put(`${baseUrl}/fxTransfers/${id}/error`, response);
     }
 
-    // ─── Internal ───────────────────────────────────────────────────────────────
-
     private async get(url: string): Promise<void> {
         await this.client.get(url, {headers: this.defaultHeaders});
     }
@@ -189,40 +221,5 @@ export class FspiopAxios {
 
     private async patch(url: string, body: unknown): Promise<void> {
         await this.client.patch(url, body, {headers: this.defaultHeaders});
-    }
-
-    private static buildClient(
-        params: FspiopAxiosParams,
-        interceptors: FspiopAxiosInterceptor[],
-        httpsAgent?: https.Agent,
-    ): AxiosInstance {
-        const instance = axios.create({
-            timeout: params.socketTimeoutMs,
-            httpAgent: params.connectionTimeoutMs
-                ? new http.Agent({timeout: params.connectionTimeoutMs})
-                : undefined,
-            httpsAgent: httpsAgent ?? (params.connectionTimeoutMs
-                ? new https.Agent({timeout: params.connectionTimeoutMs})
-                : undefined),
-        });
-
-        for (const interceptor of interceptors) {
-            instance.interceptors.request.use(interceptor);
-        }
-
-        instance.interceptors.response.use(
-            (response) => response,
-            (error: AxiosError) => {
-                if (error.response) {
-                    throw new FspiopAxiosError(
-                        error.response.status,
-                        error.response.data as ErrorInformationResponse,
-                    );
-                }
-                throw error;
-            },
-        );
-
-        return instance;
     }
 }
