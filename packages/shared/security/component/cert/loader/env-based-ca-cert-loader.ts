@@ -6,10 +6,10 @@ import {CaCertLoader} from '../ca-cert-loader';
  * Loads CA certificates from environment variables.
  *
  * Expected env variables:
- *   CA_COUNT         — total number of CA certificates (integer)
- *   CA_CONTENT_1     — PEM content of the 1st CA cert
- *   CA_CONTENT_2     — PEM content of the 2nd CA cert
- *   CA_CONTENT_N     — PEM content of the Nth CA cert
+ *   FSPIOP_MTLS_CA_COUNT         — total number of CA certificates (integer)
+ *   FSPIOP_MTLS_CA_CONTENT_1     — PEM content of the 1st CA cert
+ *   FSPIOP_MTLS_CA_CONTENT_2     — PEM content of the 2nd CA cert
+ *   FSPIOP_MTLS_CA_CONTENT_N     — PEM content of the Nth CA cert
  *
  * All certs are returned as individual CaCert instances.
  * CaStore.load() concatenates them into a single PEM bundle.
@@ -20,8 +20,8 @@ import {CaCertLoader} from '../ca-cert-loader';
 @Injectable()
 export class EnvBasedCaCertLoader extends CaCertLoader {
 
-    private static readonly ENV_CA_COUNT   = 'CA_COUNT';
-    private static readonly ENV_CA_CONTENT = 'CA_CONTENT_';
+    private static readonly ENV_CA_COUNT   = 'FSPIOP_MTLS_CA_COUNT';
+    private static readonly ENV_CA_CONTENT = 'FSPIOP_MTLS_CA_CONTENT_';
 
     load(): CaCert[] {
         const countStr = process.env[EnvBasedCaCertLoader.ENV_CA_COUNT];
@@ -45,7 +45,7 @@ export class EnvBasedCaCertLoader extends CaCertLoader {
             if (content == null || content.trim().length === 0) {
                 throw new Error(
                     `Missing CA certificate at '${envName}'. ` +
-                    `CA_COUNT is ${count} but no content was found for index ${i}.`,
+                    `FSPIOP_MTLS_CA_COUNT is ${count} but no content was found for index ${i}.`,
                 );
             }
 

@@ -11,8 +11,8 @@ afterEach(() => {
 
 describe('EnvBasedPrivateKeyLoader', () => {
 
-    it('should return empty map when FSP_IDS is missing', () => {
-        delete process.env.FSP_IDS;
+    it('should return empty map when FSPIOP_FSP_IDS is missing', () => {
+        delete process.env.FSPIOP_FSP_IDS;
         const loader = new EnvBasedPrivateKeyLoader();
 
         const keysByFspId = loader.load();
@@ -21,9 +21,9 @@ describe('EnvBasedPrivateKeyLoader', () => {
     });
 
     it('should load private keys by FSP ids from environment', () => {
-        process.env.FSP_IDS = 'fsp-a, fsp-b';
-        process.env['PRIVATE_KEY_FSP-A'] = TEST_PRIVATE_KEY_ENV_VALUE;
-        process.env['PRIVATE_KEY_FSP-B'] = TEST_PRIVATE_KEY_ENV_VALUE;
+        process.env.FSPIOP_FSP_IDS = 'fsp-a, fsp-b';
+        process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-A'] = TEST_PRIVATE_KEY_ENV_VALUE;
+        process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-B'] = TEST_PRIVATE_KEY_ENV_VALUE;
         const loader = new EnvBasedPrivateKeyLoader();
 
         const keysByFspId = loader.load();
@@ -34,13 +34,13 @@ describe('EnvBasedPrivateKeyLoader', () => {
     });
 
     it('should throw when expected key variable is missing', () => {
-        process.env.FSP_IDS = 'fsp-a';
-        delete process.env['PRIVATE_KEY_FSP-A'];
+        process.env.FSPIOP_FSP_IDS = 'fsp-a';
+        delete process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-A'];
         const loader = new EnvBasedPrivateKeyLoader();
 
         assert.throws(
             () => loader.load(),
-            /Missing private key for 'fsp-a'. Expected env var 'PRIVATE_KEY_FSP-A'./,
+            /Missing private key for 'fsp-a'. Expected env var 'FSPIOP_JWS_PRIVATE_KEY_FSP-A'./,
         );
     });
 });

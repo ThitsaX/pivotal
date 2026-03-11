@@ -8,7 +8,7 @@ export type PrivateKeyStoreMode = 'env' | 'json';
  * Static factory that builds a fully-loaded PrivateKeyStore in one call.
  *
  * create(mode):
- *   'env'  – loads via EnvBasedPrivateKeyLoader  (FSP_IDS + PRIVATE_KEY_<FSPID>)
+ *   'env'  – loads via EnvBasedPrivateKeyLoader  (FSPIOP_FSP_IDS + FSPIOP_JWS_PRIVATE_KEY_<FSPID>)
  *   'json' – loads via JsonBasedPrivateKeyLoader (JSON_PRIVATE_KEYS)
  *
  * @example — typical module usage

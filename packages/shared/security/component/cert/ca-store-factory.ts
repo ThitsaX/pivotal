@@ -8,7 +8,7 @@ export type CaStoreMode = 'env' | 'json';
  * Static factory that builds a fully-loaded CaStore in one call.
  *
  * create(mode):
- *   'env'  – loads via EnvBasedCaCertLoader  (CA_COUNT + CA_CONTENT_N)
+ *   'env'  – loads via EnvBasedCaCertLoader  (FSPIOP_MTLS_CA_COUNT + FSPIOP_MTLS_CA_CONTENT_N)
  *   'json' – loads via JsonBasedCaCertLoader (JSON_CA_CERTS)
  *
  * @example — typical module usage

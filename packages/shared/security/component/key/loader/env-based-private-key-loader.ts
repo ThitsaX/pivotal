@@ -5,9 +5,9 @@ import {PrivateKeyLoader} from '../private-key-loader';
 @Injectable()
 export class EnvBasedPrivateKeyLoader extends PrivateKeyLoader {
 
-    private static readonly FSP_IDS_ENV_NAME = 'FSP_IDS';
+    private static readonly FSP_IDS_ENV_NAME = 'FSPIOP_FSP_IDS';
 
-    private static readonly PRIVATE_KEY_ENV_PREFIX = 'PRIVATE_KEY_';
+    private static readonly PRIVATE_KEY_ENV_PREFIX = 'FSPIOP_JWS_PRIVATE_KEY_';
 
     load(): Map<string, PrivateKey> {
         const keysByFspId = new Map<string, PrivateKey>();
