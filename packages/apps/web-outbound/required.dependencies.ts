@@ -2,13 +2,13 @@ import {ConfigService} from '@nestjs/config';
 import {FspiopAxiosParams, FspiopSettings} from '@shared/fspiop';
 import {
     CaStore,
+    CaStoreFactory,
     ClientCertStore,
-    EnvBasedCaCertLoader,
-    EnvBasedClientCertLoader,
-    EnvBasedPrivateKeyLoader,
-    EnvBasedPublicKeyLoader,
+    ClientCertStoreFactory,
     PrivateKeyStore,
+    PrivateKeyStoreFactory,
     PublicKeyStore,
+    PublicKeyStoreFactory,
 } from '@shared/security';
 import type {WebOutboundModule} from './web-outbound.module';
 
@@ -19,6 +19,12 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     private static readonly DEFAULT_SWITCH_ID = 'switch';
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;
+    private static readonly DEFAULT_PUBLIC_KEY_STORE_FACTORY = 'env';
+    private static readonly DEFAULT_PRIVATE_KEY_STORE_FACTORY = 'env';
+    private static readonly DEFAULT_CA_STORE_FACTORY = 'env';
+    private static readonly DEFAULT_CLIENT_CERT_STORE_FACTORY = 'env';
+    private static readonly DEFAULT_VERIFY_SERVER_CERTIFICATE = true;
+    private static readonly DEFAULT_VERIFY_DOMAIN = true;
 
     private readonly outboundPublicKeyStore: PublicKeyStore;
     private readonly outboundPrivateKeyStore: PrivateKeyStore;
@@ -26,10 +32,18 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     private readonly outboundClientCertStore: ClientCertStore;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
-        this.outboundPublicKeyStore = new PublicKeyStore(new EnvBasedPublicKeyLoader());
-        this.outboundPrivateKeyStore = new PrivateKeyStore(new EnvBasedPrivateKeyLoader());
-        this.outboundCaStore = new CaStore(new EnvBasedCaCertLoader());
-        this.outboundClientCertStore = new ClientCertStore(new EnvBasedClientCertLoader());
+        this.outboundPublicKeyStore = PublicKeyStoreFactory.create(
+            this.readString('PUBLIC_KEY_STORE_FACTORY', WebOutboundDependencies.DEFAULT_PUBLIC_KEY_STORE_FACTORY),
+        );
+        this.outboundPrivateKeyStore = PrivateKeyStoreFactory.create(
+            this.readString('PRIVATE_KEY_STORE_FACTORY', WebOutboundDependencies.DEFAULT_PRIVATE_KEY_STORE_FACTORY),
+        );
+        this.outboundCaStore = CaStoreFactory.create(
+            this.readString('CA_CERT_STORE_FACTORY', WebOutboundDependencies.DEFAULT_CA_STORE_FACTORY),
+        );
+        this.outboundClientCertStore = ClientCertStoreFactory.create(
+            this.readString('CLIENT_CERT_STORE_FACTORY', WebOutboundDependencies.DEFAULT_CLIENT_CERT_STORE_FACTORY),
+        );
     }
 
     natsUrl(): string {
@@ -48,10 +62,20 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     fspiopAxiosParams(): FspiopAxiosParams {
         const socketTimeoutMs = this.readPositiveInteger('FSPIOP_SOCKET_TIMEOUT_MS');
         const connectionTimeoutMs = this.readPositiveInteger('FSPIOP_CONNECTION_TIMEOUT_MS');
+        const verifyServerCertificate = this.readBoolean(
+            'FSPIOP_TLS_VERIFY_SERVER_CERT',
+            WebOutboundDependencies.DEFAULT_VERIFY_SERVER_CERTIFICATE,
+        );
+        const verifyDomain = this.readBoolean(
+            'FSPIOP_TLS_VERIFY_DOMAIN',
+            WebOutboundDependencies.DEFAULT_VERIFY_DOMAIN,
+        );
 
         return {
             socketTimeoutMs,
             connectionTimeoutMs,
+            verifyServerCertificate,
+            verifyDomain,
         };
     }
 

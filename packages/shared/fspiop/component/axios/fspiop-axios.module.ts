@@ -47,7 +47,11 @@ export class FspiopAxiosModule {
                             ca:   caStore.toBuffer(),
                             cert: clientCertStore.get()?.certBuffer(),
                             key:  clientCertStore.get()?.keyBuffer(),
+                            rejectUnauthorized: params.verifyServerCertificate,
                             timeout: params.connectionTimeoutMs,
+                            ...(params.verifyDomain === false
+                                ? {checkServerIdentity: () => undefined}
+                                : {}),
                         })
                         : undefined;
 
