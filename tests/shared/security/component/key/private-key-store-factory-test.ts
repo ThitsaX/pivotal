@@ -12,9 +12,9 @@ afterEach(() => {
 describe('PrivateKeyStoreFactory', () => {
 
     it('should create and load store using env mode', () => {
-        process.env.FSP_IDS = 'fsp-a, fsp-b';
-        process.env['PRIVATE_KEY_FSP-A'] = TEST_PRIVATE_KEY_ENV_VALUE;
-        process.env['PRIVATE_KEY_FSP-B'] = TEST_PRIVATE_KEY_ENV_VALUE;
+        process.env.FSPIOP_FSP_IDS = 'fsp-a, fsp-b';
+        process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-A'] = TEST_PRIVATE_KEY_ENV_VALUE;
+        process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-B'] = TEST_PRIVATE_KEY_ENV_VALUE;
 
         const store = PrivateKeyStoreFactory.create('env');
 

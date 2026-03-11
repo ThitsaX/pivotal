@@ -8,7 +8,7 @@ export type PublicKeyStoreMode = 'env' | 'json';
  * Static factory that builds a fully-loaded PublicKeyStore in one call.
  *
  * create(mode):
- *   'env'  – loads via EnvBasedPublicKeyLoader  (FSP_IDS + PUBLIC_KEY_<FSPID>)
+ *   'env'  – loads via EnvBasedPublicKeyLoader  (FSPIOP_FSP_IDS + FSPIOP_JWS_PUBLIC_KEY_<FSPID>)
  *   'json' – loads via JsonBasedPublicKeyLoader (JSON_PUBLIC_KEYS)
  *
  * @example — typical module usage

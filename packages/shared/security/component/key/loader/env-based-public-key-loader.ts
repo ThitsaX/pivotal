@@ -5,9 +5,9 @@ import {PublicKeyLoader} from '../public-key-loader';
 @Injectable()
 export class EnvBasedPublicKeyLoader extends PublicKeyLoader {
 
-    private static readonly FSP_IDS_ENV_NAME = 'FSP_IDS';
+    private static readonly FSP_IDS_ENV_NAME = 'FSPIOP_FSP_IDS';
 
-    private static readonly PUBLIC_KEY_ENV_PREFIX = 'PUBLIC_KEY_';
+    private static readonly PUBLIC_KEY_ENV_PREFIX = 'FSPIOP_JWS_PUBLIC_KEY_';
 
     load(): Map<string, PublicKey> {
         const keysByFspId = new Map<string, PublicKey>();

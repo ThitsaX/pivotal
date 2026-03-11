@@ -12,9 +12,9 @@ afterEach(() => {
 describe('PublicKeyStoreFactory', () => {
 
     it('should create and load store using env mode', () => {
-        process.env.FSP_IDS = 'fsp-a, fsp-b';
-        process.env['PUBLIC_KEY_FSP-A'] = TEST_PUBLIC_KEY_ENV_VALUE;
-        process.env['PUBLIC_KEY_FSP-B'] = TEST_PUBLIC_KEY_ENV_VALUE;
+        process.env.FSPIOP_FSP_IDS = 'fsp-a, fsp-b';
+        process.env['FSPIOP_JWS_PUBLIC_KEY_FSP-A'] = TEST_PUBLIC_KEY_ENV_VALUE;
+        process.env['FSPIOP_JWS_PUBLIC_KEY_FSP-B'] = TEST_PUBLIC_KEY_ENV_VALUE;
 
         const store = PublicKeyStoreFactory.create('env');
 

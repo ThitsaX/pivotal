@@ -51,7 +51,7 @@ const resolveHttpsOptions = (
 
     const ca = deps.caStore().toBuffer();
     if (ca == null || ca.length === 0) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CA certificates (CA_COUNT/CA_CONTENT_N or JSON_CA_CERTS).');
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CA certificates (FSPIOP_MTLS_CA_COUNT/FSPIOP_MTLS_CA_CONTENT_N or JSON_CA_CERTS).');
     }
 
     const clientCert = deps.clientCertStore().get();
@@ -93,9 +93,8 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(WebInboundAppModule, nestOptions);
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
-    app.useGlobalGuards(new FspiopJwsGuard(deps.publicKeyStore(), settings));
-
     if (settings.useJws) {
+        app.useGlobalGuards(new FspiopJwsGuard(deps.publicKeyStore(), settings));
         Logger.log('FspiopJwsGuard is enabled.', 'Bootstrap');
     }
 
