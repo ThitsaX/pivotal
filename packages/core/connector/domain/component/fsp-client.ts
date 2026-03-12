@@ -1,30 +1,47 @@
 import {
-    TransfersIDPatchResponse,
+    AmountType,
+    Money,
+    Party,
     PartiesTypeIDPutResponse,
     PartyIdType,
-    QuotesIDPutResponse,
-    QuotesPostRequest,
+    TransactionScenario,
+    TransfersIDPatchResponse,
     TransfersIDPutResponse,
-    TransfersPostRequest,
 } from '@shared/fspiop';
 
 export abstract class FspClient {
-    abstract getParties(input: FspClient.GetPartiesInput): Promise<PartiesTypeIDPutResponse>;
-    abstract postQuotes(body: QuotesPostRequest): Promise<QuotesIDPutResponse>;
-    abstract postTransfers(body: TransfersPostRequest): Promise<TransfersIDPutResponse>;
+    abstract getParties(
+        partyIdType: PartyIdType,
+        partyId: string,
+        subId?: string | null,
+    ): Promise<PartiesTypeIDPutResponse>;
+
+    abstract postQuotes(
+        scenario: TransactionScenario,
+        subScenario: string | undefined,
+        amountType: AmountType,
+        amount: Money,
+        payerFspFee?: Money,
+    ): Promise<FspClient.PostQuotesOutput>;
+
+    abstract postTransfers(
+        transferId: string,
+        transferAmount: Money,
+        payee: Party,
+    ): Promise<TransfersIDPutResponse>;
+
     abstract patchTransfers(input: FspClient.PatchTransfersInput): Promise<void>;
 }
 
 export namespace FspClient {
 
-    export class GetPartiesInput {
+    export class PostQuotesOutput {
         constructor(
-            public readonly payerFsp: string,
-            public readonly payeeFsp: string,
-            public readonly partyIdType: PartyIdType,
-            public readonly partyId: string,
-            public readonly subId: string | null | undefined,
-        ) {}
+            public readonly transferAmount: Money,
+            public readonly payeeReceiveAmount: Money,
+            public readonly fees: Map<string, string>,
+        ) {
+        }
     }
 
     export class PatchTransfersInput {
@@ -33,6 +50,7 @@ export namespace FspClient {
             public readonly payeeFsp: string,
             public readonly transferId: string,
             public readonly response: TransfersIDPatchResponse,
-        ) {}
+        ) {
+        }
     }
 }
