@@ -18,6 +18,8 @@ import {
     FspiopErrors,
     FspiopException,
     FspiopHeaders,
+    FspiopMoney,
+    Money,
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
@@ -26,14 +28,23 @@ import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class TransferRequest {
-    @ApiProperty({type: String, description: 'The FSP ID of the destination (payee FSP)'})
-    destination!: string;
+    @ApiProperty({type: String, description: 'Quote identifier used to derive transfer identifier'})
+    quoteId!: string;
 
-    @ApiProperty({type: String, description: 'Unique identifier for this transfer'})
-    transferId!: string;
+    @ApiProperty({type: String, description: 'Payee FSP ID'})
+    payeeFsp!: string;
 
-    @ApiProperty({type: () => TransfersPostRequest, description: 'FSPIOP POST /transfers request payload'})
-    request!: TransfersPostRequest;
+    @ApiProperty({type: () => Money, description: 'Transfer amount'})
+    transferAmount!: Money;
+
+    @ApiProperty({type: String, description: 'Information for recipient (transport layer information)'})
+    ilpPacket!: string;
+
+    @ApiProperty({type: String, description: 'Condition that must be attached to the transfer by the Payer'})
+    condition!: string;
+
+    @ApiProperty({type: String, description: 'Transfer expiration in ISO-8601 datetime format'})
+    expiration!: string;
 }
 
 export class TransferResponse {
@@ -79,13 +90,16 @@ export class TransferController {
 
         const createdAt = new Date();
         const id = TransferController.nextAuditId();
+        const destination = TransferController.toDestination(request.payeeFsp);
+        const transferRequest = TransferController.toTransfersPostRequest(source, request);
+        const transferId = transferRequest.transferId;
 
         try {
             const input = new DoTransferCommand.Input(
                 source,
-                request.destination,
-                request.transferId,
-                request.request,
+                destination,
+                transferId,
+                transferRequest,
             );
 
             const output: DoTransferCommand.Output = await this.commandBus.execute(
@@ -97,9 +111,9 @@ export class TransferController {
                     id,
                     TransferController.RAIL,
                     source,
-                    request.destination,
-                    request.transferId,
-                    request.request,
+                    destination,
+                    transferId,
+                    transferRequest,
                     output.response,
                     null,
                     createdAt,
@@ -118,9 +132,9 @@ export class TransferController {
                         id,
                         TransferController.RAIL,
                         source,
-                        request.destination,
-                        request.transferId,
-                        request.request,
+                        destination,
+                        transferId,
+                        transferRequest,
                         null,
                         errorObject,
                         createdAt,
@@ -157,5 +171,42 @@ export class TransferController {
 
     private static nextAuditId(): string {
         return TransferController.SNOWFLAKE.nextId().toString();
+    }
+
+    private static toDestination(payeeFsp: string | undefined): string {
+        const destination = payeeFsp?.trim();
+
+        if (destination == null || destination.length === 0) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'payeeFsp is required',
+            );
+        }
+
+        return destination;
+    }
+
+    private static toTransfersPostRequest(source: string, request: TransferRequest): TransfersPostRequest {
+        const quoteId = request.quoteId?.trim();
+
+        if (quoteId == null || quoteId.length === 0) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'quoteId is required',
+            );
+        }
+
+        FspiopMoney.validate(request.transferAmount);
+
+        const transferRequest = new TransfersPostRequest();
+        transferRequest.transferId = quoteId;
+        transferRequest.payeeFsp = TransferController.toDestination(request.payeeFsp);
+        transferRequest.payerFsp = source;
+        transferRequest.amount = request.transferAmount;
+        transferRequest.ilpPacket = request.ilpPacket;
+        transferRequest.condition = request.condition;
+        transferRequest.expiration = request.expiration;
+
+        return transferRequest;
     }
 }

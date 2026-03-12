@@ -4,7 +4,7 @@ import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundPartiesCommand} from '@core/audit/domain';
 import {OutboundPartiesAuditPublisher} from '@core/audit/producer';
 import {DoLookupCommand} from '@core/outbound/domain';
-import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopException, FspiopHeaders, PartiesTypeIDPutResponse, PartyIdType,} from '@shared/fspiop';
+import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopException, FspiopHeaders, Party, PartyIdType,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
@@ -24,11 +24,11 @@ export class LookupRequest {
 }
 
 export class LookupResponse {
-    @ApiProperty({type: () => PartiesTypeIDPutResponse, description: 'FSPIOP PUT /parties response payload'})
-    readonly response: PartiesTypeIDPutResponse;
+    @ApiProperty({type: () => Party, description: 'Payee party information'})
+    readonly payee: Party;
 
-    constructor(response: PartiesTypeIDPutResponse) {
-        this.response = response;
+    constructor(payee: Party) {
+        this.payee = payee;
     }
 }
 
@@ -122,7 +122,7 @@ export class LookupController {
                 ),
             );
 
-            return new LookupResponse(output.response);
+            return new LookupResponse(output.response.party);
         } catch (error) {
             const errorResponse = LookupController.toAuditErrorResponse(error);
             const errorObject = LookupController.toErrorInformationObject(errorResponse);

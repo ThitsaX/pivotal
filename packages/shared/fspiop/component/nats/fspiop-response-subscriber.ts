@@ -8,7 +8,13 @@ export class FspiopResponseSubscriber {
 
     static readonly DEFAULT_TIMEOUT_MS = 30_000;
 
-    private readonly pending = new Map<string, Subscription[]>();
+    private readonly pending = new Map<
+        string,
+        {
+            readonly subs: Subscription[];
+            timer: ReturnType<typeof setTimeout> | null;
+        }
+    >();
 
     constructor(private readonly nats: NatsClientService) {
     }
@@ -40,7 +46,12 @@ export class FspiopResponseSubscriber {
             ? [successSub, errorSub, hubErrorSub]
             : [successSub, errorSub];
 
-        this.pending.set(successSubject, allSubs);
+        const pendingEntry = {
+            subs: allSubs,
+            timer: null as ReturnType<typeof setTimeout> | null,
+        };
+
+        this.pending.set(successSubject, pendingEntry);
 
         return new Promise<T>((resolve, reject) => {
 
@@ -51,6 +62,8 @@ export class FspiopResponseSubscriber {
                     `No FSPIOP callback received on '${successSubject}' within ${timeoutMs}ms.`,
                 ));
             }, timeoutMs);
+
+            pendingEntry.timer = timer;
 
             const settle = (fn: () => void): void => {
                 clearTimeout(timer);
@@ -88,10 +101,17 @@ export class FspiopResponseSubscriber {
     }
 
     cancel(successSubject: string): void {
-        const subs = this.pending.get(successSubject);
-        if (!subs) return;
+        const pending = this.pending.get(successSubject);
+        if (!pending) return;
+
         this.pending.delete(successSubject);
-        for (const sub of subs) {
+
+        if (pending.timer != null) {
+            clearTimeout(pending.timer);
+            pending.timer = null;
+        }
+
+        for (const sub of pending.subs) {
             sub.unsubscribe();
         }
     }
