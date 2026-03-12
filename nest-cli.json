@@ -194,6 +194,15 @@
         "tsConfigPath": "packages/shared/security/tsconfig.app.json"
       }
     },
+    "shared-ulid": {
+      "type": "library",
+      "root": "packages/shared/ulid",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/ulid",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/ulid/tsconfig.app.json"
+      }
+    },
     "samples-wallet1-connector": {
       "type": "application",
       "root": "packages/samples/wallet1-connector",
