@@ -11,7 +11,7 @@ import {
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandlePostQuotesCommand} from './handle-post-quotes.command';
-import {FspClient} from '../component';
+import {FspConnector} from '../component';
 
 @CommandHandler(HandlePostQuotesCommand)
 export class HandlePostQuotesHandler
@@ -21,8 +21,8 @@ export class HandlePostQuotesHandler
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
-        @Inject(FspClient)
-        private readonly fspClient: FspClient,
+        @Inject(FspConnector)
+        private readonly fspConnector: FspConnector,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
         @Inject(InboundQuotesAuditPublisher)
@@ -38,7 +38,7 @@ export class HandlePostQuotesHandler
         const id = HandlePostQuotesHandler.nextAuditId();
 
         try {
-            const response = await this.fspClient.postQuotes(request);
+            const response = await this.fspConnector.postQuotes(request);
 
             await this.fspiopAxios
                 .withHeaders(headers)

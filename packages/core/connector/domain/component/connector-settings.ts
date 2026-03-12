@@ -9,4 +9,8 @@ export class ConnectorSettings {
         public readonly ilpSecret: string,
     ) {
     }
+
+    isCurrencySupported(currency: Currency): boolean {
+        return this.supportedCurrencies.includes(currency);
+    }
 }

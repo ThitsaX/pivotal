@@ -11,7 +11,7 @@ import {
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandlePostTransfersCommand} from './handle-post-transfers.command';
-import {FspClient} from '../component';
+import {FspConnector} from '../component';
 
 @CommandHandler(HandlePostTransfersCommand)
 export class HandlePostTransfersHandler
@@ -21,8 +21,8 @@ export class HandlePostTransfersHandler
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
-        @Inject(FspClient)
-        private readonly fspClient: FspClient,
+        @Inject(FspConnector)
+        private readonly fspConnector: FspConnector,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
         @Inject(InboundTransfersAuditPublisher)
@@ -38,7 +38,7 @@ export class HandlePostTransfersHandler
         const id = HandlePostTransfersHandler.nextAuditId();
 
         try {
-            const response = await this.fspClient.postTransfers(request);
+            const response = await this.fspConnector.postTransfers(request);
 
             await this.fspiopAxios
                 .withHeaders(headers)

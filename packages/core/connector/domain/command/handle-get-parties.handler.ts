@@ -11,7 +11,7 @@ import {
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {HandleGetPartiesCommand} from './handle-get-parties.command';
-import {FspClient} from '../component';
+import {FspConnector} from '../component';
 
 @CommandHandler(HandleGetPartiesCommand)
 export class HandleGetPartiesHandler
@@ -21,8 +21,8 @@ export class HandleGetPartiesHandler
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
-        @Inject(FspClient)
-        private readonly fspClient: FspClient,
+        @Inject(FspConnector)
+        private readonly fspConnector: FspConnector,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
         @Inject(InboundPartiesAuditPublisher)
@@ -38,8 +38,10 @@ export class HandleGetPartiesHandler
         const id = HandleGetPartiesHandler.nextAuditId();
 
         try {
-            const response = await this.fspClient.getParties(
-                new FspClient.GetPartiesInput(payerFsp, payeeFsp, partyIdType, partyId, subId),
+            const response = await this.fspConnector.getParties(
+                partyIdType,
+                partyId,
+                subId,
             );
 
             await this.fspiopAxios

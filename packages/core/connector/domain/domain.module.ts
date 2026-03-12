@@ -8,7 +8,7 @@ import {
     HandlePostQuotesHandler,
     HandlePostTransfersHandler,
 } from './command';
-import {ConnectorSettings, FspClient} from './component';
+import {ConnectorSettings, FspClient, FspConnector} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('ConnectorDomainRequiredDependencies');
 const CommandHandlers = [
@@ -54,11 +54,17 @@ export class ConnectorDomainModule {
                     useFactory: (deps: ConnectorDomainModule.RequiredDependencies) => deps.connectorSettings(),
                     inject: [REQUIRED_DEPENDENCIES],
                 },
+                {
+                    provide: FspConnector,
+                    useFactory: (fspClient: FspClient, connectorSettings: ConnectorSettings) => new FspConnector(fspClient, connectorSettings),
+                    inject: [FspClient, ConnectorSettings],
+                },
                 ...CommandHandlers,
             ],
             exports: [
                 CqrsModule,
                 FspClient,
+                FspConnector,
                 ConnectorSettings,
             ],
         };
