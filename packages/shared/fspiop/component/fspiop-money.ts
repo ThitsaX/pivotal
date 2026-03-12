@@ -64,6 +64,7 @@ export class FspiopMoney {
     }
 
     static validate(money: Money | null | undefined): void {
+
         if (money == null) {
             return;
         }
