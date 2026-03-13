@@ -18,10 +18,8 @@ import {
     FspiopErrors,
     FspiopException,
     FspiopHeaders,
-    FspiopMoney,
     Money,
     TransfersIDPutResponse,
-    TransfersPostRequest,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {validateAuthorizationHeader} from './authorization-header.util';
@@ -90,18 +88,12 @@ export class TransferController {
 
         const createdAt = new Date();
         const id = TransferController.nextAuditId();
-        const destination = TransferController.toDestination(request.payeeFsp);
-        const transferRequest = TransferController.toTransfersPostRequest(source, request);
-        const transferId = transferRequest.transferId;
+        const input = new DoTransferCommand.Input(
+            source,
+            request,
+        );
 
         try {
-            const input = new DoTransferCommand.Input(
-                source,
-                destination,
-                transferId,
-                transferRequest,
-            );
-
             const output: DoTransferCommand.Output = await this.commandBus.execute(
                 new DoTransferCommand(input),
             );
@@ -111,17 +103,17 @@ export class TransferController {
                     id,
                     TransferController.RAIL,
                     source,
-                    destination,
-                    transferId,
-                    transferRequest,
-                    output.response,
+                    input.destination,
+                    input.transferId,
+                    input.transferRequest,
+                    output.callback,
                     null,
                     createdAt,
                     new Date(),
                 ),
             );
 
-            return new TransferResponse(output.response);
+            return output.response;
         } catch (error) {
             const errorResponse = TransferController.toAuditErrorResponse(error);
             const errorObject = TransferController.toErrorInformationObject(errorResponse);
@@ -132,9 +124,9 @@ export class TransferController {
                         id,
                         TransferController.RAIL,
                         source,
-                        destination,
-                        transferId,
-                        transferRequest,
+                        input.destination,
+                        input.transferId,
+                        input.transferRequest,
                         null,
                         errorObject,
                         createdAt,
@@ -171,42 +163,5 @@ export class TransferController {
 
     private static nextAuditId(): string {
         return TransferController.SNOWFLAKE.nextId().toString();
-    }
-
-    private static toDestination(payeeFsp: string | undefined): string {
-        const destination = payeeFsp?.trim();
-
-        if (destination == null || destination.length === 0) {
-            throw new FspiopException(
-                FspiopErrors.MISSING_MANDATORY_ELEMENT,
-                'payeeFsp is required',
-            );
-        }
-
-        return destination;
-    }
-
-    private static toTransfersPostRequest(source: string, request: TransferRequest): TransfersPostRequest {
-        const quoteId = request.quoteId?.trim();
-
-        if (quoteId == null || quoteId.length === 0) {
-            throw new FspiopException(
-                FspiopErrors.MISSING_MANDATORY_ELEMENT,
-                'quoteId is required',
-            );
-        }
-
-        FspiopMoney.validate(request.transferAmount);
-
-        const transferRequest = new TransfersPostRequest();
-        transferRequest.transferId = quoteId;
-        transferRequest.payeeFsp = TransferController.toDestination(request.payeeFsp);
-        transferRequest.payerFsp = source;
-        transferRequest.amount = request.transferAmount;
-        transferRequest.ilpPacket = request.ilpPacket;
-        transferRequest.condition = request.condition;
-        transferRequest.expiration = request.expiration;
-
-        return transferRequest;
     }
 }

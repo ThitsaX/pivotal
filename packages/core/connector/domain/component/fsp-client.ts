@@ -1,5 +1,6 @@
 import {
     AmountType,
+    ExtensionList,
     Money,
     Party,
     PartiesTypeIDPutResponse,
@@ -39,7 +40,7 @@ export namespace FspClient {
         constructor(
             public readonly transferAmount: Money,
             public readonly payeeReceiveAmount: Money,
-            public readonly fees: Map<string, string>,
+            public readonly fees: ExtensionList,
         ) {
         }
     }

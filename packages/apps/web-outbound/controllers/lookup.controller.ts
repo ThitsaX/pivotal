@@ -92,16 +92,12 @@ export class LookupController {
 
         const createdAt = new Date();
         const id = LookupController.nextAuditId();
+        const input = new DoLookupCommand.Input(
+            source,
+            request,
+        );
 
         try {
-            const input = new DoLookupCommand.Input(
-                source,
-                request.destination,
-                request.type,
-                request.id,
-                request.subId,
-            );
-
             const output: DoLookupCommand.Output = await this.commandBus.execute(
                 new DoLookupCommand(input),
             );
@@ -111,18 +107,18 @@ export class LookupController {
                     id,
                     LookupController.RAIL,
                     source,
-                    request.destination,
-                    request.type,
-                    request.id,
-                    request.subId ?? null,
-                    output.response,
+                    input.destination,
+                    input.type,
+                    input.id,
+                    input.auditSubId,
+                    output.callback,
                     null,
                     createdAt,
                     new Date(),
                 ),
             );
 
-            return new LookupResponse(output.response.party);
+            return output.response;
         } catch (error) {
             const errorResponse = LookupController.toAuditErrorResponse(error);
             const errorObject = LookupController.toErrorInformationObject(errorResponse);
@@ -133,10 +129,10 @@ export class LookupController {
                         id,
                         LookupController.RAIL,
                         source,
-                        request.destination,
-                        request.type,
-                        request.id,
-                        request.subId ?? null,
+                        input.destination,
+                        input.type,
+                        input.id,
+                        input.auditSubId,
                         null,
                         errorObject,
                         createdAt,

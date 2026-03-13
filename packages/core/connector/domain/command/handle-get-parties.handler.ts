@@ -32,7 +32,7 @@ export class HandleGetPartiesHandler
 
     async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
         const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
-        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const {partiesUrl} = this.fspiopAxios.settings;
         const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandleGetPartiesHandler.nextAuditId();
@@ -46,7 +46,7 @@ export class HandleGetPartiesHandler
 
             await this.fspiopAxios
                 .withHeaders(headers)
-                .putParties(switchBaseUrl, partyIdType, partyId, response, subId ?? undefined);
+                .putParties(partiesUrl, partyIdType, partyId, response, subId ?? undefined);
 
             await this.auditPublisher.publish(
                 new AuditInboundPartiesCommand.Input(
@@ -72,7 +72,7 @@ export class HandleGetPartiesHandler
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putPartiesError(switchBaseUrl, partyIdType, partyId, callbackErrorResponse, subId ?? undefined);
+                    .putPartiesError(partiesUrl, partyIdType, partyId, callbackErrorResponse, subId ?? undefined);
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = HandleGetPartiesHandler.toAuditError(putError);

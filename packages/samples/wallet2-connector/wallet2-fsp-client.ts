@@ -1,9 +1,10 @@
 import {Logger} from '@nestjs/common';
 import {ConnectorSettings, FspClient} from '@core/connector/domain';
+import {CatalystException, CatalystFeeEngine, FeeSplitRole} from '@shared/catalyst';
 import {
     AmountType,
-    FspiopCurrencies,
-    FspiopMoney,
+    FspiopErrors,
+    FspiopException,
     Money,
     Party,
     PartiesTypeIDPutResponse,
@@ -17,12 +18,11 @@ import {
 export class Wallet2FspClient extends FspClient {
 
     private readonly logger = new Logger(Wallet2FspClient.name);
-    private static readonly FEE_DENOMINATOR = 100n;
-    private static readonly PAYER_FEE_SHARE = 30n;
-    private static readonly PAYEE_FEE_SHARE = 30n;
-    private static readonly SHARE_DENOMINATOR = 100n;
 
-    constructor(private readonly connectorSettings: ConnectorSettings) {
+    constructor(
+        private readonly connectorSettings: ConnectorSettings,
+        private readonly feeEngine: CatalystFeeEngine,
+    ) {
         super();
     }
 
@@ -61,24 +61,23 @@ export class Wallet2FspClient extends FspClient {
             `postQuotes: scenario=${scenario}, subScenario=${subScenario ?? ''}, amountType=${amountType}`,
         );
 
-        const scale = FspiopCurrencies.get(amount.currency)!.scale;
-        const amountMinor = FspiopMoney.serialize(
-            amount.amount,
-            scale,
-        );
-        const totalFee = amountMinor / Wallet2FspClient.FEE_DENOMINATOR;
-        const payerFee = (totalFee * Wallet2FspClient.PAYER_FEE_SHARE) / Wallet2FspClient.SHARE_DENOMINATOR;
-        const payeeFee = (totalFee * Wallet2FspClient.PAYEE_FEE_SHARE) / Wallet2FspClient.SHARE_DENOMINATOR;
-        const hubFee = totalFee - payerFee - payeeFee;
+        const preCalculatedFees = new Map<FeeSplitRole, Money>();
+        if (payerFspFee != null) {
+            preCalculatedFees.set(FeeSplitRole.Payer, payerFspFee);
+        }
 
-        const fees = new Map<string, string>();
-        fees.set('payer_fsp_fee', FspiopMoney.deserialize(payerFee, scale));
-        fees.set('payer_fsp_fee_cc', FspiopMoney.deserialize(payerFee, scale));
-        fees.set('payee_fsp_fee', FspiopMoney.deserialize(payeeFee, scale));
-        fees.set('payee_fsp_fee_cc', FspiopMoney.deserialize(payeeFee, scale));
-        fees.set('hub_fee', FspiopMoney.deserialize(hubFee, scale));
+        const scenarioName = subScenario ?? '';
+        try {
+            const fees = await this.feeEngine.execute(preCalculatedFees, scenarioName, amount, 0n);
 
-        return new FspClient.PostQuotesOutput(amount, amount, fees);
+            return new FspClient.PostQuotesOutput(amount, amount, fees);
+        } catch (error) {
+            if (error instanceof CatalystException) {
+                throw new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, error.message);
+            }
+
+            throw error;
+        }
     }
 
     async postTransfers(

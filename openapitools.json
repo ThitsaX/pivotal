@@ -4,6 +4,18 @@
   "generator-cli": {
     "version": "7.12.0",
     "generators": {
+      "catalyst-dto": {
+        "generatorName": "typescript-nestjs",
+        "inputSpec": "packages/shared/catalyst/spec/catalyst.yaml",
+        "output": "packages/shared/catalyst/dto",
+        "globalProperty": "models",
+        "additionalProperties": {
+          "modelSuffix": "",
+          "fileNaming": "kebab-case",
+          "modelPackage": ".",
+          "stringEnums": true
+        }
+      },
       "fspiop-dto": {
         "generatorName": "typescript-nestjs",
         "inputSpec": "packages/shared/fspiop/spec/fspiop_v2.yaml",

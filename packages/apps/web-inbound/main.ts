@@ -5,7 +5,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspiopJwsGuard} from '@shared/fspiop';
+import {FspiopExceptionFilter, FspiopJwsGuard} from '@shared/fspiop';
 import {WebInboundDependencies} from './required.dependencies';
 import {WebInboundAppModule} from './app.module';
 
@@ -93,6 +93,7 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(WebInboundAppModule, nestOptions);
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
+    app.useGlobalFilters(new FspiopExceptionFilter());
     if (settings.useJws) {
         app.useGlobalGuards(new FspiopJwsGuard(deps.publicKeyStore(), settings));
         Logger.log('FspiopJwsGuard is enabled.', 'Bootstrap');

@@ -32,7 +32,7 @@ export class HandlePostTransfersHandler
 
     async execute(command: HandlePostTransfersCommand): Promise<HandlePostTransfersCommand.Output> {
         const {payerFsp, payeeFsp, request} = command.input;
-        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const {transfersUrl} = this.fspiopAxios.settings;
         const headers = FspiopHeaders.Values.Transfers.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandlePostTransfersHandler.nextAuditId();
@@ -42,7 +42,7 @@ export class HandlePostTransfersHandler
 
             await this.fspiopAxios
                 .withHeaders(headers)
-                .putTransfers(switchBaseUrl, request.transferId, response);
+                .putTransfers(transfersUrl, request.transferId, response);
 
             await this.auditPublisher.publish(
                 new AuditInboundTransfersCommand.Input(
@@ -67,7 +67,7 @@ export class HandlePostTransfersHandler
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putTransfersError(switchBaseUrl, request.transferId, callbackErrorResponse);
+                    .putTransfersError(transfersUrl, request.transferId, callbackErrorResponse);
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = HandlePostTransfersHandler.toAuditError(putError);

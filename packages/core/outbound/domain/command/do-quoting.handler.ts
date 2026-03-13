@@ -25,8 +25,8 @@ export class DoQuotingHandler
     }
 
     async execute(command: DoQuotingCommand): Promise<DoQuotingCommand.Output> {
-        const {source, destination, quoteId, request} = command.input;
-        const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
+        const {source, destination, quoteId, quoteRequest} = command.input;
+        const {quotesUrl, switchId} = this.fspiopAxios.settings;
 
         const headers = FspiopHeaders.Values.Quotes.forRequest(source, destination);
 
@@ -48,7 +48,7 @@ export class DoQuotingHandler
         try {
             await this.fspiopAxios
                 .withHeaders(headers)
-                .postQuotes(switchBaseUrl, request);
+                .postQuotes(quotesUrl, quoteRequest);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
@@ -70,6 +70,6 @@ export class DoQuotingHandler
         // on error or timeout (SERVER_TIMED_OUT after DEFAULT_TIMEOUT_MS).
         const response = await waitPromise;
 
-        return new DoQuotingCommand.Output(response);
+        return DoQuotingCommand.Output.fromCallback(command.input, response);
     }
 }
