@@ -18,9 +18,9 @@ import {Wallet2FspClient} from './wallet2-fsp-client';
 export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.RequiredDependencies {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
-    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:4000';
+    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:5003';
     private static readonly DEFAULT_SWITCH_ID = 'switch';
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;

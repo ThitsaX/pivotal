@@ -9,7 +9,7 @@ export class AuditConsumerDependencies implements AuditConsumerModule.RequiredDe
     private static readonly DEFAULT_DB_PORT = 5432;
     private static readonly DEFAULT_DB_USERNAME = 'postgres';
     private static readonly DEFAULT_DB_PASSWORD = 'postgres';
-    private static readonly DEFAULT_DB_NAME = 'payport';
+    private static readonly DEFAULT_DB_NAME = 'pivotal';
     private static readonly DEFAULT_DB_SCHEMA = 'public';
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {}

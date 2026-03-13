@@ -7,7 +7,7 @@ export class FspiopDates {
     }
 
     static forRequestHeader(date: Date = new Date()): string {
-        return date.toISOString();
+        return date.toUTCString();
     }
 
     static fromRequestBody(body: string): Date {

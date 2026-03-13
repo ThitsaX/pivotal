@@ -106,7 +106,7 @@ export class LookupController {
                 new AuditOutboundPartiesCommand.Input(
                     id,
                     LookupController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.type,
                     input.id,
@@ -128,7 +128,7 @@ export class LookupController {
                     new AuditOutboundPartiesCommand.Input(
                         id,
                         LookupController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.type,
                         input.id,

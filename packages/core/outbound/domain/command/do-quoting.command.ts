@@ -136,8 +136,6 @@ export namespace DoQuotingCommand {
             public readonly transferAmount: Money,
             public readonly payeeReceiveAmount: Money,
             public readonly schemeFeeAmount: Money,
-            public readonly payeeFspFee: Money,
-            public readonly payeeFspCommission: Money,
             public readonly ilpPacket: string,
             public readonly condition: string,
             public readonly expiration: string,
@@ -171,16 +169,12 @@ export namespace DoQuotingCommand {
                 currencyProfile.scale,
             );
             const payeeReceiveAmount = callback.payeeReceiveAmount ?? transferAmount;
-            const payeeFspFee = callback.payeeFspFee ?? DoQuotingCommand.Response.toZeroMoney(transferAmount.currency);
-            const payeeFspCommission = callback.payeeFspCommission ?? DoQuotingCommand.Response.toZeroMoney(transferAmount.currency);
 
             return new DoQuotingCommand.Response(
                 quoteId,
                 transferAmount,
                 payeeReceiveAmount,
                 schemeFeeAmount,
-                payeeFspFee,
-                payeeFspCommission,
                 callback.ilpPacket,
                 callback.condition,
                 callback.expiration,
@@ -247,10 +241,6 @@ export namespace DoQuotingCommand {
             money.amount = amount;
 
             return money;
-        }
-
-        private static toZeroMoney(currency: Currency): Money {
-            return DoQuotingCommand.Response.toMoney(currency, '0');
         }
     }
 

@@ -64,12 +64,6 @@ export class QuoteResponse {
     @ApiProperty({type: () => Money})
     readonly schemeFeeAmount: Money;
 
-    @ApiProperty({type: () => Money})
-    readonly payeeFspFee: Money;
-
-    @ApiProperty({type: () => Money})
-    readonly payeeFspCommission: Money;
-
     @ApiProperty({type: String})
     readonly ilpPacket: string;
 
@@ -87,8 +81,6 @@ export class QuoteResponse {
         transferAmount: Money,
         payeeReceiveAmount: Money,
         schemeFeeAmount: Money,
-        payeeFspFee: Money,
-        payeeFspCommission: Money,
         ilpPacket: string,
         condition: string,
         expiration: string,
@@ -98,8 +90,6 @@ export class QuoteResponse {
         this.transferAmount = transferAmount;
         this.payeeReceiveAmount = payeeReceiveAmount;
         this.schemeFeeAmount = schemeFeeAmount;
-        this.payeeFspFee = payeeFspFee;
-        this.payeeFspCommission = payeeFspCommission;
         this.ilpPacket = ilpPacket;
         this.condition = condition;
         this.expiration = expiration;
@@ -155,7 +145,7 @@ export class QuoteController {
                 new AuditOutboundQuotesCommand.Input(
                     id,
                     QuoteController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.quoteId,
                     input.quoteRequest,
@@ -176,7 +166,7 @@ export class QuoteController {
                     new AuditOutboundQuotesCommand.Input(
                         id,
                         QuoteController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.quoteId,
                         input.quoteRequest,

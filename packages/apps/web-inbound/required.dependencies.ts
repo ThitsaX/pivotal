@@ -15,9 +15,9 @@ import type {WebInboundModule} from './web-inbound.module';
 export class WebInboundDependencies implements WebInboundModule.RequiredDependencies {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
-    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:4000';
+    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:5003';
     private static readonly DEFAULT_SWITCH_ID = 'switch';
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;

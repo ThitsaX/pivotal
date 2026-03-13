@@ -63,7 +63,7 @@ const bootstrap = async (): Promise<void> => {
         port:         Number(process.env['DB_WRITE_PORT'] ?? 5432),
         username:     process.env['DB_WRITE_USERNAME'] ?? 'postgres',
         password:     process.env['DB_WRITE_PASSWORD'] ?? 'postgres',
-        database:     process.env['DB_WRITE_NAME']     ?? 'payport',
+        database:     process.env['DB_WRITE_NAME']     ?? 'pivotal',
         schema:       process.env['DB_WRITE_SCHEMA']   ?? 'public',
         historyTable: MIGRATION_TABLE,
         locations:    [location],

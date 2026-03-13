@@ -13,8 +13,8 @@
       "Bash(npm run build:shared-fspiop)",
       "Bash(/Users/aungthawaye/Development/ThitsaWorks/mtpa/packages/shared/fspiop/component/axios/index.ts:*)",
       "Bash(java -version)",
-      "Bash(~/.node-flyway/flyway-9.22.3/flyway -url='jdbc:postgresql://localhost:5432/payport' -user='postgres' -password='postgres' -locations='filesystem:/Users/aungthawaye/Development/ThitsaWorks/mtpa/packages/core/audit/domain/sql' -outputType=json migrate)",
-      "Bash(psql -h localhost -U postgres -d payport -c \":*)",
+      "Bash(~/.node-flyway/flyway-9.22.3/flyway -url='jdbc:postgresql://localhost:5432/pivotal' -user='postgres' -password='postgres' -locations='filesystem:/Users/aungthawaye/Development/ThitsaWorks/mtpa/packages/core/audit/domain/sql' -outputType=json migrate)",
+      "Bash(psql -h localhost -U postgres -d pivotal -c \":*)",
       "Bash(node -e \":*)",
       "Bash(node -e \"console.log\\(require\\(''/Users/aungthawaye/Development/ThitsaWorks/mtpa/node_modules/@nestjs/swagger/package.json''\\).version\\)\")",
       "Bash(node scripts/fix-fspiop-dto.mjs)"

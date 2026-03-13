@@ -92,7 +92,8 @@ export class FspiopAxios {
     ): AxiosInstance {
 
         const builder = AxiosClientBuilder.newBuilder()
-            .withParams(params);
+            .withParams(params)
+            .withHttpLogger(true);
 
         if (httpsAgent != null) {
             builder.withHttpsAgent(httpsAgent);

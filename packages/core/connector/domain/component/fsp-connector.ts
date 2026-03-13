@@ -8,16 +8,16 @@ import {
     FspiopException,
     FspiopMoney,
     Money,
+    PartiesTypeIDPutResponse,
     Party,
     PartyIdInfo,
-    PartiesTypeIDPutResponse,
     PartyIdType,
     QuotesIDPutResponse,
     QuotesPostRequest,
-    TransferState,
     TransfersIDPatchResponse,
     TransfersIDPutResponse,
     TransfersPostRequest,
+    TransferState,
 } from '@shared/fspiop';
 import {ConnectorSettings} from './connector-settings';
 import {FspConnectorValidation} from './fsp-connector-validation';
@@ -34,6 +34,32 @@ export class FspConnector {
         @Inject(ConnectorSettings)
         private readonly connectorSettings: ConnectorSettings,
     ) {
+    }
+
+    private static resolveLifetimeSeconds(expiration?: string): number {
+        if (expiration == null) {
+            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
+        }
+
+        const expiresAt = new Date(expiration).getTime();
+
+        if (Number.isNaN(expiresAt)) {
+            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
+        }
+
+        return Math.max(
+            1,
+            Math.floor((expiresAt - Date.now()) / 1000),
+        );
+    }
+
+    private static toZeroMoney(currency: Currency): Money {
+
+        const money = new Money();
+        money.currency = currency;
+        money.amount = '0';
+
+        return money;
     }
 
     async getParties(
@@ -79,16 +105,16 @@ export class FspConnector {
         }
 
         const transferAmountMinor = FspiopMoney.serialize(transferAmount.amount, currencyProfile.scale);
-        const expiration = FspConnector.resolveQuoteExpiration(postQuotesRequest.expiration);
-        const lifetimeSeconds = FspConnector.resolveLifetimeSeconds(expiration);
-        const agreement = this.toAgreement(postQuotesRequest, transferAmount, payeeReceiveAmount, expiration);
+        const expireAt = new Date(Date.now() + FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS * 1000);
+        const expiration = expireAt.toISOString();
+        const agreement = this.toAgreement(postQuotesRequest, transferAmount, payeeReceiveAmount, expireAt.getTime());
 
         const prepare = Interledger.prepare(
             this.connectorSettings.ilpSecret,
             Interledger.address(this.connectorSettings.connectorId),
             transferAmountMinor,
             JSON.stringify(agreement),
-            lifetimeSeconds,
+            expireAt.getTime(),
         );
 
         const response = new QuotesIDPutResponse();
@@ -96,7 +122,7 @@ export class FspConnector {
         response.payeeReceiveAmount = payeeReceiveAmount;
         response.payeeFspFee = FspConnector.toZeroMoney(transferAmount.currency);
         response.payeeFspCommission = FspConnector.toZeroMoney(transferAmount.currency);
-        response.expiration = agreement.expiration;
+        response.expiration = expiration;
         response.ilpPacket = prepare.base64PreparePacket;
         response.condition = prepare.base64Condition;
         response.extensionList = postQuotesOutput.fees;
@@ -163,72 +189,34 @@ export class FspConnector {
         postQuotesRequest: QuotesPostRequest,
         transferAmount: Money,
         payeeReceiveAmount: Money,
-        expiration: string,
+        expireAt: number,
     ): FspiopAgreement {
 
         const payer = postQuotesRequest.payer?.partyIdInfo;
         const payee = postQuotesRequest.payee?.partyIdInfo;
+        const scenario = postQuotesRequest.transactionType?.scenario;
 
-        if (payer == null || payee == null) {
+        if (payer == null || payee == null || scenario == null) {
             throw new FspiopException(
                 FspiopErrors.MISSING_MANDATORY_ELEMENT,
-                'payer.partyIdInfo and payee.partyIdInfo are required',
+                'payer.partyIdInfo, payee.partyIdInfo and transactionType.scenario are required',
             );
         }
 
         return new FspiopAgreement(
             postQuotesRequest.quoteId,
-            transferAmount.currency,
-            transferAmount.amount,
-            transferAmount.amount,
-            payeeReceiveAmount.amount,
-            postQuotesRequest.amountType,
-            '0',
-            '0',
             payer,
             payee,
-            expiration,
+            postQuotesRequest.amountType,
+            scenario,
+            postQuotesRequest.transactionType?.subScenario,
+            postQuotesRequest.amount,
+            FspConnector.toZeroMoney(transferAmount.currency),
+            FspConnector.toZeroMoney(transferAmount.currency),
+            payeeReceiveAmount,
+            transferAmount,
+            expireAt,
         );
-    }
-
-    private static resolveQuoteExpiration(expiration?: string): string {
-        if (expiration == null) {
-            return new Date(Date.now() + FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS * 1000).toISOString();
-        }
-
-        const expiresAt = new Date(expiration).getTime();
-
-        if (Number.isNaN(expiresAt)) {
-            return new Date(Date.now() + FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS * 1000).toISOString();
-        }
-
-        return expiration;
-    }
-
-    private static resolveLifetimeSeconds(expiration?: string): number {
-        if (expiration == null) {
-            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
-        }
-
-        const expiresAt = new Date(expiration).getTime();
-
-        if (Number.isNaN(expiresAt)) {
-            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
-        }
-
-        return Math.max(
-            1,
-            Math.floor((expiresAt - Date.now()) / 1000),
-        );
-    }
-
-    private static toZeroMoney(currency: Currency): Money {
-
-        const money = new Money();
-        money.currency = currency;
-        money.amount = '0';
-
-        return money;
     }
 }
 
