@@ -32,7 +32,7 @@ export class HandlePostQuotesHandler
 
     async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
         const {payerFsp, payeeFsp, request} = command.input;
-        const {switchBaseUrl} = this.fspiopAxios.settings;
+        const {quotesUrl} = this.fspiopAxios.settings;
         const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, payeeFsp);
         const createdAt = new Date();
         const id = HandlePostQuotesHandler.nextAuditId();
@@ -42,7 +42,7 @@ export class HandlePostQuotesHandler
 
             await this.fspiopAxios
                 .withHeaders(headers)
-                .putQuotes(switchBaseUrl, request.quoteId, response);
+                .putQuotes(quotesUrl, request.quoteId, response);
 
             await this.auditPublisher.publish(
                 new AuditInboundQuotesCommand.Input(
@@ -67,7 +67,7 @@ export class HandlePostQuotesHandler
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putQuotesError(switchBaseUrl, request.quoteId, callbackErrorResponse);
+                    .putQuotesError(quotesUrl, request.quoteId, callbackErrorResponse);
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = HandlePostQuotesHandler.toAuditError(putError);

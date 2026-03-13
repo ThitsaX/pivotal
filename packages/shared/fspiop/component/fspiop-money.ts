@@ -32,13 +32,13 @@ export class FspiopMoney {
 
         if (serializedAmount.length <= scale) {
             const decimals = serializedAmount.padStart(scale, '0');
-            return `0.${decimals}`;
+            return FspiopMoney.normalizeAmount(`0.${decimals}`);
         }
 
         const major = serializedAmount.slice(0, serializedAmount.length - scale);
         const minor = serializedAmount.slice(serializedAmount.length - scale);
 
-        return `${major}.${minor}`;
+        return FspiopMoney.normalizeAmount(`${major}.${minor}`);
     }
 
     static serialize(
@@ -48,7 +48,7 @@ export class FspiopMoney {
     ): bigint {
         FspiopMoney.validateScale(scale);
 
-        const normalizedAmount = amount.trim();
+        const normalizedAmount = FspiopMoney.normalizeAmount(amount.trim());
         const parsedAmount = FspiopMoney.parseDecimalAmount(normalizedAmount);
         const scaledAmount = FspiopMoney.scaleAmount(parsedAmount, scale, roundingMode);
 
@@ -69,6 +69,8 @@ export class FspiopMoney {
             return;
         }
 
+        money.amount = FspiopMoney.normalizeAmount(money.amount);
+
         const currencyProfile = FspiopCurrencies.get(money.currency);
 
         if (currencyProfile == null) {
@@ -82,6 +84,26 @@ export class FspiopMoney {
                 `Currency scale does not match. ${money.currency} supports only ${currencyProfile.scale} decimal places.`,
             );
         }
+    }
+
+    static normalizeAmount(amount: string): string {
+        const trimmed = amount.trim();
+        const matches = trimmed.match(/^([+-])?(\d+)(?:\.(\d+))?$/);
+
+        if (matches == null) {
+            return trimmed;
+        }
+
+        const sign = matches[1] ?? '';
+        const integerPart = matches[2];
+        const fractionPart = matches[3] ?? '';
+        const normalizedFractionPart = fractionPart.replace(/0+$/, '');
+
+        if (normalizedFractionPart.length === 0) {
+            return `${sign}${integerPart}`;
+        }
+
+        return `${sign}${integerPart}.${normalizedFractionPart}`;
     }
 
     private static validateScale(scale: number): void {

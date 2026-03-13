@@ -149,6 +149,15 @@
         "tsConfigPath": "packages/shared/fspiop/tsconfig.app.json"
       }
     },
+    "shared-catalyst": {
+      "type": "library",
+      "root": "packages/shared/catalyst",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/catalyst",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/catalyst/tsconfig.app.json"
+      }
+    },
     "shared-pg-migration": {
       "type": "library",
       "root": "packages/shared/pg-migration",

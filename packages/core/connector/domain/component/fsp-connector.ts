@@ -2,8 +2,6 @@ import {Inject, Injectable} from '@nestjs/common';
 import {Interledger} from '@shared/interledger/component';
 import {
     Currency,
-    Extension,
-    ExtensionList,
     FspiopAgreement,
     FspiopCurrencies,
     FspiopErrors,
@@ -101,7 +99,7 @@ export class FspConnector {
         response.expiration = agreement.expiration;
         response.ilpPacket = prepare.base64PreparePacket;
         response.condition = prepare.base64Condition;
-        response.extensionList = FspConnector.toExtensionList(postQuotesOutput.fees);
+        response.extensionList = postQuotesOutput.fees;
 
         return response;
     }
@@ -222,26 +220,6 @@ export class FspConnector {
             1,
             Math.floor((expiresAt - Date.now()) / 1000),
         );
-    }
-
-    private static toExtensionList(
-        fees: Map<string, string> | undefined,
-    ): ExtensionList {
-
-        const extensionList = new ExtensionList();
-        extensionList.extension = Array.from(fees?.entries() ?? [])
-            .map(([key, value]) => FspConnector.toExtension(key, value));
-
-        return extensionList;
-    }
-
-    private static toExtension(key: string, value: string): Extension {
-
-        const extension = new Extension();
-        extension.key = key;
-        extension.value = value;
-
-        return extension;
     }
 
     private static toZeroMoney(currency: Currency): Money {

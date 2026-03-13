@@ -26,7 +26,7 @@ export class DoLookupHandler
 
     async execute(command: DoLookupCommand): Promise<DoLookupCommand.Output> {
         const {source, destination, type, id, subId} = command.input;
-        const {switchBaseUrl, switchId} = this.fspiopAxios.settings;
+        const {partiesUrl, switchId} = this.fspiopAxios.settings;
 
         const headers = FspiopHeaders.Values.Parties.forRequest(source, destination);
 
@@ -52,7 +52,7 @@ export class DoLookupHandler
         try {
             await this.fspiopAxios
                 .withHeaders(headers)
-                .getParties(switchBaseUrl, type, id, subId);
+                .getParties(partiesUrl, type, id, subId);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
@@ -74,6 +74,6 @@ export class DoLookupHandler
         // timeout (SERVER_TIMED_OUT after DEFAULT_TIMEOUT_MS).
         const response = await waitPromise;
 
-        return new DoLookupCommand.Output(response);
+        return DoLookupCommand.Output.fromCallback(response);
     }
 }
