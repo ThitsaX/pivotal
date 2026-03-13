@@ -39,7 +39,7 @@ export class Interledger {
         peer: string,
         amount: bigint,
         data: string,
-        lifetimeSeconds: number,
+        expireAt: number,
     ): Prepare {
         const preimage = Interledger.preimage(ilpSecret, amount, peer, data);
         const condition = crypto.createHash('sha256').update(preimage).digest();
@@ -47,7 +47,7 @@ export class Interledger {
         const preparePacket: IlpPacket.IlpPrepare = {
             amount: amount.toString(),
             executionCondition: condition,
-            expiresAt: new Date(Date.now() + lifetimeSeconds * 1000),
+            expiresAt: new Date(expireAt),
             destination: peer,
             data: Buffer.from(data, 'utf-8'),
         };

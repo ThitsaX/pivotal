@@ -2,7 +2,7 @@ import {JetStreamManager} from 'nats';
 
 const NO_STREAM_MATCHES_SUBJECT = 'no stream matches subject';
 const STREAM_ALREADY_EXISTS = 'stream name already in use';
-const DEFAULT_FSPIOP_STREAM_NAME = 'PAYPORT_FSPIOP';
+const DEFAULT_FSPIOP_STREAM_NAME = 'PIVOTAL_FSPIOP';
 const DEFAULT_FSPIOP_STREAM_SUBJECT = 'fspiop.>';
 
 const isNoStreamMatchesSubjectError = (error: unknown): boolean => {
@@ -16,7 +16,7 @@ const isStreamAlreadyExistsError = (error: unknown): boolean => {
 };
 
 const getFspiopStreamName = (): string => {
-    return process.env['PAYPORT_FSPIOP_STREAM_NAME'] ?? DEFAULT_FSPIOP_STREAM_NAME;
+    return process.env['PIVOTAL_FSPIOP_STREAM_NAME'] ?? DEFAULT_FSPIOP_STREAM_NAME;
 };
 
 export const resolveFspiopStream = async (jsm: JetStreamManager, subject: string): Promise<string> => {

@@ -102,7 +102,7 @@ export class TransferController {
                 new AuditOutboundTransfersCommand.Input(
                     id,
                     TransferController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.transferId,
                     input.transferRequest,
@@ -123,7 +123,7 @@ export class TransferController {
                     new AuditOutboundTransfersCommand.Input(
                         id,
                         TransferController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.transferId,
                         input.transferRequest,

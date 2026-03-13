@@ -1,7 +1,7 @@
 {
-  "name": "payport",
+  "name": "pivotal",
   "version": "1.0.0",
-  "description": "PayPort : The multi-tenant payment adapter for Mojaloop",
+  "description": "Pivotal : The multi-tenant payment adapter for Mojaloop",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

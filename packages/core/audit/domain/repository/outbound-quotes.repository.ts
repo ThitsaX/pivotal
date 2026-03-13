@@ -3,15 +3,15 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {DbTarget} from '@shared/typeorm';
 import {Repository} from 'typeorm';
 import {OutboundQuotes} from '../model';
-import {PAYPORT_DB_READ_CONNECTION_NAME, PAYPORT_DB_WRITE_CONNECTION_NAME} from './payport-connection-name';
+import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from './pivotal-connection-name';
 
 @Injectable()
 export class OutboundQuotesRepository {
 
     constructor(
-        @InjectRepository(OutboundQuotes, PAYPORT_DB_WRITE_CONNECTION_NAME)
+        @InjectRepository(OutboundQuotes, PIVOTAL_DB_WRITE_CONNECTION_NAME)
         private readonly writeRepository: Repository<OutboundQuotes>,
-        @InjectRepository(OutboundQuotes, PAYPORT_DB_READ_CONNECTION_NAME)
+        @InjectRepository(OutboundQuotes, PIVOTAL_DB_READ_CONNECTION_NAME)
         private readonly readRepository: Repository<OutboundQuotes>,
     ) {
     }

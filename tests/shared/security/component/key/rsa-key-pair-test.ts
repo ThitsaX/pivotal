@@ -19,7 +19,7 @@ describe('RsaKeyPair', () => {
 
     it('should generate a key pair that can sign and verify jwt', () => {
         const keyPair = RsaKeyPair.generate();
-        const payload = '{"amount":"100","currency":"USD"}';
+        const payload = { amount: '100', currency: 'USD' };
 
         const token = Jwt.sign(keyPair.privateKey, { kid: 'fsp-a' }, payload);
         const isVerified = Jwt.verify(keyPair.publicKey, token);
