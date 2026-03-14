@@ -1,11 +1,11 @@
 import {PartyIdType} from '@shared/fspiop';
 
-export class HandleGetPartiesCommand {
-    constructor(public readonly input: HandleGetPartiesCommand.Input) {
+export class PerformGetPartiesCommand {
+    constructor(public readonly input: PerformGetPartiesCommand.Input) {
     }
 }
 
-export namespace HandleGetPartiesCommand {
+export namespace PerformGetPartiesCommand {
     export class Input {
         constructor(public readonly payerFsp: string,
                     public readonly payeeFsp: string,

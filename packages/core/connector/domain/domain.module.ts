@@ -3,19 +3,19 @@ import {DynamicModule, Module} from '@nestjs/common';
 import {AuditProducerModule} from '@core/audit/producer';
 import {FspiopAxiosModule} from '@shared/fspiop';
 import {
-    HandleGetPartiesHandler,
-    HandlePatchTransfersHandler,
-    HandlePostQuotesHandler,
-    HandlePostTransfersHandler,
+    PerformGetPartiesHandler,
+    PerformPatchTransfersHandler,
+    PerformPostQuotesHandler,
+    PerformPostTransfersHandler,
 } from './command';
 import {ConnectorSettings, FspClient, FspConnector} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('ConnectorDomainRequiredDependencies');
 const CommandHandlers = [
-    HandleGetPartiesHandler,
-    HandlePostQuotesHandler,
-    HandlePostTransfersHandler,
-    HandlePatchTransfersHandler,
+    PerformGetPartiesHandler,
+    PerformPostQuotesHandler,
+    PerformPostTransfersHandler,
+    PerformPatchTransfersHandler,
 ];
 
 @Module({})

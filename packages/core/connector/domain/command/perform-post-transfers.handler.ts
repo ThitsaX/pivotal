@@ -1,7 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand} from '@core/audit/domain';
-import {InboundQuotesAuditPublisher} from '@core/audit/producer';
+import {AuditInboundTransfersCommand} from '@core/audit/domain';
+import {InboundTransfersAuditPublisher} from '@core/audit/producer';
 import {
     ErrorInformationObject,
     ErrorInformationResponse,
@@ -10,12 +10,12 @@ import {
     FspiopHeaders,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
-import {HandlePostQuotesCommand} from './handle-post-quotes.command';
-import {FspConnector} from '../component';
+import {PerformPostTransfersCommand} from './perform-post-transfers.command';
+import {ConnectorSettings, FspConnector} from '../component';
 
-@CommandHandler(HandlePostQuotesCommand)
-export class HandlePostQuotesHandler
-    implements ICommandHandler<HandlePostQuotesCommand, HandlePostQuotesCommand.Output> {
+@CommandHandler(PerformPostTransfersCommand)
+export class PerformPostTransfersHandler
+    implements ICommandHandler<PerformPostTransfersCommand, PerformPostTransfersCommand.Output> {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
@@ -23,34 +23,37 @@ export class HandlePostQuotesHandler
     constructor(
         @Inject(FspConnector)
         private readonly fspConnector: FspConnector,
+        @Inject(ConnectorSettings)
+        private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundQuotesAuditPublisher)
-        private readonly auditPublisher: InboundQuotesAuditPublisher,
+        @Inject(InboundTransfersAuditPublisher)
+        private readonly auditPublisher: InboundTransfersAuditPublisher,
     ) {
     }
 
-    async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
+    async execute(command: PerformPostTransfersCommand): Promise<PerformPostTransfersCommand.Output> {
         const {payerFsp, payeeFsp, request} = command.input;
-        const {quotesUrl} = this.fspiopAxios.settings;
-        const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, payeeFsp);
+        const {transfersUrl} = this.fspiopAxios.settings;
+        const connectorId = this.connectorSettings.connectorId;
+        const headers = FspiopHeaders.Values.Transfers.forResult(payerFsp, connectorId);
         const createdAt = new Date();
-        const id = HandlePostQuotesHandler.nextAuditId();
+        const id = PerformPostTransfersHandler.nextAuditId();
 
         try {
-            const response = await this.fspConnector.postQuotes(request);
+            const response = await this.fspConnector.postTransfers(request);
 
             await this.fspiopAxios
                 .withHeaders(headers)
-                .putQuotes(quotesUrl, request.quoteId, response);
+                .putTransfers(transfersUrl, request.transferId, response);
 
             await this.auditPublisher.publish(
-                new AuditInboundQuotesCommand.Input(
+                new AuditInboundTransfersCommand.Input(
                     id,
-                    HandlePostQuotesHandler.RAIL,
+                    PerformPostTransfersHandler.RAIL,
                     payerFsp,
                     payeeFsp,
-                    request.quoteId,
+                    request.transferId,
                     request,
                     response,
                     null,
@@ -61,27 +64,27 @@ export class HandlePostQuotesHandler
             );
         } catch (error) {
             let callbackError = error;
-            let callbackAuditError = HandlePostQuotesHandler.toAuditError(error);
-            let callbackErrorResponse = HandlePostQuotesHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = PerformPostTransfersHandler.toAuditError(error);
+            let callbackErrorResponse = PerformPostTransfersHandler.toErrorResponse(callbackAuditError);
 
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putQuotesError(quotesUrl, request.quoteId, callbackErrorResponse);
+                    .putTransfersError(transfersUrl, request.transferId, callbackErrorResponse);
             } catch (putError) {
                 callbackError = putError;
-                callbackAuditError = HandlePostQuotesHandler.toAuditError(putError);
-                callbackErrorResponse = HandlePostQuotesHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = PerformPostTransfersHandler.toAuditError(putError);
+                callbackErrorResponse = PerformPostTransfersHandler.toErrorResponse(callbackAuditError);
             }
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundQuotesCommand.Input(
+                    new AuditInboundTransfersCommand.Input(
                         id,
-                        HandlePostQuotesHandler.RAIL,
+                        PerformPostTransfersHandler.RAIL,
                         payerFsp,
                         payeeFsp,
-                        request.quoteId,
+                        request.transferId,
                         request,
                         null,
                         callbackAuditError,
@@ -97,7 +100,7 @@ export class HandlePostQuotesHandler
             FspiopException.rethrow(callbackError);
         }
 
-        return new HandlePostQuotesCommand.Output();
+        return new PerformPostTransfersCommand.Output();
     }
 
     private static toAuditError(error: unknown): ErrorInformationObject {
@@ -113,6 +116,6 @@ export class HandlePostQuotesHandler
     }
 
     private static nextAuditId(): string {
-        return HandlePostQuotesHandler.SNOWFLAKE.nextId().toString();
+        return PerformPostTransfersHandler.SNOWFLAKE.nextId().toString();
     }
 }

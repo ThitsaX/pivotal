@@ -1,11 +1,11 @@
 import {QuotesPostRequest} from '@shared/fspiop';
 
-export class HandlePostQuotesCommand {
-    constructor(public readonly input: HandlePostQuotesCommand.Input) {
+export class PerformPostQuotesCommand {
+    constructor(public readonly input: PerformPostQuotesCommand.Input) {
     }
 }
 
-export namespace HandlePostQuotesCommand {
+export namespace PerformPostQuotesCommand {
     export class Input {
         constructor(public readonly payerFsp: string,
                     public readonly payeeFsp: string,

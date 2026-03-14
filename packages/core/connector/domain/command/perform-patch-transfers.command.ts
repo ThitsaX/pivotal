@@ -1,11 +1,11 @@
 import {TransfersIDPatchResponse} from '@shared/fspiop';
 
-export class HandlePatchTransfersCommand {
-    constructor(public readonly input: HandlePatchTransfersCommand.Input) {
+export class PerformPatchTransfersCommand {
+    constructor(public readonly input: PerformPatchTransfersCommand.Input) {
     }
 }
 
-export namespace HandlePatchTransfersCommand {
+export namespace PerformPatchTransfersCommand {
     export class Input {
         constructor(
             public readonly payerFsp: string,

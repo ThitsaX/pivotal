@@ -15,7 +15,7 @@ export class HandlePutTransfersErrorHandler
     }
 
     async execute(command: HandlePutTransfersErrorCommand): Promise<HandlePutTransfersErrorCommand.Output> {
-        const {payerFsp, payeeFsp, transferId, error} = command.input;
+        const {payerFsp, transferId, error} = command.input;
 
         if (error == null) {
             return new HandlePutTransfersErrorCommand.Output();
@@ -23,7 +23,6 @@ export class HandlePutTransfersErrorHandler
 
         const subject = FspiopPubSubSubjects.Transfers.forError(
             payerFsp,
-            payeeFsp,
             transferId,
         );
 
