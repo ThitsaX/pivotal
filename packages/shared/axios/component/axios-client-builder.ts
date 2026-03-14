@@ -239,7 +239,7 @@ export class AxiosClientBuilder {
         const clientCert = options.clientCertStore?.get();
 
         this.mutualTlsOptions = {
-            ca: options.caStore?.toBuffer(),
+            ca: options.caStore?.get()?.toBuffer(),
             cert: clientCert?.certBuffer(),
             key: clientCert?.keyBuffer(),
             passphrase: options.passphrase,

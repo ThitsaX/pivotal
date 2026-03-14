@@ -26,15 +26,15 @@ import {FspiopSignature} from '../../fspiop-signature';
  *   3105 INVALID_SIGNATURE         — no trusted key for source FSP, or verification failed
  *
  * Usage — per controller:
- *   @UseGuards(FspiopJwsGuard)
+ *   @UseGuards(FspInboundGuard)
  *   @Controller('parties')
  *   export class PartiesController {}
  *
  * Usage — globally:
- *   app.useGlobalGuards(app.get(FspiopJwsGuard));
+ *   app.useGlobalGuards(app.get(FspInboundGuard));
  */
 @Injectable()
-export class FspiopJwsGuard implements CanActivate {
+export class FspInboundGuard implements CanActivate {
 
     constructor(
         private readonly publicKeyStore: PublicKeyStore,
@@ -95,7 +95,7 @@ export class FspiopJwsGuard implements CanActivate {
         }
 
         // ── 4. Reconstruct the JWT token and verify ───────────────────────────
-        const body        = FspiopJwsGuard.resolveBody(request);
+        const body        = FspInboundGuard.resolveBody(request);
         const bodyEncoded = Jwt.encode(body);
         const token       = new Jwt.Token(sigHeader.protectedHeader, bodyEncoded, sigHeader.signature);
 

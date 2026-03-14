@@ -44,7 +44,7 @@ export class FspiopAxiosModule {
 
                     const httpsAgent = settings.useMutualTls
                         ? new https.Agent({
-                            ca:   caStore.toBuffer(),
+                            ca:   caStore.get()?.toBuffer(),
                             cert: clientCertStore.get()?.certBuffer(),
                             key:  clientCertStore.get()?.keyBuffer(),
                             rejectUnauthorized: params.verifyServerCertificate,

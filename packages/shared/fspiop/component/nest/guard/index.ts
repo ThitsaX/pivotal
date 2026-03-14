@@ -1,1 +1,1 @@
-export * from './fspiop-jws.guard';
+export * from './fsp-inbound.guard';

@@ -1,45 +1,34 @@
+import {Ca} from '../ca';
 import {Injectable} from '@nestjs/common';
 import {CaCert} from '../ca-cert';
-import {CaCertLoader} from '../ca-cert-loader';
+import {CaStore} from '../ca-store';
 
-/**
- * Loads CA certificates from environment variables.
- *
- * Expected env variables:
- *   FSPIOP_MTLS_CA_COUNT         — total number of CA certificates (integer)
- *   FSPIOP_MTLS_CA_CONTENT_1     — PEM content of the 1st CA cert
- *   FSPIOP_MTLS_CA_CONTENT_2     — PEM content of the 2nd CA cert
- *   FSPIOP_MTLS_CA_CONTENT_N     — PEM content of the Nth CA cert
- *
- * All certs are returned as individual CaCert instances.
- * CaStore.load() concatenates them into a single PEM bundle.
- *
- * Embedded newlines can be escaped as \n (e.g. when stored in .env files).
- * They are normalised before parsing.
- */
 @Injectable()
-export class EnvBasedCaCertLoader extends CaCertLoader {
+export class EnvBasedCaStore extends CaStore {
 
     private static readonly ENV_CA_COUNT   = 'FSPIOP_MTLS_CA_COUNT';
+
     private static readonly ENV_CA_CONTENT = 'FSPIOP_MTLS_CA_CONTENT_';
 
-    load(): CaCert[] {
-        const countStr = process.env[EnvBasedCaCertLoader.ENV_CA_COUNT];
+    private combined: Ca | undefined;
+
+    load(): CaStore {
+        const countStr = process.env[EnvBasedCaStore.ENV_CA_COUNT];
 
         if (countStr == null || countStr.trim().length === 0) {
-            return [];
+            return this;
         }
 
         const count = parseInt(countStr.trim(), 10);
 
         if (isNaN(count) || count <= 0) {
-            return [];
+            return this;
         }
 
         const certs: CaCert[] = [];
 
         for (let i = 1; i <= count; i++) {
-            const envName = `${EnvBasedCaCertLoader.ENV_CA_CONTENT}${i}`;
+            const envName = `${EnvBasedCaStore.ENV_CA_CONTENT}${i}`;
             const content = process.env[envName];
 
             if (content == null || content.trim().length === 0) {
@@ -53,6 +42,19 @@ export class EnvBasedCaCertLoader extends CaCertLoader {
             certs.push(CaCert.fromBuffer(Buffer.from(normalizedPem, 'utf-8')));
         }
 
-        return certs;
+        if (certs.length === 0) {
+            return this;
+        }
+
+        const incoming = Buffer.concat(certs.map((c) => c.toBuffer()));
+        this.combined = this.combined == null
+            ? Ca.fromBuffer(incoming)
+            : Ca.fromBuffer(Buffer.concat([this.combined.toBuffer(), incoming]));
+
+        return this;
+    }
+
+    get(): Ca | undefined {
+        return this.combined;
     }
 }

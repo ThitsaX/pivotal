@@ -1,33 +1,26 @@
 import {Injectable} from '@nestjs/common';
 import {ClientCert} from '../client-cert';
-import {ClientCertLoader} from '../client-cert-loader';
+import {ClientCertStore} from '../client-cert-store';
 
-/**
- * Loads the client certificate and key from environment variables.
- *
- * Expected env variables:
- *   CLIENT_CERT_CONTENT — PEM content of the client certificate
- *   CLIENT_CERT_KEY     — PEM content of the client private key
- *
- * Both must be set together. If neither is set, load() returns undefined
- * (no mTLS client cert configured). If only one is set, an error is thrown.
- * Embedded newlines may be escaped as \n.
- */
 @Injectable()
-export class EnvBasedClientCertLoader extends ClientCertLoader {
+export class EnvBasedClientCertStore extends ClientCertStore {
 
     private static readonly ENV_CLIENT_CERT_CONTENT = 'CLIENT_CERT_CONTENT';
+
     private static readonly ENV_CLIENT_CERT_KEY      = 'CLIENT_CERT_KEY';
 
-    load(): ClientCert | undefined {
-        const certContent = process.env[EnvBasedClientCertLoader.ENV_CLIENT_CERT_CONTENT];
-        const keyContent  = process.env[EnvBasedClientCertLoader.ENV_CLIENT_CERT_KEY];
+    private clientCert: ClientCert | undefined;
+
+    load(): ClientCertStore {
+        const certContent = process.env[EnvBasedClientCertStore.ENV_CLIENT_CERT_CONTENT];
+        const keyContent  = process.env[EnvBasedClientCertStore.ENV_CLIENT_CERT_KEY];
 
         const hasCert = certContent != null && certContent.trim().length > 0;
         const hasKey  = keyContent  != null && keyContent.trim().length  > 0;
 
         if (!hasCert && !hasKey) {
-            return undefined;
+            this.clientCert = undefined;
+            return this;
         }
 
         if (!hasCert) {
@@ -47,6 +40,12 @@ export class EnvBasedClientCertLoader extends ClientCertLoader {
         const cert = Buffer.from(certContent!.replace(/\\n/g, '\n'), 'utf-8');
         const key  = Buffer.from(keyContent!.replace(/\\n/g, '\n'),  'utf-8');
 
-        return ClientCert.fromBuffers(cert, key);
+        this.clientCert = ClientCert.fromBuffers(cert, key);
+
+        return this;
+    }
+
+    get(): ClientCert | undefined {
+        return this.clientCert;
     }
 }
