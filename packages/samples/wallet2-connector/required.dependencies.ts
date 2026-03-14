@@ -2,16 +2,20 @@ import {ConfigService} from '@nestjs/config';
 import {ConnectorConsumerModule} from '@core/connector/consumer';
 import {ConnectorSettings, FspClient} from '@core/connector/domain';
 import {CatalystFeeEngine} from '@shared/catalyst';
-import {Currency, FspiopAxiosParams, FspiopSettings} from '@shared/fspiop';
+import {
+    Currency,
+    FspiopAxiosParams,
+    FspiopJwsPrivateKeyStore,
+    FspiopJwsPublicKeyStore,
+    FspiopMtlsCaStore,
+    FspiopMtlsClientCertStore,
+    FspiopSettings,
+} from '@shared/fspiop';
 import {
     CaStore,
-    CaStoreFactory,
     ClientCertStore,
-    ClientCertStoreFactory,
     PrivateKeyStore,
-    PrivateKeyStoreFactory,
     PublicKeyStore,
-    PublicKeyStoreFactory,
 } from '@shared/security';
 import {Wallet2FspClient} from './wallet2-fsp-client';
 
@@ -24,10 +28,6 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
     private static readonly DEFAULT_SWITCH_ID = 'switch';
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;
-    private static readonly DEFAULT_PUBLIC_KEY_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_PRIVATE_KEY_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_CA_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_CLIENT_CERT_STORE_FACTORY = 'env';
     private static readonly DEFAULT_VERIFY_SERVER_CERTIFICATE = true;
     private static readonly DEFAULT_VERIFY_DOMAIN = true;
     private static readonly DEFAULT_CONNECTOR_ID = 'wallet2';
@@ -45,18 +45,10 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
         private readonly configService: ConfigService,
         catalystFeeEngine: CatalystFeeEngine,
     ) {
-        this.publicKeyStoreValue = PublicKeyStoreFactory.create(
-            this.readString('PUBLIC_KEY_STORE_FACTORY', Wallet2ConnectorDependencies.DEFAULT_PUBLIC_KEY_STORE_FACTORY),
-        );
-        this.privateKeyStoreValue = PrivateKeyStoreFactory.create(
-            this.readString('PRIVATE_KEY_STORE_FACTORY', Wallet2ConnectorDependencies.DEFAULT_PRIVATE_KEY_STORE_FACTORY),
-        );
-        this.caStoreValue = CaStoreFactory.create(
-            this.readString('CA_CERT_STORE_FACTORY', Wallet2ConnectorDependencies.DEFAULT_CA_STORE_FACTORY),
-        );
-        this.clientCertStoreValue = ClientCertStoreFactory.create(
-            this.readString('CLIENT_CERT_STORE_FACTORY', Wallet2ConnectorDependencies.DEFAULT_CLIENT_CERT_STORE_FACTORY),
-        );
+        this.publicKeyStoreValue = new FspiopJwsPublicKeyStore().load();
+        this.privateKeyStoreValue = new FspiopJwsPrivateKeyStore().load();
+        this.caStoreValue = new FspiopMtlsCaStore().load();
+        this.clientCertStoreValue = new FspiopMtlsClientCertStore().load();
 
         this.fspClientValue = new Wallet2FspClient(this.connectorSettings(), catalystFeeEngine);
     }
@@ -67,10 +59,10 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
 
     fspiopSettings(): FspiopSettings {
         return new FspiopSettings(
+            this.readString('FSPIOP_SWITCH_ID', Wallet2ConnectorDependencies.DEFAULT_SWITCH_ID),
             this.readString('FSPIOP_PARTIES_URL', Wallet2ConnectorDependencies.DEFAULT_PARTIES_URL),
             this.readString('FSPIOP_QUOTES_URL', Wallet2ConnectorDependencies.DEFAULT_QUOTES_URL),
             this.readString('FSPIOP_TRANSFERS_URL', Wallet2ConnectorDependencies.DEFAULT_TRANSFERS_URL),
-            this.readString('FSPIOP_SWITCH_ID', Wallet2ConnectorDependencies.DEFAULT_SWITCH_ID),
             this.readBoolean('FSPIOP_USE_JWS', Wallet2ConnectorDependencies.DEFAULT_USE_JWS),
             this.readBoolean('FSPIOP_USE_MUTUAL_TLS', Wallet2ConnectorDependencies.DEFAULT_USE_MUTUAL_TLS),
         );
@@ -177,4 +169,5 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
 
         return parsed;
     }
+
 }

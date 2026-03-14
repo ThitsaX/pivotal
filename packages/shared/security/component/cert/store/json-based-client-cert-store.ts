@@ -1,34 +1,26 @@
 import {Injectable} from '@nestjs/common';
 import {ClientCert} from '../client-cert';
-import {ClientCertLoader} from '../client-cert-loader';
+import {ClientCertStore} from '../client-cert-store';
 
 interface JsonClientCertSource {
     clientCert: string;
+
     clientKey:  string;
 }
 
-/**
- * Loads the client certificate and key from a JSON environment variable.
- *
- * Expected env variable:
- *   JSON_CLIENT_CERT — JSON object with 'clientCert' and 'clientKey' PEM fields.
- *
- * Example:
- *   JSON_CLIENT_CERT={"clientCert":"-----BEGIN CERTIFICATE-----\n...", "clientKey":"-----BEGIN RSA PRIVATE KEY-----\n..."}
- *
- * If the variable is absent, load() returns undefined.
- * Embedded newlines may be escaped as \n.
- */
 @Injectable()
-export class JsonBasedClientCertLoader extends ClientCertLoader {
+export class JsonBasedClientCertStore extends ClientCertStore {
 
     private static readonly ENV_JSON_CLIENT_CERT = 'JSON_CLIENT_CERT';
 
-    load(): ClientCert | undefined {
-        const raw = process.env[JsonBasedClientCertLoader.ENV_JSON_CLIENT_CERT];
+    private clientCert: ClientCert | undefined;
+
+    load(): ClientCertStore {
+        const raw = process.env[JsonBasedClientCertStore.ENV_JSON_CLIENT_CERT];
 
         if (raw == null || raw.trim().length === 0) {
-            return undefined;
+            this.clientCert = undefined;
+            return this;
         }
 
         const parsed = JSON.parse(raw) as unknown;
@@ -50,6 +42,12 @@ export class JsonBasedClientCertLoader extends ClientCertLoader {
         const cert = Buffer.from(source.clientCert.replace(/\\n/g, '\n'), 'utf-8');
         const key  = Buffer.from(source.clientKey.replace(/\\n/g, '\n'),  'utf-8');
 
-        return ClientCert.fromBuffers(cert, key);
+        this.clientCert = ClientCert.fromBuffers(cert, key);
+
+        return this;
+    }
+
+    get(): ClientCert | undefined {
+        return this.clientCert;
     }
 }
