@@ -3,6 +3,7 @@ import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
 import {AxiosClientBuilder} from '@shared/axios/component';
 import {FspiopHeadersMap} from '../fspiop-headers';
 import {FspiopSettings} from '../fspiop-settings';
+import {FspiopErrors} from '../../exception';
 import {
     ErrorInformationResponse,
     FxQuotesIDPutResponse,
@@ -112,11 +113,49 @@ export class FspiopAxios {
                         error.response.data as ErrorInformationResponse,
                     );
                 }
-                throw error;
+
+                throw new FspiopAxiosError(
+                    502,
+                    {
+                        errorInformation: {
+                            errorCode: FspiopErrors.DESTINATION_COMMUNICATION_ERROR.errorType.code,
+                            errorDescription: FspiopAxios.transportErrorDescription(error),
+                        },
+                    },
+                );
             },
         );
 
         return builder.build();
+    }
+
+    private static transportErrorDescription(error: AxiosError): string {
+        const messageCandidates: string[] = [
+            error.message,
+        ];
+
+        if (error.cause instanceof Error) {
+            messageCandidates.push(error.cause.message);
+        }
+
+        const aggregateCause = error.cause as { errors?: unknown[] } | undefined;
+        const aggregateErrors = aggregateCause?.errors;
+
+        if (Array.isArray(aggregateErrors)) {
+            for (const item of aggregateErrors) {
+                if (item instanceof Error) {
+                    messageCandidates.push(item.message);
+                }
+            }
+        }
+
+        for (const candidate of messageCandidates) {
+            if (candidate.trim().length > 0) {
+                return candidate;
+            }
+        }
+
+        return FspiopErrors.DESTINATION_COMMUNICATION_ERROR.description;
     }
 
 

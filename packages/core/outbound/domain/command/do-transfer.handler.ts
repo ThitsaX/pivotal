@@ -1,15 +1,6 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {
-    FspiopAxios,
-    FspiopAxiosError,
-    FspiopErrors,
-    FspiopException,
-    FspiopHeaders,
-    FspiopPubSubSubjects,
-    FspiopResponseSubscriber,
-    TransfersIDPutResponse,
-} from '@shared/fspiop';
+import {FspiopAxios, FspiopAxiosError, FspiopErrors, FspiopException, FspiopHeaders, FspiopPubSubSubjects, FspiopResponseSubscriber, TransfersIDPutResponse,} from '@shared/fspiop';
 import {DoTransferCommand} from './do-transfer.command';
 
 @CommandHandler(DoTransferCommand)
@@ -32,8 +23,8 @@ export class DoTransferHandler
 
         // Transfers carry a unique transferId — a single error subject is sufficient,
         // no hub error subject is needed (unlike Parties).
-        const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, destination, transferId);
-        const errorSubject   = FspiopPubSubSubjects.Transfers.forError(source, destination, transferId);
+        const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, transferId);
+        const errorSubject = FspiopPubSubSubjects.Transfers.forError(source, transferId);
 
         // ── Step 1: Subscribe to NATS BEFORE sending the request ─────────────
         // nc.subscribe() is synchronous — subscriptions are active immediately.
@@ -56,7 +47,9 @@ export class DoTransferHandler
             if (FspiopAxiosError.is(error)) {
                 const info = error.errorInformationResponse?.errorInformation;
                 const code = info?.errorCode ?? '';
-                const desc = info?.errorDescription ?? 'Communication error';
+                const desc = info?.errorDescription?.trim().length
+                    ? info.errorDescription
+                    : 'Communication error';
                 const extensionList = info?.extensionList;
                 const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
                 throw new FspiopException(errorDef, desc, extensionList);

@@ -3,7 +3,7 @@ import {Interledger} from '@shared/interledger/component';
 import {
     Currency,
     FspiopAgreement,
-    FspiopCurrencies,
+    FspiopCurrencies, FspiopDates,
     FspiopErrors,
     FspiopException,
     FspiopMoney,
@@ -26,7 +26,7 @@ import {FspClient} from './fsp-client';
 @Injectable()
 export class FspConnector {
 
-    private static readonly DEFAULT_PREPARE_LIFETIME_SECONDS = 30;
+    private static readonly _15_MINUTES = 900;
 
     constructor(
         @Inject(FspClient)
@@ -38,13 +38,13 @@ export class FspConnector {
 
     private static resolveLifetimeSeconds(expiration?: string): number {
         if (expiration == null) {
-            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
+            return FspConnector._15_MINUTES;
         }
 
         const expiresAt = new Date(expiration).getTime();
 
         if (Number.isNaN(expiresAt)) {
-            return FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS;
+            return FspConnector._15_MINUTES;
         }
 
         return Math.max(
@@ -105,8 +105,8 @@ export class FspConnector {
         }
 
         const transferAmountMinor = FspiopMoney.serialize(transferAmount.amount, currencyProfile.scale);
-        const expireAt = new Date(Date.now() + FspConnector.DEFAULT_PREPARE_LIFETIME_SECONDS * 1000);
-        const expiration = expireAt.toISOString();
+        const expireAt = new Date(Date.now() + (FspConnector._15_MINUTES * 1000));
+        const expiration = FspiopDates.forRequestBody(expireAt);
         const agreement = this.toAgreement(postQuotesRequest, transferAmount, payeeReceiveAmount, expireAt.getTime());
 
         const prepare = Interledger.prepare(

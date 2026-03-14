@@ -92,7 +92,7 @@ export class Wallet1FspClient extends FspClient {
         );
 
         const transferState = payeeFsp === this.connectorSettings.connectorId
-            ? TransferState.Committed
+            ? TransferState.Reserved
             : TransferState.Aborted;
 
         const response = new TransfersIDPutResponse();

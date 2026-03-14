@@ -1,5 +1,5 @@
-import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Param, Post, Put,} from '@nestjs/common';
-import {CommandBus} from '@nestjs/cqrs';
+import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put,} from '@nestjs/common';
+import {CommandBus, ICommand} from '@nestjs/cqrs';
 import {HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCommand,} from '@core/inbound/domain';
 import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, QuotesIDPutResponse, QuotesPostRequest,} from '@shared/fspiop';
 
@@ -7,6 +7,7 @@ import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHe
 export class QuotesController {
 
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
+    private readonly logger = new Logger(QuotesController.name);
 
     constructor(
         @Inject(CommandBus)
@@ -28,69 +29,80 @@ export class QuotesController {
 
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
-    async postQuotes(@Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-                     @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-                     @Body() request: QuotesPostRequest): Promise<void> {
-        const payerFsp = QuotesController.headerValue(sourceHeader);
-        const payeeFsp = QuotesController.headerValue(destinationHeader);
+    postQuotes(@Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+               @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+               @Body() request: QuotesPostRequest): void {
+        this.dispatch(() => {
+            const payerFsp = QuotesController.headerValue(sourceHeader);
+            const payeeFsp = QuotesController.headerValue(destinationHeader);
 
-        await this.commandBus.execute(
-            new HandlePostQuotesCommand(
+            return new HandlePostQuotesCommand(
                 new HandlePostQuotesCommand.Input(payerFsp, payeeFsp, request),
-            ),
-        );
+            );
+        });
     }
 
     @Put(':quoteId')
-    @HttpCode(HttpStatus.OK)
-    async putQuotes(
+    @HttpCode(HttpStatus.ACCEPTED)
+    putQuotes(
         @Param('quoteId') quoteId: string,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesIDPutResponse,
-    ): Promise<void> {
-        const payerFsp = QuotesController.headerValue(destinationHeader);
-        const payeeFsp = QuotesController.headerValue(sourceHeader);
+    ): void {
+        this.dispatch(() => {
+            const payerFsp = QuotesController.headerValue(destinationHeader);
+            const payeeFsp = QuotesController.headerValue(sourceHeader);
 
-        await this.commandBus.execute(
-            new HandlePutQuotesCommand(
+            return new HandlePutQuotesCommand(
                 new HandlePutQuotesCommand.Input(
                     payerFsp,
                     payeeFsp,
                     quoteId,
                     request,
                 ),
-            ),
-        );
+            );
+        });
     }
 
     @Put(':quoteId/error')
-    @HttpCode(HttpStatus.OK)
-    async putQuotesError(
+    @HttpCode(HttpStatus.ACCEPTED)
+    putQuotesError(
         @Param('quoteId') quoteId: string,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
-    ): Promise<void> {
-        const payerFsp = QuotesController.headerValue(destinationHeader);
-        const payeeFsp = QuotesController.headerValue(sourceHeader);
-        const error = QuotesController.toErrorInformationObject(request);
+    ): void {
+        this.dispatch(() => {
+            const payerFsp = QuotesController.headerValue(destinationHeader);
+            const payeeFsp = QuotesController.headerValue(sourceHeader);
+            const error = QuotesController.toErrorInformationObject(request);
 
-        await this.commandBus.execute(
-            new HandlePutQuotesErrorCommand(
+            return new HandlePutQuotesErrorCommand(
                 new HandlePutQuotesErrorCommand.Input(
                     payerFsp,
                     payeeFsp,
                     quoteId,
                     error,
                 ),
-            ),
-        );
+            );
+        });
     }
 
     private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {
         return {
             errorInformation: response?.errorInformation ?? QuotesController.FALLBACK_ERROR.errorInformation,
         };
+    }
+
+    private dispatch(commandFactory: () => ICommand): void {
+        setImmediate(() => {
+            void this.commandBus.execute(commandFactory())
+                .catch((error: unknown) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    const stack = error instanceof Error ? error.stack : undefined;
+                    this.logger.error(message, stack);
+                });
+        });
     }
 }

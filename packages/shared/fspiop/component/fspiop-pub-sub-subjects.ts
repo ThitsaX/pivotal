@@ -67,18 +67,18 @@ export namespace FspiopPubSubSubjects {
 
         /**
          * Success callback subject for a quote.
-         * e.g. "quotes:DFSP-A:DFSP-B:quote-uuid"
+         * e.g. "quotes:DFSP-A:quote-uuid"
          */
-        static forSuccess(payer: string, payee: string, quoteId: string): string {
-            return `quotes:${payer}:${payee}:${quoteId}`;
+            static forSuccess(payer: string, quoteId: string): string {
+            return `quotes:${payer}:${quoteId}`;
         }
 
         /**
          * Error callback subject for a quote.
-         * e.g. "quotes-error:DFSP-A:DFSP-B:quote-uuid"
+         * e.g. "quotes-error:DFSP-A:quote-uuid"
          */
-        static forError(payer: string, payee: string, quoteId: string): string {
-            return `quotes-error:${payer}:${payee}:${quoteId}`;
+        static forError(payer: string, quoteId: string): string {
+            return `quotes-error:${payer}:${quoteId}`;
         }
     }
 
@@ -89,18 +89,18 @@ export namespace FspiopPubSubSubjects {
 
         /**
          * Success callback subject for a transfer.
-         * e.g. "transfers:DFSP-A:DFSP-B:transfer-uuid"
+         * e.g. "transfers:DFSP-A:transfer-uuid"
          */
-        static forSuccess(payer: string, payee: string, transferId: string): string {
-            return `transfers:${payer}:${payee}:${transferId}`;
+        static forSuccess(payer: string, transferId: string): string {
+            return `transfers:${payer}:${transferId}`;
         }
 
         /**
          * Error callback subject for a transfer.
-         * e.g. "transfers-error:DFSP-A:DFSP-B:transfer-uuid"
+         * e.g. "transfers-error:DFSP-A:transfer-uuid"
          */
-        static forError(payer: string, payee: string, transferId: string): string {
-            return `transfers-error:${payer}:${payee}:${transferId}`;
+        static forError(payer: string, transferId: string): string {
+            return `transfers-error:${payer}:${transferId}`;
         }
     }
 }

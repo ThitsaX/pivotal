@@ -1,11 +1,11 @@
 import {TransfersPostRequest} from '@shared/fspiop';
 
-export class HandlePostTransfersCommand {
-    constructor(public readonly input: HandlePostTransfersCommand.Input) {
+export class PerformPostTransfersCommand {
+    constructor(public readonly input: PerformPostTransfersCommand.Input) {
     }
 }
 
-export namespace HandlePostTransfersCommand {
+export namespace PerformPostTransfersCommand {
     export class Input {
         constructor(public readonly payerFsp: string,
                     public readonly payeeFsp: string,

@@ -1,7 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundPartiesCommand} from '@core/audit/domain';
-import {InboundPartiesAuditPublisher} from '@core/audit/producer';
+import {AuditInboundQuotesCommand} from '@core/audit/domain';
+import {InboundQuotesAuditPublisher} from '@core/audit/producer';
 import {
     ErrorInformationObject,
     ErrorInformationResponse,
@@ -10,12 +10,12 @@ import {
     FspiopHeaders,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
-import {HandleGetPartiesCommand} from './handle-get-parties.command';
-import {FspConnector} from '../component';
+import {PerformPostQuotesCommand} from './perform-post-quotes.command';
+import {ConnectorSettings, FspConnector} from '../component';
 
-@CommandHandler(HandleGetPartiesCommand)
-export class HandleGetPartiesHandler
-    implements ICommandHandler<HandleGetPartiesCommand, HandleGetPartiesCommand.Output> {
+@CommandHandler(PerformPostQuotesCommand)
+export class PerformPostQuotesHandler
+    implements ICommandHandler<PerformPostQuotesCommand, PerformPostQuotesCommand.Output> {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
@@ -23,40 +23,38 @@ export class HandleGetPartiesHandler
     constructor(
         @Inject(FspConnector)
         private readonly fspConnector: FspConnector,
+        @Inject(ConnectorSettings)
+        private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundPartiesAuditPublisher)
-        private readonly auditPublisher: InboundPartiesAuditPublisher,
+        @Inject(InboundQuotesAuditPublisher)
+        private readonly auditPublisher: InboundQuotesAuditPublisher,
     ) {
     }
 
-    async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
-        const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
-        const {partiesUrl} = this.fspiopAxios.settings;
-        const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, payeeFsp);
+    async execute(command: PerformPostQuotesCommand): Promise<PerformPostQuotesCommand.Output> {
+        const {payerFsp, payeeFsp, request} = command.input;
+        const {quotesUrl} = this.fspiopAxios.settings;
+        const connectorId = this.connectorSettings.connectorId;
+        const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, connectorId);
         const createdAt = new Date();
-        const id = HandleGetPartiesHandler.nextAuditId();
+        const id = PerformPostQuotesHandler.nextAuditId();
 
         try {
-            const response = await this.fspConnector.getParties(
-                partyIdType,
-                partyId,
-                subId,
-            );
+            const response = await this.fspConnector.postQuotes(request);
 
             await this.fspiopAxios
                 .withHeaders(headers)
-                .putParties(partiesUrl, partyIdType, partyId, response, subId ?? undefined);
+                .putQuotes(quotesUrl, request.quoteId, response);
 
             await this.auditPublisher.publish(
-                new AuditInboundPartiesCommand.Input(
+                new AuditInboundQuotesCommand.Input(
                     id,
-                    HandleGetPartiesHandler.RAIL,
+                    PerformPostQuotesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
-                    partyIdType,
-                    partyId,
-                    subId,
+                    request.quoteId,
+                    request,
                     response,
                     null,
                     null,
@@ -66,29 +64,28 @@ export class HandleGetPartiesHandler
             );
         } catch (error) {
             let callbackError = error;
-            let callbackAuditError = HandleGetPartiesHandler.toAuditError(error);
-            let callbackErrorResponse = HandleGetPartiesHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = PerformPostQuotesHandler.toAuditError(error);
+            let callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
 
             try {
                 await this.fspiopAxios
                     .withHeaders(headers)
-                    .putPartiesError(partiesUrl, partyIdType, partyId, callbackErrorResponse, subId ?? undefined);
+                    .putQuotesError(quotesUrl, request.quoteId, callbackErrorResponse);
             } catch (putError) {
                 callbackError = putError;
-                callbackAuditError = HandleGetPartiesHandler.toAuditError(putError);
-                callbackErrorResponse = HandleGetPartiesHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = PerformPostQuotesHandler.toAuditError(putError);
+                callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
             }
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundPartiesCommand.Input(
+                    new AuditInboundQuotesCommand.Input(
                         id,
-                        HandleGetPartiesHandler.RAIL,
+                        PerformPostQuotesHandler.RAIL,
                         payerFsp,
                         payeeFsp,
-                        partyIdType,
-                        partyId,
-                        subId,
+                        request.quoteId,
+                        request,
                         null,
                         callbackAuditError,
                         null,
@@ -103,7 +100,7 @@ export class HandleGetPartiesHandler
             FspiopException.rethrow(callbackError);
         }
 
-        return new HandleGetPartiesCommand.Output();
+        return new PerformPostQuotesCommand.Output();
     }
 
     private static toAuditError(error: unknown): ErrorInformationObject {
@@ -119,6 +116,6 @@ export class HandleGetPartiesHandler
     }
 
     private static nextAuditId(): string {
-        return HandleGetPartiesHandler.SNOWFLAKE.nextId().toString();
+        return PerformPostQuotesHandler.SNOWFLAKE.nextId().toString();
     }
 }

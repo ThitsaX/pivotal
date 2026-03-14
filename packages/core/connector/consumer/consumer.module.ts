@@ -1,7 +1,7 @@
 import {CommandBus} from '@nestjs/cqrs';
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
-import {ConnectorDomainModule} from '../domain';
+import {ConnectorDomainModule, ConnectorSettings} from '../domain';
 import {
     ConnectorGetPartiesListener,
     ConnectorPatchTransfersListener,
@@ -43,23 +43,39 @@ export class ConnectorConsumerModule {
         return [
             {
                 provide: ConnectorGetPartiesListener,
-                useFactory: (ncs: NatsClientService, commandBus: CommandBus) => new ConnectorGetPartiesListener(ncs, commandBus),
-                inject: [NatsClientService, CommandBus],
+                useFactory: (
+                    ncs: NatsClientService,
+                    commandBus: CommandBus,
+                    connectorSettings: ConnectorSettings,
+                ) => new ConnectorGetPartiesListener(ncs, commandBus, connectorSettings),
+                inject: [NatsClientService, CommandBus, ConnectorSettings],
             },
             {
                 provide: ConnectorPostQuotesListener,
-                useFactory: (ncs: NatsClientService, commandBus: CommandBus) => new ConnectorPostQuotesListener(ncs, commandBus),
-                inject: [NatsClientService, CommandBus],
+                useFactory: (
+                    ncs: NatsClientService,
+                    commandBus: CommandBus,
+                    connectorSettings: ConnectorSettings,
+                ) => new ConnectorPostQuotesListener(ncs, commandBus, connectorSettings),
+                inject: [NatsClientService, CommandBus, ConnectorSettings],
             },
             {
                 provide: ConnectorPostTransfersListener,
-                useFactory: (ncs: NatsClientService, commandBus: CommandBus) => new ConnectorPostTransfersListener(ncs, commandBus),
-                inject: [NatsClientService, CommandBus],
+                useFactory: (
+                    ncs: NatsClientService,
+                    commandBus: CommandBus,
+                    connectorSettings: ConnectorSettings,
+                ) => new ConnectorPostTransfersListener(ncs, commandBus, connectorSettings),
+                inject: [NatsClientService, CommandBus, ConnectorSettings],
             },
             {
                 provide: ConnectorPatchTransfersListener,
-                useFactory: (ncs: NatsClientService, commandBus: CommandBus) => new ConnectorPatchTransfersListener(ncs, commandBus),
-                inject: [NatsClientService, CommandBus],
+                useFactory: (
+                    ncs: NatsClientService,
+                    commandBus: CommandBus,
+                    connectorSettings: ConnectorSettings,
+                ) => new ConnectorPatchTransfersListener(ncs, commandBus, connectorSettings),
+                inject: [NatsClientService, CommandBus, ConnectorSettings],
             },
         ];
     }
