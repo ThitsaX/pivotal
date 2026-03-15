@@ -126,7 +126,11 @@ export class FspiopAxios {
             },
         );
 
-        return builder.build();
+        const client = builder.build();
+
+        FspiopAxios.clearDefaultAcceptHeaders(client);
+
+        return client;
     }
 
     private static transportErrorDescription(error: AxiosError): string {
@@ -159,111 +163,168 @@ export class FspiopAxios {
     }
 
 
-    withHeaders(headers: FspiopHeadersMap): FspiopAxios {
-        // client is already built with the agent baked in — pass it through directly
-        return new FspiopAxios(this.settings, this.params, this.interceptors, headers, undefined, this.client);
-    }
-
     // ─── Parties ────────────────────────────────────────────────────────────────
 
-    async getParties(baseUrl: string, type: PartyIdType, id: string, subId?: string): Promise<void> {
+    async getParties(baseUrl: string, headers: FspiopHeadersMap, type: PartyIdType, id: string, subId?: string): Promise<void> {
         const url = subId
             ? `${baseUrl}/parties/${type}/${id}/${subId}`
             : `${baseUrl}/parties/${type}/${id}`;
-        await this.get(url);
+        await this.get(url, headers);
     }
 
-    async putParties(baseUrl: string, type: PartyIdType, id: string, body: PartiesTypeIDPutResponse, subId?: string): Promise<void> {
+    async putParties(baseUrl: string, headers: FspiopHeadersMap, type: PartyIdType, id: string, body: PartiesTypeIDPutResponse, subId?: string): Promise<void> {
         const url = subId
             ? `${baseUrl}/parties/${type}/${id}/${subId}`
             : `${baseUrl}/parties/${type}/${id}`;
-        await this.put(url, body);
+        await this.put(url, body, headers);
     }
 
-    async putPartiesError(baseUrl: string, type: PartyIdType, id: string, response: ErrorInformationResponse, subId?: string): Promise<void> {
+    async putPartiesError(baseUrl: string, headers: FspiopHeadersMap, type: PartyIdType, id: string, response: ErrorInformationResponse, subId?: string): Promise<void> {
         const url = subId
             ? `${baseUrl}/parties/${type}/${id}/${subId}/error`
             : `${baseUrl}/parties/${type}/${id}/error`;
-        await this.put(url, response);
+        await this.put(url, response, headers);
     }
 
     // ─── Quotes ─────────────────────────────────────────────────────────────────
 
-    async postQuotes(baseUrl: string, body: QuotesPostRequest): Promise<void> {
-        await this.post(`${baseUrl}/quotes`, body);
+    async postQuotes(baseUrl: string, headers: FspiopHeadersMap, body: QuotesPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/quotes`, body, headers);
     }
 
-    async putQuotes(baseUrl: string, id: string, body: QuotesIDPutResponse): Promise<void> {
-        await this.put(`${baseUrl}/quotes/${id}`, body);
+    async putQuotes(baseUrl: string, headers: FspiopHeadersMap, id: string, body: QuotesIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/quotes/${id}`, body, headers);
     }
 
-    async putQuotesError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
-        await this.put(`${baseUrl}/quotes/${id}/error`, response);
+    async putQuotesError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/quotes/${id}/error`, response, headers);
     }
 
     // ─── Transfers ──────────────────────────────────────────────────────────────
 
-    async postTransfers(baseUrl: string, body: TransfersPostRequest): Promise<void> {
-        await this.post(`${baseUrl}/transfers`, body);
+    async postTransfers(baseUrl: string, headers: FspiopHeadersMap, body: TransfersPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/transfers`, body, headers);
     }
 
-    async putTransfers(baseUrl: string, id: string, body: TransfersIDPutResponse): Promise<void> {
-        await this.put(`${baseUrl}/transfers/${id}`, body);
+    async putTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: TransfersIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/transfers/${id}`, body, headers);
     }
 
-    async patchTransfers(baseUrl: string, id: string, body: TransfersIDPatchResponse): Promise<void> {
-        await this.patch(`${baseUrl}/transfers/${id}`, body);
+    async patchTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: TransfersIDPatchResponse): Promise<void> {
+        await this.patch(`${baseUrl}/transfers/${id}`, body, headers);
     }
 
     // ─── FX Quotes ──────────────────────────────────────────────────────────────
 
-    async putTransfersError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
-        await this.put(`${baseUrl}/transfers/${id}/error`, response);
+    async putTransfersError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/transfers/${id}/error`, response, headers);
     }
 
-    async postFxQuotes(baseUrl: string, body: FxQuotesPostRequest): Promise<void> {
-        await this.post(`${baseUrl}/fxQuotes`, body);
+    async postFxQuotes(baseUrl: string, headers: FspiopHeadersMap, body: FxQuotesPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/fxQuotes`, body, headers);
     }
 
-    async putFxQuotes(baseUrl: string, id: string, body: FxQuotesIDPutResponse): Promise<void> {
-        await this.put(`${baseUrl}/fxQuotes/${id}`, body);
+    async putFxQuotes(baseUrl: string, headers: FspiopHeadersMap, id: string, body: FxQuotesIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxQuotes/${id}`, body, headers);
     }
 
     // ─── FX Transfers ───────────────────────────────────────────────────────────
 
-    async putFxQuotesError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
-        await this.put(`${baseUrl}/fxQuotes/${id}/error`, response);
+    async putFxQuotesError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxQuotes/${id}/error`, response, headers);
     }
 
-    async postFxTransfers(baseUrl: string, body: FxTransfersPostRequest): Promise<void> {
-        await this.post(`${baseUrl}/fxTransfers`, body);
+    async postFxTransfers(baseUrl: string, headers: FspiopHeadersMap, body: FxTransfersPostRequest): Promise<void> {
+        await this.post(`${baseUrl}/fxTransfers`, body, headers);
     }
 
-    async putFxTransfers(baseUrl: string, id: string, body: FxTransfersIDPutResponse): Promise<void> {
-        await this.put(`${baseUrl}/fxTransfers/${id}`, body);
+    async putFxTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: FxTransfersIDPutResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxTransfers/${id}`, body, headers);
     }
 
-    async patchFxTransfers(baseUrl: string, id: string, body: FxTransfersIDPatchResponse): Promise<void> {
-        await this.patch(`${baseUrl}/fxTransfers/${id}`, body);
+    async patchFxTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: FxTransfersIDPatchResponse): Promise<void> {
+        await this.patch(`${baseUrl}/fxTransfers/${id}`, body, headers);
     }
 
-    async putFxTransfersError(baseUrl: string, id: string, response: ErrorInformationResponse): Promise<void> {
-        await this.put(`${baseUrl}/fxTransfers/${id}/error`, response);
+    async putFxTransfersError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
+        await this.put(`${baseUrl}/fxTransfers/${id}/error`, response, headers);
     }
 
-    private async get(url: string): Promise<void> {
-        await this.client.get(url, {headers: this.defaultHeaders});
+    private static clearDefaultAcceptHeaders(client: AxiosInstance): void {
+        const defaultsHeaders = client.defaults.headers as Record<string, Record<string, unknown> | undefined>;
+        const headerBuckets = [
+            defaultsHeaders.common,
+            defaultsHeaders.get,
+            defaultsHeaders.post,
+            defaultsHeaders.put,
+            defaultsHeaders.patch,
+            defaultsHeaders.delete,
+            defaultsHeaders.head,
+            defaultsHeaders.options,
+        ];
+
+        for (const bucket of headerBuckets) {
+            if (bucket == null) {
+                continue;
+            }
+
+            delete bucket.Accept;
+            delete bucket.accept;
+        }
     }
 
-    private async post(url: string, body: unknown): Promise<void> {
-        await this.client.post(url, body, {headers: this.defaultHeaders});
+    private resolveHeaders(headers: FspiopHeadersMap | undefined): FspiopHeadersMap | undefined {
+        const resolvedHeaders = {
+            ...this.defaultHeaders,
+            ...(headers ?? {}),
+        };
+
+        return Object.keys(resolvedHeaders).length > 0
+            ? resolvedHeaders
+            : undefined;
     }
 
-    private async put(url: string, body: unknown): Promise<void> {
-        await this.client.put(url, body, {headers: this.defaultHeaders});
+    private async get(url: string, headers?: FspiopHeadersMap): Promise<void> {
+        const resolvedHeaders = this.resolveHeaders(headers);
+
+        if (resolvedHeaders == null) {
+            await this.client.get(url);
+            return;
+        }
+
+        await this.client.get(url, {headers: resolvedHeaders});
     }
 
-    private async patch(url: string, body: unknown): Promise<void> {
-        await this.client.patch(url, body, {headers: this.defaultHeaders});
+    private async post(url: string, body: unknown, headers?: FspiopHeadersMap): Promise<void> {
+        const resolvedHeaders = this.resolveHeaders(headers);
+
+        if (resolvedHeaders == null) {
+            await this.client.post(url, body);
+            return;
+        }
+
+        await this.client.post(url, body, {headers: resolvedHeaders});
+    }
+
+    private async put(url: string, body: unknown, headers?: FspiopHeadersMap): Promise<void> {
+        const resolvedHeaders = this.resolveHeaders(headers);
+
+        if (resolvedHeaders == null) {
+            await this.client.put(url, body);
+            return;
+        }
+
+        await this.client.put(url, body, {headers: resolvedHeaders});
+    }
+
+    private async patch(url: string, body: unknown, headers?: FspiopHeadersMap): Promise<void> {
+        const resolvedHeaders = this.resolveHeaders(headers);
+
+        if (resolvedHeaders == null) {
+            await this.client.patch(url, body);
+            return;
+        }
+
+        await this.client.patch(url, body, {headers: resolvedHeaders});
     }
 }

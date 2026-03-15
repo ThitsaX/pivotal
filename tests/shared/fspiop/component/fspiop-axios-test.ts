@@ -19,7 +19,7 @@ describe('FspiopAxios', () => {
         });
 
         await assert.rejects(
-            () => fspiopAxios.getParties(settings.partiesUrl, PartyIdType.Msisdn, '8000000001'),
+            () => fspiopAxios.getParties(settings.partiesUrl, {}, PartyIdType.Msisdn, '8000000001'),
             (error: unknown) => {
                 assert.equal(FspiopAxiosError.is(error), true);
 

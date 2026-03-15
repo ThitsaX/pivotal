@@ -37,9 +37,7 @@ export class DoTransferHandler
 
         // ── Step 2: Fire the POST /transfers request ──────────────────────────
         try {
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .postTransfers(transfersUrl, transferRequest);
+            await this.fspiopAxios.postTransfers(transfersUrl, headers, transferRequest);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
