@@ -2,13 +2,7 @@ import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {AuditInboundPartiesCommand} from '@core/audit/domain';
 import {InboundPartiesAuditPublisher} from '@core/audit/producer';
-import {
-    ErrorInformationObject,
-    ErrorInformationResponse,
-    FspiopAxios,
-    FspiopException,
-    FspiopHeaders,
-} from '@shared/fspiop';
+import {ErrorInformationObject, ErrorInformationResponse, FspiopAxios, FspiopException, FspiopHeaders,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {PerformGetPartiesCommand} from './perform-get-parties.command';
 import {ConnectorSettings, FspConnector} from '../component';
@@ -35,8 +29,7 @@ export class PerformGetPartiesHandler
     async execute(command: PerformGetPartiesCommand): Promise<PerformGetPartiesCommand.Output> {
         const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
         const {partiesUrl} = this.fspiopAxios.settings;
-        const connectorId = this.connectorSettings.connectorId;
-        const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, connectorId);
+        const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, this.connectorSettings.connectorId);
         const createdAt = new Date();
         const id = PerformGetPartiesHandler.nextAuditId();
 
@@ -47,9 +40,14 @@ export class PerformGetPartiesHandler
                 subId,
             );
 
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .putParties(partiesUrl, partyIdType, partyId, response, subId ?? undefined);
+            await this.fspiopAxios.putParties(
+                partiesUrl,
+                headers,
+                partyIdType,
+                partyId,
+                response,
+                subId ?? undefined,
+            );
 
             await this.auditPublisher.publish(
                 new AuditInboundPartiesCommand.Input(
@@ -73,9 +71,14 @@ export class PerformGetPartiesHandler
             let callbackErrorResponse = PerformGetPartiesHandler.toErrorResponse(callbackAuditError);
 
             try {
-                await this.fspiopAxios
-                    .withHeaders(headers)
-                    .putPartiesError(partiesUrl, partyIdType, partyId, callbackErrorResponse, subId ?? undefined);
+                await this.fspiopAxios.putPartiesError(
+                    partiesUrl,
+                    headers,
+                    partyIdType,
+                    partyId,
+                    callbackErrorResponse,
+                    subId ?? undefined,
+                );
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = PerformGetPartiesHandler.toAuditError(putError);

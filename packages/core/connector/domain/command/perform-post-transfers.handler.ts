@@ -43,9 +43,12 @@ export class PerformPostTransfersHandler
         try {
             const response = await this.fspConnector.postTransfers(request);
 
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .putTransfers(transfersUrl, request.transferId, response);
+            await this.fspiopAxios.putTransfers(
+                transfersUrl,
+                headers,
+                request.transferId,
+                response,
+            );
 
             await this.auditPublisher.publish(
                 new AuditInboundTransfersCommand.Input(
@@ -68,9 +71,12 @@ export class PerformPostTransfersHandler
             let callbackErrorResponse = PerformPostTransfersHandler.toErrorResponse(callbackAuditError);
 
             try {
-                await this.fspiopAxios
-                    .withHeaders(headers)
-                    .putTransfersError(transfersUrl, request.transferId, callbackErrorResponse);
+                await this.fspiopAxios.putTransfersError(
+                    transfersUrl,
+                    headers,
+                    request.transferId,
+                    callbackErrorResponse,
+                );
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = PerformPostTransfersHandler.toAuditError(putError);

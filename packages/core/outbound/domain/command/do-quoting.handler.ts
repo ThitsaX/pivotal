@@ -37,9 +37,7 @@ export class DoQuotingHandler
 
         // ── Step 2: Fire the POST /quotes request ─────────────────────────────
         try {
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .postQuotes(quotesUrl, quoteRequest);
+            await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);

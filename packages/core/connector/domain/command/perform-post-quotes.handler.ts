@@ -43,9 +43,12 @@ export class PerformPostQuotesHandler
         try {
             const response = await this.fspConnector.postQuotes(request);
 
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .putQuotes(quotesUrl, request.quoteId, response);
+            await this.fspiopAxios.putQuotes(
+                quotesUrl,
+                headers,
+                request.quoteId,
+                response,
+            );
 
             await this.auditPublisher.publish(
                 new AuditInboundQuotesCommand.Input(
@@ -68,9 +71,12 @@ export class PerformPostQuotesHandler
             let callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
 
             try {
-                await this.fspiopAxios
-                    .withHeaders(headers)
-                    .putQuotesError(quotesUrl, request.quoteId, callbackErrorResponse);
+                await this.fspiopAxios.putQuotesError(
+                    quotesUrl,
+                    headers,
+                    request.quoteId,
+                    callbackErrorResponse,
+                );
             } catch (putError) {
                 callbackError = putError;
                 callbackAuditError = PerformPostQuotesHandler.toAuditError(putError);

@@ -50,9 +50,7 @@ export class DoLookupHandler
 
         // ── Step 2: Fire the GET /parties request ─────────────────────────────
         try {
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .getParties(partiesUrl, type, id, subId);
+            await this.fspiopAxios.getParties(partiesUrl, headers, type, id, subId);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
