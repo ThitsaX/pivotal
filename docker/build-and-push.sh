@@ -5,18 +5,21 @@ set -euo pipefail
 print_usage() {
   cat <<'USAGE'
 Usage:
-  ./docker/build-and-push.sh --user <dockerhub_user> --version <version> [options]
+  ./docker/build-and-push.sh --namespace <namespace> --version <version> [options]
 
 Options:
-  -u, --user <dockerhub_user>   Docker Hub username/namespace.
+  -n, --namespace <namespace>   Registry namespace (Docker user or GH org/user).
+  -u, --user <namespace>        Alias for --namespace (backward compatible).
+  -r, --registry <registry>     Registry host (default: docker.io). Example: ghcr.io
   -v, --version <version>       Image version tag to publish (example: 1.0.0).
       --no-latest               Do not tag/push :latest.
       --no-build                Skip build and only push existing local images.
   -h, --help                    Show this help message.
 
 Examples:
-  ./docker/build-and-push.sh --user acme --version 1.0.0
-  ./docker/build-and-push.sh --user acme --version 1.0.1 --no-latest
+  ./docker/build-and-push.sh --namespace acme --version 1.0.0
+  ./docker/build-and-push.sh --namespace acme --version 1.0.1 --no-latest
+  ./docker/build-and-push.sh --registry ghcr.io --namespace acme --version 1.0.0
 USAGE
 }
 
@@ -28,15 +31,20 @@ require_cmd() {
   fi
 }
 
-DOCKER_USER=""
+NAMESPACE=""
+REGISTRY="docker.io"
 VERSION=""
 PUSH_LATEST="true"
 DO_BUILD="true"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -u|--user)
-      DOCKER_USER="${2:-}"
+    -n|--namespace|-u|--user)
+      NAMESPACE="${2:-}"
+      shift 2
+      ;;
+    -r|--registry)
+      REGISTRY="${2:-}"
       shift 2
       ;;
     -v|--version)
@@ -63,9 +71,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${DOCKER_USER}" || -z "${VERSION}" ]]; then
-  echo "Error: --user and --version are required."
+if [[ -z "${NAMESPACE}" || -z "${VERSION}" ]]; then
+  echo "Error: --namespace (or --user) and --version are required."
   print_usage
+  exit 1
+fi
+
+if [[ -z "${REGISTRY}" ]]; then
+  echo "Error: --registry cannot be empty."
   exit 1
 fi
 
@@ -80,6 +93,7 @@ if [[ ! -f "${REPO_ROOT}/package.json" ]]; then
 fi
 
 IMAGE_NAMES=(
+  "pivotal-app-auditor"
   "pivotal-web-outbound"
   "pivotal-web-inbound"
   "pivotal-wallet1-connector"
@@ -87,6 +101,7 @@ IMAGE_NAMES=(
 )
 
 DOCKERFILES=(
+  "docker/app-auditor.Dockerfile"
   "docker/web-outbound.Dockerfile"
   "docker/web-inbound.Dockerfile"
   "docker/wallet1-connector.Dockerfile"
@@ -94,7 +109,8 @@ DOCKERFILES=(
 )
 
 echo "Repository: ${REPO_ROOT}"
-echo "Docker user: ${DOCKER_USER}"
+echo "Registry: ${REGISTRY}"
+echo "Namespace: ${NAMESPACE}"
 echo "Version: ${VERSION}"
 echo "Build: ${DO_BUILD}"
 echo "Push latest: ${PUSH_LATEST}"
@@ -104,8 +120,8 @@ for i in "${!IMAGE_NAMES[@]}"; do
   DOCKERFILE="${DOCKERFILES[$i]}"
 
   LOCAL_IMAGE="${IMAGE_NAME}:local"
-  VERSION_IMAGE="${DOCKER_USER}/${IMAGE_NAME}:${VERSION}"
-  LATEST_IMAGE="${DOCKER_USER}/${IMAGE_NAME}:latest"
+  VERSION_IMAGE="${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}:${VERSION}"
+  LATEST_IMAGE="${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}:latest"
 
   echo
   echo "=== ${IMAGE_NAME} ==="
@@ -136,4 +152,4 @@ for i in "${!IMAGE_NAMES[@]}"; do
 done
 
 echo
-echo "Done. Published images under '${DOCKER_USER}' with version '${VERSION}'."
+echo "Done. Published images under '${REGISTRY}/${NAMESPACE}' with version '${VERSION}'."

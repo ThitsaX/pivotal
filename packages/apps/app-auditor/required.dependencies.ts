@@ -1,6 +1,6 @@
 import {ConfigService} from '@nestjs/config';
+import type {AuditConsumerModule} from '@core/audit/consumer';
 import {TypeOrmSettings} from '@shared/typeorm';
-import type {AuditConsumerModule} from './consumer.module';
 
 export class AuditConsumerDependencies implements AuditConsumerModule.RequiredDependencies {
 

@@ -69,12 +69,21 @@
       }
     },
     "core-audit-consumer": {
-      "type": "application",
+      "type": "library",
       "root": "packages/core/audit/consumer",
-      "entryFile": "core/audit/consumer/main",
+      "entryFile": "index",
       "sourceRoot": "packages/core/audit/consumer",
       "compilerOptions": {
         "tsConfigPath": "packages/core/audit/consumer/tsconfig.app.json"
+      }
+    },
+    "apps-app-auditor": {
+      "type": "application",
+      "root": "packages/apps/app-auditor",
+      "entryFile": "apps/app-auditor/main",
+      "sourceRoot": "packages/apps/app-auditor",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/app-auditor/tsconfig.app.json"
       }
     },
     "apps-web-outbound": {

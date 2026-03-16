@@ -1,6 +1,7 @@
-# Docker images for web apps
+# Docker images for apps
 
 This folder contains Docker setup for:
+- `app-auditor`
 - `web-outbound`
 - `web-inbound`
 
@@ -48,6 +49,11 @@ docker build -f docker/web-inbound.Dockerfile -t pivotal-web-inbound:local .
 docker run --rm --env-file packages/apps/web-inbound/.env -p 3201:3201 pivotal-web-inbound:local
 ```
 
+```bash
+docker build -f docker/app-auditor.Dockerfile -t pivotal-app-auditor:local .
+docker run --rm --env-file packages/apps/app-auditor/.env pivotal-app-auditor:local
+```
+
 ## 4) Build/run wallet connector images
 
 Run these commands from the repository root (`/Users/aungthawaye/Development/ThitsaWorks/mtpa`).
@@ -60,4 +66,20 @@ docker run --rm --env-file packages/samples/wallet1-connector/.env pivotal-walle
 ```bash
 docker build -f docker/wallet2-connector.Dockerfile -t pivotal-wallet2-connector:local .
 docker run --rm --env-file packages/samples/wallet2-connector/.env pivotal-wallet2-connector:local
+```
+
+## 5) Build and push all images (Docker Hub or GHCR)
+
+Use the helper script from the repository root (`/Users/aungthawaye/Development/ThitsaWorks/mtpa`):
+
+```bash
+docker login
+./docker/build-and-push.sh --namespace <dockerhub_user> --version 1.0.0
+```
+
+For GHCR:
+
+```bash
+echo "<GITHUB_PAT>" | docker login ghcr.io -u <github_user> --password-stdin
+./docker/build-and-push.sh --registry ghcr.io --namespace <github_user_or_org> --version 1.0.0
 ```

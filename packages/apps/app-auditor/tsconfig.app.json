@@ -1,7 +1,7 @@
 {
-  "extends": "../../../../tsconfig.json",
+  "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../../../dist/core/audit/consumer"
+    "outDir": "../../../dist/packages"
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
