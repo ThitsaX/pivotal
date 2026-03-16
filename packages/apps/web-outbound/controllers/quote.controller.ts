@@ -24,6 +24,7 @@ import {
     PartyIdInfo,
     TransactionScenario,
 } from '@shared/fspiop';
+import {PrivateKeyStore} from '@shared/security';
 import {Snowflake} from '@shared/snowflake';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
@@ -110,6 +111,8 @@ export class QuoteController {
         private readonly commandBus: CommandBus,
         @Inject(OutboundQuotesAuditPublisher)
         private readonly auditPublisher: OutboundQuotesAuditPublisher,
+        @Inject(PrivateKeyStore)
+        private readonly privateKeyStore: PrivateKeyStore,
     ) {
     }
 
@@ -118,6 +121,7 @@ export class QuoteController {
     @ApiOperation({summary: 'Initiate a quoting request via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
+    @ApiHeader({name: 'conversion', required: false, description: 'When true, skip FSPIOP call and return generated quote request'})
     @ApiBearerAuth('authorization')
     @ApiBody({type: QuoteRequest})
     @ApiOkResponse({type: QuoteResponse})
@@ -125,8 +129,9 @@ export class QuoteController {
     async quote(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Headers('authorization') authorization: string | undefined,
+        @Headers('conversion') conversion: string | undefined,
         @Body() request: QuoteRequest,
-    ): Promise<QuoteResponse> {
+    ): Promise<QuoteResponse | DoQuotingCommand.ConversionResponse> {
         validateAuthorizationHeader(authorization);
 
         const createdAt = new Date();
@@ -137,6 +142,28 @@ export class QuoteController {
         );
 
         try {
+            if (QuoteController.isConversionEnabled(conversion)) {
+                await this.auditPublisher.publish(
+                    new AuditOutboundQuotesCommand.Input(
+                        id,
+                        QuoteController.RAIL,
+                        input.source,
+                        input.destination,
+                        input.quoteId,
+                        input.quoteRequest,
+                        null,
+                        null,
+                        createdAt,
+                        new Date(),
+                    ),
+                );
+
+                return DoQuotingCommand.ConversionResponse.fromInput(
+                    input,
+                    this.privateKeyStore,
+                );
+            }
+
             const output: DoQuotingCommand.Output = await this.commandBus.execute(
                 new DoQuotingCommand(input),
             );
@@ -206,5 +233,9 @@ export class QuoteController {
 
     private static nextAuditId(): string {
         return QuoteController.SNOWFLAKE.nextId().toString();
+    }
+
+    private static isConversionEnabled(conversion: string | undefined): boolean {
+        return conversion?.trim().toLowerCase() === 'true';
     }
 }

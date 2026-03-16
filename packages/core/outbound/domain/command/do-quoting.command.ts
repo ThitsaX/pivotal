@@ -5,7 +5,9 @@ import {
     FspiopCurrencies,
     FspiopErrors,
     FspiopException,
+    FspiopHeaders,
     FspiopMoney,
+    FspiopSignature,
     Money,
     Party,
     PartyIdInfo,
@@ -16,6 +18,7 @@ import {
     TransactionScenario,
     TransactionType,
 } from '@shared/fspiop';
+import {PrivateKeyStore} from '@shared/security/component/key';
 import {Ulid} from '@shared/ulid';
 
 export class DoQuotingCommand {
@@ -241,6 +244,47 @@ export namespace DoQuotingCommand {
             money.amount = amount;
 
             return money;
+        }
+    }
+
+    export class ConversionResponse {
+        public readonly quoteRequest: QuotesPostRequest;
+        public readonly fspiopSignature: string;
+        public readonly ['fspiop-signature']: string;
+
+        constructor(
+            quoteRequest: QuotesPostRequest,
+            fspiopSignature: string,
+        ) {
+            this.quoteRequest = quoteRequest;
+            this.fspiopSignature = fspiopSignature;
+            this['fspiop-signature'] = fspiopSignature;
+        }
+
+        static fromInput(
+            input: DoQuotingCommand.Input,
+            privateKeyStore: PrivateKeyStore,
+        ): DoQuotingCommand.ConversionResponse {
+            const privateKey = privateKeyStore.get(input.source);
+
+            if (privateKey == null) {
+                throw new FspiopException(
+                    FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                    `Private key is required to generate fspiop-signature for source "${input.source}".`,
+                );
+            }
+
+            const headers = FspiopHeaders.Values.Quotes.forRequest(input.source, input.destination);
+            const signatureHeader = FspiopSignature.sign(
+                privateKey,
+                headers,
+                JSON.stringify(input.quoteRequest),
+            );
+
+            return new DoQuotingCommand.ConversionResponse(
+                input.quoteRequest,
+                JSON.stringify(signatureHeader),
+            );
         }
     }
 

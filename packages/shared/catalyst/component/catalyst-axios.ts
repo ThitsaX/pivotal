@@ -43,6 +43,9 @@ export class CatalystAxiosError extends Error {
 
 export class CatalystAxios {
 
+    private static readonly DEFAULT_SOCKET_TIMEOUT_MS = 10_000;
+    private static readonly DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
+
     readonly catalystUrl: string;
 
     private readonly client: AxiosInstance;
@@ -57,11 +60,16 @@ export class CatalystAxios {
         headers: CatalystHeadersMap = {},
         client?: AxiosInstance,
     ) {
+        const resolvedParams: CatalystAxiosParams = {
+            socketTimeoutMs: params.socketTimeoutMs ?? CatalystAxios.DEFAULT_SOCKET_TIMEOUT_MS,
+            connectionTimeoutMs: params.connectionTimeoutMs ?? CatalystAxios.DEFAULT_CONNECTION_TIMEOUT_MS,
+        };
+
         this.catalystUrl = catalystUrl;
-        this.params = params;
+        this.params = resolvedParams;
         this.interceptors = interceptors;
         this.defaultHeaders = headers;
-        this.client = client ?? CatalystAxios.buildClient(params, interceptors);
+        this.client = client ?? CatalystAxios.buildClient(resolvedParams, interceptors);
     }
 
     private static buildClient(

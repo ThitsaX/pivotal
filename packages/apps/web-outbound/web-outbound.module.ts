@@ -1,12 +1,15 @@
-import {DynamicModule, Module} from '@nestjs/common';
+import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {AuditProducerModule} from '@core/audit/producer';
 import {OutboundDomainModule} from '@core/outbound/domain';
+import {PrivateKeyStore} from '@shared/security';
 import {
     LookupController,
     QuoteController,
     TransferController,
 } from './controllers';
 import {WebOutboundDependencies} from './required.dependencies';
+
+const REQUIRED_DEPENDENCIES = Symbol('WebOutboundRequiredDependencies');
 
 @Module({})
 export class WebOutboundModule {
@@ -38,7 +41,25 @@ export class WebOutboundModule {
                 QuoteController,
                 TransferController,
             ],
+            providers: [
+                ...WebOutboundModule.createProviders(asyncOptions),
+            ],
         };
+    }
+
+    private static createProviders(asyncOptions: WebOutboundModule.AsyncOptions): Provider[] {
+        return [
+            {
+                provide: REQUIRED_DEPENDENCIES,
+                useFactory: asyncOptions.useFactory,
+                inject: asyncOptions.inject ?? [],
+            },
+            {
+                provide: PrivateKeyStore,
+                useFactory: (deps: WebOutboundModule.RequiredDependencies): PrivateKeyStore => deps.privateKeyStore(),
+                inject: [REQUIRED_DEPENDENCIES],
+            },
+        ];
     }
 }
 

@@ -51,12 +51,12 @@ const resolveHttpsOptions = (
 
     const ca = deps.caStore().get();
     if (ca == null || ca.toBuffer().length === 0) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires FSPIOP_MTLS_CA.');
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CA.');
     }
 
     const clientCert = deps.clientCertStore().get();
     if (clientCert == null) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires FSPIOP_MTLS_CLIENT_CERT and FSPIOP_MTLS_CLIENT_KEY.');
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CLIENT_CERT and FSPIOP_MTLS_CLIENT_KEY.');
     }
 
     return {
