@@ -98,6 +98,7 @@ IMAGE_NAMES=(
   "pivotal-web-inbound"
   "pivotal-wallet1-connector"
   "pivotal-wallet2-connector"
+  "pivotal-wallet3-connector"
 )
 
 DOCKERFILES=(
@@ -106,6 +107,7 @@ DOCKERFILES=(
   "docker/web-inbound.Dockerfile"
   "docker/wallet1-connector.Dockerfile"
   "docker/wallet2-connector.Dockerfile"
+  "docker/wallet3-connector.Dockerfile"
 )
 
 echo "Repository: ${REPO_ROOT}"

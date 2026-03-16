@@ -68,6 +68,11 @@ docker build -f docker/wallet2-connector.Dockerfile -t pivotal-wallet2-connector
 docker run --rm --env-file packages/samples/wallet2-connector/.env pivotal-wallet2-connector:local
 ```
 
+```bash
+docker build -f docker/wallet3-connector.Dockerfile -t pivotal-wallet3-connector:local .
+docker run --rm --env-file packages/samples/wallet3-connector/.env pivotal-wallet3-connector:local
+```
+
 ## 5) Build and push all images (Docker Hub or GHCR)
 
 Use the helper script from the repository root (`/Users/aungthawaye/Development/ThitsaWorks/mtpa`):

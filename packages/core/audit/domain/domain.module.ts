@@ -19,6 +19,14 @@ import {
     OutboundTransfers,
 } from './model';
 import {
+    FindInboundPartiesHandler,
+    FindInboundQuotesHandler,
+    FindInboundTransfersHandler,
+    FindOutboundPartiesHandler,
+    FindOutboundQuotesHandler,
+    FindOutboundTransfersHandler,
+} from './query';
+import {
     InboundPartiesRepository,
     InboundQuotesRepository,
     InboundTransfersRepository,
@@ -56,6 +64,15 @@ const CommandHandlers = [
     AuditOutboundTransfersHandler,
 ];
 
+const QueryHandlers = [
+    FindInboundPartiesHandler,
+    FindInboundQuotesHandler,
+    FindInboundTransfersHandler,
+    FindOutboundPartiesHandler,
+    FindOutboundQuotesHandler,
+    FindOutboundTransfersHandler,
+];
+
 @Module({})
 export class AuditDomainModule {
 
@@ -81,7 +98,7 @@ export class AuditDomainModule {
                 NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_WRITE_CONNECTION_NAME),
                 NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_READ_CONNECTION_NAME),
             ],
-            providers: [...Repositories, ...CommandHandlers],
+            providers: [...Repositories, ...CommandHandlers, ...QueryHandlers],
             exports: [CqrsModule, ...Repositories],
         };
     }

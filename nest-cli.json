@@ -104,6 +104,15 @@
         "tsConfigPath": "packages/apps/web-inbound/tsconfig.app.json"
       }
     },
+    "apps-web-audit": {
+      "type": "application",
+      "root": "packages/apps/web-audit",
+      "entryFile": "apps/web-audit/main",
+      "sourceRoot": "packages/apps/web-audit",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-audit/tsconfig.app.json"
+      }
+    },
     "core-audit-subscriber": {
       "type": "library",
       "root": "packages/core/audit/subscriber",
@@ -237,6 +246,15 @@
       "sourceRoot": "packages/samples/wallet2-connector",
       "compilerOptions": {
         "tsConfigPath": "packages/samples/wallet2-connector/tsconfig.app.json"
+      }
+    },
+    "samples-wallet3-connector": {
+      "type": "application",
+      "root": "packages/samples/wallet3-connector",
+      "entryFile": "samples/wallet3-connector/main",
+      "sourceRoot": "packages/samples/wallet3-connector",
+      "compilerOptions": {
+        "tsConfigPath": "packages/samples/wallet3-connector/tsconfig.app.json"
       }
     }
   }
