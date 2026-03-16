@@ -1,6 +1,6 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
-import {AuditConsumerModule} from './consumer.module';
+import {AuditConsumerModule} from '@core/audit/consumer';
 import {AuditConsumerDependencies} from './required.dependencies';
 
 @Module({

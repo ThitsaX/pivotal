@@ -8,7 +8,7 @@ import {PgMigration} from '@shared/pg-migration';
 
 const SQL_LOCATION = 'packages/core/audit/domain/sql';
 const ROOT_ENV_LOCATION = '.env';
-const MODULE_ENV_LOCATION = 'packages/core/audit/consumer/.env';
+const MODULE_ENV_LOCATION = 'packages/apps/app-auditor/.env';
 const MIGRATION_TABLE = 'migration_history';
 const ROOT_MARKER_FILE = 'package.json';
 const ROOT_MARKER_DIR = 'packages';

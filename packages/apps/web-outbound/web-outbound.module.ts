@@ -1,7 +1,9 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {AuditProducerModule} from '@core/audit/producer';
 import {OutboundDomainModule} from '@core/outbound/domain';
+import {FspiopSettings} from '@shared/fspiop';
 import {PrivateKeyStore} from '@shared/security';
+import {FspiopSigner} from './component';
 import {
     LookupController,
     QuoteController,
@@ -55,9 +57,21 @@ export class WebOutboundModule {
                 inject: asyncOptions.inject ?? [],
             },
             {
+                provide: FspiopSettings,
+                useFactory: (deps: WebOutboundModule.RequiredDependencies): FspiopSettings => deps.fspiopSettings(),
+                inject: [REQUIRED_DEPENDENCIES],
+            },
+            {
                 provide: PrivateKeyStore,
                 useFactory: (deps: WebOutboundModule.RequiredDependencies): PrivateKeyStore => deps.privateKeyStore(),
                 inject: [REQUIRED_DEPENDENCIES],
+            },
+            {
+                provide: FspiopSigner,
+                useFactory: (settings: FspiopSettings, privateKeyStore: PrivateKeyStore): FspiopSigner => {
+                    return new FspiopSigner(settings, privateKeyStore);
+                },
+                inject: [FspiopSettings, PrivateKeyStore],
             },
         ];
     }

@@ -15,17 +15,14 @@ import {DoQuotingCommand} from '@core/outbound/domain';
 import {
     AmountType,
     ExtensionList,
-    ErrorInformationObject,
-    ErrorInformationResponse,
-    FspiopErrors,
-    FspiopException,
+    FspiopErrorTranslator,
     FspiopHeaders,
     Money,
     PartyIdInfo,
     TransactionScenario,
 } from '@shared/fspiop';
-import {PrivateKeyStore} from '@shared/security';
 import {Snowflake} from '@shared/snowflake';
+import {FspiopSigner} from '../component';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
@@ -53,8 +50,8 @@ export class QuoteRequest {
 }
 
 export class QuoteResponse {
-    @ApiProperty({type: String, description: 'Generated quote identifier'})
-    readonly quoteId: string;
+    @ApiProperty({type: String, description: 'Generated transaction identifier'})
+    readonly transactionId: string;
 
     @ApiProperty({type: () => Money})
     readonly transferAmount: Money;
@@ -78,7 +75,7 @@ export class QuoteResponse {
     readonly extensionList: ExtensionList;
 
     constructor(
-        quoteId: string,
+        transactionId: string,
         transferAmount: Money,
         payeeReceiveAmount: Money,
         schemeFeeAmount: Money,
@@ -87,7 +84,7 @@ export class QuoteResponse {
         expiration: string,
         extensionList: ExtensionList,
     ) {
-        this.quoteId = quoteId;
+        this.transactionId = transactionId;
         this.transferAmount = transferAmount;
         this.payeeReceiveAmount = payeeReceiveAmount;
         this.schemeFeeAmount = schemeFeeAmount;
@@ -104,15 +101,14 @@ export class QuoteController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
-    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(OutboundQuotesAuditPublisher)
         private readonly auditPublisher: OutboundQuotesAuditPublisher,
-        @Inject(PrivateKeyStore)
-        private readonly privateKeyStore: PrivateKeyStore,
+        @Inject(FspiopSigner)
+        private readonly fspiopSigner: FspiopSigner,
     ) {
     }
 
@@ -160,7 +156,7 @@ export class QuoteController {
 
                 return DoQuotingCommand.ConversionResponse.fromInput(
                     input,
-                    this.privateKeyStore,
+                    this.fspiopSigner,
                 );
             }
 
@@ -183,10 +179,10 @@ export class QuoteController {
                 ),
             );
 
-            return output.response;
+            return QuoteController.toQuoteResponse(output.response);
         } catch (error) {
-            const errorResponse = QuoteController.toAuditErrorResponse(error);
-            const errorObject = QuoteController.toErrorInformationObject(errorResponse);
+            const fspiopException = FspiopErrorTranslator.toFspiopException(error, input.quoteId);
+            const errorObject = fspiopException.toErrorObject();
 
             try {
                 await this.auditPublisher.publish(
@@ -204,31 +200,9 @@ export class QuoteController {
                     ),
                 );
             } finally {
-                throw error;
+                throw fspiopException;
             }
         }
-    }
-
-    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
-        const response = new ErrorInformationResponse();
-
-        if (error instanceof FspiopException) {
-            response.errorInformation = error.toErrorObject().errorInformation;
-            return response;
-        }
-
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
-        return response;
-    }
-
-    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
-        return {
-            errorInformation: response.errorInformation ?? QuoteController.FALLBACK_ERROR.errorInformation,
-        };
     }
 
     private static nextAuditId(): string {
@@ -237,5 +211,18 @@ export class QuoteController {
 
     private static isConversionEnabled(conversion: string | undefined): boolean {
         return conversion?.trim().toLowerCase() === 'true';
+    }
+
+    private static toQuoteResponse(response: DoQuotingCommand.Response): QuoteResponse {
+        return new QuoteResponse(
+            response.quoteId,
+            response.transferAmount,
+            response.payeeReceiveAmount,
+            response.schemeFeeAmount,
+            response.ilpPacket,
+            response.condition,
+            response.expiration,
+            response.extensionList,
+        );
     }
 }
