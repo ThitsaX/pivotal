@@ -47,3 +47,17 @@ docker run --rm --env-file packages/apps/web-outbound/.env -p 3200:3200 pivotal-
 docker build -f docker/web-inbound.Dockerfile -t pivotal-web-inbound:local .
 docker run --rm --env-file packages/apps/web-inbound/.env -p 3201:3201 pivotal-web-inbound:local
 ```
+
+## 4) Build/run wallet connector images
+
+Run these commands from the repository root (`/Users/aungthawaye/Development/ThitsaWorks/mtpa`).
+
+```bash
+docker build -f docker/wallet1-connector.Dockerfile -t pivotal-wallet1-connector:local .
+docker run --rm --env-file packages/samples/wallet1-connector/.env pivotal-wallet1-connector:local
+```
+
+```bash
+docker build -f docker/wallet2-connector.Dockerfile -t pivotal-wallet2-connector:local .
+docker run --rm --env-file packages/samples/wallet2-connector/.env pivotal-wallet2-connector:local
+```
