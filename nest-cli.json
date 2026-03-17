@@ -104,13 +104,13 @@
         "tsConfigPath": "packages/apps/web-inbound/tsconfig.app.json"
       }
     },
-    "apps-web-audit": {
+    "apps-web-pivotal": {
       "type": "application",
-      "root": "packages/apps/web-audit",
-      "entryFile": "apps/web-audit/main",
-      "sourceRoot": "packages/apps/web-audit",
+      "root": "packages/apps/web-pivotal",
+      "entryFile": "apps/web-pivotal/main",
+      "sourceRoot": "packages/apps/web-pivotal",
       "compilerOptions": {
-        "tsConfigPath": "packages/apps/web-audit/tsconfig.app.json"
+        "tsConfigPath": "packages/apps/web-pivotal/tsconfig.app.json"
       }
     },
     "core-audit-subscriber": {
