@@ -25,7 +25,7 @@ import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class TransferRequest {
     @ApiProperty({type: String, description: 'Transaction identifier used to derive transfer identifier'})
-    transactionId!: string;
+    quoteId!: string;
 
     @ApiProperty({type: String, description: 'Payee FSP ID'})
     payeeFsp!: string;
@@ -173,7 +173,7 @@ export class TransferController {
 
     private static toCommandRequest(request: TransferRequest): DoTransferCommand.Request {
         return new DoTransferCommand.Request(
-            request.transactionId,
+            request.quoteId,
             request.payeeFsp,
             request.transferAmount,
             request.ilpPacket,

@@ -51,7 +51,7 @@ export class QuoteRequest {
 
 export class QuoteResponse {
     @ApiProperty({type: String, description: 'Generated transaction identifier'})
-    readonly transactionId: string;
+    readonly quoteId: string;
 
     @ApiProperty({type: () => Money})
     readonly transferAmount: Money;
@@ -84,7 +84,7 @@ export class QuoteResponse {
         expiration: string,
         extensionList: ExtensionList,
     ) {
-        this.transactionId = transactionId;
+        this.quoteId = transactionId;
         this.transferAmount = transferAmount;
         this.payeeReceiveAmount = payeeReceiveAmount;
         this.schemeFeeAmount = schemeFeeAmount;
