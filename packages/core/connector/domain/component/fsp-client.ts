@@ -23,6 +23,7 @@ export abstract class FspClient {
         amountType: AmountType,
         amount: Money,
         payerFspFee?: Money,
+        extensionList?: ExtensionList,
     ): Promise<FspClient.PostQuotesOutput>;
 
     abstract postTransfers(
