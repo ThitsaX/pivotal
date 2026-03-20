@@ -5,7 +5,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspiopExceptionFilter, FspiopJwsGuard} from '@shared/fspiop';
+import {FspiopExceptionFilter, FspInboundGuard} from '@shared/fspiop';
 import {WebInboundDependencies} from './required.dependencies';
 import {WebInboundAppModule} from './app.module';
 
@@ -49,18 +49,18 @@ const resolveHttpsOptions = (
         return undefined;
     }
 
-    const ca = deps.caStore().toBuffer();
-    if (ca == null || ca.length === 0) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CA certificates (FSPIOP_MTLS_CA_COUNT/FSPIOP_MTLS_CA_CONTENT_N or JSON_CA_CERTS).');
+    const ca = deps.caStore().get();
+    if (ca == null || ca.toBuffer().length === 0) {
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CA.');
     }
 
     const clientCert = deps.clientCertStore().get();
     if (clientCert == null) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=true requires CLIENT_CERT_CONTENT and CLIENT_CERT_KEY (or JSON_CLIENT_CERT).');
+        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CLIENT_CERT and FSPIOP_MTLS_CLIENT_KEY.');
     }
 
     return {
-        ca,
+        ca: ca.toBuffer(),
         cert: clientCert.certBuffer(),
         key: clientCert.keyBuffer(),
         requestCert: true,
@@ -95,8 +95,8 @@ const bootstrap = async (): Promise<void> => {
     app.use(json({type: ['application/json', 'application/*+json']}));
     app.useGlobalFilters(new FspiopExceptionFilter());
     if (settings.useJws) {
-        app.useGlobalGuards(new FspiopJwsGuard(deps.publicKeyStore(), settings));
-        Logger.log('FspiopJwsGuard is enabled.', 'Bootstrap');
+        app.useGlobalGuards(new FspInboundGuard(deps.publicKeyStore(), settings));
+        Logger.log('FspInboundGuard is enabled.', 'Bootstrap');
     }
 
     if (settings.useMutualTls) {

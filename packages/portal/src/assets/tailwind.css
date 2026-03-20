@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html,
+    body,
+    #app {
+        min-height: 100%;
+    }
+
+    body {
+        @apply m-0 bg-canvas font-body text-ink antialiased;
+        background-image: none;
+        background-color: #f7f9fc;
+    }
+}
+
+@layer components {
+    .glass-card {
+        @apply rounded-2xl border border-white/80 bg-card/95 shadow-soft backdrop-blur-sm;
+    }
+
+    .field-label {
+        @apply mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600;
+    }
+
+    .field-input {
+        @apply w-full rounded-xl border border-slate-300 bg-[#fcfdff] px-3 py-2.5 text-sm text-ink shadow-insetSoft outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
+    }
+
+    .custom-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding-right: 2.25rem;
+    }
+
+    .pretty-select {
+        @apply border-accent/35 bg-[#f4f9ff] text-ink shadow-insetSoft;
+    }
+
+    .pretty-select option {
+        background-color: #ffffff;
+        color: #12263a;
+    }
+
+    .pretty-select optgroup {
+        background-color: #eef6ff;
+        color: #147fc3;
+        font-weight: 600;
+    }
+
+    .portal-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #7cbce8 #eef6ff;
+        scrollbar-gutter: stable;
+    }
+
+    .portal-scrollbar::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    .portal-scrollbar::-webkit-scrollbar-track {
+        background: #eef6ff;
+        border-radius: 999px;
+    }
+
+    .portal-scrollbar::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #77b9e7 0%, #3399de 100%);
+        border: 2px solid #eef6ff;
+        border-radius: 999px;
+    }
+
+    .portal-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #5aaee4 0%, #147fc3 100%);
+    }
+}

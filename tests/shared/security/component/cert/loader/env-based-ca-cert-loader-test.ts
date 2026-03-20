@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
-import { EnvBasedCaCertLoader } from '../../../../../../packages/shared/security/component/cert/loader/env-based-ca-cert-loader';
+import { EnvBasedCaStore } from '../../../../../../packages/shared/security/component/cert/store/env-based-ca-store';
 import { TEST_CERT_ENV_VALUE, TEST_CERT_PEM } from '../test-cert-fixtures';
 
 const originalEnv = { ...process.env };
@@ -9,53 +9,55 @@ afterEach(() => {
     process.env = { ...originalEnv };
 });
 
-describe('EnvBasedCaCertLoader', () => {
+describe('EnvBasedCaStore', () => {
 
     it('should return empty list when FSPIOP_MTLS_CA_COUNT is missing', () => {
         delete process.env.FSPIOP_MTLS_CA_COUNT;
-        const loader = new EnvBasedCaCertLoader();
+        const store = new EnvBasedCaStore();
 
-        const certs = loader.load();
+        const loadedStore = store.load();
 
-        assert.equal(certs.length, 0);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get(), undefined);
     });
 
     it('should return empty list when FSPIOP_MTLS_CA_COUNT is invalid', () => {
         process.env.FSPIOP_MTLS_CA_COUNT = 'zero';
-        const nonNumberLoader = new EnvBasedCaCertLoader();
+        const nonNumberStore = new EnvBasedCaStore();
 
-        const nonNumberCerts = nonNumberLoader.load();
+        const nonNumberLoadedStore = nonNumberStore.load();
 
         process.env.FSPIOP_MTLS_CA_COUNT = '0';
-        const nonPositiveLoader = new EnvBasedCaCertLoader();
+        const nonPositiveStore = new EnvBasedCaStore();
 
-        const nonPositiveCerts = nonPositiveLoader.load();
+        const nonPositiveLoadedStore = nonPositiveStore.load();
 
-        assert.equal(nonNumberCerts.length, 0);
-        assert.equal(nonPositiveCerts.length, 0);
+        assert.equal(nonNumberLoadedStore, nonNumberStore);
+        assert.equal(nonPositiveLoadedStore, nonPositiveStore);
+        assert.equal(nonNumberStore.get(), undefined);
+        assert.equal(nonPositiveStore.get(), undefined);
     });
 
     it('should load CA certs by count from environment', () => {
         process.env.FSPIOP_MTLS_CA_COUNT = '2';
         process.env.FSPIOP_MTLS_CA_CONTENT_1 = TEST_CERT_ENV_VALUE;
         process.env.FSPIOP_MTLS_CA_CONTENT_2 = TEST_CERT_ENV_VALUE;
-        const loader = new EnvBasedCaCertLoader();
+        const store = new EnvBasedCaStore();
 
-        const certs = loader.load();
+        const loadedStore = store.load();
 
-        assert.equal(certs.length, 2);
-        assert.equal(certs[0]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
-        assert.equal(certs[1]?.toBuffer().toString('utf-8'), TEST_CERT_PEM);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get()?.toBuffer().toString('utf-8'), `${TEST_CERT_PEM}${TEST_CERT_PEM}`);
     });
 
     it('should throw when expected cert variable is missing', () => {
         process.env.FSPIOP_MTLS_CA_COUNT = '2';
         process.env.FSPIOP_MTLS_CA_CONTENT_1 = TEST_CERT_ENV_VALUE;
         delete process.env.FSPIOP_MTLS_CA_CONTENT_2;
-        const loader = new EnvBasedCaCertLoader();
+        const store = new EnvBasedCaStore();
 
         assert.throws(
-            () => loader.load(),
+            () => store.load(),
             /Missing CA certificate at 'FSPIOP_MTLS_CA_CONTENT_2'. FSPIOP_MTLS_CA_COUNT is 2 but no content was found for index 2./,
         );
     });

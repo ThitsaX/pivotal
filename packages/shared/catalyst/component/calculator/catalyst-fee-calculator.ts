@@ -5,7 +5,7 @@ import {
     FeeCalculationResult,
 } from '../../dto';
 import {CatalystException} from '../../exception';
-import {CatalystAxios, CatalystAxiosError} from '../catalyst-axios';
+import {CatalystAxios} from '../catalyst-axios';
 import {FeeCalculator} from '../fee-calculator';
 
 export class CatalystFeeCalculator extends FeeCalculator {
@@ -60,13 +60,15 @@ export class CatalystFeeCalculator extends FeeCalculator {
     }
 
     private static rethrowAsCatalystException(error: unknown): void {
-        if (!(error instanceof CatalystAxiosError)) {
-            return;
+
+        if (error instanceof CatalystException) {
+            throw error;
         }
 
-        const code = error.responseData?.code ?? `CATALYST_HTTP_${error.status}`;
-        const message = error.responseData?.message ?? error.message;
+        const message = error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : 'Unexpected catalyst error.';
 
-        throw new CatalystException(code, `Catalyst (${code}) ${message}`);
+        throw new CatalystException('CATALYST_ERROR', message);
     }
 }

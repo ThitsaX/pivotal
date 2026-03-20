@@ -13,20 +13,18 @@ import {AuditOutboundTransfersCommand} from '@core/audit/domain';
 import {OutboundTransfersAuditPublisher} from '@core/audit/producer';
 import {DoTransferCommand} from '@core/outbound/domain';
 import {
-    ErrorInformationObject,
-    ErrorInformationResponse,
-    FspiopErrors,
-    FspiopException,
+    FspiopErrorTranslator,
     FspiopHeaders,
     Money,
     TransfersIDPutResponse,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {FspiopSigner} from '../component';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
 export class TransferRequest {
-    @ApiProperty({type: String, description: 'Quote identifier used to derive transfer identifier'})
+    @ApiProperty({type: String, description: 'Transaction identifier used to derive transfer identifier'})
     quoteId!: string;
 
     @ApiProperty({type: String, description: 'Payee FSP ID'})
@@ -60,13 +58,14 @@ export class TransferController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
-    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(OutboundTransfersAuditPublisher)
         private readonly auditPublisher: OutboundTransfersAuditPublisher,
+        @Inject(FspiopSigner)
+        private readonly fspiopSigner: FspiopSigner,
     ) {
     }
 
@@ -75,6 +74,7 @@ export class TransferController {
     @ApiOperation({summary: 'Initiate a transfer via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
+    @ApiHeader({name: 'myog', required: false, description: 'When true, skip FSPIOP call and return generated transfer request'})
     @ApiBearerAuth('authorization')
     @ApiBody({type: TransferRequest})
     @ApiOkResponse({type: TransferResponse})
@@ -82,18 +82,42 @@ export class TransferController {
     async transfer(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Headers('authorization') authorization: string | undefined,
+        @Headers('myog') conversion: string | undefined,
         @Body() request: TransferRequest,
-    ): Promise<TransferResponse> {
+    ): Promise<TransferResponse | DoTransferCommand.ConversionResponse> {
         validateAuthorizationHeader(authorization);
 
         const createdAt = new Date();
         const id = TransferController.nextAuditId();
+        const commandRequest = TransferController.toCommandRequest(request);
         const input = new DoTransferCommand.Input(
             source,
-            request,
+            commandRequest,
         );
 
         try {
+            if (TransferController.isConversionEnabled(conversion)) {
+                await this.auditPublisher.publish(
+                    new AuditOutboundTransfersCommand.Input(
+                        id,
+                        TransferController.RAIL,
+                        input.source,
+                        input.destination,
+                        input.transferId,
+                        input.transferRequest,
+                        null,
+                        null,
+                        createdAt,
+                        new Date(),
+                    ),
+                );
+
+                return DoTransferCommand.ConversionResponse.fromInput(
+                    input,
+                    this.fspiopSigner,
+                );
+            }
+
             const output: DoTransferCommand.Output = await this.commandBus.execute(
                 new DoTransferCommand(input),
             );
@@ -102,7 +126,7 @@ export class TransferController {
                 new AuditOutboundTransfersCommand.Input(
                     id,
                     TransferController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.transferId,
                     input.transferRequest,
@@ -115,15 +139,15 @@ export class TransferController {
 
             return output.response;
         } catch (error) {
-            const errorResponse = TransferController.toAuditErrorResponse(error);
-            const errorObject = TransferController.toErrorInformationObject(errorResponse);
+            const fspiopException = FspiopErrorTranslator.toFspiopException(error, input.transferId);
+            const errorObject = fspiopException.toErrorObject();
 
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundTransfersCommand.Input(
                         id,
                         TransferController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.transferId,
                         input.transferRequest,
@@ -134,34 +158,27 @@ export class TransferController {
                     ),
                 );
             } finally {
-                throw error;
+                throw fspiopException;
             }
         }
     }
 
-    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
-        const response = new ErrorInformationResponse();
-
-        if (error instanceof FspiopException) {
-            response.errorInformation = error.toErrorObject().errorInformation;
-            return response;
-        }
-
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
-        return response;
-    }
-
-    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
-        return {
-            errorInformation: response.errorInformation ?? TransferController.FALLBACK_ERROR.errorInformation,
-        };
-    }
-
     private static nextAuditId(): string {
         return TransferController.SNOWFLAKE.nextId().toString();
+    }
+
+    private static isConversionEnabled(conversion: string | undefined): boolean {
+        return conversion?.trim().toLowerCase() === 'true';
+    }
+
+    private static toCommandRequest(request: TransferRequest): DoTransferCommand.Request {
+        return new DoTransferCommand.Request(
+            request.quoteId,
+            request.payeeFsp,
+            request.transferAmount,
+            request.ilpPacket,
+            request.condition,
+            request.expiration,
+        );
     }
 }

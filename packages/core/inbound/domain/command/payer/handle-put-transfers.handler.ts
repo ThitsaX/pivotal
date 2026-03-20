@@ -15,7 +15,7 @@ export class HandlePutTransfersHandler
     }
 
     async execute(command: HandlePutTransfersCommand): Promise<HandlePutTransfersCommand.Output> {
-        const {payerFsp, payeeFsp, transferId, response} = command.input;
+        const {payerFsp, transferId, response} = command.input;
 
         if (response == null) {
             return new HandlePutTransfersCommand.Output();
@@ -23,7 +23,6 @@ export class HandlePutTransfersHandler
 
         const subject = FspiopPubSubSubjects.Transfers.forSuccess(
             payerFsp,
-            payeeFsp,
             transferId,
         );
 

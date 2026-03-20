@@ -20,19 +20,19 @@ export class Jwt {
     static sign(
         privateKey: PrivateKey,
         headers: Record<string, string>,
-        payload: string,
+        payload: Record<string, unknown>,
     ): Jwt.Token;
     static sign(
         privateKey: PrivateKey,
         algorithm: JsonWebToken.Algorithm,
         headers: Record<string, string>,
-        payload: string,
+        payload: Record<string, unknown>,
     ): Jwt.Token;
     static sign(
         privateKey: PrivateKey,
         algorithmOrHeaders: JsonWebToken.Algorithm | Record<string, string>,
-        headersOrPayload: Record<string, string> | string,
-        payloadArg?: string,
+        headersOrPayload: Record<string, string> | Record<string, unknown>,
+        payloadArg?: Record<string, unknown>,
     ): Jwt.Token {
 
         const algorithm = payloadArg == null ? 'RS256' : algorithmOrHeaders as JsonWebToken.Algorithm;
@@ -41,8 +41,10 @@ export class Jwt {
             ? algorithmOrHeaders as Record<string, string>
             : headersOrPayload as Record<string, string>;
 
-        const payload = payloadArg == null ? headersOrPayload as string : payloadArg;
-        const parsedPayload = Jwt.parseJsonPayload(payload);
+        const payload = payloadArg == null
+            ? headersOrPayload as Record<string, unknown>
+            : payloadArg;
+        const parsedPayload = Jwt.toJsonPayload(payload);
 
         const signOptions: JsonWebToken.SignOptions = {
             algorithm,
@@ -50,6 +52,7 @@ export class Jwt {
             header: {
                 alg: algorithm,
                 typ: 'JWT',
+                cty: 'json',
                 ...headers,
             },
         };
@@ -65,12 +68,12 @@ export class Jwt {
         return new Jwt.Token(parts[0], parts[1], parts[2], token);
     }
 
-    static verify(privateKey: PrivateKey, token: string, payload: string): boolean;
+    static verify(privateKey: PrivateKey, token: string, payload: Record<string, unknown>): boolean;
     static verify(publicKey: PublicKey, token: Jwt.Token): boolean;
     static verify(
         key: PrivateKey | PublicKey,
         tokenOrTokenObject: string | Jwt.Token,
-        payload?: string,
+        payload?: Record<string, unknown>,
     ): boolean {
 
         try {
@@ -80,17 +83,21 @@ export class Jwt {
                     return false;
                 }
 
-                const parsedPayload = Jwt.parseJsonPayload(payload);
+                const parsedPayload = Jwt.toJsonPayload(payload);
                 const content = JsonWebToken.verify(tokenOrTokenObject, Jwt.toSecret(key));
 
-                if (typeof content !== 'object' || content == null || Array.isArray(content)) {
+                if (!Jwt.isJsonObjectPayload(content)) {
                     return false;
                 }
 
                 return Jwt.toCanonicalJson(content) === Jwt.toCanonicalJson(parsedPayload);
             }
 
-            JsonWebToken.verify(tokenOrTokenObject.full, Jwt.toSecret(key));
+            const content = JsonWebToken.verify(tokenOrTokenObject.full, Jwt.toSecret(key));
+
+            if (!Jwt.isJsonObjectPayload(content)) {
+                return false;
+            }
 
             return true;
 
@@ -103,18 +110,16 @@ export class Jwt {
         return key.toBuffer();
     }
 
-    private static parseJsonPayload(payload: string): Record<string, unknown> {
-        try {
-            const parsed = JSON.parse(payload) as unknown;
-
-            if (typeof parsed !== 'object' || parsed == null || Array.isArray(parsed)) {
-                throw new Error(Jwt.INVALID_JSON_PAYLOAD_ERROR);
-            }
-
-            return parsed as Record<string, unknown>;
-        } catch {
+    private static toJsonPayload(payload: unknown): Record<string, unknown> {
+        if (!Jwt.isJsonObjectPayload(payload)) {
             throw new Error(Jwt.INVALID_JSON_PAYLOAD_ERROR);
         }
+
+        return payload;
+    }
+
+    private static isJsonObjectPayload(payload: unknown): payload is Record<string, unknown> {
+        return typeof payload === 'object' && payload != null && !Array.isArray(payload);
     }
 
     private static toCanonicalJson(value: unknown): string {

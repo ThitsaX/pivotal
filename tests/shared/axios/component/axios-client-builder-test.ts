@@ -4,32 +4,47 @@ import * as https from 'https';
 import { describe, it } from 'node:test';
 import { AxiosHeaders, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { AxiosClientBuilder } from '../../../../packages/shared/axios/component/axios-client-builder';
+import { Ca } from '../../../../packages/shared/security/component/cert/ca';
 import { CaCert } from '../../../../packages/shared/security/component/cert/ca-cert';
-import { CaCertLoader } from '../../../../packages/shared/security/component/cert/ca-cert-loader';
 import { CaStore } from '../../../../packages/shared/security/component/cert/ca-store';
 import { ClientCert } from '../../../../packages/shared/security/component/cert/client-cert';
-import { ClientCertLoader } from '../../../../packages/shared/security/component/cert/client-cert-loader';
 import { ClientCertStore } from '../../../../packages/shared/security/component/cert/client-cert-store';
 import { TEST_CERT_PEM, TEST_PRIVATE_KEY_PEM } from '../../security/component/cert/test-cert-fixtures';
 
-class StubCaCertLoader extends CaCertLoader {
+class StubCaStore extends CaStore {
+
+    private combined: Ca | undefined;
 
     constructor(private readonly certs: CaCert[]) {
         super();
     }
 
-    load(): CaCert[] {
-        return this.certs;
+    load(): CaStore {
+        if (this.certs.length === 0) {
+            return this;
+        }
+
+        this.combined = Ca.fromBuffer(Buffer.concat(this.certs.map((cert) => cert.toBuffer())));
+
+        return this;
+    }
+
+    get(): Ca | undefined {
+        return this.combined;
     }
 }
 
-class StubClientCertLoader extends ClientCertLoader {
+class StubClientCertStore extends ClientCertStore {
 
     constructor(private readonly clientCert: ClientCert | undefined) {
         super();
     }
 
-    load(): ClientCert | undefined {
+    load(): ClientCertStore {
+        return this;
+    }
+
+    get(): ClientCert | undefined {
         return this.clientCert;
     }
 }
@@ -71,15 +86,15 @@ describe('AxiosClientBuilder', () => {
     });
 
     it('should build mTLS https agent from security stores', () => {
-        const caStore = new CaStore(new StubCaCertLoader([
+        const caStore = new StubCaStore([
             CaCert.fromBuffer(Buffer.from(TEST_CERT_PEM, 'utf-8')),
-        ]));
-        const clientCertStore = new ClientCertStore(new StubClientCertLoader(
+        ]);
+        const clientCertStore = new StubClientCertStore(
             ClientCert.fromBuffers(
                 Buffer.from(TEST_CERT_PEM, 'utf-8'),
                 Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'),
             ),
-        ));
+        );
 
         caStore.load();
         clientCertStore.load();

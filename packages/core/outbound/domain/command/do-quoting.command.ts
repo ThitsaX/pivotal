@@ -5,7 +5,10 @@ import {
     FspiopCurrencies,
     FspiopErrors,
     FspiopException,
+    FspiopHeaders,
+    FspiopHeadersMap,
     FspiopMoney,
+    FspiopSignature,
     Money,
     Party,
     PartyIdInfo,
@@ -131,15 +134,13 @@ export namespace DoQuotingCommand {
 
     export class Response {
         private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
-        private static readonly FEE_CURRENCY_KEY = 'fee_currency';
+        private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
         constructor(
             public readonly quoteId: string,
             public readonly transferAmount: Money,
             public readonly payeeReceiveAmount: Money,
             public readonly schemeFeeAmount: Money,
-            public readonly payeeFspFee: Money,
-            public readonly payeeFspCommission: Money,
             public readonly ilpPacket: string,
             public readonly condition: string,
             public readonly expiration: string,
@@ -173,16 +174,12 @@ export namespace DoQuotingCommand {
                 currencyProfile.scale,
             );
             const payeeReceiveAmount = callback.payeeReceiveAmount ?? transferAmount;
-            const payeeFspFee = callback.payeeFspFee ?? DoQuotingCommand.Response.toZeroMoney(transferAmount.currency);
-            const payeeFspCommission = callback.payeeFspCommission ?? DoQuotingCommand.Response.toZeroMoney(transferAmount.currency);
 
             return new DoQuotingCommand.Response(
                 quoteId,
                 transferAmount,
                 payeeReceiveAmount,
                 schemeFeeAmount,
-                payeeFspFee,
-                payeeFspCommission,
                 callback.ilpPacket,
                 callback.condition,
                 callback.expiration,
@@ -250,10 +247,40 @@ export namespace DoQuotingCommand {
 
             return money;
         }
+    }
 
-        private static toZeroMoney(currency: Currency): Money {
-            return DoQuotingCommand.Response.toMoney(currency, '0');
+    export class ConversionResponse {
+        public readonly response: QuotesPostRequest;
+        public readonly headers: FspiopHeadersMap;
+
+        constructor(
+            response: QuotesPostRequest,
+            headers: FspiopHeadersMap,
+        ) {
+            this.response = response;
+            this.headers = headers;
         }
+
+        static fromInput(
+            input: DoQuotingCommand.Input,
+            signer: DoQuotingCommand.Signer,
+        ): DoQuotingCommand.ConversionResponse {
+            const headers = FspiopHeaders.Values.Quotes.forRequest(input.source, input.destination);
+            const signatureHeader = signer.sign(headers, JSON.stringify(input.quoteRequest));
+
+            if (signatureHeader != null) {
+                headers[FspiopHeaders.Names.FSPIOP_SIGNATURE] = JSON.stringify(signatureHeader);
+            }
+
+            return new DoQuotingCommand.ConversionResponse(
+                input.quoteRequest,
+                headers,
+            );
+        }
+    }
+
+    export interface Signer {
+        sign(headers: FspiopHeadersMap, payload: string): FspiopSignature.Header | undefined;
     }
 
     /**

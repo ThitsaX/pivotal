@@ -1,15 +1,6 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {
-    FspiopAxios,
-    FspiopAxiosError,
-    FspiopErrors,
-    FspiopException,
-    FspiopHeaders,
-    FspiopPubSubSubjects,
-    FspiopResponseSubscriber,
-    QuotesIDPutResponse,
-} from '@shared/fspiop';
+import {FspiopAxios, FspiopAxiosError, FspiopErrors, FspiopException, FspiopHeaders, FspiopPubSubSubjects, FspiopResponseSubscriber, QuotesIDPutResponse,} from '@shared/fspiop';
 import {DoQuotingCommand} from './do-quoting.command';
 
 @CommandHandler(DoQuotingCommand)
@@ -32,8 +23,8 @@ export class DoQuotingHandler
 
         // Quotes carry a unique quoteId — a single error subject is sufficient,
         // no hub error subject is needed (unlike Parties).
-        const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, destination, quoteId);
-        const errorSubject   = FspiopPubSubSubjects.Quotes.forError(source, destination, quoteId);
+        const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
+        const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 
         // ── Step 1: Subscribe to NATS BEFORE sending the request ─────────────
         // nc.subscribe() is synchronous — subscriptions are active immediately.
@@ -46,9 +37,7 @@ export class DoQuotingHandler
 
         // ── Step 2: Fire the POST /quotes request ─────────────────────────────
         try {
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .postQuotes(quotesUrl, quoteRequest);
+            await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
@@ -56,7 +45,9 @@ export class DoQuotingHandler
             if (FspiopAxiosError.is(error)) {
                 const info = error.errorInformationResponse?.errorInformation;
                 const code = info?.errorCode ?? '';
-                const desc = info?.errorDescription ?? 'Communication error';
+                const desc = info?.errorDescription?.trim().length
+                    ? info.errorDescription
+                    : 'Communication error';
                 const extensionList = info?.extensionList;
                 const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
                 throw new FspiopException(errorDef, desc, extensionList);

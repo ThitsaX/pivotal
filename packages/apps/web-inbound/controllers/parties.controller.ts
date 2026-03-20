@@ -6,10 +6,11 @@ import {
     HttpCode,
     HttpStatus,
     Inject,
+    Logger,
     Param,
     Put,
 } from '@nestjs/common';
-import {CommandBus} from '@nestjs/cqrs';
+import {CommandBus, ICommand} from '@nestjs/cqrs';
 import {
     HandleGetPartiesCommand,
     HandlePutPartiesCommand,
@@ -28,6 +29,7 @@ import {
 export class PartiesController {
 
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
+    private readonly logger = new Logger(PartiesController.name);
 
     constructor(
         @Inject(CommandBus)
@@ -37,38 +39,38 @@ export class PartiesController {
 
     @Get(':type/:id{/:subId}')
     @HttpCode(HttpStatus.ACCEPTED)
-    async getParties(
+    getParties(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-    ): Promise<void> {
-        const payerFsp = PartiesController.headerValue(sourceHeader);
-        const payeeFsp = PartiesController.headerValue(destinationHeader);
+    ): void {
+        this.dispatch(() => {
+            const payerFsp = PartiesController.headerValue(sourceHeader);
+            const payeeFsp = PartiesController.headerValue(destinationHeader);
 
-        await this.commandBus.execute(
-            new HandleGetPartiesCommand(
+            return new HandleGetPartiesCommand(
                 new HandleGetPartiesCommand.Input(payerFsp, payeeFsp, type, id, subId ?? null),
-            ),
-        );
+            );
+        });
     }
 
     @Put(':type/:id{/:subId}')
-    @HttpCode(HttpStatus.OK)
-    async putParties(
+    @HttpCode(HttpStatus.ACCEPTED)
+    putParties(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
-    ): Promise<void> {
-        const payerFsp = PartiesController.headerValue(destinationHeader);
-        const payeeFsp = PartiesController.headerValue(sourceHeader);
+    ): void {
+        this.dispatch(() => {
+            const payerFsp = PartiesController.headerValue(destinationHeader);
+            const payeeFsp = PartiesController.headerValue(sourceHeader);
 
-        await this.commandBus.execute(
-            new HandlePutPartiesCommand(
+            return new HandlePutPartiesCommand(
                 new HandlePutPartiesCommand.Input(
                     payerFsp,
                     payeeFsp,
@@ -77,26 +79,26 @@ export class PartiesController {
                     subId ?? null,
                     request,
                 ),
-            ),
-        );
+            );
+        });
     }
 
     @Put(':type/:id{/:subId}/error')
-    @HttpCode(HttpStatus.OK)
-    async putPartiesError(
+    @HttpCode(HttpStatus.ACCEPTED)
+    putPartiesError(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
-    ): Promise<void> {
-        const payerFsp = PartiesController.headerValue(destinationHeader);
-        const payeeFsp = PartiesController.headerValue(sourceHeader);
-        const error = PartiesController.toErrorInformationObject(request);
+    ): void {
+        this.dispatch(() => {
+            const payerFsp = PartiesController.headerValue(destinationHeader);
+            const payeeFsp = PartiesController.headerValue(sourceHeader);
+            const error = PartiesController.toErrorInformationObject(request);
 
-        await this.commandBus.execute(
-            new HandlePutPartiesErrorCommand(
+            return new HandlePutPartiesErrorCommand(
                 new HandlePutPartiesErrorCommand.Input(
                     payerFsp,
                     payeeFsp,
@@ -105,8 +107,8 @@ export class PartiesController {
                     subId ?? null,
                     error,
                 ),
-            ),
-        );
+            );
+        });
     }
 
     private static headerValue(value: string | string[] | undefined, fallback = ''): string {
@@ -125,5 +127,16 @@ export class PartiesController {
         return {
             errorInformation: response?.errorInformation ?? PartiesController.FALLBACK_ERROR.errorInformation,
         };
+    }
+
+    private dispatch(commandFactory: () => ICommand): void {
+        setImmediate(() => {
+            void this.commandBus.execute(commandFactory())
+                .catch((error: unknown) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    const stack = error instanceof Error ? error.stack : undefined;
+                    this.logger.error(message, stack);
+                });
+        });
     }
 }

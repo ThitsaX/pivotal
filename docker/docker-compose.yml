@@ -1,0 +1,58 @@
+name: pivotal-web
+
+services:
+  web-outbound:
+    image: pivotal-web-outbound:local
+    build:
+      context: ..
+      dockerfile: docker/web-outbound.Dockerfile
+    environment:
+      WEB_OUTBOUND_PORT: ${WEB_OUTBOUND_PORT:-3200}
+      NATS_URL: ${NATS_URL:-nats://localhost:4222}
+      FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://localhost:4002}
+      FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://localhost:3002}
+      FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://localhost:3000}
+      FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
+      FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}
+      FSPIOP_VERIFY_JWS: ${FSPIOP_VERIFY_JWS:-false}
+      FSPIOP_MUTUAL_TLS: ${FSPIOP_MUTUAL_TLS:-false}
+      FSPIOP_SOCKET_TIMEOUT_MS: ${FSPIOP_SOCKET_TIMEOUT_MS:-30000}
+      FSPIOP_CONNECTION_TIMEOUT_MS: ${FSPIOP_CONNECTION_TIMEOUT_MS:-5000}
+      FSPIOP_TLS_VERIFY_SERVER_CERT: ${FSPIOP_TLS_VERIFY_SERVER_CERT:-false}
+      FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
+      FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
+      FSPIOP_JWS_PRIVATE_KEY: ${FSPIOP_JWS_PRIVATE_KEY:-}
+      FSPIOP_JWS_PUBLIC_KEY: ${FSPIOP_JWS_PUBLIC_KEY:-}
+      FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
+      FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
+      FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+    ports:
+      - "${WEB_OUTBOUND_HOST_PORT:-3200}:${WEB_OUTBOUND_PORT:-3200}"
+    restart: unless-stopped
+
+  web-inbound:
+    image: pivotal-web-inbound:local
+    build:
+      context: ..
+      dockerfile: docker/web-inbound.Dockerfile
+    environment:
+      WEB_INBOUND_PORT: ${WEB_INBOUND_PORT:-3201}
+      NATS_URL: ${NATS_URL:-nats://localhost:4222}
+      FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://localhost:4002}
+      FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://localhost:3002}
+      FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://localhost:3000}
+      FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
+      FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
+      FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
+      FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}
+      FSPIOP_VERIFY_JWS: ${FSPIOP_VERIFY_JWS:-false}
+      FSPIOP_MUTUAL_TLS: ${FSPIOP_MUTUAL_TLS:-false}
+      FSPIOP_TLS_VERIFY_SERVER_CERT: ${FSPIOP_TLS_VERIFY_SERVER_CERT:-false}
+      FSPIOP_JWS_PRIVATE_KEY: ${FSPIOP_JWS_PRIVATE_KEY:-}
+      FSPIOP_JWS_PUBLIC_KEY: ${FSPIOP_JWS_PUBLIC_KEY:-}
+      FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
+      FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
+      FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+    ports:
+      - "${WEB_INBOUND_HOST_PORT:-3201}:${WEB_INBOUND_PORT:-3201}"
+    restart: unless-stopped

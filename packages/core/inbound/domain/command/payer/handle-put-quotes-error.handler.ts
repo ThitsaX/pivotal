@@ -15,7 +15,7 @@ export class HandlePutQuotesErrorHandler
     }
 
     async execute(command: HandlePutQuotesErrorCommand): Promise<HandlePutQuotesErrorCommand.Output> {
-        const {payerFsp, payeeFsp, quoteId, error} = command.input;
+        const {payerFsp, quoteId, error} = command.input;
 
         if (error == null) {
             return new HandlePutQuotesErrorCommand.Output();
@@ -23,7 +23,6 @@ export class HandlePutQuotesErrorHandler
 
         const subject = FspiopPubSubSubjects.Quotes.forError(
             payerFsp,
-            payeeFsp,
             quoteId,
         );
 
