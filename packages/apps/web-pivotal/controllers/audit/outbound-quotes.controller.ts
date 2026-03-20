@@ -17,6 +17,8 @@ export class OutboundQuotesAuditController {
         @Query('payerFsp') payerFsp: string | undefined,
         @Query('payeeFsp') payeeFsp: string | undefined,
         @Query('quoteId') quoteId: string | undefined,
+        @Query('scenario') scenario: string | undefined,
+        @Query('subScenario') subScenario: string | undefined,
         @Query('createdAtStart') createdAtStart: string | undefined,
         @Query('createdAtEnd') createdAtEnd: string | undefined,
         @Query('completedAtStart') completedAtStart: string | undefined,
@@ -31,6 +33,8 @@ export class OutboundQuotesAuditController {
             QueryParamsUtil.toOptionalString(payerFsp),
             QueryParamsUtil.toOptionalString(payeeFsp),
             QueryParamsUtil.toOptionalString(quoteId),
+            QueryParamsUtil.toOptionalString(scenario),
+            QueryParamsUtil.toOptionalString(subScenario),
             QueryParamsUtil.toDateRange(
                 createdAtStart,
                 createdAtEnd,

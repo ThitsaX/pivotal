@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="web-legacy" type="NodeJSConfigurationType" node-parameters="-r ts-node/register -r tsconfig-paths/register " path-to-js-file="main.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$/packages/apps/web-legacy">
+    <method v="2" />
+  </configuration>
+</component>

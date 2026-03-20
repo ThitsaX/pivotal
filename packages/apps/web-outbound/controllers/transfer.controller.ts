@@ -74,7 +74,7 @@ export class TransferController {
     @ApiOperation({summary: 'Initiate a transfer via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
-    @ApiHeader({name: 'conversion', required: false, description: 'When true, skip FSPIOP call and return generated transfer request'})
+    @ApiHeader({name: 'myog', required: false, description: 'When true, skip FSPIOP call and return generated transfer request'})
     @ApiBearerAuth('authorization')
     @ApiBody({type: TransferRequest})
     @ApiOkResponse({type: TransferResponse})
@@ -82,7 +82,7 @@ export class TransferController {
     async transfer(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Headers('authorization') authorization: string | undefined,
-        @Headers('conversion') conversion: string | undefined,
+        @Headers('myog') conversion: string | undefined,
         @Body() request: TransferRequest,
     ): Promise<TransferResponse | DoTransferCommand.ConversionResponse> {
         validateAuthorizationHeader(authorization);

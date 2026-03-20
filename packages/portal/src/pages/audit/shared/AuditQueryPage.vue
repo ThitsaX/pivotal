@@ -411,6 +411,56 @@ const formatDateInTimeZone = (value: string): string => {
     return `${parts.date} ${parts.time} (${parts.zone})`;
 };
 
+const formatAmountWithThousandsSeparator = (amount: string): string => {
+    const matches = amount.match(/^([+-]?)(\d+)(\.\d+)?$/);
+
+    if (!matches) {
+        return amount;
+    }
+
+    const sign = matches[1];
+    const integerPart = matches[2];
+    const decimalPart = matches[3] ?? '';
+    const groupedIntegerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    return `${sign}${groupedIntegerPart}${decimalPart}`;
+};
+
+const formatMoneyValue = (value: unknown): string | null => {
+    if (typeof value !== 'object' || value == null) {
+        return null;
+    }
+
+    const amount = (value as Record<string, unknown>).amount;
+    const currency = (value as Record<string, unknown>).currency;
+
+    if (typeof amount !== 'string' || typeof currency !== 'string') {
+        return null;
+    }
+
+    return `${formatAmountWithThousandsSeparator(amount)} ${currency}`;
+};
+
+const formatSubScenarioValue = (value: unknown): string | null => {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+        return null;
+    }
+
+    const normalized = trimmed
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return normalized.replace(/\b([a-z])/g, (match: string): string => match.toUpperCase());
+};
+
 const formatColumnValue = (record: Record<string, unknown>, columnKey: string): string => {
     const value = record[columnKey];
 
@@ -418,7 +468,18 @@ const formatColumnValue = (record: Record<string, unknown>, columnKey: string): 
         return formatDateInTimeZone(value);
     }
 
+    if (columnKey === 'amount') {
+        return formatMoneyValue(value) ?? formatValue(value);
+    }
+
     return formatValue(value);
+};
+
+const getScenarioDisplay = (record: Record<string, unknown>): {scenario: string; subScenario: string | null} => {
+    return {
+        scenario: formatValue(record.scenario),
+        subScenario: formatSubScenarioValue(record.subScenario),
+    };
 };
 
 const isDateColumn = (columnKey: string): boolean => {
@@ -796,6 +857,40 @@ const jumpToPage = (pageNumber: number): void => {
                                                 <span class="inline-flex rounded-md border border-accent/25 bg-accentSoft px-2 py-0.5 text-[10px] font-semibold text-accent">
                                                     {{ getDateTimeParts(record, column.key)?.zone }}
                                                 </span>
+                                            </div>
+                                            <div v-else-if="column.key === 'scenario'" class="space-y-1">
+                                                <p class="font-semibold leading-4 text-ink">
+                                                    {{ getScenarioDisplay(record).scenario }}
+                                                </p>
+                                                <p
+                                                    v-if="getScenarioDisplay(record).subScenario"
+                                                    class="flex items-start gap-1.5 text-[11px] leading-4 text-slate-500"
+                                                >
+                                                    <span class="mt-[1px] inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-orange-500">
+                                                        <svg
+                                                            class="h-3.5 w-3.5"
+                                                            viewBox="0 0 16 16"
+                                                            fill="none"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path
+                                                                d="M3.5 3.5V8c0 1.657 1.343 3 3 3h6"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.5"
+                                                                stroke-linecap="round"
+                                                                stroke-linejoin="round"
+                                                            />
+                                                            <path
+                                                                d="M10 8.5 12.5 11 10 13.5"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.5"
+                                                                stroke-linecap="round"
+                                                                stroke-linejoin="round"
+                                                            />
+                                                        </svg>
+                                                    </span>
+                                                    <span class="break-words text-slate-600">{{ getScenarioDisplay(record).subScenario }}</span>
+                                                </p>
                                             </div>
                                             <span v-else class="break-all">{{ formatColumnValue(record, column.key) }}</span>
                                         </td>

@@ -21,6 +21,8 @@ export namespace FindOutboundQuotesQuery {
             public readonly payerFsp?: string,
             public readonly payeeFsp?: string,
             public readonly quoteId?: string,
+            public readonly scenario?: string,
+            public readonly subScenario?: string,
             public readonly createdAt?: DateRange,
             public readonly completedAt?: DateRange,
             public readonly error?: boolean,
