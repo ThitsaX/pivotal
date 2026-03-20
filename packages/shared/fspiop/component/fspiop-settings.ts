@@ -11,10 +11,10 @@ import {Injectable} from '@nestjs/common';
  * {
  *   provide: FspiopSettings,
  *   useFactory: () => new FspiopSettings(
+ *     process.env['FSPIOP_SWITCH_ID']       ?? '',
  *     process.env['FSPIOP_PARTIES_URL']     ?? '',
  *     process.env['FSPIOP_QUOTES_URL']      ?? '',
  *     process.env['FSPIOP_TRANSFERS_URL']   ?? '',
- *     process.env['FSPIOP_SWITCH_ID']       ?? '',
  *     process.env['FSPIOP_USE_JWS']         === 'true',
  *     process.env['FSPIOP_USE_MUTUAL_TLS']  === 'true',
  *   ),
@@ -23,10 +23,10 @@ import {Injectable} from '@nestjs/common';
 @Injectable()
 export class FspiopSettings {
     constructor(
+        public readonly switchId: string,
         public readonly partiesUrl: string,
         public readonly quotesUrl: string,
         public readonly transfersUrl: string,
-        public readonly switchId: string,
         public readonly useJws: boolean,
         public readonly useMutualTls: boolean,
     ) {

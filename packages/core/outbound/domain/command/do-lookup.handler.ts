@@ -50,9 +50,7 @@ export class DoLookupHandler
 
         // ── Step 2: Fire the GET /parties request ─────────────────────────────
         try {
-            await this.fspiopAxios
-                .withHeaders(headers)
-                .getParties(partiesUrl, type, id, subId);
+            await this.fspiopAxios.getParties(partiesUrl, headers, type, id, subId);
         } catch (error) {
             // Cancel the NATS subscriptions immediately — no callback will arrive.
             this.subscriber.cancel(successSubject);
@@ -60,7 +58,9 @@ export class DoLookupHandler
             if (FspiopAxiosError.is(error)) {
                 const info = error.errorInformationResponse?.errorInformation;
                 const code = info?.errorCode ?? '';
-                const desc = info?.errorDescription ?? 'Communication error';
+                const desc = info?.errorDescription?.trim().length
+                    ? info.errorDescription
+                    : 'Communication error';
                 const extensionList = info?.extensionList;
                 const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
                 throw new FspiopException(errorDef, desc, extensionList);

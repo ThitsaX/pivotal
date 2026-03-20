@@ -14,7 +14,7 @@ export class HandlePutQuotesHandler
     }
 
     async execute(command: HandlePutQuotesCommand): Promise<HandlePutQuotesCommand.Output> {
-        const {payerFsp, payeeFsp, quoteId, response} = command.input;
+        const {payerFsp, quoteId, response} = command.input;
 
         if (response == null) {
             return new HandlePutQuotesCommand.Output();
@@ -22,7 +22,6 @@ export class HandlePutQuotesHandler
 
         const subject = FspiopPubSubSubjects.Quotes.forSuccess(
             payerFsp,
-            payeeFsp,
             quoteId,
         );
 

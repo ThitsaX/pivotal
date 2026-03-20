@@ -15,16 +15,14 @@ import {DoQuotingCommand} from '@core/outbound/domain';
 import {
     AmountType,
     ExtensionList,
-    ErrorInformationObject,
-    ErrorInformationResponse,
-    FspiopErrors,
-    FspiopException,
+    FspiopErrorTranslator,
     FspiopHeaders,
     Money,
     PartyIdInfo,
     TransactionScenario,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
+import {FspiopSigner} from '../component';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
 
@@ -55,7 +53,7 @@ export class QuoteRequest {
 }
 
 export class QuoteResponse {
-    @ApiProperty({type: String, description: 'Generated quote identifier'})
+    @ApiProperty({type: String, description: 'Generated transaction identifier'})
     readonly quoteId: string;
 
     @ApiProperty({type: () => Money})
@@ -66,12 +64,6 @@ export class QuoteResponse {
 
     @ApiProperty({type: () => Money})
     readonly schemeFeeAmount: Money;
-
-    @ApiProperty({type: () => Money})
-    readonly payeeFspFee: Money;
-
-    @ApiProperty({type: () => Money})
-    readonly payeeFspCommission: Money;
 
     @ApiProperty({type: String})
     readonly ilpPacket: string;
@@ -86,23 +78,19 @@ export class QuoteResponse {
     readonly extensionList: ExtensionList;
 
     constructor(
-        quoteId: string,
+        transactionId: string,
         transferAmount: Money,
         payeeReceiveAmount: Money,
         schemeFeeAmount: Money,
-        payeeFspFee: Money,
-        payeeFspCommission: Money,
         ilpPacket: string,
         condition: string,
         expiration: string,
         extensionList: ExtensionList,
     ) {
-        this.quoteId = quoteId;
+        this.quoteId = transactionId;
         this.transferAmount = transferAmount;
         this.payeeReceiveAmount = payeeReceiveAmount;
         this.schemeFeeAmount = schemeFeeAmount;
-        this.payeeFspFee = payeeFspFee;
-        this.payeeFspCommission = payeeFspCommission;
         this.ilpPacket = ilpPacket;
         this.condition = condition;
         this.expiration = expiration;
@@ -116,13 +104,14 @@ export class QuoteController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
-    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(OutboundQuotesAuditPublisher)
         private readonly auditPublisher: OutboundQuotesAuditPublisher,
+        @Inject(FspiopSigner)
+        private readonly fspiopSigner: FspiopSigner,
     ) {
     }
 
@@ -131,6 +120,7 @@ export class QuoteController {
     @ApiOperation({summary: 'Initiate a quoting request via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
+    @ApiHeader({name: 'myog', required: false, description: 'When true, skip FSPIOP call and return generated quote request'})
     @ApiBearerAuth('authorization')
     @ApiBody({type: QuoteRequest})
     @ApiOkResponse({type: QuoteResponse})
@@ -138,8 +128,9 @@ export class QuoteController {
     async quote(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Headers('authorization') authorization: string | undefined,
+        @Headers('myog') conversion: string | undefined,
         @Body() request: QuoteRequest,
-    ): Promise<QuoteResponse> {
+    ): Promise<QuoteResponse | DoQuotingCommand.ConversionResponse> {
         validateAuthorizationHeader(authorization);
 
         const createdAt = new Date();
@@ -150,6 +141,28 @@ export class QuoteController {
         );
 
         try {
+            if (QuoteController.isConversionEnabled(conversion)) {
+                await this.auditPublisher.publish(
+                    new AuditOutboundQuotesCommand.Input(
+                        id,
+                        QuoteController.RAIL,
+                        input.source,
+                        input.destination,
+                        input.quoteId,
+                        input.quoteRequest,
+                        null,
+                        null,
+                        createdAt,
+                        new Date(),
+                    ),
+                );
+
+                return DoQuotingCommand.ConversionResponse.fromInput(
+                    input,
+                    this.fspiopSigner,
+                );
+            }
+
             const output: DoQuotingCommand.Output = await this.commandBus.execute(
                 new DoQuotingCommand(input),
             );
@@ -158,7 +171,7 @@ export class QuoteController {
                 new AuditOutboundQuotesCommand.Input(
                     id,
                     QuoteController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.quoteId,
                     input.quoteRequest,
@@ -169,17 +182,17 @@ export class QuoteController {
                 ),
             );
 
-            return output.response;
+            return QuoteController.toQuoteResponse(output.response);
         } catch (error) {
-            const errorResponse = QuoteController.toAuditErrorResponse(error);
-            const errorObject = QuoteController.toErrorInformationObject(errorResponse);
+            const fspiopException = FspiopErrorTranslator.toFspiopException(error, input.quoteId);
+            const errorObject = fspiopException.toErrorObject();
 
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundQuotesCommand.Input(
                         id,
                         QuoteController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.quoteId,
                         input.quoteRequest,
@@ -190,34 +203,29 @@ export class QuoteController {
                     ),
                 );
             } finally {
-                throw error;
+                throw fspiopException;
             }
         }
     }
 
-    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
-        const response = new ErrorInformationResponse();
-
-        if (error instanceof FspiopException) {
-            response.errorInformation = error.toErrorObject().errorInformation;
-            return response;
-        }
-
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
-        return response;
-    }
-
-    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
-        return {
-            errorInformation: response.errorInformation ?? QuoteController.FALLBACK_ERROR.errorInformation,
-        };
-    }
-
     private static nextAuditId(): string {
         return QuoteController.SNOWFLAKE.nextId().toString();
+    }
+
+    private static isConversionEnabled(conversion: string | undefined): boolean {
+        return conversion?.trim().toLowerCase() === 'true';
+    }
+
+    private static toQuoteResponse(response: DoQuotingCommand.Response): QuoteResponse {
+        return new QuoteResponse(
+            response.quoteId,
+            response.transferAmount,
+            response.payeeReceiveAmount,
+            response.schemeFeeAmount,
+            response.ilpPacket,
+            response.condition,
+            response.expiration,
+            response.extensionList,
+        );
     }
 }

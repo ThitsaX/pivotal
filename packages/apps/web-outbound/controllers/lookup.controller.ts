@@ -4,7 +4,7 @@ import {CommandBus} from '@nestjs/cqrs';
 import {AuditOutboundPartiesCommand} from '@core/audit/domain';
 import {OutboundPartiesAuditPublisher} from '@core/audit/producer';
 import {DoLookupCommand} from '@core/outbound/domain';
-import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopException, FspiopHeaders, Party, PartyIdType,} from '@shared/fspiop';
+import {FspiopErrorTranslator, FspiopHeaders, Party, PartyIdType,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {validateAuthorizationHeader} from './authorization-header.util';
 import {ApiFspiopErrorResponses} from './fspiop-error-responses.decorator';
@@ -38,7 +38,6 @@ export class LookupController {
 
     private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
-    private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
 
     constructor(
         @Inject(CommandBus)
@@ -46,28 +45,6 @@ export class LookupController {
         @Inject(OutboundPartiesAuditPublisher)
         private readonly auditPublisher: OutboundPartiesAuditPublisher,
     ) {
-    }
-
-    private static toAuditErrorResponse(error: unknown): ErrorInformationResponse {
-        const response = new ErrorInformationResponse();
-
-        if (error instanceof FspiopException) {
-            response.errorInformation = error.toErrorObject().errorInformation;
-            return response;
-        }
-
-        const message = error instanceof Error
-            ? error.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
-
-        response.errorInformation = new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message).toErrorObject().errorInformation;
-        return response;
-    }
-
-    private static toErrorInformationObject(response: ErrorInformationResponse): ErrorInformationObject {
-        return {
-            errorInformation: response.errorInformation ?? LookupController.FALLBACK_ERROR.errorInformation,
-        };
     }
 
     private static nextAuditId(): string {
@@ -106,7 +83,7 @@ export class LookupController {
                 new AuditOutboundPartiesCommand.Input(
                     id,
                     LookupController.RAIL,
-                    source,
+                    input.source,
                     input.destination,
                     input.type,
                     input.id,
@@ -120,15 +97,15 @@ export class LookupController {
 
             return output.response;
         } catch (error) {
-            const errorResponse = LookupController.toAuditErrorResponse(error);
-            const errorObject = LookupController.toErrorInformationObject(errorResponse);
+            const fspiopException = FspiopErrorTranslator.toFspiopException(error);
+            const errorObject = fspiopException.toErrorObject();
 
             try {
                 await this.auditPublisher.publish(
                     new AuditOutboundPartiesCommand.Input(
                         id,
                         LookupController.RAIL,
-                        source,
+                        input.source,
                         input.destination,
                         input.type,
                         input.id,
@@ -140,7 +117,7 @@ export class LookupController {
                     ),
                 );
             } finally {
-                throw error;
+                throw fspiopException;
             }
         }
     }

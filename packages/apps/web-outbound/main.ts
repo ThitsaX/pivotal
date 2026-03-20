@@ -65,7 +65,7 @@ const bootstrap = async (): Promise<void> => {
     app.useGlobalFilters(new FspiopExceptionFilter());
 
     const swaggerConfig = new DocumentBuilder()
-        .setTitle('PayPort - Outbound')
+        .setTitle('Pivotal - Outbound')
         .setDescription(
             'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows. ',
         )

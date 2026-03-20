@@ -1,84 +1,75 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PrivateKeyLoader } from '../../../../../packages/shared/security/component/key/private-key-loader';
 import { PrivateKeyStore } from '../../../../../packages/shared/security/component/key/private-key-store';
 import { PrivateKey } from '../../../../../packages/shared/security/component/key/private-key';
 import { TEST_PRIVATE_KEY_PEM } from './test-key-fixtures';
 
-class StubPrivateKeyLoader extends PrivateKeyLoader {
+class StubPrivateKeyStore extends PrivateKeyStore {
 
     private readonly keysByFspId: Map<string, PrivateKey>;
+    private readonly loadedKeysByFspId = new Map<string, PrivateKey>();
 
     constructor(keysByFspId: Map<string, PrivateKey>) {
         super();
         this.keysByFspId = keysByFspId;
     }
 
-    load(): Map<string, PrivateKey> {
-        return this.keysByFspId;
+    load(): PrivateKeyStore {
+        for (const [fspId, privateKey] of this.keysByFspId.entries()) {
+            this.loadedKeysByFspId.set(fspId, PrivateKey.fromBuffer(privateKey.toBuffer()));
+        }
+
+        return this;
+    }
+
+    get(fspId: string): PrivateKey | undefined {
+        const privateKey = this.loadedKeysByFspId.get(fspId);
+
+        if (privateKey == null) {
+            return undefined;
+        }
+
+        return PrivateKey.fromBuffer(privateKey.toBuffer());
     }
 }
 
 describe('PrivateKeyStore', () => {
 
-    it('should load keys from loader and return loaded count', () => {
+    it('should load keys from store implementation and return self', () => {
         const privateKeyA = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
         const privateKeyB = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
-        const loader = new StubPrivateKeyLoader(new Map([
+        const store = new StubPrivateKeyStore(new Map([
             ['fsp-a', privateKeyA],
             ['fsp-b', privateKeyB],
         ]));
-        const store = new PrivateKeyStore(loader);
 
-        const loadedCount = store.load();
+        const loadedStore = store.load();
 
-        assert.equal(loadedCount, 2);
-        assert.equal(store.has('fsp-a'), true);
-        assert.equal(store.has('fsp-b'), true);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get('fsp-a') != null, true);
+        assert.equal(store.get('fsp-b') != null, true);
     });
 
-    it('should return defensive copy from get and getBuffer', () => {
+    it('should return defensive copy from get', () => {
         const sourceKey = PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'));
-        const loader = new StubPrivateKeyLoader(new Map([['fsp-a', sourceKey]]));
-        const store = new PrivateKeyStore(loader);
+        const store = new StubPrivateKeyStore(new Map([['fsp-a', sourceKey]]));
 
         store.load();
 
         const key = store.get('fsp-a');
-        const keyBuffer = store.getBuffer('fsp-a');
 
         assert.ok(key);
-        assert.ok(keyBuffer);
         assert.notEqual(key, sourceKey);
 
+        const keyBuffer = key.toBuffer();
         keyBuffer.write('X', 0, 'utf-8');
 
-        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), TEST_PRIVATE_KEY_PEM);
-    });
-
-    it('should support delete and clear', () => {
-        const loader = new StubPrivateKeyLoader(new Map([
-            ['fsp-a', PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'))],
-            ['fsp-b', PrivateKey.fromBuffer(Buffer.from(TEST_PRIVATE_KEY_PEM, 'utf-8'))],
-        ]));
-        const store = new PrivateKeyStore(loader);
-
-        store.load();
-
-        const isDeleted = store.delete('fsp-a');
-        const isDeletedAgain = store.delete('fsp-a');
-
-        store.clear();
-
-        assert.equal(isDeleted, true);
-        assert.equal(isDeletedAgain, false);
-        assert.equal(store.has('fsp-b'), false);
+        assert.equal(store.get('fsp-a')?.toBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
     });
 
     it('should return undefined for unknown fspId', () => {
-        const store = new PrivateKeyStore(new StubPrivateKeyLoader(new Map()));
+        const store = new StubPrivateKeyStore(new Map());
 
         assert.equal(store.get('missing'), undefined);
-        assert.equal(store.getBuffer('missing'), undefined);
     });
 });

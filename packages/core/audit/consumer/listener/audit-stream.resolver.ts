@@ -2,7 +2,7 @@ import {JetStreamManager} from 'nats';
 
 const NO_STREAM_MATCHES_SUBJECT = 'no stream matches subject';
 const STREAM_ALREADY_EXISTS = 'stream name already in use';
-const DEFAULT_AUDIT_STREAM_NAME = 'PAYPORT_AUDIT';
+const DEFAULT_AUDIT_STREAM_NAME = 'PIVOTAL_AUDIT';
 const DEFAULT_AUDIT_STREAM_SUBJECT = 'audit.>';
 
 const isNoStreamMatchesSubjectError = (error: unknown): boolean => {
@@ -16,7 +16,7 @@ const isStreamAlreadyExistsError = (error: unknown): boolean => {
 };
 
 const getAuditStreamName = (): string => {
-    return process.env['PAYPORT_AUDIT_STREAM_NAME'] ?? DEFAULT_AUDIT_STREAM_NAME;
+    return process.env['PIVOTAL_AUDIT_STREAM_NAME'] ?? DEFAULT_AUDIT_STREAM_NAME;
 };
 
 export const resolveAuditStream = async (jsm: JetStreamManager, subject: string): Promise<string> => {

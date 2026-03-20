@@ -1,30 +1,28 @@
 import {ConfigService} from '@nestjs/config';
-import {FspiopSettings} from '@shared/fspiop';
+import {
+    FspiopJwsPrivateKeyStore,
+    FspiopJwsPublicKeyStore,
+    FspiopMtlsCaStore,
+    FspiopMtlsClientCertStore,
+    FspiopSettings,
+} from '@shared/fspiop';
 import {
     CaStore,
-    CaStoreFactory,
     ClientCertStore,
-    ClientCertStoreFactory,
     PrivateKeyStore,
-    PrivateKeyStoreFactory,
     PublicKeyStore,
-    PublicKeyStoreFactory,
 } from '@shared/security';
 import type {WebInboundModule} from './web-inbound.module';
 
 export class WebInboundDependencies implements WebInboundModule.RequiredDependencies {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
-    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:4000';
-    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:4000';
+    private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_QUOTES_URL = 'http://localhost:5003';
+    private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:5003';
     private static readonly DEFAULT_SWITCH_ID = 'switch';
     private static readonly DEFAULT_USE_JWS = false;
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;
-    private static readonly DEFAULT_PUBLIC_KEY_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_PRIVATE_KEY_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_CA_STORE_FACTORY = 'env';
-    private static readonly DEFAULT_CLIENT_CERT_STORE_FACTORY = 'env';
 
     private readonly inboundPublicKeyStore: PublicKeyStore;
     private readonly inboundPrivateKeyStore: PrivateKeyStore;
@@ -32,18 +30,10 @@ export class WebInboundDependencies implements WebInboundModule.RequiredDependen
     private readonly inboundClientCertStore: ClientCertStore;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
-        this.inboundPublicKeyStore = PublicKeyStoreFactory.create(
-            this.readString('PUBLIC_KEY_STORE_FACTORY', WebInboundDependencies.DEFAULT_PUBLIC_KEY_STORE_FACTORY),
-        );
-        this.inboundPrivateKeyStore = PrivateKeyStoreFactory.create(
-            this.readString('PRIVATE_KEY_STORE_FACTORY', WebInboundDependencies.DEFAULT_PRIVATE_KEY_STORE_FACTORY),
-        );
-        this.inboundCaStore = CaStoreFactory.create(
-            this.readString('CA_CERT_STORE_FACTORY', WebInboundDependencies.DEFAULT_CA_STORE_FACTORY),
-        );
-        this.inboundClientCertStore = ClientCertStoreFactory.create(
-            this.readString('CLIENT_CERT_STORE_FACTORY', WebInboundDependencies.DEFAULT_CLIENT_CERT_STORE_FACTORY),
-        );
+        this.inboundPublicKeyStore = new FspiopJwsPublicKeyStore().load();
+        this.inboundPrivateKeyStore = new FspiopJwsPrivateKeyStore().load();
+        this.inboundCaStore = new FspiopMtlsCaStore().load();
+        this.inboundClientCertStore = new FspiopMtlsClientCertStore().load();
     }
 
     natsUrl(): string {
@@ -52,10 +42,10 @@ export class WebInboundDependencies implements WebInboundModule.RequiredDependen
 
     fspiopSettings(): FspiopSettings {
         return new FspiopSettings(
+            this.readString('FSPIOP_SWITCH_ID', WebInboundDependencies.DEFAULT_SWITCH_ID),
             this.readString('FSPIOP_PARTIES_URL', WebInboundDependencies.DEFAULT_PARTIES_URL),
             this.readString('FSPIOP_QUOTES_URL', WebInboundDependencies.DEFAULT_QUOTES_URL),
             this.readString('FSPIOP_TRANSFERS_URL', WebInboundDependencies.DEFAULT_TRANSFERS_URL),
-            this.readString('FSPIOP_SWITCH_ID', WebInboundDependencies.DEFAULT_SWITCH_ID),
             this.readBoolean('FSPIOP_USE_JWS', WebInboundDependencies.DEFAULT_USE_JWS),
             this.readBoolean('FSPIOP_USE_MUTUAL_TLS', WebInboundDependencies.DEFAULT_USE_MUTUAL_TLS),
         );

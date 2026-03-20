@@ -1,13 +1,13 @@
-import {ErrorInformationObject, QuotesIDPutResponse, QuotesPostRequest} from '@shared/fspiop';
+import {ErrorInformationObject, Money, QuotesIDPutResponse, QuotesPostRequest, TransactionScenario} from '@shared/fspiop';
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'outbound_quotes'})
-@Index('outbound_quotes_02_idx', ['quoteId'])
-@Index('outbound_quotes_03_idx', ['createdAt'])
-@Index('outbound_quotes_04_idx', ['completedAt'])
-@Index('outbound_quotes_05_idx', ['payerFsp', 'payeeFsp'])
-@Index('outbound_quotes_06_idx', ['rail'])
-@Index('outbound_quotes_07_idx', ['failed'])
+@Index('outbound_quotes_01_idx', ['quoteId'])
+@Index('outbound_quotes_02_idx', ['createdAt'])
+@Index('outbound_quotes_03_idx', ['completedAt'])
+@Index('outbound_quotes_04_idx', ['payerFsp', 'payeeFsp'])
+@Index('outbound_quotes_05_idx', ['rail'])
+@Index('outbound_quotes_06_idx', ['failed'])
 export class OutboundQuotes {
 
     @PrimaryColumn({type: 'bigint', name: 'id'})
@@ -24,6 +24,15 @@ export class OutboundQuotes {
 
     @Column({type: 'varchar', length: 64, name: 'quote_id'})
     public quoteId: string;
+
+    @Column({type: 'varchar', length: 32, name: 'scenario'})
+    public scenario: TransactionScenario;
+
+    @Column({type: 'varchar', length: 128, name: 'sub_scenario', nullable: true})
+    public subScenario: string | null;
+
+    @Column({type: 'jsonb', name: 'amount'})
+    public amount: Money;
 
     @Column({type: 'jsonb', name: 'request'})
     public request: QuotesPostRequest;
@@ -62,6 +71,9 @@ export class OutboundQuotes {
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
         this.quoteId = quoteId;
+        this.scenario = request?.transactionType?.scenario as TransactionScenario;
+        this.subScenario = request?.transactionType?.subScenario ?? null;
+        this.amount = request?.amount as Money;
         this.request = request;
         this.response = response;
         this.error = error;

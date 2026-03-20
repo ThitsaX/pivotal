@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
-import { EnvBasedPrivateKeyLoader } from '../../../../../../packages/shared/security/component/key/loader/env-based-private-key-loader';
+import { EnvBasedPrivateKeyStore } from '../../../../../../packages/shared/security/component/key/store/env-based-private-key-store';
 import { TEST_PRIVATE_KEY_ENV_VALUE, TEST_PRIVATE_KEY_PEM } from '../test-key-fixtures';
 
 const originalEnv = { ...process.env };
@@ -9,37 +9,38 @@ afterEach(() => {
     process.env = { ...originalEnv };
 });
 
-describe('EnvBasedPrivateKeyLoader', () => {
+describe('EnvBasedPrivateKeyStore', () => {
 
     it('should return empty map when FSPIOP_FSP_IDS is missing', () => {
         delete process.env.FSPIOP_FSP_IDS;
-        const loader = new EnvBasedPrivateKeyLoader();
+        const store = new EnvBasedPrivateKeyStore();
 
-        const keysByFspId = loader.load();
+        const loadedStore = store.load();
 
-        assert.equal(keysByFspId.size, 0);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get('fsp-a'), undefined);
     });
 
     it('should load private keys by FSP ids from environment', () => {
         process.env.FSPIOP_FSP_IDS = 'fsp-a, fsp-b';
         process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-A'] = TEST_PRIVATE_KEY_ENV_VALUE;
         process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-B'] = TEST_PRIVATE_KEY_ENV_VALUE;
-        const loader = new EnvBasedPrivateKeyLoader();
+        const store = new EnvBasedPrivateKeyStore();
 
-        const keysByFspId = loader.load();
+        const loadedStore = store.load();
 
-        assert.equal(keysByFspId.size, 2);
-        assert.equal(keysByFspId.get('fsp-a')?.toBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
-        assert.equal(keysByFspId.get('fsp-b')?.toBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get('fsp-a')?.toBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
+        assert.equal(store.get('fsp-b')?.toBuffer().toString('utf-8'), TEST_PRIVATE_KEY_PEM);
     });
 
     it('should throw when expected key variable is missing', () => {
         process.env.FSPIOP_FSP_IDS = 'fsp-a';
         delete process.env['FSPIOP_JWS_PRIVATE_KEY_FSP-A'];
-        const loader = new EnvBasedPrivateKeyLoader();
+        const store = new EnvBasedPrivateKeyStore();
 
         assert.throws(
-            () => loader.load(),
+            () => store.load(),
             /Missing private key for 'fsp-a'. Expected env var 'FSPIOP_JWS_PRIVATE_KEY_FSP-A'./,
         );
     });

@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import * as JsonWebToken from 'jsonwebtoken';
 import { Jwt } from '../../../../../packages/shared/security/component/jwt/jwt';
 import { PrivateKey, RsaKeyPair } from '../../../../../packages/shared/security/component/key';
 
@@ -20,7 +21,7 @@ describe('Jwt', () => {
 
     it('should sign with default algorithm and verify token with public key', () => {
         const { privateKey, publicKey } = createRsaKeyPair();
-        const payload = '{"amount":"100","currency":"USD"}';
+        const payload = { amount: '100', currency: 'USD' };
 
         const token = Jwt.sign(privateKey, { kid: 'fsp-a' }, payload);
         const isVerified = Jwt.verify(publicKey, token);
@@ -30,7 +31,7 @@ describe('Jwt', () => {
 
     it('should verify jwt string against original json payload text', () => {
         const { privateKey } = createRsaKeyPair();
-        const payload = '{"amount":"100","currency":"USD"}';
+        const payload = { amount: '100', currency: 'USD' };
 
         const token = Jwt.sign(privateKey, { kid: 'fsp-a' }, payload);
         const isVerified = Jwt.verify(privateKey, token.full, payload);
@@ -40,7 +41,7 @@ describe('Jwt', () => {
 
     it('should sign with explicit algorithm and verify with public key token', () => {
         const { privateKey, publicKey } = createRsaKeyPair();
-        const payload = '{"amount":"100","currency":"USD"}';
+        const payload = { amount: '100', currency: 'USD' };
 
         const token = Jwt.sign(privateKey, 'RS512', { kid: 'fsp-a' }, payload);
         const isVerified = Jwt.verify(publicKey, token);
@@ -55,9 +56,9 @@ describe('Jwt', () => {
 
     it('should return false when verifying string token without payload', () => {
         const { privateKey } = createRsaKeyPair();
-        const token = Jwt.sign(privateKey, { kid: 'fsp-a' }, '{"amount":"100"}');
+        const token = Jwt.sign(privateKey, { kid: 'fsp-a' }, { amount: '100' });
 
-        const isVerified = (Jwt.verify as (key: PrivateKey, token: string, payload?: string) => boolean)(
+        const isVerified = (Jwt.verify as unknown as (key: PrivateKey, token: string, payload?: Record<string, unknown>) => boolean)(
             privateKey,
             token.full,
         );
@@ -69,7 +70,25 @@ describe('Jwt', () => {
         const { privateKey } = createRsaKeyPair();
         const invalidToken = 'invalid.token.value';
 
-        const isVerified = Jwt.verify(privateKey, invalidToken, '{"amount":"100"}');
+        const isVerified = Jwt.verify(privateKey, invalidToken, { amount: '100' });
+
+        assert.equal(isVerified, false);
+    });
+
+    it('should return false when token payload is not a json object', () => {
+        const { privateKey, publicKey } = createRsaKeyPair();
+
+        const fullToken = JsonWebToken.sign(
+            'plain-text-payload',
+            privateKey.toBuffer(),
+            {
+                algorithm: 'RS256',
+            },
+        );
+        const parts = fullToken.split('.');
+        const token = new Jwt.Token(parts[0], parts[1], parts[2], fullToken);
+
+        const isVerified = Jwt.verify(publicKey, token);
 
         assert.equal(isVerified, false);
     });
@@ -78,7 +97,7 @@ describe('Jwt', () => {
         const { privateKey } = createRsaKeyPair();
 
         assert.throws(
-            () => Jwt.sign(privateKey, { kid: 'fsp-a' }, 'sample-payload'),
+            () => Jwt.sign(privateKey, { kid: 'fsp-a' }, 'sample-payload' as unknown as Record<string, unknown>),
             /JWT payload must be a valid JSON object\./,
         );
     });

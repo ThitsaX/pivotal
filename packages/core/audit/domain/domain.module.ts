@@ -19,11 +19,19 @@ import {
     OutboundTransfers,
 } from './model';
 import {
+    FindInboundPartiesHandler,
+    FindInboundQuotesHandler,
+    FindInboundTransfersHandler,
+    FindOutboundPartiesHandler,
+    FindOutboundQuotesHandler,
+    FindOutboundTransfersHandler,
+} from './query';
+import {
     InboundPartiesRepository,
     InboundQuotesRepository,
     InboundTransfersRepository,
-    PAYPORT_DB_READ_CONNECTION_NAME,
-    PAYPORT_DB_WRITE_CONNECTION_NAME,
+    PIVOTAL_DB_READ_CONNECTION_NAME,
+    PIVOTAL_DB_WRITE_CONNECTION_NAME,
     OutboundPartiesRepository,
     OutboundQuotesRepository,
     OutboundTransfersRepository,
@@ -56,6 +64,15 @@ const CommandHandlers = [
     AuditOutboundTransfersHandler,
 ];
 
+const QueryHandlers = [
+    FindInboundPartiesHandler,
+    FindInboundQuotesHandler,
+    FindInboundTransfersHandler,
+    FindOutboundPartiesHandler,
+    FindOutboundQuotesHandler,
+    FindOutboundTransfersHandler,
+];
+
 @Module({})
 export class AuditDomainModule {
 
@@ -65,23 +82,23 @@ export class AuditDomainModule {
             imports: [
                 CqrsModule,
                 TypeOrmModule.forRootAsync({
-                    connectionName: PAYPORT_DB_WRITE_CONNECTION_NAME,
+                    connectionName: PIVOTAL_DB_WRITE_CONNECTION_NAME,
                     target: DbTarget.Write,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
                 TypeOrmModule.forRootAsync({
-                    connectionName: PAYPORT_DB_READ_CONNECTION_NAME,
+                    connectionName: PIVOTAL_DB_READ_CONNECTION_NAME,
                     target: DbTarget.Read,
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
-                NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_WRITE_CONNECTION_NAME),
-                NestJsTypeOrmModule.forFeature(Entities, PAYPORT_DB_READ_CONNECTION_NAME),
+                NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_WRITE_CONNECTION_NAME),
+                NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_READ_CONNECTION_NAME),
             ],
-            providers: [...Repositories, ...CommandHandlers],
+            providers: [...Repositories, ...CommandHandlers, ...QueryHandlers],
             exports: [CqrsModule, ...Repositories],
         };
     }

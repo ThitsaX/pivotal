@@ -1,7 +1,10 @@
 import {
     FspiopErrors,
     FspiopException,
+    FspiopHeaders,
+    FspiopHeadersMap,
     FspiopMoney,
+    FspiopSignature,
     Money,
     TransfersIDPutResponse,
     TransfersPostRequest,
@@ -84,6 +87,40 @@ export namespace DoTransferCommand {
     export class Response {
         constructor(public readonly response: TransfersIDPutResponse) {
         }
+    }
+
+    export class ConversionResponse {
+        public readonly response: TransfersPostRequest;
+        public readonly headers: FspiopHeadersMap;
+
+        constructor(
+            response: TransfersPostRequest,
+            headers: FspiopHeadersMap,
+        ) {
+            this.response = response;
+            this.headers = headers;
+        }
+
+        static fromInput(
+            input: DoTransferCommand.Input,
+            signer: DoTransferCommand.Signer,
+        ): DoTransferCommand.ConversionResponse {
+            const headers = FspiopHeaders.Values.Transfers.forRequest(input.source, input.destination);
+            const signatureHeader = signer.sign(headers, JSON.stringify(input.transferRequest));
+
+            if (signatureHeader != null) {
+                headers[FspiopHeaders.Names.FSPIOP_SIGNATURE] = JSON.stringify(signatureHeader);
+            }
+
+            return new DoTransferCommand.ConversionResponse(
+                input.transferRequest,
+                headers,
+            );
+        }
+    }
+
+    export interface Signer {
+        sign(headers: FspiopHeadersMap, payload: string): FspiopSignature.Header | undefined;
     }
 
     /**

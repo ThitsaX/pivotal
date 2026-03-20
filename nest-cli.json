@@ -50,6 +50,15 @@
         "tsConfigPath": "packages/core/outbound/domain/tsconfig.app.json"
       }
     },
+    "core-legacy-domain": {
+      "type": "library",
+      "root": "packages/core/legacy/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/legacy/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/legacy/domain/tsconfig.app.json"
+      }
+    },
     "core-outbound-publisher": {
       "type": "library",
       "root": "packages/core/outbound/publisher",
@@ -69,12 +78,21 @@
       }
     },
     "core-audit-consumer": {
-      "type": "application",
+      "type": "library",
       "root": "packages/core/audit/consumer",
-      "entryFile": "core/audit/consumer/main",
+      "entryFile": "index",
       "sourceRoot": "packages/core/audit/consumer",
       "compilerOptions": {
         "tsConfigPath": "packages/core/audit/consumer/tsconfig.app.json"
+      }
+    },
+    "apps-app-auditor": {
+      "type": "application",
+      "root": "packages/apps/app-auditor",
+      "entryFile": "apps/app-auditor/main",
+      "sourceRoot": "packages/apps/app-auditor",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/app-auditor/tsconfig.app.json"
       }
     },
     "apps-web-outbound": {
@@ -86,6 +104,15 @@
         "tsConfigPath": "packages/apps/web-outbound/tsconfig.app.json"
       }
     },
+    "apps-web-legacy": {
+      "type": "application",
+      "root": "packages/apps/web-legacy",
+      "entryFile": "apps/web-legacy/main",
+      "sourceRoot": "packages/apps/web-legacy",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-legacy/tsconfig.app.json"
+      }
+    },
     "apps-web-inbound": {
       "type": "application",
       "root": "packages/apps/web-inbound",
@@ -93,6 +120,15 @@
       "sourceRoot": "packages/apps/web-inbound",
       "compilerOptions": {
         "tsConfigPath": "packages/apps/web-inbound/tsconfig.app.json"
+      }
+    },
+    "apps-web-pivotal": {
+      "type": "application",
+      "root": "packages/apps/web-pivotal",
+      "entryFile": "apps/web-pivotal/main",
+      "sourceRoot": "packages/apps/web-pivotal",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-pivotal/tsconfig.app.json"
       }
     },
     "core-audit-subscriber": {
@@ -228,6 +264,15 @@
       "sourceRoot": "packages/samples/wallet2-connector",
       "compilerOptions": {
         "tsConfigPath": "packages/samples/wallet2-connector/tsconfig.app.json"
+      }
+    },
+    "samples-wallet3-connector": {
+      "type": "application",
+      "root": "packages/samples/wallet3-connector",
+      "entryFile": "samples/wallet3-connector/main",
+      "sourceRoot": "packages/samples/wallet3-connector",
+      "compilerOptions": {
+        "tsConfigPath": "packages/samples/wallet3-connector/tsconfig.app.json"
       }
     }
   }

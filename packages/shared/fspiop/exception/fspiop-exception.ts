@@ -16,11 +16,12 @@ export class FspiopException extends Error {
     constructor(errorDefinition: ErrorDefinition, message: string, extensionList?: ExtensionList);
     constructor(errorDefinition: ErrorDefinition, error: Error, extensionList?: ExtensionList);
     constructor(errorDefinition: ErrorDefinition, messageOrError?: string | Error | ExtensionList, extensionListArg?: ExtensionList) {
-        const message = typeof messageOrError === 'string'
+        const rawMessage = typeof messageOrError === 'string'
             ? messageOrError
             : messageOrError instanceof Error
                 ? messageOrError.message
                 : errorDefinition.description;
+        const message = FspiopException.firstNonBlank(rawMessage, errorDefinition.description);
 
         const isMessageOrError = typeof messageOrError === 'string' || messageOrError instanceof Error;
         const extensionList = isMessageOrError
@@ -32,7 +33,7 @@ export class FspiopException extends Error {
         this.name = 'FspiopException';
 
         this.errorDefinition = typeof messageOrError === 'string'
-            ? new ErrorDefinition(errorDefinition.errorType, messageOrError)
+            ? new ErrorDefinition(errorDefinition.errorType, message)
             : errorDefinition;
 
         this.extensionList = extensionList;
@@ -57,10 +58,17 @@ export class FspiopException extends Error {
             return exception;
         }
 
-        const message = exception instanceof Error
-            ? exception.message
-            : FspiopErrors.INTERNAL_SERVER_ERROR.description;
+        const message = FspiopException.firstNonBlank(
+            exception instanceof Error ? exception.message : undefined,
+            FspiopErrors.INTERNAL_SERVER_ERROR.description,
+        );
 
         return new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, message);
+    }
+
+    private static firstNonBlank(value: string | undefined, fallback: string): string {
+        return value != null && value.trim().length > 0
+            ? value
+            : fallback;
     }
 }

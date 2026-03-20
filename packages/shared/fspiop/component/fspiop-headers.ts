@@ -65,7 +65,7 @@ export namespace FspiopHeaders {
             }
 
             static forResult(payer: string, payee: string): FspiopHeadersMap {
-                return createHeaders(null, Parties.CONTENT_TYPE, payee, payer);
+                return createHeaders(Parties.ACCEPT, Parties.CONTENT_TYPE, payee, payer);
             }
         }
 

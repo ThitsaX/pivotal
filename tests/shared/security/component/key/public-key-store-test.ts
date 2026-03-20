@@ -1,84 +1,75 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PublicKeyLoader } from '../../../../../packages/shared/security/component/key/public-key-loader';
 import { PublicKeyStore } from '../../../../../packages/shared/security/component/key/public-key-store';
 import { PublicKey } from '../../../../../packages/shared/security/component/key/public-key';
 import { TEST_PUBLIC_KEY_PEM } from './test-key-fixtures';
 
-class StubPublicKeyLoader extends PublicKeyLoader {
+class StubPublicKeyStore extends PublicKeyStore {
 
     private readonly keysByFspId: Map<string, PublicKey>;
+    private readonly loadedKeysByFspId = new Map<string, PublicKey>();
 
     constructor(keysByFspId: Map<string, PublicKey>) {
         super();
         this.keysByFspId = keysByFspId;
     }
 
-    load(): Map<string, PublicKey> {
-        return this.keysByFspId;
+    load(): PublicKeyStore {
+        for (const [fspId, publicKey] of this.keysByFspId.entries()) {
+            this.loadedKeysByFspId.set(fspId, PublicKey.fromBuffer(publicKey.toBuffer()));
+        }
+
+        return this;
+    }
+
+    get(fspId: string): PublicKey | undefined {
+        const publicKey = this.loadedKeysByFspId.get(fspId);
+
+        if (publicKey == null) {
+            return undefined;
+        }
+
+        return PublicKey.fromBuffer(publicKey.toBuffer());
     }
 }
 
 describe('PublicKeyStore', () => {
 
-    it('should load keys from loader and return loaded count', () => {
+    it('should load keys from store implementation and return self', () => {
         const publicKeyA = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
         const publicKeyB = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
-        const loader = new StubPublicKeyLoader(new Map([
+        const store = new StubPublicKeyStore(new Map([
             ['fsp-a', publicKeyA],
             ['fsp-b', publicKeyB],
         ]));
-        const store = new PublicKeyStore(loader);
 
-        const loadedCount = store.load();
+        const loadedStore = store.load();
 
-        assert.equal(loadedCount, 2);
-        assert.equal(store.has('fsp-a'), true);
-        assert.equal(store.has('fsp-b'), true);
+        assert.equal(loadedStore, store);
+        assert.equal(store.get('fsp-a') != null, true);
+        assert.equal(store.get('fsp-b') != null, true);
     });
 
-    it('should return defensive copy from get and getBuffer', () => {
+    it('should return defensive copy from get', () => {
         const sourceKey = PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'));
-        const loader = new StubPublicKeyLoader(new Map([['fsp-a', sourceKey]]));
-        const store = new PublicKeyStore(loader);
+        const store = new StubPublicKeyStore(new Map([['fsp-a', sourceKey]]));
 
         store.load();
 
         const key = store.get('fsp-a');
-        const keyBuffer = store.getBuffer('fsp-a');
 
         assert.ok(key);
-        assert.ok(keyBuffer);
         assert.notEqual(key, sourceKey);
 
+        const keyBuffer = key.toBuffer();
         keyBuffer.write('X', 0, 'utf-8');
 
-        assert.equal(store.getBuffer('fsp-a')?.toString('utf-8'), TEST_PUBLIC_KEY_PEM);
-    });
-
-    it('should support delete and clear', () => {
-        const loader = new StubPublicKeyLoader(new Map([
-            ['fsp-a', PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'))],
-            ['fsp-b', PublicKey.fromBuffer(Buffer.from(TEST_PUBLIC_KEY_PEM, 'utf-8'))],
-        ]));
-        const store = new PublicKeyStore(loader);
-
-        store.load();
-
-        const isDeleted = store.delete('fsp-a');
-        const isDeletedAgain = store.delete('fsp-a');
-
-        store.clear();
-
-        assert.equal(isDeleted, true);
-        assert.equal(isDeletedAgain, false);
-        assert.equal(store.has('fsp-b'), false);
+        assert.equal(store.get('fsp-a')?.toBuffer().toString('utf-8'), TEST_PUBLIC_KEY_PEM);
     });
 
     it('should return undefined for unknown fspId', () => {
-        const store = new PublicKeyStore(new StubPublicKeyLoader(new Map()));
+        const store = new StubPublicKeyStore(new Map());
 
         assert.equal(store.get('missing'), undefined);
-        assert.equal(store.getBuffer('missing'), undefined);
     });
 });

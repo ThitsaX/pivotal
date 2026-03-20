@@ -10,16 +10,9 @@ import {
     OutboundQuotesListener,
     OutboundTransfersListener,
 } from './listener';
-import {AuditConsumerDependencies} from './required.dependencies';
 
 @Module({})
 export class AuditConsumerModule {
-
-    static forRoot(): DynamicModule {
-        return AuditConsumerModule.forRootAsync({
-            useFactory: (): AuditConsumerModule.RequiredDependencies => new AuditConsumerDependencies(),
-        });
-    }
 
     static forRootAsync(asyncOptions: AuditConsumerModule.AsyncOptions): DynamicModule {
         return {

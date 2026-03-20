@@ -28,6 +28,9 @@ CREATE TABLE inbound_quotes (
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
     quote_id VARCHAR(64) NOT NULL,
+    scenario VARCHAR(32) NOT NULL,
+    sub_scenario VARCHAR(128),
+    amount JSONB NOT NULL,
     request JSONB NOT NULL,
     response JSONB,
     error JSONB,
@@ -37,12 +40,12 @@ CREATE TABLE inbound_quotes (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX inbound_quotes_02_idx ON inbound_quotes (quote_id);
-CREATE INDEX inbound_quotes_03_idx ON inbound_quotes (created_at);
-CREATE INDEX inbound_quotes_04_idx ON inbound_quotes (completed_at);
-CREATE INDEX inbound_quotes_05_idx ON inbound_quotes (payer_fsp, payee_fsp);
-CREATE INDEX inbound_quotes_06_idx ON inbound_quotes (rail);
-CREATE INDEX inbound_quotes_07_idx ON inbound_quotes (failed);
+CREATE INDEX inbound_quotes_01_idx ON inbound_quotes (quote_id);
+CREATE INDEX inbound_quotes_02_idx ON inbound_quotes (created_at);
+CREATE INDEX inbound_quotes_03_idx ON inbound_quotes (completed_at);
+CREATE INDEX inbound_quotes_04_idx ON inbound_quotes (payer_fsp, payee_fsp);
+CREATE INDEX inbound_quotes_05_idx ON inbound_quotes (rail);
+CREATE INDEX inbound_quotes_06_idx ON inbound_quotes (failed);
 
 CREATE TABLE inbound_transfers (
     id BIGINT PRIMARY KEY,
