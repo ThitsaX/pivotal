@@ -1,7 +1,7 @@
 import {AmountType, Currency, Party, QuotesIDPutResponse, TransactionScenario, TransfersIDPutResponse} from '@shared/fspiop';
 import {FspParty} from '../dto';
 
-export class CachedTransaction {
+export class TransferRequest {
 
     payer!: Party;
 
@@ -30,10 +30,6 @@ export class CachedTransaction {
     subScenario!: string;
 
     note?: string;
-
-    initiatedTimestamp!: string;
-
-    direction!: string;
 
     supportedCurrencies?: Array<string>;
 }
