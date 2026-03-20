@@ -63,6 +63,7 @@ export class FspConnector {
             postQuotesRequest.amountType,
             postQuotesRequest.amount,
             postQuotesRequest.fees,
+            postQuotesRequest.extensionList,
         );
 
         FspConnectorValidation.validatePostQuotesOutput(postQuotesOutput, this.connectorSettings);

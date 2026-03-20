@@ -3,6 +3,7 @@ import {ConnectorSettings, FspClient} from '@core/connector/domain';
 import {CatalystException, CatalystFeeEngine, FeeSplitRole} from '@shared/catalyst';
 import {
     AmountType,
+    ExtensionList,
     FspiopErrors,
     FspiopException,
     Money,
@@ -56,10 +57,15 @@ export class Wallet2FspClient extends FspClient {
         amountType: AmountType,
         amount: Money,
         payerFspFee?: Money,
+        extensionList?: ExtensionList,
     ): Promise<FspClient.PostQuotesOutput> {
         this.logger.log(
-            `postQuotes: scenario=${scenario}, subScenario=${subScenario ?? ''}, amountType=${amountType}`,
+            `postQuotes: scenario=${scenario}, subScenario=${subScenario ?? ''}, amountType=${amountType}, extensions=${extensionList?.extension?.length ?? 0}`,
         );
+
+        if ((extensionList?.extension?.length ?? 0) > 0) {
+            this.logger.debug(`postQuotes extensionList=${JSON.stringify(extensionList?.extension)}`);
+        }
 
         const preCalculatedFees = new Map<FeeSplitRole, Money>();
         if (payerFspFee != null) {
