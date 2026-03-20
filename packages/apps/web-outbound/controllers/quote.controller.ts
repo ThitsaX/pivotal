@@ -49,6 +49,9 @@ export class QuoteRequest {
 
     @ApiProperty({type: () => Money, required: false, description: 'Optional payer-side FSP fee'})
     payerFspFee?: Money;
+
+    @ApiProperty({type: () => ExtensionList, required: false, description: 'Optional quote extensions to forward to the payee DFSP'})
+    extensionList?: ExtensionList;
 }
 
 export class QuoteResponse {

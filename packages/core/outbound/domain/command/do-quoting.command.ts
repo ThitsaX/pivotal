@@ -33,6 +33,7 @@ export namespace DoQuotingCommand {
             public readonly payee: PartyIdInfo,
             public readonly subScenario?: string,
             public readonly payerFspFee?: Money,
+            public readonly extensionList?: ExtensionList,
         ) {
         }
     }
@@ -80,6 +81,7 @@ export namespace DoQuotingCommand {
             quoteRequest.payer = DoQuotingCommand.Input.toParty(request.payer);
             quoteRequest.payee = DoQuotingCommand.Input.toParty(request.payee);
             quoteRequest.fees = request.payerFspFee;
+            quoteRequest.extensionList = request.extensionList;
             quoteRequest.transactionType = DoQuotingCommand.Input.toTransactionType(request.scenario, request.subScenario);
 
             return quoteRequest;
