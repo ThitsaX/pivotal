@@ -79,7 +79,7 @@ export class PutAcceptQuoteHandler
 
         const callback = await waitPromise;
         transferRequest.transfer = callback;
-        const response = PutAcceptQuoteHandler.toResponse(transferRequest, callback);
+        const response = PutAcceptQuoteHandler.toResponse(transferRequest);
 
         await this.redisClient.set(transferId, transferRequest);
 
@@ -146,22 +146,9 @@ export class PutAcceptQuoteHandler
 
     private static toResponse(
         transferRequest: TransferRequest,
-        callback: TransfersIDPutResponse,
     ): SendMoneyResponse {
         const response = new SendMoneyResponse();
         response.transferId = transferRequest.transferId;
-        response.homeTransactionId = transferRequest.homeTransactionId;
-        response.from = transferRequest.from;
-        response.to = transferRequest.to;
-        response.amountType = transferRequest.amountType;
-        response.transactionType = transferRequest.transactionType;
-        response.note = transferRequest.note;
-        response.amount = transferRequest.amount;
-        response.payeeFspFeeAmount = transferRequest.quotes?.payeeFspFee?.amount;
-        response.currency = transferRequest.quotes?.transferAmount?.currency ?? transferRequest.currency;
-        response.direction = 'OUTBOUND';
-        response.supportedCurrencies = transferRequest.supportedCurrencies;
-        response.extensionList = callback.extensionList?.extension;
 
         return response;
     }

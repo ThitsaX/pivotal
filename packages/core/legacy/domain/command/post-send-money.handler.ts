@@ -77,7 +77,7 @@ export class PostSendMoneyHandler
         }
 
         const callback = await waitPromise;
-        const response = PostSendMoneyHandler.toResponse(transferId, request, callback);
+        const response = PostSendMoneyHandler.toResponse(transferId, callback);
         const cachedTransaction = PostSendMoneyHandler.toTransferRequest(request, response, callback);
 
         await this.redisClient.set(transferId, cachedTransaction);
@@ -95,22 +95,12 @@ export class PostSendMoneyHandler
 
     private static toResponse(
         transferId: string,
-        request: SendMoneyRequest,
         callback: PartiesTypeIDPutResponse,
     ): SendMoneyResponse {
         const response = new SendMoneyResponse();
         response.transferId = transferId;
-        response.homeTransactionId = request.homeTransactionId;
-        response.from = request.from;
         response.to = PostSendMoneyHandler.toFspParty(callback);
-        response.amountType = request.amountType;
-        response.transactionType = request.transactionType;
-        response.note = request.note;
-        response.amount = request.amount;
-        response.currency = request.currency;
-        response.initiatedTimestamp = new Date().toISOString();
         response.supportedCurrencies = callback.party.supportedCurrencies;
-        response.direction = 'OUTBOUND';
 
         return response;
     }
