@@ -50,6 +50,15 @@
         "tsConfigPath": "packages/core/outbound/domain/tsconfig.app.json"
       }
     },
+    "core-legacy-domain": {
+      "type": "library",
+      "root": "packages/core/legacy/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/legacy/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/legacy/domain/tsconfig.app.json"
+      }
+    },
     "core-outbound-publisher": {
       "type": "library",
       "root": "packages/core/outbound/publisher",
@@ -93,6 +102,15 @@
       "sourceRoot": "packages/apps/web-outbound",
       "compilerOptions": {
         "tsConfigPath": "packages/apps/web-outbound/tsconfig.app.json"
+      }
+    },
+    "apps-web-legacy": {
+      "type": "application",
+      "root": "packages/apps/web-legacy",
+      "entryFile": "apps/web-legacy/main",
+      "sourceRoot": "packages/apps/web-legacy",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/web-legacy/tsconfig.app.json"
       }
     },
     "apps-web-inbound": {

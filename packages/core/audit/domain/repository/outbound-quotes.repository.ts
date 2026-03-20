@@ -67,6 +67,14 @@ export class OutboundQuotesRepository {
             queryBuilder.andWhere('outboundQuotes.quoteId = :quoteId', {quoteId: criteria.quoteId});
         }
 
+        if (criteria.scenario !== undefined) {
+            queryBuilder.andWhere('outboundQuotes.scenario = :scenario', {scenario: criteria.scenario});
+        }
+
+        if (criteria.subScenario !== undefined) {
+            queryBuilder.andWhere('outboundQuotes.subScenario = :subScenario', {subScenario: criteria.subScenario});
+        }
+
         if (criteria.createdAt?.startInclusive !== undefined) {
             queryBuilder.andWhere('outboundQuotes.createdAt >= :createdAtStartInclusive', {
                 createdAtStartInclusive: criteria.createdAt.startInclusive,

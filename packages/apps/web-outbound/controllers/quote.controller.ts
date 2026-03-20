@@ -117,7 +117,7 @@ export class QuoteController {
     @ApiOperation({summary: 'Initiate a quoting request via FSPIOP'})
     @ApiHeader({name: FspiopHeaders.Names.FSPIOP_SOURCE, required: true, description: 'The FSP ID of the requester'})
     @ApiHeader({name: 'authorization', required: true, description: 'Bearer RS256 JWT for API authentication'})
-    @ApiHeader({name: 'conversion', required: false, description: 'When true, skip FSPIOP call and return generated quote request'})
+    @ApiHeader({name: 'myog', required: false, description: 'When true, skip FSPIOP call and return generated quote request'})
     @ApiBearerAuth('authorization')
     @ApiBody({type: QuoteRequest})
     @ApiOkResponse({type: QuoteResponse})
@@ -125,7 +125,7 @@ export class QuoteController {
     async quote(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Headers('authorization') authorization: string | undefined,
-        @Headers('conversion') conversion: string | undefined,
+        @Headers('myog') conversion: string | undefined,
         @Body() request: QuoteRequest,
     ): Promise<QuoteResponse | DoQuotingCommand.ConversionResponse> {
         validateAuthorizationHeader(authorization);
