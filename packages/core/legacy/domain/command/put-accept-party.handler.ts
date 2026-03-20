@@ -2,11 +2,14 @@ import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {
     Currency,
+    ExtensionList,
     FspiopAxios,
     FspiopAxiosError,
+    FspiopCurrencies,
     FspiopErrors,
     FspiopException,
     FspiopHeaders,
+    FspiopMoney,
     FspiopPubSubSubjects,
     FspiopResponseSubscriber,
     Money,
@@ -25,6 +28,9 @@ import {PutAcceptPartyCommand} from './put-accept-party.command';
 @CommandHandler(PutAcceptPartyCommand)
 export class PutAcceptPartyHandler
     implements ICommandHandler<PutAcceptPartyCommand, PutAcceptPartyCommand.Output> {
+
+    private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
+    private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
     constructor(
         @Inject(FspiopAxios)
@@ -160,21 +166,70 @@ export class PutAcceptPartyHandler
         callback: QuotesIDPutResponse,
     ): SendMoneyResponse {
         const response = new SendMoneyResponse();
-        response.transferId = transferRequest.transferId;
-        response.homeTransactionId = transferRequest.homeTransactionId;
-        response.from = transferRequest.from;
-        response.to = transferRequest.to;
-        response.amountType = transferRequest.amountType;
-        response.transactionType = transferRequest.transactionType;
-        response.note = transferRequest.note;
-        response.amount = callback.transferAmount?.amount ?? transferRequest.amount;
-        response.payeeFspFeeAmount = callback.payeeFspFee?.amount;
-        response.currency = callback.transferAmount?.currency ?? transferRequest.currency;
-        response.direction = 'OUTBOUND';
-        response.supportedCurrencies = transferRequest.supportedCurrencies;
-        response.extensionList = callback.extensionList?.extension;
+        response.schemeFee = PutAcceptPartyHandler.toSchemeFee(callback, transferRequest.currency);
 
         return response;
+    }
+
+    private static toSchemeFee(callback: QuotesIDPutResponse, fallbackCurrency: Currency): Money {
+        const transferAmountCurrency = callback.transferAmount?.currency ?? fallbackCurrency;
+        const transferAmountScale = FspiopCurrencies.get(transferAmountCurrency)?.scale;
+
+        if (transferAmountScale == null) {
+            throw new FspiopException(
+                FspiopErrors.PAYEE_UNSUPPORTED_CURRENCY,
+                `Unsupported currency ${transferAmountCurrency}`,
+            );
+        }
+
+        const extensionList = PutAcceptPartyHandler.toExtensionList(callback.extensionList);
+        const schemeFeeAmount = PutAcceptPartyHandler.findExtensionValue(
+            extensionList,
+            PutAcceptPartyHandler.SCHEME_FEE_AMOUNT_KEY,
+        ) ?? '0';
+        const feeCurrencyValue = PutAcceptPartyHandler.findExtensionValue(
+            extensionList,
+            PutAcceptPartyHandler.FEE_CURRENCY_KEY,
+        );
+        const feeCurrency = feeCurrencyValue as Currency | undefined;
+        const feeCurrencyScale = feeCurrency == null
+            ? undefined
+            : FspiopCurrencies.get(feeCurrency)?.scale;
+        const currency = feeCurrencyScale == null || feeCurrency == null
+            ? transferAmountCurrency
+            : feeCurrency;
+        const scale = feeCurrencyScale == null
+            ? transferAmountScale
+            : feeCurrencyScale;
+        const serializedSchemeFeeAmount = FspiopMoney.serialize(schemeFeeAmount, scale);
+
+        return PutAcceptPartyHandler.toMoney(
+            currency,
+            FspiopMoney.deserialize(serializedSchemeFeeAmount, scale),
+        );
+    }
+
+    private static toExtensionList(extensionList: ExtensionList | undefined): ExtensionList {
+        const normalizedExtensionList = new ExtensionList();
+        normalizedExtensionList.extension = extensionList?.extension ?? [];
+
+        return normalizedExtensionList;
+    }
+
+    private static findExtensionValue(extensionList: ExtensionList, targetKey: string): string | undefined {
+        const normalizedTargetKey = targetKey.trim().toLowerCase();
+
+        for (const extension of extensionList.extension) {
+            const key = extension.key?.trim().toLowerCase() ?? '';
+
+            if (key !== normalizedTargetKey) {
+                continue;
+            }
+
+            return extension.value?.trim();
+        }
+
+        return undefined;
     }
 
     private static toOptionalValue(value: string | undefined): string | undefined {
