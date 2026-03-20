@@ -11,8 +11,8 @@ export enum EngineMode {
 export class CatalystFeeEngine {
 
     private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
-    private static readonly FEE_CURRENCY_KEY = 'fee_currency';
-    private static readonly FEE_POLICY_ID_KEY = 'fee_policy_id';
+    private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
+    private static readonly FEE_POLICY_ID_KEY = 'scheme_fee_policy_id';
 
     constructor(
         private readonly feeCalculator: FeeCalculator,

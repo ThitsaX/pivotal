@@ -17,7 +17,7 @@ import {
     PartiesTypeIDPutResponse,
 } from '@shared/fspiop';
 import {RedisClient} from '../component';
-import {CachedTransaction} from '../cache';
+import {TransferRequest} from '../cache';
 import {FspParty, SendMoneyRequest, SendMoneyResponse} from '../dto';
 import {PostSendMoneyCommand} from './post-send-money.command';
 
@@ -78,7 +78,7 @@ export class PostSendMoneyHandler
 
         const callback = await waitPromise;
         const response = PostSendMoneyHandler.toResponse(transferId, request, callback);
-        const cachedTransaction = PostSendMoneyHandler.toCachedTransaction(request, response, callback);
+        const cachedTransaction = PostSendMoneyHandler.toTransferRequest(request, response, callback);
 
         await this.redisClient.set(transferId, cachedTransaction);
 
@@ -136,31 +136,29 @@ export class PostSendMoneyHandler
         return fspParty;
     }
 
-    private static toCachedTransaction(
+    private static toTransferRequest(
         request: SendMoneyRequest,
         response: SendMoneyResponse,
         callback: PartiesTypeIDPutResponse,
-    ): CachedTransaction {
-        const cachedTransaction = new CachedTransaction();
-        cachedTransaction.payer = PostSendMoneyHandler.toParty(request.from);
-        cachedTransaction.payee = callback.party;
-        cachedTransaction.quotes = undefined;
-        cachedTransaction.transfer = undefined;
-        cachedTransaction.transferId = response.transferId ?? '';
-        cachedTransaction.homeTransactionId = request.homeTransactionId;
-        cachedTransaction.from = request.from;
-        cachedTransaction.to = response.to ?? request.to;
-        cachedTransaction.amountType = request.amountType;
-        cachedTransaction.currency = request.currency;
-        cachedTransaction.amount = request.amount;
-        cachedTransaction.transactionType = request.transactionType;
-        cachedTransaction.subScenario = request.subScenario;
-        cachedTransaction.note = request.note;
-        cachedTransaction.initiatedTimestamp = response.initiatedTimestamp ?? '';
-        cachedTransaction.direction = response.direction ?? '';
-        cachedTransaction.supportedCurrencies = callback.party.supportedCurrencies;
+    ): TransferRequest {
+        const transferRequest = new TransferRequest();
+        transferRequest.payer = PostSendMoneyHandler.toParty(request.from);
+        transferRequest.payee = callback.party;
+        transferRequest.quotes = undefined;
+        transferRequest.transfer = undefined;
+        transferRequest.transferId = response.transferId ?? '';
+        transferRequest.homeTransactionId = request.homeTransactionId;
+        transferRequest.from = request.from;
+        transferRequest.to = response.to ?? request.to;
+        transferRequest.amountType = request.amountType;
+        transferRequest.currency = request.currency;
+        transferRequest.amount = request.amount;
+        transferRequest.transactionType = request.transactionType;
+        transferRequest.subScenario = request.subScenario;
+        transferRequest.note = request.note;
+        transferRequest.supportedCurrencies = callback.party.supportedCurrencies;
 
-        return cachedTransaction;
+        return transferRequest;
     }
 
     private static toParty(fspParty: FspParty): Party {

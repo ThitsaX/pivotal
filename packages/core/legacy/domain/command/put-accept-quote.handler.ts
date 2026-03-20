@@ -13,7 +13,7 @@ import {
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
-import {CachedTransaction} from '../cache';
+import {TransferRequest} from '../cache';
 import {RedisClient} from '../component';
 import {SendMoneyResponse} from '../dto';
 import {PutAcceptQuoteCommand} from './put-accept-quote.command';
@@ -34,7 +34,7 @@ export class PutAcceptQuoteHandler
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const {transferId, acceptQuote} = command.input;
-        const cachedTransaction = await this.getCachedTransaction(transferId);
+        const transferRequest = await this.getTransferRequest(transferId);
 
         if (!acceptQuote) {
             throw new FspiopException(
@@ -43,9 +43,9 @@ export class PutAcceptQuoteHandler
             );
         }
 
-        const source = PutAcceptQuoteHandler.getFspId(cachedTransaction.payer, 'payer');
-        const destination = PutAcceptQuoteHandler.getFspId(cachedTransaction.payee, 'payee');
-        const transferRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, cachedTransaction);
+        const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
+        const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
+        const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const {transfersUrl} = this.fspiopAxios.settings;
 
         const headers = FspiopHeaders.Values.Transfers.forRequest(source, destination);
@@ -58,7 +58,7 @@ export class PutAcceptQuoteHandler
         );
 
         try {
-            await this.fspiopAxios.postTransfers(transfersUrl, headers, transferRequest);
+            await this.fspiopAxios.postTransfers(transfersUrl, headers, transfersPostRequest);
         } catch (error) {
             this.subscriber.cancel(successSubject);
 
@@ -78,25 +78,25 @@ export class PutAcceptQuoteHandler
         }
 
         const callback = await waitPromise;
-        cachedTransaction.transfer = callback;
-        const response = PutAcceptQuoteHandler.toResponse(cachedTransaction, callback);
+        transferRequest.transfer = callback;
+        const response = PutAcceptQuoteHandler.toResponse(transferRequest, callback);
 
-        await this.redisClient.set(transferId, cachedTransaction);
+        await this.redisClient.set(transferId, transferRequest);
 
         return new PutAcceptQuoteCommand.Output(response, callback);
     }
 
-    private async getCachedTransaction(transferId: string): Promise<CachedTransaction> {
-        const cachedTransaction = await this.redisClient.get<CachedTransaction>(transferId);
+    private async getTransferRequest(transferId: string): Promise<TransferRequest> {
+        const transferRequest = await this.redisClient.get<TransferRequest>(transferId);
 
-        if (cachedTransaction == null) {
+        if (transferRequest == null) {
             throw new FspiopException(
                 FspiopErrors.TRANSFER_ID_NOT_FOUND,
                 `Transfer ${transferId} was not found in cache.`,
             );
         }
 
-        return cachedTransaction;
+        return transferRequest;
     }
 
     private static getFspId(party: Party | undefined, label: string): string {
@@ -114,9 +114,9 @@ export class PutAcceptQuoteHandler
 
     private static toTransfersPostRequest(
         transferId: string,
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
     ): TransfersPostRequest {
-        const quotes = cachedTransaction.quotes;
+        const quotes = transferRequest.quotes;
 
         if (quotes == null) {
             throw new FspiopException(
@@ -125,19 +125,19 @@ export class PutAcceptQuoteHandler
             );
         }
 
-        const payerFsp = PutAcceptQuoteHandler.getFspId(cachedTransaction.payer, 'payer');
-        const payeeFsp = PutAcceptQuoteHandler.getFspId(cachedTransaction.payee, 'payee');
-        const transferRequest = new TransfersPostRequest();
-        transferRequest.transferId = transferId;
-        transferRequest.payerFsp = payerFsp;
-        transferRequest.payeeFsp = payeeFsp;
-        transferRequest.amount = quotes.transferAmount;
-        transferRequest.ilpPacket = quotes.ilpPacket;
-        transferRequest.condition = quotes.condition;
-        transferRequest.expiration = quotes.expiration;
-        transferRequest.extensionList = PutAcceptQuoteHandler.toExtensionList(quotes);
+        const payerFsp = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
+        const payeeFsp = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
+        const transfersPostRequest = new TransfersPostRequest();
+        transfersPostRequest.transferId = transferId;
+        transfersPostRequest.payerFsp = payerFsp;
+        transfersPostRequest.payeeFsp = payeeFsp;
+        transfersPostRequest.amount = quotes.transferAmount;
+        transfersPostRequest.ilpPacket = quotes.ilpPacket;
+        transfersPostRequest.condition = quotes.condition;
+        transfersPostRequest.expiration = quotes.expiration;
+        transfersPostRequest.extensionList = PutAcceptQuoteHandler.toExtensionList(quotes);
 
-        return transferRequest;
+        return transfersPostRequest;
     }
 
     private static toExtensionList(quotes: QuotesIDPutResponse): QuotesIDPutResponse['extensionList'] {
@@ -145,23 +145,22 @@ export class PutAcceptQuoteHandler
     }
 
     private static toResponse(
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
         callback: TransfersIDPutResponse,
     ): SendMoneyResponse {
         const response = new SendMoneyResponse();
-        response.transferId = cachedTransaction.transferId;
-        response.homeTransactionId = cachedTransaction.homeTransactionId;
-        response.from = cachedTransaction.from;
-        response.to = cachedTransaction.to;
-        response.amountType = cachedTransaction.amountType;
-        response.transactionType = cachedTransaction.transactionType;
-        response.note = cachedTransaction.note;
-        response.amount = cachedTransaction.amount;
-        response.payeeFspFeeAmount = cachedTransaction.quotes?.payeeFspFee?.amount;
-        response.currency = cachedTransaction.quotes?.transferAmount?.currency ?? cachedTransaction.currency;
-        response.initiatedTimestamp = callback.completedTimestamp ?? cachedTransaction.initiatedTimestamp;
-        response.direction = cachedTransaction.direction;
-        response.supportedCurrencies = cachedTransaction.supportedCurrencies;
+        response.transferId = transferRequest.transferId;
+        response.homeTransactionId = transferRequest.homeTransactionId;
+        response.from = transferRequest.from;
+        response.to = transferRequest.to;
+        response.amountType = transferRequest.amountType;
+        response.transactionType = transferRequest.transactionType;
+        response.note = transferRequest.note;
+        response.amount = transferRequest.amount;
+        response.payeeFspFeeAmount = transferRequest.quotes?.payeeFspFee?.amount;
+        response.currency = transferRequest.quotes?.transferAmount?.currency ?? transferRequest.currency;
+        response.direction = 'OUTBOUND';
+        response.supportedCurrencies = transferRequest.supportedCurrencies;
         response.extensionList = callback.extensionList?.extension;
 
         return response;
