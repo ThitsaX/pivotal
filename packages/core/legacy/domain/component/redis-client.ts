@@ -1,12 +1,15 @@
 import {OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {createClient, RedisClientType} from 'redis';
+import {LegacySettings} from './legacy-settings';
 
 export class RedisClient implements OnModuleInit, OnModuleDestroy {
 
     private readonly client: RedisClientType;
+    private readonly defaultTtlMs: number;
 
-    constructor(private readonly redisUrl: string) {
-        this.client = createClient({url: this.redisUrl});
+    constructor(private readonly legacySettings: LegacySettings) {
+        this.client = createClient({url: this.legacySettings.redisUrl});
+        this.defaultTtlMs = this.legacySettings.redisTtlMs;
     }
 
     async onModuleInit(): Promise<void> {
@@ -31,15 +34,16 @@ export class RedisClient implements OnModuleInit, OnModuleDestroy {
         return JSON.parse(value) as T;
     }
 
-    async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+    async set<T>(key: string, value: T, ttlMs?: number): Promise<void> {
         const serialized = JSON.stringify(value);
+        const resolvedTtlMs = ttlMs ?? this.defaultTtlMs;
 
-        if (ttlSeconds == null) {
+        if (resolvedTtlMs <= 0) {
             await this.client.set(key, serialized);
             return;
         }
 
-        await this.client.set(key, serialized, {EX: ttlSeconds});
+        await this.client.set(key, serialized, {PX: resolvedTtlMs});
     }
 
     async delete(key: string): Promise<void> {

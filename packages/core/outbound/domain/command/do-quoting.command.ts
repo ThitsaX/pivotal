@@ -132,7 +132,7 @@ export namespace DoQuotingCommand {
 
     export class Response {
         private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
-        private static readonly FEE_CURRENCY_KEY = 'fee_currency';
+        private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
         constructor(
             public readonly quoteId: string,

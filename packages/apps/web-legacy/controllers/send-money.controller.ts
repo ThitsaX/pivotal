@@ -11,13 +11,13 @@ import {
     OutboundTransfersAuditPublisher,
 } from '@core/audit/producer';
 import {
-    CachedTransaction,
     PostSendMoneyCommand,
     PutAcceptPartyCommand,
     PutAcceptQuoteCommand,
     RedisClient,
     SendMoneyRequest,
     SendMoneyResponse,
+    TransferRequest,
 } from '@core/legacy/domain';
 import {
     FspiopErrorTranslator,
@@ -123,14 +123,14 @@ export class SendMoneyController {
         @Param('transferId') transferId: string,
         @Body() request: PutSendMoneyRequest,
     ): Promise<SendMoneyResponse> {
-        const cachedTransaction = await this.getCachedTransaction(transferId);
+        const transferRequest = await this.getTransferRequest(transferId);
 
         if (request.acceptParty != null) {
-            return this.putAcceptParty(transferId, request.acceptParty, cachedTransaction);
+            return this.putAcceptParty(transferId, request.acceptParty, transferRequest);
         }
 
         if (request.acceptQuote != null) {
-            return this.putAcceptQuote(transferId, request.acceptQuote, cachedTransaction);
+            return this.putAcceptQuote(transferId, request.acceptQuote, transferRequest);
         }
 
         throw new FspiopException(
@@ -183,47 +183,47 @@ export class SendMoneyController {
         return fspId;
     }
 
-    private static toMoney(cachedTransaction: CachedTransaction): Money {
+    private static toMoney(transferRequest: TransferRequest): Money {
         const money = new Money();
-        money.currency = cachedTransaction.currency;
-        money.amount = cachedTransaction.amount;
+        money.currency = transferRequest.currency;
+        money.amount = transferRequest.amount;
 
         return money;
     }
 
-    private static toTransactionType(cachedTransaction: CachedTransaction): TransactionType {
+    private static toTransactionType(transferRequest: TransferRequest): TransactionType {
         const transactionType = new TransactionType();
-        transactionType.scenario = cachedTransaction.transactionType;
-        transactionType.subScenario = SendMoneyController.toOptionalValue(cachedTransaction.subScenario);
+        transactionType.scenario = transferRequest.transactionType;
+        transactionType.subScenario = SendMoneyController.toOptionalValue(transferRequest.subScenario);
         transactionType.initiator = TransactionInitiator.Payer;
-        transactionType.initiatorType = cachedTransaction.from.type ?? TransactionInitiatorType.Consumer;
+        transactionType.initiatorType = transferRequest.from.type ?? TransactionInitiatorType.Consumer;
 
         return transactionType;
     }
 
     private static toQuotesPostRequest(
         transferId: string,
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
     ): QuotesPostRequest {
         const quoteRequest = new QuotesPostRequest();
         quoteRequest.quoteId = transferId;
         quoteRequest.transactionId = transferId;
         quoteRequest.transactionRequestId = transferId;
-        quoteRequest.payee = cachedTransaction.payee;
-        quoteRequest.payer = cachedTransaction.payer;
-        quoteRequest.amountType = cachedTransaction.amountType;
-        quoteRequest.amount = SendMoneyController.toMoney(cachedTransaction);
-        quoteRequest.transactionType = SendMoneyController.toTransactionType(cachedTransaction);
-        quoteRequest.note = cachedTransaction.note;
+        quoteRequest.payee = transferRequest.payee;
+        quoteRequest.payer = transferRequest.payer;
+        quoteRequest.amountType = transferRequest.amountType;
+        quoteRequest.amount = SendMoneyController.toMoney(transferRequest);
+        quoteRequest.transactionType = SendMoneyController.toTransactionType(transferRequest);
+        quoteRequest.note = transferRequest.note;
 
         return quoteRequest;
     }
 
     private static toTransfersPostRequest(
         transferId: string,
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
     ): TransfersPostRequest {
-        const quotes = cachedTransaction.quotes;
+        const quotes = transferRequest.quotes;
 
         if (quotes == null) {
             throw new FspiopException(
@@ -232,42 +232,42 @@ export class SendMoneyController {
             );
         }
 
-        const transferRequest = new TransfersPostRequest();
-        transferRequest.transferId = transferId;
-        transferRequest.payerFsp = SendMoneyController.getFspId(cachedTransaction.payer, 'payer');
-        transferRequest.payeeFsp = SendMoneyController.getFspId(cachedTransaction.payee, 'payee');
-        transferRequest.amount = quotes.transferAmount;
-        transferRequest.ilpPacket = quotes.ilpPacket;
-        transferRequest.condition = quotes.condition;
-        transferRequest.expiration = quotes.expiration;
-        transferRequest.extensionList = quotes.extensionList;
+        const transfersPostRequest = new TransfersPostRequest();
+        transfersPostRequest.transferId = transferId;
+        transfersPostRequest.payerFsp = SendMoneyController.getFspId(transferRequest.payer, 'payer');
+        transfersPostRequest.payeeFsp = SendMoneyController.getFspId(transferRequest.payee, 'payee');
+        transfersPostRequest.amount = quotes.transferAmount;
+        transfersPostRequest.ilpPacket = quotes.ilpPacket;
+        transfersPostRequest.condition = quotes.condition;
+        transfersPostRequest.expiration = quotes.expiration;
+        transfersPostRequest.extensionList = quotes.extensionList;
 
-        return transferRequest;
+        return transfersPostRequest;
     }
 
-    private async getCachedTransaction(transferId: string): Promise<CachedTransaction> {
-        const cachedTransaction = await this.redisClient.get<CachedTransaction>(transferId);
+    private async getTransferRequest(transferId: string): Promise<TransferRequest> {
+        const transferRequest = await this.redisClient.get<TransferRequest>(transferId);
 
-        if (cachedTransaction == null) {
+        if (transferRequest == null) {
             throw new FspiopException(
                 FspiopErrors.TRANSFER_ID_NOT_FOUND,
                 `Transfer ${transferId} was not found in cache.`,
             );
         }
 
-        return cachedTransaction;
+        return transferRequest;
     }
 
     private async putAcceptParty(
         transferId: string,
         acceptParty: boolean,
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
     ): Promise<SendMoneyResponse> {
         const createdAt = new Date();
         const id = SendMoneyController.nextAuditId();
-        const quoteRequest = SendMoneyController.toQuotesPostRequest(transferId, cachedTransaction);
-        const payerFsp = SendMoneyController.getFspId(cachedTransaction.payer, 'payer');
-        const payeeFsp = SendMoneyController.getFspId(cachedTransaction.payee, 'payee');
+        const quoteRequest = SendMoneyController.toQuotesPostRequest(transferId, transferRequest);
+        const payerFsp = SendMoneyController.getFspId(transferRequest.payer, 'payer');
+        const payeeFsp = SendMoneyController.getFspId(transferRequest.payee, 'payee');
 
         try {
             const output: PutAcceptPartyCommand.Output = await this.commandBus.execute(
@@ -320,13 +320,13 @@ export class SendMoneyController {
     private async putAcceptQuote(
         transferId: string,
         acceptQuote: boolean,
-        cachedTransaction: CachedTransaction,
+        transferRequest: TransferRequest,
     ): Promise<SendMoneyResponse> {
         const createdAt = new Date();
         const id = SendMoneyController.nextAuditId();
-        const transferRequest = SendMoneyController.toTransfersPostRequest(transferId, cachedTransaction);
-        const payerFsp = SendMoneyController.getFspId(cachedTransaction.payer, 'payer');
-        const payeeFsp = SendMoneyController.getFspId(cachedTransaction.payee, 'payee');
+        const transfersPostRequest = SendMoneyController.toTransfersPostRequest(transferId, transferRequest);
+        const payerFsp = SendMoneyController.getFspId(transferRequest.payer, 'payer');
+        const payeeFsp = SendMoneyController.getFspId(transferRequest.payee, 'payee');
 
         try {
             const output: PutAcceptQuoteCommand.Output = await this.commandBus.execute(
@@ -341,8 +341,8 @@ export class SendMoneyController {
                     SendMoneyController.RAIL,
                     payerFsp,
                     payeeFsp,
-                    transferRequest.transferId,
-                    transferRequest,
+                    transfersPostRequest.transferId,
+                    transfersPostRequest,
                     output.callback,
                     null,
                     createdAt,
@@ -362,8 +362,8 @@ export class SendMoneyController {
                         SendMoneyController.RAIL,
                         payerFsp,
                         payeeFsp,
-                        transferRequest.transferId,
-                        transferRequest,
+                        transfersPostRequest.transferId,
+                        transfersPostRequest,
                         null,
                         errorObject,
                         createdAt,

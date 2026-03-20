@@ -6,7 +6,7 @@ import {
     FspiopSettings,
 } from '@shared/fspiop';
 import {PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler} from './command';
-import {RedisClient} from './component';
+import {LegacySettings, RedisClient} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('LegacyDomainRequiredDependencies');
 const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
@@ -51,11 +51,16 @@ export class LegacyDomainModule {
                 inject: [REQUIRED_DEPENDENCIES],
             },
             {
-                provide: RedisClient,
-                useFactory: (deps: LegacyDomainModule.RequiredDependencies): RedisClient => {
-                    return new RedisClient(deps.redisUrl());
-                },
+                provide: LegacySettings,
+                useFactory: (deps: LegacyDomainModule.RequiredDependencies): LegacySettings => deps.legacySettings(),
                 inject: [REQUIRED_DEPENDENCIES],
+            },
+            {
+                provide: RedisClient,
+                useFactory: (legacySettings: LegacySettings): RedisClient => {
+                    return new RedisClient(legacySettings);
+                },
+                inject: [LegacySettings],
             },
             ...CommandHandlers,
         ];
@@ -67,7 +72,7 @@ export namespace LegacyDomainModule {
     export interface RequiredDependencies
         extends FspiopAxiosModule.RequiredDependencies,
                 FspiopPubSubModule.RequiredDependencies {
-        redisUrl(): string;
+        legacySettings(): LegacySettings;
     }
 
     export type AsyncOptions = {
