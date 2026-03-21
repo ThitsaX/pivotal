@@ -43,6 +43,7 @@
     "build:ports-iso20022": "nest build ports-iso20022",
     "build:shared-axios": "nest build shared-axios",
     "build:shared-catalyst": "nest build shared-catalyst",
+    "build:shared-central-ledger": "nest build shared-central-ledger",
     "build:shared-fspiop": "nest build shared-fspiop",
     "build:shared-pg-migration": "nest build shared-pg-migration",
     "build:shared-snowflake": "nest build shared-snowflake",

@@ -194,6 +194,15 @@
         "tsConfigPath": "packages/shared/catalyst/tsconfig.app.json"
       }
     },
+    "shared-central-ledger": {
+      "type": "library",
+      "root": "packages/shared/central-ledger",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/central-ledger",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/central-ledger/tsconfig.app.json"
+      }
+    },
     "shared-pg-migration": {
       "type": "library",
       "root": "packages/shared/pg-migration",
