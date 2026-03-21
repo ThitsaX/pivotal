@@ -6,7 +6,8 @@ import {NestFactory} from '@nestjs/core';
 import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspiopExceptionFilter, FspiopHeaders} from '@shared/fspiop';
+import {FspiopHeaders} from '@shared/fspiop';
+import {LegacyExceptionFilter} from './component';
 import {WebLegacyAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -62,7 +63,7 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(WebLegacyAppModule);
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
-    app.useGlobalFilters(new FspiopExceptionFilter());
+    app.useGlobalFilters(new LegacyExceptionFilter());
 
     const swaggerConfig = new DocumentBuilder()
         .setTitle('Pivotal - Legacy API')
