@@ -251,7 +251,7 @@ export class SendMoneyController {
         if (transferRequest == null) {
             throw new FspiopException(
                 FspiopErrors.TRANSFER_ID_NOT_FOUND,
-                `Transfer ${transferId} was not found in cache.`,
+                `Transfer ${transferId} was not found.`,
             );
         }
 
