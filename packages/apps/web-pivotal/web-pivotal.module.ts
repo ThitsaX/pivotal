@@ -1,12 +1,21 @@
 import {DynamicModule, Module} from '@nestjs/common';
 import {AuditDomainModule} from '@core/audit/domain';
+import {ParticipantDomainModule} from '@core/participant/domain';
 import {
+    AddFspCurrencyController,
+    AddHubCurrencyController,
+    AddHubSigningKeysController,
+    AddSigningKeysController,
+    GenerateSigningKeyController,
     InboundPartiesAuditController,
     InboundQuotesAuditController,
     InboundTransfersAuditController,
+    ListParticipantsController,
+    OnboardFspController,
     OutboundPartiesAuditController,
     OutboundQuotesAuditController,
     OutboundTransfersAuditController,
+    UpsertEndpointController,
 } from './controllers';
 import {WebPivotalDependencies} from './required.dependencies';
 
@@ -28,9 +37,22 @@ export class WebPivotalModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                ParticipantDomainModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
             controllers: [
+                OnboardFspController,
+                AddFspCurrencyController,
+                AddHubCurrencyController,
+                AddHubSigningKeysController,
+                AddSigningKeysController,
+                ListParticipantsController,
+                UpsertEndpointController,
+                GenerateSigningKeyController,
                 InboundPartiesAuditController,
                 InboundQuotesAuditController,
                 InboundTransfersAuditController,
@@ -44,7 +66,9 @@ export class WebPivotalModule {
 
 export namespace WebPivotalModule {
 
-    export interface RequiredDependencies extends AuditDomainModule.RequiredDependencies {
+    export interface RequiredDependencies
+        extends AuditDomainModule.RequiredDependencies,
+                ParticipantDomainModule.RequiredDependencies {
     }
 
     export type AsyncOptions = {

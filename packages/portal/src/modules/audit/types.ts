@@ -1,6 +1,11 @@
 export type ViewKey =
+    | 'hub-add-currency'
+    | 'hub-list-participants'
+    | 'hub-add-signing-keys'
     | 'participant-onboarding'
+    | 'participant-add-signing-keys'
     | 'participant-add-new-currency'
+    | 'participant-register-endpoint'
     | 'inbound-parties'
     | 'inbound-quotes'
     | 'inbound-transfers'
@@ -8,7 +13,7 @@ export type ViewKey =
     | 'outbound-quotes'
     | 'outbound-transfers';
 
-export type ViewGroup = 'Participant' | 'Inbound' | 'Outbound';
+export type ViewGroup = 'Hub' | 'Participant' | 'Inbound' | 'Outbound';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';

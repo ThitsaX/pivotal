@@ -33,7 +33,7 @@ export const buildInitialState = (viewDefinitions: ViewDefinition[]): Record<Vie
 };
 
 export const groupViews = (viewDefinitions: ViewDefinition[]): Array<{group: ViewGroup; views: ViewDefinition[]}> => {
-    return ['Participant', 'Outbound', 'Inbound'].map((group): {group: ViewGroup; views: ViewDefinition[]} => {
+    return ['Hub', 'Participant', 'Outbound', 'Inbound'].map((group): {group: ViewGroup; views: ViewDefinition[]} => {
         return {
             group: group as ViewGroup,
             views: viewDefinitions.filter((view: ViewDefinition): boolean => view.group === group),

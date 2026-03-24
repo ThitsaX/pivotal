@@ -248,6 +248,15 @@
         "tsConfigPath": "packages/shared/security/tsconfig.app.json"
       }
     },
+    "shared-foundation": {
+      "type": "library",
+      "root": "packages/shared/foundation",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/foundation",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/foundation/tsconfig.app.json"
+      }
+    },
     "shared-ulid": {
       "type": "library",
       "root": "packages/shared/ulid",

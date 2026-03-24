@@ -3,7 +3,7 @@ import CustomDropdown from './CustomDropdown.vue';
 import TimeRangeSelector from './TimeRangeSelector.vue';
 import type {CriteriaSection} from '../modules/audit/types';
 
-defineProps<{
+const props = withDefaults(defineProps<{
     sections: CriteriaSection[];
     criteria: Record<string, string>;
     selectedTimeZone: string;
@@ -11,7 +11,10 @@ defineProps<{
     loading: boolean;
     lastLoadedAt: string | null;
     formatLastLoadedAt: (value: string) => string;
-}>();
+    embedded?: boolean;
+}>(), {
+    embedded: false,
+});
 
 const emit = defineEmits<{
     (event: 'toggle'): void;
@@ -22,7 +25,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <section class="pt-5">
+    <section :class="props.embedded ? 'pt-0' : 'pt-5'">
         <article class="overflow-visible border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
             <div class="flex items-center justify-between border-b border-accent/15 bg-[#f8fbff] px-4 py-3">
                 <div>
@@ -37,7 +40,7 @@ const emit = defineEmits<{
                     <button
                         v-if="!visible"
                         type="button"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
                         :disabled="loading"
                         @click="emit('refresh')"
                     >
@@ -167,7 +170,7 @@ const emit = defineEmits<{
                     <div class="flex flex-wrap items-center gap-2.5 border-t border-slate-200 pt-2.5">
                         <button
                             type="submit"
-                            class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8]"
+                            class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
                             :disabled="loading"
                         >
                             <span
@@ -179,7 +182,7 @@ const emit = defineEmits<{
 
                         <button
                             type="button"
-                            class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+                            class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
                             @click="emit('reset')"
                         >
                             Reset

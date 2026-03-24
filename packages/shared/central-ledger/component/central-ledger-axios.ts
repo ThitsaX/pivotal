@@ -2,6 +2,7 @@ import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
 import {AxiosClientBuilder} from '@shared/axios/component';
 import {CentralLedgerException} from '../exception';
 import {
+    CentralLedgerParticipant,
     CurrencyIsActive,
     GetTransactionResponse,
     LedgerAccountType,
@@ -79,7 +80,8 @@ export class CentralLedgerAxios {
     ): AxiosInstance {
 
         const builder = AxiosClientBuilder.newBuilder()
-            .withParams(params);
+            .withParams(params)
+            .withHttpLogger(true);
 
         for (const interceptor of interceptors) {
             builder.withRequestInterceptor(interceptor);
@@ -106,9 +108,9 @@ export class CentralLedgerAxios {
         const code = error.response != null
             ? CentralLedgerAxios.resolveResponseCode(status, data)
             : 'CENTRAL_LEDGER_COMMUNICATION_ERROR';
-        const message = CentralLedgerAxios.resolveErrorMessage(status, data, error);
+        const description = CentralLedgerAxios.resolveErrorDescription(status, data, error);
 
-        return new CentralLedgerException(code, `Central Ledger (${code}) ${message}`);
+        return new CentralLedgerException(code, description);
     }
 
     private static resolveResponseCode(status: number, data: unknown): string {
@@ -118,20 +120,25 @@ export class CentralLedgerAxios {
             return bodyCode.trim();
         }
 
+        const nestedCode = CentralLedgerAxios.readNestedStringField(data, 'errorInformation', 'errorCode');
+        if (nestedCode != null && nestedCode.trim().length > 0) {
+            return nestedCode.trim();
+        }
+
         return `CENTRAL_LEDGER_HTTP_${status}`;
     }
 
-    private static resolveErrorMessage(status: number, data: unknown, error: AxiosError): string {
+    private static resolveErrorDescription(status: number, data: unknown, error: AxiosError): string {
         const responseMessage = CentralLedgerAxios.resolveResponseMessage(data);
         const transportMessage = CentralLedgerAxios.resolveTransportMessage(error);
 
-        const message = CentralLedgerAxios.firstNonBlank(
+        const description = CentralLedgerAxios.firstNonBlank(
             responseMessage,
             transportMessage,
             `Central Ledger request failed with HTTP ${status}.`,
         );
 
-        return message ?? `Central Ledger request failed with HTTP ${status}.`;
+        return description ?? `Central Ledger request failed with HTTP ${status}.`;
     }
 
     private static resolveResponseMessage(data: unknown): string | undefined {
@@ -157,6 +164,11 @@ export class CentralLedgerAxios {
         const nestedError = CentralLedgerAxios.readNestedStringField(data, 'error', 'message');
         if (nestedError != null && nestedError.trim().length > 0) {
             return nestedError;
+        }
+
+        const errorDescription = CentralLedgerAxios.readNestedStringField(data, 'errorInformation', 'errorDescription');
+        if (errorDescription != null && errorDescription.trim().length > 0) {
+            return errorDescription;
         }
 
         return undefined;
@@ -236,11 +248,11 @@ export class CentralLedgerAxios {
         return this.get('/metrics');
     }
 
-    async getParticipants(query: CentralLedgerParticipantsQuery = {}): Promise<unknown> {
+    async getParticipants(query: CentralLedgerParticipantsQuery = {}): Promise<Array<CentralLedgerParticipant>> {
         return this.get('/participants', query);
     }
 
-    async createParticipant(body: PostParticipantsRequest): Promise<unknown> {
+    async createParticipant(body: PostParticipantsRequest): Promise<CentralLedgerParticipant> {
         return this.post('/participants', body);
     }
 
@@ -248,7 +260,7 @@ export class CentralLedgerAxios {
         return this.get('/participants/limits', query);
     }
 
-    async getParticipant(name: string): Promise<unknown> {
+    async getParticipant(name: string): Promise<CentralLedgerParticipant> {
         return this.get(`/participants/${CentralLedgerAxios.encodePathSegment(name)}`);
     }
 

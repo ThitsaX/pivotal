@@ -1,5 +1,7 @@
 import { Currency } from '../dto/currency';
 
+export type FspiopCurrency = Currency;
+
 export interface FspiopCurrencyProfile {
     currency: Currency;
     name: string;

@@ -1,18 +1,20 @@
 export class CentralLedgerException extends Error {
 
     readonly code: string;
+    readonly description: string;
 
-    constructor(message: string);
+    constructor(description: string);
 
-    constructor(code: string, message: string);
+    constructor(code: string, description: string);
 
-    constructor(codeOrMessage: string, messageArg?: string) {
-        const code = messageArg == null ? 'CENTRAL_LEDGER_ERROR' : codeOrMessage;
-        const message = messageArg == null ? codeOrMessage : messageArg;
+    constructor(codeOrDescription: string, descriptionArg?: string) {
+        const code = descriptionArg == null ? 'CENTRAL_LEDGER_ERROR' : codeOrDescription;
+        const description = descriptionArg == null ? codeOrDescription : descriptionArg;
 
-        super(message);
+        super(description);
 
         this.code = code;
+        this.description = description;
         this.name = 'CentralLedgerException';
 
         Object.setPrototypeOf(this, new.target.prototype);
