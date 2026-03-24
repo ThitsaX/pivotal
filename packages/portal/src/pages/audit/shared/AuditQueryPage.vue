@@ -4,6 +4,8 @@ import PageSizeDialog from '../../../components/PageSizeDialog.vue';
 import PaginationInfoBar from '../../../components/PaginationInfoBar.vue';
 import PrettyJsonViewer from '../../../components/PrettyJsonViewer.vue';
 import SearchCriteriaForm from '../../../components/SearchCriteriaForm.vue';
+import StatusDialog from '../../../components/StatusDialog.vue';
+import TimeZoneSelector from '../../../components/TimeZoneSelector.vue';
 import {
     DATE_COLUMN_KEYS,
     getCriteriaSections,
@@ -22,6 +24,10 @@ import type {
 const props = defineProps<{
     viewDefinition: ViewDefinition;
     selectedTimeZone: string;
+}>();
+
+const emit = defineEmits<{
+    (event: 'update:selectedTimeZone', value: string): void;
 }>();
 
 const DEFAULT_WEB_PIVOTAL_API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3202`;
@@ -616,6 +622,10 @@ const closePayloadModal = (): void => {
     selectedPayload.value = null;
 };
 
+const closeRequestErrorDialog = (): void => {
+    requestError.value = null;
+};
+
 const isSortableColumn = (columnKey: string): boolean => {
     return props.viewDefinition.orderColumns.some((column: SelectOption): boolean => column.value === columnKey);
 };
@@ -702,24 +712,48 @@ const jumpToPage = (pageNumber: number): void => {
 </script>
 
 <template>
-    <SearchCriteriaForm
-        :sections="criteriaSections"
-        :criteria="state.criteria"
-        :selected-time-zone="selectedTimeZone"
-        :visible="isSearchFormVisible"
-        :loading="loading"
-        :last-loaded-at="lastLoadedAt"
-        :format-last-loaded-at="formatDateInTimeZone"
-        @toggle="toggleSearchForm"
-        @submit="submitSearch"
-        @reset="resetFilters"
-        @refresh="refreshResults"
-    />
+    <section class="animate-fadeSlide pt-2">
+        <div class="mb-2 flex justify-end">
+            <div class="w-full max-w-[13rem]">
+                <TimeZoneSelector
+                    :model-value="selectedTimeZone"
+                    compact
+                    @update:model-value="emit('update:selectedTimeZone', $event)"
+                />
+            </div>
+        </div>
 
-    <section
-        v-if="requestError || loading || results"
-        class="mt-6"
-    >
+        <article class="overflow-visible border border-accent/20 bg-[#fafdff] shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
+            <div class="border-b border-accent/15 bg-[linear-gradient(135deg,rgba(20,127,195,0.14),rgba(255,255,255,0.95))] px-5 py-5">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                        {{ viewDefinition.group }}
+                    </p>
+                    <h3 class="mt-2 font-display text-2xl text-ink">
+                        {{ viewDefinition.title }}
+                    </h3>
+                    <p class="mt-2 max-w-3xl text-sm text-slate-600">
+                        {{ viewDefinition.subtitle }}
+                    </p>
+                </div>
+            </div>
+            <div class="space-y-5 px-5 py-5">
+                <SearchCriteriaForm
+                    :sections="criteriaSections"
+                    :criteria="state.criteria"
+                    :selected-time-zone="selectedTimeZone"
+                    :visible="isSearchFormVisible"
+                    :loading="loading"
+                    :last-loaded-at="lastLoadedAt"
+                    :format-last-loaded-at="formatDateInTimeZone"
+                    embedded
+                    @toggle="toggleSearchForm"
+                    @submit="submitSearch"
+                    @reset="resetFilters"
+                    @refresh="refreshResults"
+                />
+
+                <section v-if="requestError || loading || results">
         <article class="overflow-hidden border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
             <div class="border-b border-accent/15 bg-[#f8fbff] px-4 py-3">
                 <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -738,12 +772,6 @@ const jumpToPage = (pageNumber: number): void => {
             </div>
 
             <div class="space-y-4 p-4">
-                <article v-if="requestError" class="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    <p class="font-semibold">Search failed</p>
-                    <p class="mt-1 break-all font-mono text-xs">{{ requestError }}</p>
-                    <p v-if="lastRequestedUrl" class="mt-2 break-all text-xs text-rose-600">{{ lastRequestedUrl }}</p>
-                </article>
-
                 <article v-if="loading" class="space-y-3 border border-slate-200 bg-[#f7faff] p-4">
                     <div class="h-4 w-48 animate-pulse bg-slate-200" />
                     <div class="h-24 animate-pulse bg-slate-100" />
@@ -947,6 +975,9 @@ const jumpToPage = (pageNumber: number): void => {
                 </template>
             </div>
         </article>
+                </section>
+            </div>
+        </article>
     </section>
 
     <PageSizeDialog
@@ -956,6 +987,25 @@ const jumpToPage = (pageNumber: number): void => {
         @close="closePageSizeDialog"
         @select="applyPageSize"
     />
+
+    <StatusDialog
+        :open="requestError != null"
+        tone="error"
+        eyebrow="Search Failed"
+        title="Audit search could not be completed"
+        :message="requestError"
+        max-width-class="max-w-3xl"
+        @close="closeRequestErrorDialog"
+    >
+        <div v-if="lastRequestedUrl" class="space-y-1">
+            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Requested URL
+            </p>
+            <p class="break-all font-mono text-xs text-slate-600">
+                {{ lastRequestedUrl }}
+            </p>
+        </div>
+    </StatusDialog>
 
     <Teleport to="body">
         <div

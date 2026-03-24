@@ -44,6 +44,10 @@ export class PgMigration {
 
     private static readonly MIGRATION_FILE_RE = /^V([\d]+(?:_[\d]+)*)__(.+)\.sql$/i;
 
+    private static escapeIdentifier(value: string): string {
+        return value.replace(/"/g, '""');
+    }
+
     // ── version helpers ──────────────────────────────────────────────────────
 
     private static parseVersionTuple(raw: string): number[] {
@@ -96,13 +100,22 @@ export class PgMigration {
 
     // ── history table ────────────────────────────────────────────────────────
 
+    private static async ensureSchema(client: Client, schema: string): Promise<void> {
+        const escapedSchema = PgMigration.escapeIdentifier(schema);
+
+        await client.query(`CREATE SCHEMA IF NOT EXISTS "${escapedSchema}"`);
+    }
+
     private static async ensureHistoryTable(
         client: Client,
         schema: string,
         table: string,
     ): Promise<void> {
+        const escapedSchema = PgMigration.escapeIdentifier(schema);
+        const escapedTable = PgMigration.escapeIdentifier(table);
+
         await client.query(`
-            CREATE TABLE IF NOT EXISTS "${schema}"."${table}" (
+            CREATE TABLE IF NOT EXISTS "${escapedSchema}"."${escapedTable}" (
                 installed_rank   SERIAL        PRIMARY KEY,
                 version          VARCHAR(50)   NOT NULL UNIQUE,
                 description      VARCHAR(200)  NOT NULL,
@@ -124,8 +137,10 @@ export class PgMigration {
         schema: string,
         table: string,
     ): Promise<Map<string, string>> {
+        const escapedSchema = PgMigration.escapeIdentifier(schema);
+        const escapedTable = PgMigration.escapeIdentifier(table);
         const {rows} = await client.query<{version: string; script: string}>(
-            `SELECT version, script FROM "${schema}"."${table}" WHERE success = true`,
+            `SELECT version, script FROM "${escapedSchema}"."${escapedTable}" WHERE success = true`,
         );
         return new Map(rows.map(r => [r.version, r.script]));
     }
@@ -137,8 +152,11 @@ export class PgMigration {
         migration: MigrationFile,
         executionTime: number,
     ): Promise<void> {
+        const escapedSchema = PgMigration.escapeIdentifier(schema);
+        const escapedTable = PgMigration.escapeIdentifier(table);
+
         await client.query(
-            `INSERT INTO "${schema}"."${table}"
+            `INSERT INTO "${escapedSchema}"."${escapedTable}"
              (version, description, script, execution_time, success)
              VALUES ($1, $2, $3, $4, true)`,
             [migration.version, migration.description, migration.filename, executionTime],
@@ -162,6 +180,7 @@ export class PgMigration {
         await client.connect();
 
         try {
+            await PgMigration.ensureSchema(client, schema);
             await PgMigration.ensureHistoryTable(client, schema, historyTable);
 
             const all     = await PgMigration.discoverMigrations(settings.locations);
@@ -190,6 +209,9 @@ export class PgMigration {
 
                 await client.query('BEGIN');
                 try {
+                    const escapedSchema = PgMigration.escapeIdentifier(schema);
+
+                    await client.query(`SET LOCAL search_path TO "${escapedSchema}"`);
                     await client.query(sql);
                     await PgMigration.recordMigration(
                         client, schema, historyTable, migration, Date.now() - start,

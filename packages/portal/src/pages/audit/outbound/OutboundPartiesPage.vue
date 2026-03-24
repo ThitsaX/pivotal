@@ -6,6 +6,10 @@ defineProps<{
     selectedTimeZone: string;
 }>();
 
+const emit = defineEmits<{
+    (event: 'update:selectedTimeZone', value: string): void;
+}>();
+
 const viewDefinition = VIEW_BY_KEY['outbound-parties'];
 </script>
 
@@ -13,5 +17,6 @@ const viewDefinition = VIEW_BY_KEY['outbound-parties'];
     <AuditQueryPage
         :view-definition="viewDefinition"
         :selected-time-zone="selectedTimeZone"
+        @update:selected-time-zone="emit('update:selectedTimeZone', $event)"
     />
 </template>

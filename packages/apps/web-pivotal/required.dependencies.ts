@@ -1,9 +1,11 @@
 import {ConfigService} from '@nestjs/config';
+import {CentralLedgerAxios, CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm';
 import type {WebPivotalModule} from './web-pivotal.module';
 
 export class WebPivotalDependencies implements WebPivotalModule.RequiredDependencies {
 
+    private static readonly DEFAULT_CENTRAL_LEDGER_URL = 'http://localhost:3001';
     private static readonly DEFAULT_DB_HOST = 'localhost';
     private static readonly DEFAULT_DB_PORT = 5432;
     private static readonly DEFAULT_DB_USERNAME = 'postgres';
@@ -36,6 +38,23 @@ export class WebPivotalDependencies implements WebPivotalModule.RequiredDependen
         );
     }
 
+    centralLedgerAxios(): CentralLedgerAxios {
+        return new CentralLedgerAxios(
+            this.readValue('CENTRAL_LEDGER_URL', WebPivotalDependencies.DEFAULT_CENTRAL_LEDGER_URL),
+            this.centralLedgerAxiosParams(),
+        );
+    }
+
+    private centralLedgerAxiosParams(): CentralLedgerAxiosParams {
+        const socketTimeoutMs = this.readPositiveInteger('CENTRAL_LEDGER_SOCKET_TIMEOUT_MS');
+        const connectionTimeoutMs = this.readPositiveInteger('CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS');
+
+        return {
+            socketTimeoutMs,
+            connectionTimeoutMs,
+        };
+    }
+
     private readValue(name: string, fallback: string): string {
         return this.configService.get<string>(name) ?? fallback;
     }
@@ -51,6 +70,22 @@ export class WebPivotalDependencies implements WebPivotalModule.RequiredDependen
 
         if (!Number.isInteger(parsed) || parsed <= 0) {
             return fallback;
+        }
+
+        return parsed;
+    }
+
+    private readPositiveInteger(name: string): number | undefined {
+        const value = this.configService.get<string>(name);
+
+        if (value == null) {
+            return undefined;
+        }
+
+        const parsed = Number(value);
+
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            return undefined;
         }
 
         return parsed;

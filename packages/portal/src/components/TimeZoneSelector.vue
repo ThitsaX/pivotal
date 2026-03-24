@@ -3,6 +3,7 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
 
 const props = defineProps<{
     modelValue: string;
+    compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -163,15 +164,30 @@ onBeforeUnmount((): void => {
 <template>
     <div
         ref="rootRef"
-        class="relative w-full sm:min-w-[22rem] lg:min-w-[26rem] lg:w-auto"
+        :class="[
+            'relative',
+            props.compact
+                ? 'w-full sm:min-w-[12rem] lg:min-w-[13rem] lg:w-auto'
+                : 'w-full sm:min-w-[15rem] lg:min-w-[17rem] lg:w-auto',
+        ]"
     >
         <button
             type="button"
-            class="flex w-full items-center gap-3 rounded-2xl border border-accent/20 bg-white px-3 py-2.5 text-left shadow-[0_14px_32px_rgba(20,127,195,0.08)] transition hover:border-accent/35 hover:shadow-[0_18px_38px_rgba(20,127,195,0.12)]"
+            :class="[
+                'flex w-full items-center text-left transition hover:border-accent/35',
+                props.compact
+                    ? 'gap-1.5 rounded-lg border border-accent/16 bg-white/88 px-2 py-1.5 shadow-[0_8px_18px_rgba(20,127,195,0.07)] hover:shadow-[0_10px_22px_rgba(20,127,195,0.10)]'
+                    : 'gap-2 rounded-xl border border-accent/18 bg-white/92 px-2.5 py-2 shadow-[0_10px_24px_rgba(20,127,195,0.08)] hover:shadow-[0_12px_28px_rgba(20,127,195,0.12)]',
+            ]"
             @click="toggle"
         >
-            <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-accent/15 bg-[#f4faff] text-accent shadow-insetSoft">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <span
+                :class="[
+                    'inline-flex shrink-0 items-center justify-center border border-accent/15 bg-[#f4faff] text-accent shadow-insetSoft',
+                    props.compact ? 'h-7 w-7 rounded-lg' : 'h-11 w-11 rounded-2xl',
+                ]"
+            >
+                <svg :class="props.compact ? 'h-3.5 w-3.5' : 'h-4 w-4'" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6" />
                     <path d="M3.5 12h17" stroke="currentColor" stroke-width="1.3" />
                     <path d="M12 3.5c2.6 2.3 3.8 5.2 3.8 8.5S14.6 18.2 12 20.5c-2.6-2.3-3.8-5.2-3.8-8.5S9.4 5.8 12 3.5Z" stroke="currentColor" stroke-width="1.3" />
@@ -180,29 +196,25 @@ onBeforeUnmount((): void => {
             </span>
 
             <span class="min-w-0 flex-1">
-                <span class="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Time Zone
-                </span>
-                <span class="mt-0.5 block truncate font-display text-lg leading-5 text-ink">
+                <span :class="['block truncate text-ink', props.compact ? 'mt-0 font-body text-xs font-semibold leading-4' : 'mt-0 font-body text-sm font-semibold leading-5']">
                     {{ modelValue }}
-                </span>
-                <span class="mt-1 block truncate text-[11px] text-slate-500">
-                    {{ selectedRegion }}
                 </span>
             </span>
 
-            <span class="flex shrink-0 flex-col items-end gap-1">
-                <span class="inline-flex rounded-full border border-accent/20 bg-[#f8fbff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent">
+            <span :class="['flex shrink-0 flex-col items-end', props.compact ? 'gap-0.5' : 'gap-0.5']">
+                <span :class="['inline-flex rounded-full border border-accent/20 bg-[#f8fbff] font-semibold uppercase tracking-[0.08em] text-accent', props.compact ? 'px-1.5 py-0 text-[8px]' : 'px-2 py-0.5 text-[9px]']">
                     {{ selectedOffset }}
                 </span>
-                <span class="text-[11px] text-slate-500">
+                <span :class="props.compact ? 'text-[9px] text-slate-500' : 'text-[10px] text-slate-500'">
                     {{ selectedLocalTime }}
                 </span>
             </span>
 
             <svg
-                class="h-4 w-4 shrink-0 text-slate-500 transition"
-                :class="open ? 'rotate-180 text-accent' : ''"
+                :class="[
+                    props.compact ? 'h-3.5 w-3.5 shrink-0 text-slate-500 transition' : 'h-3.5 w-3.5 shrink-0 text-slate-500 transition',
+                    open ? 'rotate-180 text-accent' : '',
+                ]"
                 viewBox="0 0 20 20"
                 fill="none"
                 aria-hidden="true"
@@ -221,7 +233,11 @@ onBeforeUnmount((): void => {
         >
             <div
                 v-if="open"
-                class="absolute right-0 z-50 mt-2 w-full overflow-hidden rounded-2xl border border-accent/20 bg-white shadow-[0_22px_50px_rgba(20,127,195,0.16)]"
+                :class="[
+                    'absolute right-0 z-50 mt-2 min-w-full overflow-hidden border border-accent/20 bg-white shadow-[0_22px_50px_rgba(20,127,195,0.16)]',
+                    props.compact ? 'w-[min(24rem,calc(100vw-1.5rem))]' : 'w-[min(26rem,calc(100vw-2rem))]',
+                    props.compact ? 'rounded-xl' : 'rounded-2xl',
+                ]"
                 @mousedown.stop
                 @click.stop
             >

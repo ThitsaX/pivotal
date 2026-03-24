@@ -49,6 +49,7 @@
     "build:shared-snowflake": "nest build shared-snowflake",
     "build:shared-interledger": "nest build shared-interledger",
     "build:shared-persistence": "nest build shared-persistence",
+    "build:shared-foundation": "nest build shared-foundation",
     "build:shared-security": "nest build shared-security",
     "build:shared-ulid": "nest build shared-ulid",
     "build:samples-wallet1-connector": "nest build samples-wallet1-connector",
