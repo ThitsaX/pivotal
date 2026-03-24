@@ -8,10 +8,14 @@ import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 @Index('outbound_quotes_04_idx', ['payerFsp', 'payeeFsp'])
 @Index('outbound_quotes_05_idx', ['rail'])
 @Index('outbound_quotes_06_idx', ['failed'])
+@Index('outbound_quotes_07_idx', ['correlationId'])
 export class OutboundQuotes {
 
     @PrimaryColumn({type: 'bigint', name: 'id'})
     public id: string;
+
+    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
+    public correlationId: string;
 
     @Column({type: 'varchar', length: 32, name: 'rail'})
     public rail: string;
@@ -54,6 +58,7 @@ export class OutboundQuotes {
 
     constructor(
         id: string,
+        correlationId: string,
         rail: string,
         payerFsp: string,
         payeeFsp: string,
@@ -67,6 +72,7 @@ export class OutboundQuotes {
     ) {
 
         this.id = id;
+        this.correlationId = correlationId;
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;

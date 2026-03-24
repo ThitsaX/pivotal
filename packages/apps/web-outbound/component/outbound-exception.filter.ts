@@ -2,7 +2,7 @@ import {ArgumentsHost, Catch, ExceptionFilter, Logger} from '@nestjs/common';
 import {Response} from 'express';
 import {ExtensionList, FspiopException, FspiopStatusTranslator} from '@shared/fspiop';
 
-export class LegacyErrorInformation {
+export class OutboundErrorInformation {
     statusCode!: string;
 
     message!: string;
@@ -13,14 +13,14 @@ export class LegacyErrorInformation {
 }
 
 @Catch()
-export class LegacyExceptionFilter implements ExceptionFilter {
+export class OutboundExceptionFilter implements ExceptionFilter {
 
-    private readonly logger = new Logger(LegacyExceptionFilter.name);
+    private readonly logger = new Logger(OutboundExceptionFilter.name);
 
     catch(exception: unknown, host: ArgumentsHost): void {
         const response = host.switchToHttp().getResponse<Response>();
 
-        const fspiopException = LegacyExceptionFilter.toFspiopException(exception);
+        const fspiopException = OutboundExceptionFilter.toFspiopException(exception);
         const status = FspiopStatusTranslator.toHttpStatus(fspiopException);
 
         if (fspiopException.originalError != null || !(exception instanceof FspiopException)) {
@@ -32,19 +32,19 @@ export class LegacyExceptionFilter implements ExceptionFilter {
 
         response
             .status(status)
-            .json(LegacyExceptionFilter.toErrorInformation(fspiopException));
+            .json(OutboundExceptionFilter.toErrorInformation(fspiopException));
     }
 
     private static toFspiopException(exception: unknown): FspiopException {
         return FspiopException.normalize(exception);
     }
 
-    private static toErrorInformation(exception: FspiopException): LegacyErrorInformation {
-        const errorInformation = new LegacyErrorInformation();
+    private static toErrorInformation(exception: FspiopException): OutboundErrorInformation {
+        const errorInformation = new OutboundErrorInformation();
         errorInformation.statusCode = exception.errorDefinition.errorType.code;
         errorInformation.message = exception.message;
         errorInformation.localeMessage = exception.message;
-        errorInformation.detailedDescription = LegacyExceptionFilter.toDetailedDescription(exception.extensionList);
+        errorInformation.detailedDescription = OutboundExceptionFilter.toDetailedDescription(exception.extensionList);
 
         return errorInformation;
     }

@@ -1,15 +1,15 @@
 import {OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {createClient, RedisClientType} from 'redis';
-import {LegacySettings} from './legacy-settings';
+import {OutboundSettings} from './outbound-settings';
 
 export class RedisClient implements OnModuleInit, OnModuleDestroy {
 
     private readonly client: RedisClientType;
     private readonly defaultTtlMs: number;
 
-    constructor(private readonly legacySettings: LegacySettings) {
-        this.client = createClient({url: this.legacySettings.redisUrl});
-        this.defaultTtlMs = this.legacySettings.redisTtlMs;
+    constructor(private readonly outboundSettings: OutboundSettings) {
+        this.client = createClient({url: this.outboundSettings.redisUrl});
+        this.defaultTtlMs = this.outboundSettings.redisTtlMs;
     }
 
     async onModuleInit(): Promise<void> {

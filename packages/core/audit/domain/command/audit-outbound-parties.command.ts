@@ -10,6 +10,7 @@ export namespace AuditOutboundPartiesCommand {
     export class Input {
         constructor(
             public readonly id: string,
+            public readonly correlationId: string,
             public readonly rail: string,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,

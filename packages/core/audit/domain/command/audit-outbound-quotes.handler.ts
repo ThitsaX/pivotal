@@ -15,7 +15,7 @@ export class AuditOutboundQuotesHandler
     }
 
     async execute(command: AuditOutboundQuotesCommand): Promise<AuditOutboundQuotesCommand.Output> {
-        const {id, rail, payerFsp, payeeFsp, quoteId, request, response, error, createdAt, completedAt} = command.input;
+        const {id, correlationId, rail, payerFsp, payeeFsp, quoteId, request, response, error, createdAt, completedAt} = command.input;
 
         const finalResponse = response ?? null;
         const finalError = finalResponse ? null : (error ?? null);
@@ -24,6 +24,7 @@ export class AuditOutboundQuotesHandler
 
         const entity = new OutboundQuotes(
             id,
+            correlationId,
             rail,
             payerFsp,
             payeeFsp,

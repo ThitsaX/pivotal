@@ -5,10 +5,11 @@ import {
     FspiopPubSubModule,
     FspiopSettings,
 } from '@shared/fspiop';
-import {DoLookupHandler, DoQuotingHandler, DoTransferHandler} from './command';
+import {PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler} from './command';
+import {OutboundSettings, RedisClient} from './component';
 
 const REQUIRED_DEPENDENCIES = Symbol('OutboundDomainRequiredDependencies');
-const CommandHandlers = [DoLookupHandler, DoQuotingHandler, DoTransferHandler];
+const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
 
 @Module({})
 export class OutboundDomainModule {
@@ -38,7 +39,7 @@ export class OutboundDomainModule {
                 },
                 ...OutboundDomainModule.createProviders(),
             ],
-            exports: [CqrsModule],
+            exports: [CqrsModule, RedisClient],
         };
     }
 
@@ -48,6 +49,18 @@ export class OutboundDomainModule {
                 provide: FspiopSettings,
                 useFactory: (deps: OutboundDomainModule.RequiredDependencies) => deps.fspiopSettings(),
                 inject: [REQUIRED_DEPENDENCIES],
+            },
+            {
+                provide: OutboundSettings,
+                useFactory: (deps: OutboundDomainModule.RequiredDependencies): OutboundSettings => deps.outboundSettings(),
+                inject: [REQUIRED_DEPENDENCIES],
+            },
+            {
+                provide: RedisClient,
+                useFactory: (outboundSettings: OutboundSettings): RedisClient => {
+                    return new RedisClient(outboundSettings);
+                },
+                inject: [OutboundSettings],
             },
             ...CommandHandlers,
         ];
@@ -59,6 +72,7 @@ export namespace OutboundDomainModule {
     export interface RequiredDependencies
         extends FspiopAxiosModule.RequiredDependencies,
                 FspiopPubSubModule.RequiredDependencies {
+        outboundSettings(): OutboundSettings;
     }
 
     export type AsyncOptions = {

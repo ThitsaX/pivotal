@@ -1,4 +1,5 @@
 import {ConfigService} from '@nestjs/config';
+import {OutboundSettings} from '@core/outbound/domain';
 import {
     FspiopAxiosParams,
     FspiopJwsPrivateKeyStore,
@@ -18,6 +19,8 @@ import type {WebOutboundModule} from './web-outbound.module';
 export class WebOutboundDependencies implements WebOutboundModule.RequiredDependencies {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
+    private static readonly DEFAULT_REDIS_URL = 'redis://localhost:6379';
+    private static readonly DEFAULT_REDIS_TTL_MS = 300000;
     private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
     private static readonly DEFAULT_QUOTES_URL = 'http://localhost:5003';
     private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:5003';
@@ -41,6 +44,13 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
 
     natsUrl(): string {
         return this.readString('NATS_URL', WebOutboundDependencies.DEFAULT_NATS_URL);
+    }
+
+    outboundSettings(): OutboundSettings {
+        return new OutboundSettings(
+            this.readString('REDIS_URL', WebOutboundDependencies.DEFAULT_REDIS_URL),
+            this.readPositiveInteger('REDIS_TTL_MS') ?? WebOutboundDependencies.DEFAULT_REDIS_TTL_MS,
+        );
     }
 
     fspiopSettings(): FspiopSettings {

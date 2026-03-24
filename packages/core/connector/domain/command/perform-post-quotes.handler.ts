@@ -53,6 +53,7 @@ export class PerformPostQuotesHandler
             await this.auditPublisher.publish(
                 new AuditInboundQuotesCommand.Input(
                     id,
+                    id,
                     PerformPostQuotesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -86,6 +87,7 @@ export class PerformPostQuotesHandler
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundQuotesCommand.Input(
+                        id,
                         id,
                         PerformPostQuotesHandler.RAIL,
                         payerFsp,

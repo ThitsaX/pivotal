@@ -6,7 +6,8 @@ import {NestFactory} from '@nestjs/core';
 import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspiopExceptionFilter, FspiopHeaders} from '@shared/fspiop';
+import {FspiopHeaders} from '@shared/fspiop';
+import {OutboundExceptionFilter} from './component';
 import {WebOutboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -62,12 +63,12 @@ const bootstrap = async (): Promise<void> => {
     const app = await NestFactory.create(WebOutboundAppModule);
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
-    app.useGlobalFilters(new FspiopExceptionFilter());
+    app.useGlobalFilters(new OutboundExceptionFilter());
 
     const swaggerConfig = new DocumentBuilder()
-        .setTitle('Pivotal - Outbound')
+        .setTitle('Pivotal - Outbound API')
         .setDescription(
-            'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows. ',
+            'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows.',
         )
         .setVersion('1.0.0')
         .addBearerAuth(

@@ -1,27 +1,11 @@
 import {Body, Controller, Headers, Inject, Param, Post, Put} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {AuditOutboundPartiesCommand, AuditOutboundQuotesCommand, AuditOutboundTransfersCommand,} from '@core/audit/domain';
+import {OutboundPartiesAuditPublisher, OutboundQuotesAuditPublisher, OutboundTransfersAuditPublisher,} from '@core/audit/producer';
+import {PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, RedisClient, SendMoneyRequest, SendMoneyResponse, TransferRequest,} from '@core/outbound/domain';
 import {
-    AuditOutboundPartiesCommand,
-    AuditOutboundQuotesCommand,
-    AuditOutboundTransfersCommand,
-} from '@core/audit/domain';
-import {
-    OutboundPartiesAuditPublisher,
-    OutboundQuotesAuditPublisher,
-    OutboundTransfersAuditPublisher,
-} from '@core/audit/producer';
-import {
-    PostSendMoneyCommand,
-    PutAcceptPartyCommand,
-    PutAcceptQuoteCommand,
-    RedisClient,
-    SendMoneyRequest,
-    SendMoneyResponse,
-    TransferRequest,
-} from '@core/legacy/domain';
-import {
-    FspiopErrorTranslator,
     FspiopErrors,
+    FspiopErrorTranslator,
     FspiopException,
     FspiopHeaders,
     Money,
@@ -44,6 +28,7 @@ class PutSendMoneyRequest {
 export class SendMoneyController {
 
     private static readonly RAIL = 'fspiop';
+
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
@@ -58,85 +43,6 @@ export class SendMoneyController {
         @Inject(RedisClient)
         private readonly redisClient: RedisClient,
     ) {
-    }
-
-    @Post()
-    async post(
-        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
-        @Body() request: SendMoneyRequest,
-    ): Promise<SendMoneyResponse> {
-        const createdAt = new Date();
-        const id = SendMoneyController.nextAuditId();
-        const payerFsp = SendMoneyController.toSource(source, request);
-        const input = new PostSendMoneyCommand.Input(payerFsp, request);
-
-        try {
-            const output: PostSendMoneyCommand.Output = await this.commandBus.execute(
-                new PostSendMoneyCommand(input),
-            );
-
-            await this.outboundPartiesAuditPublisher.publish(
-                new AuditOutboundPartiesCommand.Input(
-                    id,
-                    SendMoneyController.RAIL,
-                    payerFsp,
-                    request.to.fspId,
-                    request.to.idType,
-                    request.to.idValue,
-                    SendMoneyController.toOptionalValue(request.to.idSubValue),
-                    output.callback,
-                    null,
-                    createdAt,
-                    new Date(),
-                ),
-            );
-
-            return output.response;
-        } catch (error) {
-            const fspiopException = FspiopErrorTranslator.toFspiopException(error);
-            const errorObject = fspiopException.toErrorObject();
-
-            try {
-                await this.outboundPartiesAuditPublisher.publish(
-                    new AuditOutboundPartiesCommand.Input(
-                        id,
-                        SendMoneyController.RAIL,
-                        payerFsp,
-                        request.to.fspId,
-                        request.to.idType,
-                        request.to.idValue,
-                        SendMoneyController.toOptionalValue(request.to.idSubValue),
-                        null,
-                        errorObject,
-                        createdAt,
-                        new Date(),
-                    ),
-                );
-            } finally {
-                throw fspiopException;
-            }
-        }
-    }
-
-    @Put(':transferId')
-    async put(
-        @Param('transferId') transferId: string,
-        @Body() request: PutSendMoneyRequest,
-    ): Promise<SendMoneyResponse> {
-        const transferRequest = await this.getTransferRequest(transferId);
-
-        if (request.acceptParty != null) {
-            return this.putAcceptParty(transferId, request.acceptParty, transferRequest);
-        }
-
-        if (request.acceptQuote != null) {
-            return this.putAcceptQuote(transferId, request.acceptQuote, transferRequest);
-        }
-
-        throw new FspiopException(
-            FspiopErrors.MISSING_MANDATORY_ELEMENT,
-            'acceptParty or acceptQuote is required.',
-        );
     }
 
     private static nextAuditId(): string {
@@ -245,6 +151,87 @@ export class SendMoneyController {
         return transfersPostRequest;
     }
 
+    @Post()
+    async post(
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
+        @Body() request: SendMoneyRequest,
+    ): Promise<SendMoneyResponse> {
+        const createdAt = new Date();
+        const id = SendMoneyController.nextAuditId();
+        const payerFsp = SendMoneyController.toSource(source, request);
+        const input = new PostSendMoneyCommand.Input(payerFsp, request);
+
+        try {
+            const output: PostSendMoneyCommand.Output = await this.commandBus.execute(
+                new PostSendMoneyCommand(input),
+            );
+
+            await this.outboundPartiesAuditPublisher.publish(
+                new AuditOutboundPartiesCommand.Input(
+                    id,
+                    output.response.transferId,
+                    SendMoneyController.RAIL,
+                    payerFsp,
+                    request.to.fspId,
+                    request.to.idType,
+                    request.to.idValue,
+                    SendMoneyController.toOptionalValue(request.to.idSubValue),
+                    output.callback,
+                    null,
+                    createdAt,
+                    new Date(),
+                ),
+            );
+
+            return output.response;
+        } catch (error) {
+            const fspiopException = FspiopErrorTranslator.toFspiopException(error);
+            const errorObject = fspiopException.toErrorObject();
+
+            try {
+                await this.outboundPartiesAuditPublisher.publish(
+                    new AuditOutboundPartiesCommand.Input(
+                        id,
+                        id,
+                        SendMoneyController.RAIL,
+                        payerFsp,
+                        request.to.fspId,
+                        request.to.idType,
+                        request.to.idValue,
+                        SendMoneyController.toOptionalValue(request.to.idSubValue),
+                        null,
+                        errorObject,
+                        createdAt,
+                        new Date(),
+                    ),
+                );
+            } finally {
+                throw fspiopException;
+            }
+        }
+    }
+
+    @Put(':transferId')
+    async put(
+        @Param('transferId') transferId: string,
+        @Body() request: PutSendMoneyRequest,
+    ): Promise<SendMoneyResponse> {
+        const transferRequest = await this.getTransferRequest(transferId);
+
+        if (request.acceptParty != null) {
+            return this.putAcceptParty(transferId, request.acceptParty, transferRequest);
+        }
+
+        if (request.acceptQuote != null) {
+            return this.putAcceptQuote(transferId, request.acceptQuote, transferRequest);
+        }
+
+        throw new FspiopException(
+            FspiopErrors.MISSING_MANDATORY_ELEMENT,
+            'acceptParty or acceptQuote is required.',
+        );
+    }
+
     private async getTransferRequest(transferId: string): Promise<TransferRequest> {
         const transferRequest = await this.redisClient.get<TransferRequest>(transferId);
 
@@ -279,6 +266,7 @@ export class SendMoneyController {
             await this.outboundQuotesAuditPublisher.publish(
                 new AuditOutboundQuotesCommand.Input(
                     id,
+                    transferId,
                     SendMoneyController.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -300,6 +288,7 @@ export class SendMoneyController {
                 await this.outboundQuotesAuditPublisher.publish(
                     new AuditOutboundQuotesCommand.Input(
                         id,
+                        transferId,
                         SendMoneyController.RAIL,
                         payerFsp,
                         payeeFsp,
@@ -338,6 +327,7 @@ export class SendMoneyController {
             await this.outboundTransfersAuditPublisher.publish(
                 new AuditOutboundTransfersCommand.Input(
                     id,
+                    transferId,
                     SendMoneyController.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -359,6 +349,7 @@ export class SendMoneyController {
                 await this.outboundTransfersAuditPublisher.publish(
                     new AuditOutboundTransfersCommand.Input(
                         id,
+                        transferId,
                         SendMoneyController.RAIL,
                         payerFsp,
                         payeeFsp,

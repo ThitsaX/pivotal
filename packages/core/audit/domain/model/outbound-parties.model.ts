@@ -2,17 +2,21 @@ import {ErrorInformationObject, PartiesTypeIDPutResponse, PartyIdType} from '@sh
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'outbound_parties'})
-@Index('outbound_parties_02_idx', ['partyIdType', 'partyId'])
-@Index('outbound_parties_03_idx', ['partyIdType', 'partyId', 'subId'])
-@Index('outbound_parties_04_idx', ['createdAt'])
-@Index('outbound_parties_05_idx', ['completedAt'])
-@Index('outbound_parties_06_idx', ['payerFsp', 'payeeFsp'])
-@Index('outbound_parties_07_idx', ['rail'])
-@Index('outbound_parties_08_idx', ['failed'])
+@Index('outbound_parties_01_idx', ['partyIdType', 'partyId'])
+@Index('outbound_parties_02_idx', ['partyIdType', 'partyId', 'subId'])
+@Index('outbound_parties_03_idx', ['createdAt'])
+@Index('outbound_parties_04_idx', ['completedAt'])
+@Index('outbound_parties_05_idx', ['payerFsp', 'payeeFsp'])
+@Index('outbound_parties_06_idx', ['rail'])
+@Index('outbound_parties_07_idx', ['failed'])
+@Index('outbound_parties_08_idx', ['correlationId'])
 export class OutboundParties {
 
     @PrimaryColumn({type: 'bigint', name: 'id'})
     public id: string;
+
+    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
+    public correlationId: string;
 
     @Column({type: 'varchar', length: 32, name: 'rail'})
     public rail: string;
@@ -49,6 +53,7 @@ export class OutboundParties {
 
     constructor(
         id: string,
+        correlationId: string,
         rail: string,
         payerFsp: string,
         payeeFsp: string,
@@ -63,6 +68,7 @@ export class OutboundParties {
     ) {
 
         this.id = id;
+        this.correlationId = correlationId;
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;

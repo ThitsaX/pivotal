@@ -1,4 +1,4 @@
-export class LegacySettings {
+export class OutboundSettings {
     constructor(
         public readonly redisUrl: string,
         public readonly redisTtlMs: number,
