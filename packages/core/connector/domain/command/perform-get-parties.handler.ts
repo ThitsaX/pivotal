@@ -52,6 +52,7 @@ export class PerformGetPartiesHandler
             await this.auditPublisher.publish(
                 new AuditInboundPartiesCommand.Input(
                     id,
+                    id,
                     PerformGetPartiesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -88,6 +89,7 @@ export class PerformGetPartiesHandler
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundPartiesCommand.Input(
+                        id,
                         id,
                         PerformGetPartiesHandler.RAIL,
                         payerFsp,

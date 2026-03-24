@@ -9,6 +9,8 @@ services:
     environment:
       WEB_OUTBOUND_PORT: ${WEB_OUTBOUND_PORT:-3200}
       NATS_URL: ${NATS_URL:-nats://localhost:4222}
+      REDIS_URL: ${REDIS_URL:-redis://localhost:6379}
+      REDIS_TTL_MS: ${REDIS_TTL_MS:-300000}
       FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://localhost:4002}
       FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://localhost:3002}
       FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://localhost:3000}

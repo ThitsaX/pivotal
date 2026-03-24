@@ -2,16 +2,20 @@ import {ErrorInformationObject, TransfersIDPutResponse, TransfersPostRequest} fr
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'inbound_transfers'})
-@Index('inbound_transfers_02_idx', ['transferId'])
-@Index('inbound_transfers_03_idx', ['createdAt'])
-@Index('inbound_transfers_04_idx', ['completedAt'])
-@Index('inbound_transfers_05_idx', ['payerFsp', 'payeeFsp'])
-@Index('inbound_transfers_06_idx', ['rail'])
-@Index('inbound_transfers_07_idx', ['failed'])
+@Index('inbound_transfers_01_idx', ['transferId'])
+@Index('inbound_transfers_02_idx', ['createdAt'])
+@Index('inbound_transfers_03_idx', ['completedAt'])
+@Index('inbound_transfers_04_idx', ['payerFsp', 'payeeFsp'])
+@Index('inbound_transfers_05_idx', ['rail'])
+@Index('inbound_transfers_06_idx', ['failed'])
+@Index('inbound_transfers_07_idx', ['correlationId'])
 export class InboundTransfers {
 
     @PrimaryColumn({type: 'bigint', name: 'id'})
     public id: string;
+
+    @Column({type: 'varchar', length: 128, name: 'correlation_id'})
+    public correlationId: string;
 
     @Column({type: 'varchar', length: 32, name: 'rail'})
     public rail: string;
@@ -48,6 +52,7 @@ export class InboundTransfers {
 
     constructor(
         id: string,
+        correlationId: string,
         rail: string,
         payerFsp: string,
         payeeFsp: string,
@@ -62,6 +67,7 @@ export class InboundTransfers {
     ) {
 
         this.id = id;
+        this.correlationId = correlationId;
         this.rail = rail;
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;

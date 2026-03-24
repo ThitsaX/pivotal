@@ -4,11 +4,7 @@ import {OutboundDomainModule} from '@core/outbound/domain';
 import {FspiopSettings} from '@shared/fspiop';
 import {PrivateKeyStore} from '@shared/security';
 import {FspiopSigner} from './component';
-import {
-    LookupController,
-    QuoteController,
-    TransferController,
-} from './controllers';
+import {SendMoneyController} from './controllers';
 import {WebOutboundDependencies} from './required.dependencies';
 
 const REQUIRED_DEPENDENCIES = Symbol('WebOutboundRequiredDependencies');
@@ -38,11 +34,7 @@ export class WebOutboundModule {
                 }),
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [
-                LookupController,
-                QuoteController,
-                TransferController,
-            ],
+            controllers: [SendMoneyController],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],

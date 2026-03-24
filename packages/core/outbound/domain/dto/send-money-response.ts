@@ -6,7 +6,7 @@ import {FspParty} from './fsp-party';
 export class SendMoneyResponse {
     @IsOptional()
     @IsString()
-    transferId?: string;
+    transferId: string;
 
     @IsOptional()
     @IsString()

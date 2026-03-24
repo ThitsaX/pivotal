@@ -53,6 +53,7 @@ export class PerformPostTransfersHandler
             await this.auditPublisher.publish(
                 new AuditInboundTransfersCommand.Input(
                     id,
+                    id,
                     PerformPostTransfersHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -86,6 +87,7 @@ export class PerformPostTransfersHandler
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundTransfersCommand.Input(
+                        id,
                         id,
                         PerformPostTransfersHandler.RAIL,
                         payerFsp,
