@@ -1,5 +1,6 @@
-import {ErrorInformationObject, TransfersIDPutResponse, TransfersPostRequest} from '@shared/fspiop';
+import {ErrorInformationObject, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest} from '@shared/fspiop';
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {InboundStageEnum} from './inbound-stage.enum';
 
 @Entity({name: 'inbound_transfers'})
 @Index('inbound_transfers_01_idx', ['transferId'])
@@ -29,11 +30,11 @@ export class InboundTransfers {
     @Column({type: 'varchar', length: 64, name: 'transfer_id'})
     public transferId: string;
 
-    @Column({type: 'jsonb', name: 'request'})
-    public request: TransfersPostRequest;
+    @Column({type: 'jsonb', name: 'request', nullable: true})
+    public request: TransfersPostRequest | null;
 
     @Column({type: 'jsonb', name: 'response', nullable: true})
-    public response: TransfersIDPutResponse | null;
+    public response: TransfersIDPutResponse | TransfersIDPatchResponse | null;
 
     @Column({type: 'jsonb', name: 'error', nullable: true})
     public error: ErrorInformationObject | null;
@@ -50,6 +51,9 @@ export class InboundTransfers {
     @Column({type: 'timestamptz', name: 'completed_at', nullable: true})
     public completedAt: Date | null;
 
+    @Column({type: 'varchar', length: 32, name: 'stage', default: InboundStageEnum.AT_CONNECTOR})
+    public stage: InboundStageEnum;
+
     constructor(
         id: string,
         correlationId: string,
@@ -57,13 +61,14 @@ export class InboundTransfers {
         payerFsp: string,
         payeeFsp: string,
         transferId: string,
-        request: TransfersPostRequest,
-        response: TransfersIDPutResponse | null = null,
+        request: TransfersPostRequest | null = null,
+        response: TransfersIDPutResponse | TransfersIDPatchResponse | null = null,
         error: ErrorInformationObject | null = null,
         fspError: string | null = null,
         failed: boolean = false,
         createdAt: Date = new Date(),
         completedAt: Date | null = null,
+        stage: InboundStageEnum = InboundStageEnum.AT_CONNECTOR,
     ) {
 
         this.id = id;
@@ -79,5 +84,6 @@ export class InboundTransfers {
         this.failed = failed;
         this.createdAt = createdAt;
         this.completedAt = completedAt;
+        this.stage = stage;
     }
 }

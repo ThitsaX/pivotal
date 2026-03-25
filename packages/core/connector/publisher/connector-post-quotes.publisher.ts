@@ -19,6 +19,7 @@ export namespace ConnectorPostQuotesPublisher {
 
     export class Message {
         constructor(
+            public readonly correlationId: string | null,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly request: QuotesPostRequest,

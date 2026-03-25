@@ -27,17 +27,24 @@ export class QuotesController {
         return value;
     }
 
+    private static optionalHeaderValue(value: string | string[] | undefined): string | null {
+        const header = QuotesController.headerValue(value).trim();
+        return header.length > 0 ? header : null;
+    }
+
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
-    postQuotes(@Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+    postQuotes(@Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+               @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
                @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
                @Body() request: QuotesPostRequest): void {
         this.dispatch(() => {
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(sourceHeader);
             const payeeFsp = QuotesController.headerValue(destinationHeader);
 
             return new HandlePostQuotesCommand(
-                new HandlePostQuotesCommand.Input(payerFsp, payeeFsp, request),
+                new HandlePostQuotesCommand.Input(correlationId, payerFsp, payeeFsp, request),
             );
         });
     }
@@ -46,16 +53,19 @@ export class QuotesController {
     @HttpCode(HttpStatus.ACCEPTED)
     putQuotes(
         @Param('quoteId') quoteId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesIDPutResponse,
     ): void {
         this.dispatch(() => {
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
 
             return new HandlePutQuotesCommand(
                 new HandlePutQuotesCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     quoteId,
@@ -69,17 +79,20 @@ export class QuotesController {
     @HttpCode(HttpStatus.ACCEPTED)
     putQuotesError(
         @Param('quoteId') quoteId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
             const error = QuotesController.toErrorInformationObject(request);
 
             return new HandlePutQuotesErrorCommand(
                 new HandlePutQuotesErrorCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     quoteId,

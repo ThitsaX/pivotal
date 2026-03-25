@@ -1,5 +1,6 @@
 import {ErrorInformationObject, PartiesTypeIDPutResponse, PartyIdType} from '@shared/fspiop';
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {InboundStageEnum} from './inbound-stage.enum';
 
 @Entity({name: 'inbound_parties'})
 @Index('inbound_parties_01_idx', ['partyIdType', 'partyId'])
@@ -54,6 +55,9 @@ export class InboundParties {
     @Column({type: 'timestamptz', name: 'completed_at', nullable: true})
     public completedAt: Date | null;
 
+    @Column({type: 'varchar', length: 32, name: 'stage', default: InboundStageEnum.AT_CONNECTOR})
+    public stage: InboundStageEnum;
+
     constructor(
         id: string,
         correlationId: string,
@@ -69,6 +73,7 @@ export class InboundParties {
         failed: boolean = false,
         createdAt: Date = new Date(),
         completedAt: Date | null = null,
+        stage: InboundStageEnum = InboundStageEnum.AT_CONNECTOR,
     ) {
 
         this.id = id;
@@ -85,5 +90,6 @@ export class InboundParties {
         this.failed = failed;
         this.createdAt = createdAt;
         this.completedAt = completedAt;
+        this.stage = stage;
     }
 }

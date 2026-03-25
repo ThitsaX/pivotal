@@ -1,6 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {InboundQuotes} from '../model';
+import {DbTarget} from '@shared/typeorm';
+import {InboundQuotes, InboundStageEnum} from '../model';
 import {InboundQuotesRepository} from '../repository';
 import {AuditInboundQuotesCommand} from './audit-inbound-quotes.command';
 
@@ -15,28 +16,34 @@ export class AuditInboundQuotesHandler
     }
 
     async execute(command: AuditInboundQuotesCommand): Promise<AuditInboundQuotesCommand.Output> {
-        const {id, correlationId, rail, payerFsp, payeeFsp, quoteId, request, response, error, fspError, createdAt, completedAt} = command.input;
+        const {id, correlationId, rail, payerFsp, payeeFsp, quoteId, request, response, error, fspError, createdAt, completedAt, stage} = command.input;
 
-        const finalResponse = response ?? null;
-        const finalError = finalResponse ? null : (error ?? null);
-        const finalFspError = finalResponse ? null : (fspError ?? null);
+        const existing = await this.repository.findByCorrelationId(correlationId, DbTarget.Write);
+
+        const finalRequest = request ?? existing?.request ?? null;
+        const finalResponse = response ?? existing?.response ?? null;
+        const finalError = finalResponse ? null : (error ?? existing?.error ?? null);
+        const finalFspError = finalResponse ? null : (fspError ?? existing?.fspError ?? null);
         const failed = finalError !== null || finalFspError !== null;
-        const finalCompletedAt = completedAt ?? (finalResponse || finalError || finalFspError ? new Date() : null);
+        const hasCompletionState = finalResponse !== null || finalError !== null || finalFspError !== null;
+        const finalCompletedAt = completedAt ?? existing?.completedAt ?? (hasCompletionState ? new Date() : null);
+        const finalStage = stage ?? existing?.stage ?? InboundStageEnum.AT_CONNECTOR;
 
         const entity = new InboundQuotes(
-            id,
+            existing?.id ?? id,
             correlationId,
             rail,
             payerFsp,
             payeeFsp,
             quoteId,
-            request,
+            finalRequest,
             finalResponse,
             finalError,
             finalFspError,
             failed,
-            createdAt ?? new Date(),
+            existing?.createdAt ?? createdAt ?? new Date(),
             finalCompletedAt,
+            finalStage,
         );
 
         const saved = await this.repository.save(entity);

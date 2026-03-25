@@ -81,6 +81,7 @@ export class ConnectorPostTransfersListener implements OnModuleInit {
                 await this.commandBus.execute(
                     new PerformPostTransfersCommand(
                         new PerformPostTransfersCommand.Input(
+                            message.correlationId,
                             message.payerFsp,
                             message.payeeFsp,
                             message.request,

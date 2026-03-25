@@ -48,7 +48,7 @@ export class PutAcceptQuoteHandler
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const {transfersUrl} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Transfers.forRequest(source, destination);
+        const headers = FspiopHeaders.Values.Transfers.forRequest(null, source, destination);
         const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, transferId);
         const errorSubject = FspiopPubSubSubjects.Transfers.forError(source, transferId);
 

@@ -28,6 +28,10 @@ export class InboundQuotesRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
+    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<InboundQuotes | null> {
+        return this.getRepository(target).findOne({where: {correlationId}});
+    }
+
     async findByQuoteId(quoteId: string, target: DbTarget = DbTarget.Read): Promise<InboundQuotes | null> {
         return this.getRepository(target).findOne({where: {quoteId}});
     }

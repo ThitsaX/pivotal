@@ -1,5 +1,6 @@
 import {ErrorInformationObject, Money, QuotesIDPutResponse, QuotesPostRequest, TransactionScenario} from '@shared/fspiop';
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {InboundStageEnum} from './inbound-stage.enum';
 
 @Entity({name: 'inbound_quotes'})
 @Index('inbound_quotes_01_idx', ['quoteId'])
@@ -29,17 +30,17 @@ export class InboundQuotes {
     @Column({type: 'varchar', length: 64, name: 'quote_id'})
     public quoteId: string;
 
-    @Column({type: 'varchar', length: 32, name: 'scenario'})
-    public scenario: TransactionScenario;
+    @Column({type: 'varchar', length: 32, name: 'scenario', nullable: true})
+    public scenario: TransactionScenario | null;
 
     @Column({type: 'varchar', length: 128, name: 'sub_scenario', nullable: true})
     public subScenario: string | null;
 
-    @Column({type: 'jsonb', name: 'amount'})
-    public amount: Money;
+    @Column({type: 'jsonb', name: 'amount', nullable: true})
+    public amount: Money | null;
 
-    @Column({type: 'jsonb', name: 'request'})
-    public request: QuotesPostRequest;
+    @Column({type: 'jsonb', name: 'request', nullable: true})
+    public request: QuotesPostRequest | null;
 
     @Column({type: 'jsonb', name: 'response', nullable: true})
     public response: QuotesIDPutResponse | null;
@@ -59,6 +60,9 @@ export class InboundQuotes {
     @Column({type: 'timestamptz', name: 'completed_at', nullable: true})
     public completedAt: Date | null;
 
+    @Column({type: 'varchar', length: 32, name: 'stage', default: InboundStageEnum.AT_CONNECTOR})
+    public stage: InboundStageEnum;
+
     constructor(
         id: string,
         correlationId: string,
@@ -66,13 +70,14 @@ export class InboundQuotes {
         payerFsp: string,
         payeeFsp: string,
         quoteId: string,
-        request: QuotesPostRequest,
+        request: QuotesPostRequest | null = null,
         response: QuotesIDPutResponse | null = null,
         error: ErrorInformationObject | null = null,
         fspError: string | null = null,
         failed: boolean = false,
         createdAt: Date = new Date(),
         completedAt: Date | null = null,
+        stage: InboundStageEnum = InboundStageEnum.AT_CONNECTOR,
     ) {
 
         this.id = id;
@@ -81,9 +86,9 @@ export class InboundQuotes {
         this.payerFsp = payerFsp;
         this.payeeFsp = payeeFsp;
         this.quoteId = quoteId;
-        this.scenario = request?.transactionType?.scenario as TransactionScenario;
+        this.scenario = request?.transactionType?.scenario as TransactionScenario ?? null;
         this.subScenario = request?.transactionType?.subScenario ?? null;
-        this.amount = request?.amount as Money;
+        this.amount = request?.amount as Money ?? null;
         this.request = request;
         this.response = response;
         this.error = error;
@@ -91,5 +96,6 @@ export class InboundQuotes {
         this.failed = failed;
         this.createdAt = createdAt;
         this.completedAt = completedAt;
+        this.stage = stage;
     }
 }

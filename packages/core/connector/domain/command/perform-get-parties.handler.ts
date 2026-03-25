@@ -1,11 +1,11 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundPartiesCommand} from '@core/audit/domain';
+import {AuditInboundPartiesCommand, InboundStageEnum} from '@core/audit/domain';
 import {InboundPartiesAuditPublisher} from '@core/audit/producer';
-import {ErrorInformationObject, ErrorInformationResponse, FspiopAxios, FspiopException, FspiopHeaders,} from '@shared/fspiop';
+import {FspiopAxios, FspiopException, FspiopHeaders,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {PerformGetPartiesCommand} from './perform-get-parties.command';
-import {ConnectorSettings, FspConnector} from '../component';
+import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformGetPartiesCommand)
 export class PerformGetPartiesHandler
@@ -27,11 +27,12 @@ export class PerformGetPartiesHandler
     }
 
     async execute(command: PerformGetPartiesCommand): Promise<PerformGetPartiesCommand.Output> {
-        const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
+        const {correlationId, payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
         const {partiesUrl} = this.fspiopAxios.settings;
-        const headers = FspiopHeaders.Values.Parties.forResult(payerFsp, this.connectorSettings.connectorId);
+        const headers = FspiopHeaders.Values.Parties.forResult(correlationId, payerFsp, this.connectorSettings.connectorId);
         const createdAt = new Date();
         const id = PerformGetPartiesHandler.nextAuditId();
+        const auditCorrelationId = correlationId ?? id;
 
         try {
             const response = await this.fspConnector.getParties(
@@ -52,7 +53,7 @@ export class PerformGetPartiesHandler
             await this.auditPublisher.publish(
                 new AuditInboundPartiesCommand.Input(
                     id,
-                    id,
+                    auditCorrelationId,
                     PerformGetPartiesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -64,12 +65,14 @@ export class PerformGetPartiesHandler
                     null,
                     createdAt,
                     new Date(),
+                    InboundStageEnum.AT_CONNECTOR,
                 ),
             );
         } catch (error) {
             let callbackError = error;
-            let callbackAuditError = PerformGetPartiesHandler.toAuditError(error);
-            let callbackErrorResponse = PerformGetPartiesHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = AuditErrorConverter.toAuditError(error);
+            let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+            let callbackFspError = AuditErrorConverter.toFspError(error);
 
             try {
                 await this.fspiopAxios.putPartiesError(
@@ -82,15 +85,16 @@ export class PerformGetPartiesHandler
                 );
             } catch (putError) {
                 callbackError = putError;
-                callbackAuditError = PerformGetPartiesHandler.toAuditError(putError);
-                callbackErrorResponse = PerformGetPartiesHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = AuditErrorConverter.toAuditError(putError);
+                callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+                callbackFspError = callbackFspError ?? AuditErrorConverter.toFspError(putError);
             }
 
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundPartiesCommand.Input(
                         id,
-                        id,
+                        auditCorrelationId,
                         PerformGetPartiesHandler.RAIL,
                         payerFsp,
                         payeeFsp,
@@ -99,9 +103,10 @@ export class PerformGetPartiesHandler
                         subId,
                         null,
                         callbackAuditError,
-                        null,
+                        callbackFspError,
                         createdAt,
                         new Date(),
+                        InboundStageEnum.AT_CONNECTOR,
                     ),
                 );
             } catch {
@@ -112,18 +117,6 @@ export class PerformGetPartiesHandler
         }
 
         return new PerformGetPartiesCommand.Output();
-    }
-
-    private static toAuditError(error: unknown): ErrorInformationObject {
-        try {
-            FspiopException.rethrow(error);
-        } catch (normalizedError) {
-            return (normalizedError as FspiopException).toErrorObject();
-        }
-    }
-
-    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
-        return {errorInformation: error.errorInformation};
     }
 
     private static nextAuditId(): string {

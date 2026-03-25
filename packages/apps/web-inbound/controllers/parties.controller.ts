@@ -43,15 +43,17 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
     ): void {
         this.dispatch(() => {
+            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(sourceHeader);
             const payeeFsp = PartiesController.headerValue(destinationHeader);
 
             return new HandleGetPartiesCommand(
-                new HandleGetPartiesCommand.Input(payerFsp, payeeFsp, type, id, subId ?? null),
+                new HandleGetPartiesCommand.Input(correlationId, payerFsp, payeeFsp, type, id, subId ?? null),
             );
         });
     }
@@ -62,16 +64,19 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
     ): void {
         this.dispatch(() => {
+            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
 
             return new HandlePutPartiesCommand(
                 new HandlePutPartiesCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     type,
@@ -89,17 +94,20 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
             const error = PartiesController.toErrorInformationObject(request);
 
             return new HandlePutPartiesErrorCommand(
                 new HandlePutPartiesErrorCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     type,
@@ -121,6 +129,11 @@ export class PartiesController {
         }
 
         return value;
+    }
+
+    private static optionalHeaderValue(value: string | string[] | undefined): string | null {
+        const header = PartiesController.headerValue(value).trim();
+        return header.length > 0 ? header : null;
     }
 
     private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {

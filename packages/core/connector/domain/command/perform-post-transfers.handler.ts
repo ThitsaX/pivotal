@@ -1,17 +1,15 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundTransfersCommand} from '@core/audit/domain';
+import {AuditInboundTransfersCommand, InboundStageEnum} from '@core/audit/domain';
 import {InboundTransfersAuditPublisher} from '@core/audit/producer';
 import {
-    ErrorInformationObject,
-    ErrorInformationResponse,
     FspiopAxios,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {PerformPostTransfersCommand} from './perform-post-transfers.command';
-import {ConnectorSettings, FspConnector} from '../component';
+import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformPostTransfersCommand)
 export class PerformPostTransfersHandler
@@ -33,12 +31,13 @@ export class PerformPostTransfersHandler
     }
 
     async execute(command: PerformPostTransfersCommand): Promise<PerformPostTransfersCommand.Output> {
-        const {payerFsp, payeeFsp, request} = command.input;
+        const {correlationId, payerFsp, payeeFsp, request} = command.input;
         const {transfersUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
-        const headers = FspiopHeaders.Values.Transfers.forResult(payerFsp, connectorId);
+        const headers = FspiopHeaders.Values.Transfers.forResult(correlationId, payerFsp, connectorId);
         const createdAt = new Date();
         const id = PerformPostTransfersHandler.nextAuditId();
+        const auditCorrelationId = correlationId ?? id;
 
         try {
             const response = await this.fspConnector.postTransfers(request);
@@ -53,7 +52,7 @@ export class PerformPostTransfersHandler
             await this.auditPublisher.publish(
                 new AuditInboundTransfersCommand.Input(
                     id,
-                    id,
+                    auditCorrelationId,
                     PerformPostTransfersHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -64,12 +63,14 @@ export class PerformPostTransfersHandler
                     null,
                     createdAt,
                     new Date(),
+                    InboundStageEnum.AT_CONNECTOR,
                 ),
             );
         } catch (error) {
             let callbackError = error;
-            let callbackAuditError = PerformPostTransfersHandler.toAuditError(error);
-            let callbackErrorResponse = PerformPostTransfersHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = AuditErrorConverter.toAuditError(error);
+            let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+            let callbackFspError = AuditErrorConverter.toFspError(error);
 
             try {
                 await this.fspiopAxios.putTransfersError(
@@ -80,15 +81,16 @@ export class PerformPostTransfersHandler
                 );
             } catch (putError) {
                 callbackError = putError;
-                callbackAuditError = PerformPostTransfersHandler.toAuditError(putError);
-                callbackErrorResponse = PerformPostTransfersHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = AuditErrorConverter.toAuditError(putError);
+                callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+                callbackFspError = callbackFspError ?? AuditErrorConverter.toFspError(putError);
             }
 
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundTransfersCommand.Input(
                         id,
-                        id,
+                        auditCorrelationId,
                         PerformPostTransfersHandler.RAIL,
                         payerFsp,
                         payeeFsp,
@@ -96,9 +98,10 @@ export class PerformPostTransfersHandler
                         request,
                         null,
                         callbackAuditError,
-                        null,
+                        callbackFspError,
                         createdAt,
                         new Date(),
+                        InboundStageEnum.AT_CONNECTOR,
                     ),
                 );
             } catch {
@@ -109,18 +112,6 @@ export class PerformPostTransfersHandler
         }
 
         return new PerformPostTransfersCommand.Output();
-    }
-
-    private static toAuditError(error: unknown): ErrorInformationObject {
-        try {
-            FspiopException.rethrow(error);
-        } catch (normalizedError) {
-            return (normalizedError as FspiopException).toErrorObject();
-        }
-    }
-
-    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
-        return {errorInformation: error.errorInformation};
     }
 
     private static nextAuditId(): string {

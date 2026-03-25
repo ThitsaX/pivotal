@@ -1,17 +1,15 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand} from '@core/audit/domain';
+import {AuditInboundQuotesCommand, InboundStageEnum} from '@core/audit/domain';
 import {InboundQuotesAuditPublisher} from '@core/audit/producer';
 import {
-    ErrorInformationObject,
-    ErrorInformationResponse,
     FspiopAxios,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {PerformPostQuotesCommand} from './perform-post-quotes.command';
-import {ConnectorSettings, FspConnector} from '../component';
+import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformPostQuotesCommand)
 export class PerformPostQuotesHandler
@@ -33,12 +31,13 @@ export class PerformPostQuotesHandler
     }
 
     async execute(command: PerformPostQuotesCommand): Promise<PerformPostQuotesCommand.Output> {
-        const {payerFsp, payeeFsp, request} = command.input;
+        const {correlationId, payerFsp, payeeFsp, request} = command.input;
         const {quotesUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
-        const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, connectorId);
+        const headers = FspiopHeaders.Values.Quotes.forResult(correlationId, payerFsp, connectorId);
         const createdAt = new Date();
         const id = PerformPostQuotesHandler.nextAuditId();
+        const auditCorrelationId = correlationId ?? id;
 
         try {
             const response = await this.fspConnector.postQuotes(request);
@@ -53,7 +52,7 @@ export class PerformPostQuotesHandler
             await this.auditPublisher.publish(
                 new AuditInboundQuotesCommand.Input(
                     id,
-                    id,
+                    auditCorrelationId,
                     PerformPostQuotesHandler.RAIL,
                     payerFsp,
                     payeeFsp,
@@ -64,12 +63,14 @@ export class PerformPostQuotesHandler
                     null,
                     createdAt,
                     new Date(),
+                    InboundStageEnum.AT_CONNECTOR,
                 ),
             );
         } catch (error) {
             let callbackError = error;
-            let callbackAuditError = PerformPostQuotesHandler.toAuditError(error);
-            let callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = AuditErrorConverter.toAuditError(error);
+            let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+            let callbackFspError = AuditErrorConverter.toFspError(error);
 
             try {
                 await this.fspiopAxios.putQuotesError(
@@ -80,15 +81,16 @@ export class PerformPostQuotesHandler
                 );
             } catch (putError) {
                 callbackError = putError;
-                callbackAuditError = PerformPostQuotesHandler.toAuditError(putError);
-                callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = AuditErrorConverter.toAuditError(putError);
+                callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+                callbackFspError = callbackFspError ?? AuditErrorConverter.toFspError(putError);
             }
 
             try {
                 await this.auditPublisher.publish(
                     new AuditInboundQuotesCommand.Input(
                         id,
-                        id,
+                        auditCorrelationId,
                         PerformPostQuotesHandler.RAIL,
                         payerFsp,
                         payeeFsp,
@@ -96,9 +98,10 @@ export class PerformPostQuotesHandler
                         request,
                         null,
                         callbackAuditError,
-                        null,
+                        callbackFspError,
                         createdAt,
                         new Date(),
+                        InboundStageEnum.AT_CONNECTOR,
                     ),
                 );
             } catch {
@@ -109,18 +112,6 @@ export class PerformPostQuotesHandler
         }
 
         return new PerformPostQuotesCommand.Output();
-    }
-
-    private static toAuditError(error: unknown): ErrorInformationObject {
-        try {
-            FspiopException.rethrow(error);
-        } catch (normalizedError) {
-            return (normalizedError as FspiopException).toErrorObject();
-        }
-    }
-
-    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
-        return {errorInformation: error.errorInformation};
     }
 
     private static nextAuditId(): string {

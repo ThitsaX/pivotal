@@ -98,12 +98,14 @@ CREATE TABLE IF NOT EXISTS inbound_parties (
     fsp_error TEXT,
     failed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL,
-    completed_at TIMESTAMPTZ
+    completed_at TIMESTAMPTZ,
+    stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR'
 );
 
 ALTER TABLE inbound_parties ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(128);
 UPDATE inbound_parties SET correlation_id = CAST(id AS VARCHAR(128)) WHERE correlation_id IS NULL;
 ALTER TABLE inbound_parties ALTER COLUMN correlation_id SET NOT NULL;
+ALTER TABLE inbound_parties ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR';
 
 CREATE INDEX IF NOT EXISTS inbound_parties_01_idx ON inbound_parties (party_id_type, party_id);
 CREATE INDEX IF NOT EXISTS inbound_parties_02_idx ON inbound_parties (party_id_type, party_id, sub_id);
@@ -121,21 +123,26 @@ CREATE TABLE IF NOT EXISTS inbound_quotes (
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
     quote_id VARCHAR(64) NOT NULL,
-    scenario VARCHAR(32) NOT NULL,
+    scenario VARCHAR(32),
     sub_scenario VARCHAR(128),
-    amount JSONB NOT NULL,
-    request JSONB NOT NULL,
+    amount JSONB,
+    request JSONB,
     response JSONB,
     error JSONB,
     fsp_error TEXT,
     failed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL,
-    completed_at TIMESTAMPTZ
+    completed_at TIMESTAMPTZ,
+    stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR'
 );
 
 ALTER TABLE inbound_quotes ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(128);
 UPDATE inbound_quotes SET correlation_id = CAST(id AS VARCHAR(128)) WHERE correlation_id IS NULL;
 ALTER TABLE inbound_quotes ALTER COLUMN correlation_id SET NOT NULL;
+ALTER TABLE inbound_quotes ALTER COLUMN scenario DROP NOT NULL;
+ALTER TABLE inbound_quotes ALTER COLUMN amount DROP NOT NULL;
+ALTER TABLE inbound_quotes ALTER COLUMN request DROP NOT NULL;
+ALTER TABLE inbound_quotes ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR';
 
 CREATE INDEX IF NOT EXISTS inbound_quotes_01_idx ON inbound_quotes (quote_id);
 CREATE INDEX IF NOT EXISTS inbound_quotes_02_idx ON inbound_quotes (created_at);
@@ -152,18 +159,21 @@ CREATE TABLE IF NOT EXISTS inbound_transfers (
     payer_fsp VARCHAR(32) NOT NULL,
     payee_fsp VARCHAR(32) NOT NULL,
     transfer_id VARCHAR(64) NOT NULL,
-    request JSONB NOT NULL,
+    request JSONB,
     response JSONB,
     error JSONB,
     fsp_error TEXT,
     failed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL,
-    completed_at TIMESTAMPTZ
+    completed_at TIMESTAMPTZ,
+    stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR'
 );
 
 ALTER TABLE inbound_transfers ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(128);
 UPDATE inbound_transfers SET correlation_id = CAST(id AS VARCHAR(128)) WHERE correlation_id IS NULL;
 ALTER TABLE inbound_transfers ALTER COLUMN correlation_id SET NOT NULL;
+ALTER TABLE inbound_transfers ALTER COLUMN request DROP NOT NULL;
+ALTER TABLE inbound_transfers ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'AT_CONNECTOR';
 
 CREATE INDEX IF NOT EXISTS inbound_transfers_01_idx ON inbound_transfers (transfer_id);
 CREATE INDEX IF NOT EXISTS inbound_transfers_02_idx ON inbound_transfers (created_at);

@@ -28,6 +28,10 @@ export class OutboundTransfersRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
+    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<OutboundTransfers | null> {
+        return this.getRepository(target).findOne({where: {correlationId}});
+    }
+
     async findByTransferId(transferId: string, target: DbTarget = DbTarget.Read): Promise<OutboundTransfers | null> {
         return this.getRepository(target).findOne({where: {transferId}});
     }
