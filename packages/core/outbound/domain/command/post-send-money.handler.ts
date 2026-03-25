@@ -44,7 +44,7 @@ export class PostSendMoneyHandler
         const subId = PostSendMoneyHandler.toSubId(request.to.idSubValue);
         const {partiesUrl, switchId} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Parties.forRequest(source, destination);
+        const headers = FspiopHeaders.Values.Parties.forRequest(null, source, destination);
 
         const successSubject = FspiopPubSubSubjects.Parties.forSuccess(source, destination, type, id, subId);
         const errorSubject = FspiopPubSubSubjects.Parties.forError(source, destination, type, id, subId);

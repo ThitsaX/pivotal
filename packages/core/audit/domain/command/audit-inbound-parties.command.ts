@@ -1,4 +1,5 @@
 import {ErrorInformationObject, PartiesTypeIDPutResponse, PartyIdType} from '@shared/fspiop';
+import {InboundStageEnum} from '../model/inbound-stage.enum';
 
 export class AuditInboundPartiesCommand {
     constructor(public readonly input: AuditInboundPartiesCommand.Input) {
@@ -21,7 +22,8 @@ export namespace AuditInboundPartiesCommand {
             public readonly error: ErrorInformationObject | null = null,
             public readonly fspError: string | null = null,
             public readonly createdAt?: Date,
-            public readonly completedAt?: Date,
+            public readonly completedAt?: Date | null,
+            public readonly stage: InboundStageEnum = InboundStageEnum.AT_CONNECTOR,
         ) {
         }
     }

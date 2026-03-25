@@ -81,6 +81,7 @@ export class ConnectorPatchTransfersListener implements OnModuleInit {
                 await this.commandBus.execute(
                     new PerformPatchTransfersCommand(
                         new PerformPatchTransfersCommand.Input(
+                            message.correlationId,
                             message.payerFsp,
                             message.payeeFsp,
                             message.transferId,

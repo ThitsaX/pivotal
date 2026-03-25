@@ -1,3 +1,4 @@
+export * from './inbound-stage.enum';
 export * from './inbound-parties.model';
 export * from './inbound-quotes.model';
 export * from './inbound-transfers.model';

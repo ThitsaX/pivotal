@@ -28,6 +28,10 @@ export class OutboundPartiesRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
+    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<OutboundParties | null> {
+        return this.getRepository(target).findOne({where: {correlationId}});
+    }
+
     async findOutboundParties(
         criteria: FindOutboundPartiesQuery.Criteria,
         pageRequest: FindOutboundPartiesQuery.PageRequest,

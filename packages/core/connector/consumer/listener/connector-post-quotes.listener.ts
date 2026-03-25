@@ -81,6 +81,7 @@ export class ConnectorPostQuotesListener implements OnModuleInit {
                 await this.commandBus.execute(
                     new PerformPostQuotesCommand(
                         new PerformPostQuotesCommand.Input(
+                            message.correlationId,
                             message.payerFsp,
                             message.payeeFsp,
                             message.request,

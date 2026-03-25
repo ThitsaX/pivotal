@@ -27,17 +27,24 @@ export class TransfersController {
         return value;
     }
 
+    private static optionalHeaderValue(value: string | string[] | undefined): string | null {
+        const header = TransfersController.headerValue(value).trim();
+        return header.length > 0 ? header : null;
+    }
+
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
-    postTransfers(@Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+    postTransfers(@Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+                  @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
                   @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
                   @Body() request: TransfersPostRequest): void {
         this.dispatch(() => {
+            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(sourceHeader);
             const payeeFsp = TransfersController.headerValue(destinationHeader);
 
             return new HandlePostTransfersCommand(
-                new HandlePostTransfersCommand.Input(payerFsp, payeeFsp, request),
+                new HandlePostTransfersCommand.Input(correlationId, payerFsp, payeeFsp, request),
             );
         });
     }
@@ -46,16 +53,18 @@ export class TransfersController {
     @HttpCode(HttpStatus.ACCEPTED)
     patchTransfers(
         @Param('transferId') transferId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() response: TransfersIDPatchResponse,
     ): void {
         this.dispatch(() => {
+            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(sourceHeader);
             const payeeFsp = TransfersController.headerValue(destinationHeader);
 
             return new HandlePatchTransfersCommand(
-                new HandlePatchTransfersCommand.Input(payerFsp, payeeFsp, transferId, response),
+                new HandlePatchTransfersCommand.Input(correlationId, payerFsp, payeeFsp, transferId, response),
             );
         });
     }
@@ -64,16 +73,19 @@ export class TransfersController {
     @HttpCode(HttpStatus.ACCEPTED)
     putTransfers(
         @Param('transferId') transferId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: TransfersIDPutResponse,
     ): void {
         this.dispatch(() => {
+            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(destinationHeader);
             const payeeFsp = TransfersController.headerValue(sourceHeader);
 
             return new HandlePutTransfersCommand(
                 new HandlePutTransfersCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     transferId,
@@ -87,17 +99,20 @@ export class TransfersController {
     @HttpCode(HttpStatus.ACCEPTED)
     putTransfersError(
         @Param('transferId') transferId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(destinationHeader);
             const payeeFsp = TransfersController.headerValue(sourceHeader);
             const error = TransfersController.toErrorInformationObject(request);
 
             return new HandlePutTransfersErrorCommand(
                 new HandlePutTransfersErrorCommand.Input(
+                    correlationId,
                     payerFsp,
                     payeeFsp,
                     transferId,

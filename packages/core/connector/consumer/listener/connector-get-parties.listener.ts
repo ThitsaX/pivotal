@@ -81,6 +81,7 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
                 await this.commandBus.execute(
                     new PerformGetPartiesCommand(
                         new PerformGetPartiesCommand.Input(
+                            message.correlationId,
                             message.payerFsp,
                             message.payeeFsp,
                             message.partyIdType,

@@ -59,7 +59,7 @@ export class PutAcceptPartyHandler
         const {quoteId} = quoteRequest;
         const {quotesUrl} = this.fspiopAxios.settings;
 
-        const headers = FspiopHeaders.Values.Quotes.forRequest(source, destination);
+        const headers = FspiopHeaders.Values.Quotes.forRequest(null, source, destination);
         const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
         const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 

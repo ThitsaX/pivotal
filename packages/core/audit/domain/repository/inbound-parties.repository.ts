@@ -73,6 +73,10 @@ export class InboundPartiesRepository {
         return this.getRepository(target).findOne({where: {id}});
     }
 
+    async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<InboundParties | null> {
+        return this.getRepository(target).findOne({where: {correlationId}});
+    }
+
     async findInboundParties(
         criteria: FindInboundPartiesQuery.Criteria,
         pageRequest: FindInboundPartiesQuery.PageRequest,
