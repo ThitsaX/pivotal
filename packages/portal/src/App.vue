@@ -6,12 +6,7 @@ import TimeZoneSelector from './components/TimeZoneSelector.vue';
 import {DESKTOP_BREAKPOINT, groupViews} from './modules/audit/helpers';
 import type {ViewKey} from './modules/audit/types';
 import {VIEW_BY_KEY, VIEW_DEFINITIONS} from './modules/audit/view-definitions';
-import InboundPartiesPage from './pages/audit/inbound/InboundPartiesPage.vue';
-import InboundQuotesPage from './pages/audit/inbound/InboundQuotesPage.vue';
-import InboundTransfersPage from './pages/audit/inbound/InboundTransfersPage.vue';
-import OutboundPartiesPage from './pages/audit/outbound/OutboundPartiesPage.vue';
-import OutboundQuotesPage from './pages/audit/outbound/OutboundQuotesPage.vue';
-import OutboundTransfersPage from './pages/audit/outbound/OutboundTransfersPage.vue';
+import TransactionsPage from './pages/audit/TransactionsPage.vue';
 import DashboardPage from './pages/DashboardPage.vue';
 import HubAddCurrencyPage from './pages/hub/HubAddCurrencyPage.vue';
 import HubAddSigningKeysPage from './pages/hub/HubAddSigningKeysPage.vue';
@@ -23,7 +18,7 @@ import ParticipantRegisterEndpointPage from './pages/participant/ParticipantRegi
 
 const isSidebarOpen = ref(false);
 const isDashboardActive = ref(true);
-const activeViewKey = ref<ViewKey>('outbound-parties');
+const activeViewKey = ref<ViewKey>('transactions');
 const sidebarScrollContainer = ref<HTMLElement | null>(null);
 const sidebarScrollIndicatorHeight = ref(0);
 const sidebarScrollIndicatorOffset = ref(0);
@@ -48,12 +43,7 @@ const pageComponentByKey: Record<ViewKey, Component> = {
     'participant-add-signing-keys': ParticipantAddSigningKeysPage,
     'participant-add-new-currency': ParticipantAddNewCurrencyPage,
     'participant-register-endpoint': ParticipantRegisterEndpointPage,
-    'inbound-parties': InboundPartiesPage,
-    'inbound-quotes': InboundQuotesPage,
-    'inbound-transfers': InboundTransfersPage,
-    'outbound-parties': OutboundPartiesPage,
-    'outbound-quotes': OutboundQuotesPage,
-    'outbound-transfers': OutboundTransfersPage,
+    transactions: TransactionsPage,
 };
 
 const activePageComponent = computed((): Component => {
@@ -99,6 +89,10 @@ const updateSidebarScrollIndicator = (): void => {
 };
 
 const handleWindowResize = (): void => {
+    if (window.innerWidth < DESKTOP_BREAKPOINT) {
+        isSidebarOpen.value = false;
+    }
+
     updateSidebarScrollIndicator();
 };
 
@@ -142,9 +136,10 @@ const openDashboard = (): void => {
 <template>
     <div class="min-h-screen">
         <button
+            v-if="!isSidebarOpen"
             type="button"
             class="fixed left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#3d257f]/30 bg-[#fbfdff] text-ink shadow-soft transition hover:border-[#3d257f] lg:hidden"
-            @click="isSidebarOpen = !isSidebarOpen"
+            @click="isSidebarOpen = true"
         >
             <img
                 :src="thitsaworksLogo"

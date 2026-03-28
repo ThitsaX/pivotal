@@ -7,14 +7,9 @@ import {
     AddHubSigningKeysController,
     AddSigningKeysController,
     GenerateSigningKeyController,
-    InboundPartiesAuditController,
-    InboundQuotesAuditController,
-    InboundTransfersAuditController,
     ListParticipantsController,
     OnboardFspController,
-    OutboundPartiesAuditController,
-    OutboundQuotesAuditController,
-    OutboundTransfersAuditController,
+    TransactionsAuditController,
     UpsertEndpointController,
 } from './controllers';
 import {WebPivotalDependencies} from './required.dependencies';
@@ -53,12 +48,7 @@ export class WebPivotalModule {
                 ListParticipantsController,
                 UpsertEndpointController,
                 GenerateSigningKeyController,
-                InboundPartiesAuditController,
-                InboundQuotesAuditController,
-                InboundTransfersAuditController,
-                OutboundPartiesAuditController,
-                OutboundQuotesAuditController,
-                OutboundTransfersAuditController,
+                TransactionsAuditController,
             ],
         };
     }

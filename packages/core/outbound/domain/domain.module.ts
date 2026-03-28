@@ -1,5 +1,6 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
+import {AuditProducerModule} from '@core/audit/producer';
 import {
     FspiopAxiosModule,
     FspiopPubSubModule,
@@ -25,6 +26,11 @@ export class OutboundDomainModule {
                     useFactory: asyncOptions.useFactory,
                 }),
                 FspiopPubSubModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
+                AuditProducerModule.forRootAsync({
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
@@ -71,7 +77,8 @@ export namespace OutboundDomainModule {
 
     export interface RequiredDependencies
         extends FspiopAxiosModule.RequiredDependencies,
-                FspiopPubSubModule.RequiredDependencies {
+                FspiopPubSubModule.RequiredDependencies,
+                AuditProducerModule.RequiredDependencies {
         outboundSettings(): OutboundSettings;
     }
 

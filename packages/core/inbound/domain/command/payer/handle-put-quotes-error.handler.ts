@@ -1,10 +1,10 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundQuotesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopPubSubSubjects, FspiopResponsePublisher} from '@shared/fspiop';
 import {HandlePutQuotesErrorCommand} from './handle-put-quotes-error.command';
-import {GATEWAY_RAIL, nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePutQuotesErrorCommand)
 export class HandlePutQuotesErrorHandler
@@ -12,8 +12,8 @@ export class HandlePutQuotesErrorHandler
 {
 
     constructor(
-        @Inject(InboundQuotesAuditPublisher)
-        private readonly auditPublisher: InboundQuotesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(FspiopResponsePublisher)
         private readonly publisher: FspiopResponsePublisher,
     ) {
@@ -31,20 +31,16 @@ export class HandlePutQuotesErrorHandler
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
-            new AuditInboundQuotesCommand.Input(
-                auditId,
-                auditCorrelationId,
-                GATEWAY_RAIL,
-                payerFsp,
-                payeeFsp,
-                quoteId,
-                null,
-                null,
-                error,
-                null,
-                createdAt,
-                createdAt,
-                InboundStageEnum.AT_GATEWAY,
+            TransactionMessage.error(
+                TransactionMessage.InvocationPhase.Quotes,
+                TransactionMessage.InvocationGateway.Inbound,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    error,
+                    occurredAt: createdAt,
+                },
             ),
         );
 

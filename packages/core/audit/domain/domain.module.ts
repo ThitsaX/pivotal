@@ -3,74 +3,46 @@ import {CqrsModule} from '@nestjs/cqrs';
 import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {
-    AuditInboundPartiesHandler,
-    AuditInboundQuotesHandler,
-    AuditInboundTransfersHandler,
-    AuditOutboundPartiesHandler,
-    AuditOutboundQuotesHandler,
-    AuditOutboundTransfersHandler,
+    AuditPartiesErrorHandler,
+    AuditPartiesRequestHandler,
+    AuditPartiesResponseHandler,
+    AuditPatchErrorHandler,
+    AuditPatchRequestHandler,
+    AuditPatchResponseHandler,
+    AuditQuotesErrorHandler,
+    AuditQuotesRequestHandler,
+    AuditQuotesResponseHandler,
+    AuditTransfersErrorHandler,
+    AuditTransfersRequestHandler,
+    AuditTransfersResponseHandler,
+    DisputeTransactionHandler,
 } from './command';
-import {
-    InboundParties,
-    InboundQuotes,
-    InboundTransfers,
-    OutboundParties,
-    OutboundQuotes,
-    OutboundTransfers,
-} from './model';
-import {
-    FindInboundPartiesHandler,
-    FindInboundQuotesHandler,
-    FindInboundTransfersHandler,
-    FindOutboundPartiesHandler,
-    FindOutboundQuotesHandler,
-    FindOutboundTransfersHandler,
-} from './query';
-import {
-    InboundPartiesRepository,
-    InboundQuotesRepository,
-    InboundTransfersRepository,
-    PIVOTAL_DB_READ_CONNECTION_NAME,
-    PIVOTAL_DB_WRITE_CONNECTION_NAME,
-    OutboundPartiesRepository,
-    OutboundQuotesRepository,
-    OutboundTransfersRepository,
-} from './repository';
+import {Transaction} from './model';
+import {FindTransactionHandler} from './query';
+import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME, TransactionRepository,} from './repository';
 
-const Entities = [
-    InboundParties,
-    InboundQuotes,
-    InboundTransfers,
-    OutboundParties,
-    OutboundQuotes,
-    OutboundTransfers,
-];
+const Entities = [Transaction];
 
-const Repositories = [
-    InboundPartiesRepository,
-    InboundQuotesRepository,
-    InboundTransfersRepository,
-    OutboundPartiesRepository,
-    OutboundQuotesRepository,
-    OutboundTransfersRepository,
-];
+const Repositories = [TransactionRepository];
 
 const CommandHandlers = [
-    AuditInboundPartiesHandler,
-    AuditInboundQuotesHandler,
-    AuditInboundTransfersHandler,
-    AuditOutboundPartiesHandler,
-    AuditOutboundQuotesHandler,
-    AuditOutboundTransfersHandler,
+    AuditPartiesErrorHandler,
+    AuditPartiesRequestHandler,
+    AuditPartiesResponseHandler,
+    AuditPatchErrorHandler,
+    AuditPatchRequestHandler,
+    AuditPatchResponseHandler,
+    AuditQuotesErrorHandler,
+    AuditQuotesRequestHandler,
+    AuditQuotesResponseHandler,
+    AuditTransfersErrorHandler,
+    AuditTransfersRequestHandler,
+    AuditTransfersResponseHandler,
+    DisputeTransactionHandler,
 ];
 
 const QueryHandlers = [
-    FindInboundPartiesHandler,
-    FindInboundQuotesHandler,
-    FindInboundTransfersHandler,
-    FindOutboundPartiesHandler,
-    FindOutboundQuotesHandler,
-    FindOutboundTransfersHandler,
+    FindTransactionHandler,
 ];
 
 @Module({})

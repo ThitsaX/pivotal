@@ -1,7 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundPartiesCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundPartiesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopAxios, FspiopException, FspiopHeaders,} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
 import {PerformGetPartiesCommand} from './perform-get-parties.command';
@@ -10,8 +10,6 @@ import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component
 @CommandHandler(PerformGetPartiesCommand)
 export class PerformGetPartiesHandler
     implements ICommandHandler<PerformGetPartiesCommand, PerformGetPartiesCommand.Output> {
-
-    private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
@@ -21,8 +19,8 @@ export class PerformGetPartiesHandler
         private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundPartiesAuditPublisher)
-        private readonly auditPublisher: InboundPartiesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
     }
 
@@ -33,6 +31,22 @@ export class PerformGetPartiesHandler
         const createdAt = new Date();
         const id = PerformGetPartiesHandler.nextAuditId();
         const auditCorrelationId = correlationId ?? id;
+
+        await this.auditPublisher.publish(
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Parties,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    payeeIdType: partyIdType,
+                    payeeId: partyId,
+                    payeeSubId: subId ?? null,
+                    occurredAt: createdAt,
+                },
+            ),
+        );
 
         try {
             const response = await this.fspConnector.getParties(
@@ -51,21 +65,19 @@ export class PerformGetPartiesHandler
             );
 
             await this.auditPublisher.publish(
-                new AuditInboundPartiesCommand.Input(
-                    id,
-                    auditCorrelationId,
-                    PerformGetPartiesHandler.RAIL,
-                    payerFsp,
-                    payeeFsp,
-                    partyIdType,
-                    partyId,
-                    subId,
-                    response,
-                    null,
-                    null,
-                    createdAt,
-                    new Date(),
-                    InboundStageEnum.AT_CONNECTOR,
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Parties,
+                    TransactionMessage.InvocationGateway.Connector,
+                    {
+                        correlationId: auditCorrelationId,
+                        payerFsp,
+                        payeeFsp,
+                        payeeIdType: partyIdType,
+                        payeeId: partyId,
+                        payeeSubId: subId ?? null,
+                        response,
+                        occurredAt: new Date(),
+                    },
                 ),
             );
         } catch (error) {
@@ -92,21 +104,21 @@ export class PerformGetPartiesHandler
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundPartiesCommand.Input(
-                        id,
-                        auditCorrelationId,
-                        PerformGetPartiesHandler.RAIL,
-                        payerFsp,
-                        payeeFsp,
-                        partyIdType,
-                        partyId,
-                        subId,
-                        null,
-                        callbackAuditError,
-                        callbackFspError,
-                        createdAt,
-                        new Date(),
-                        InboundStageEnum.AT_CONNECTOR,
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Parties,
+                        TransactionMessage.InvocationGateway.Connector,
+                        {
+                            correlationId: auditCorrelationId,
+                            payerFsp,
+                            payeeFsp,
+                            payeeIdType: partyIdType,
+                            payeeId: partyId,
+                            payeeSubId: subId ?? null,
+                            error: callbackFspError == null
+                                ? callbackAuditError
+                                : {audit: callbackAuditError, fspError: callbackFspError},
+                            occurredAt: new Date(),
+                        },
                     ),
                 );
             } catch {

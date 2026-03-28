@@ -1,5 +1,4 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
-import {AuditProducerModule} from '@core/audit/producer';
 import {OutboundDomainModule} from '@core/outbound/domain';
 import {FspiopSettings} from '@shared/fspiop';
 import {PrivateKeyStore} from '@shared/security';
@@ -23,11 +22,6 @@ export class WebOutboundModule {
             module: WebOutboundModule,
             imports: [
                 OutboundDomainModule.forRootAsync({
-                    imports: asyncOptions.imports ?? [],
-                    inject: asyncOptions.inject ?? [],
-                    useFactory: asyncOptions.useFactory,
-                }),
-                AuditProducerModule.forRootAsync({
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
@@ -72,8 +66,7 @@ export class WebOutboundModule {
 export namespace WebOutboundModule {
 
     export interface RequiredDependencies
-        extends OutboundDomainModule.RequiredDependencies,
-            AuditProducerModule.RequiredDependencies {
+        extends OutboundDomainModule.RequiredDependencies {
     }
 
     export type AsyncOptions = {

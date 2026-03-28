@@ -1,7 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundTransfersCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundTransfersAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
     FspiopAxios,
     FspiopException,
@@ -14,8 +14,6 @@ import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component
 @CommandHandler(PerformPostTransfersCommand)
 export class PerformPostTransfersHandler
     implements ICommandHandler<PerformPostTransfersCommand, PerformPostTransfersCommand.Output> {
-
-    private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
@@ -25,8 +23,8 @@ export class PerformPostTransfersHandler
         private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundTransfersAuditPublisher)
-        private readonly auditPublisher: InboundTransfersAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
     }
 
@@ -39,6 +37,20 @@ export class PerformPostTransfersHandler
         const id = PerformPostTransfersHandler.nextAuditId();
         const auditCorrelationId = correlationId ?? id;
 
+        await this.auditPublisher.publish(
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Transfers,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    request,
+                    occurredAt: createdAt,
+                },
+            ),
+        );
+
         try {
             const response = await this.fspConnector.postTransfers(request);
 
@@ -50,20 +62,17 @@ export class PerformPostTransfersHandler
             );
 
             await this.auditPublisher.publish(
-                new AuditInboundTransfersCommand.Input(
-                    id,
-                    auditCorrelationId,
-                    PerformPostTransfersHandler.RAIL,
-                    payerFsp,
-                    payeeFsp,
-                    request.transferId,
-                    request,
-                    response,
-                    null,
-                    null,
-                    createdAt,
-                    new Date(),
-                    InboundStageEnum.AT_CONNECTOR,
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Transfers,
+                    TransactionMessage.InvocationGateway.Connector,
+                    {
+                        correlationId: auditCorrelationId,
+                        payerFsp,
+                        payeeFsp,
+                        request,
+                        response,
+                        occurredAt: new Date(),
+                    },
                 ),
             );
         } catch (error) {
@@ -88,20 +97,19 @@ export class PerformPostTransfersHandler
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundTransfersCommand.Input(
-                        id,
-                        auditCorrelationId,
-                        PerformPostTransfersHandler.RAIL,
-                        payerFsp,
-                        payeeFsp,
-                        request.transferId,
-                        request,
-                        null,
-                        callbackAuditError,
-                        callbackFspError,
-                        createdAt,
-                        new Date(),
-                        InboundStageEnum.AT_CONNECTOR,
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Transfers,
+                        TransactionMessage.InvocationGateway.Connector,
+                        {
+                            correlationId: auditCorrelationId,
+                            payerFsp,
+                            payeeFsp,
+                            request,
+                            error: callbackFspError == null
+                                ? callbackAuditError
+                                : {audit: callbackAuditError, fspError: callbackFspError},
+                            occurredAt: new Date(),
+                        },
                     ),
                 );
             } catch {

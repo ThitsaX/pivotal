@@ -1,466 +1,200 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {
-    AuditInboundPartiesCommand,
-    AuditInboundPartiesHandler,
-    AuditInboundQuotesCommand,
-    AuditInboundQuotesHandler,
-    AuditInboundTransfersCommand,
-    AuditInboundTransfersHandler,
-    AuditOutboundPartiesCommand,
-    AuditOutboundPartiesHandler,
-    AuditOutboundQuotesCommand,
-    AuditOutboundQuotesHandler,
-    AuditOutboundTransfersCommand,
-    AuditOutboundTransfersHandler,
-} from '../../../../../packages/core/audit/domain/command';
-import {
-    InboundParties,
-    InboundQuotes,
-    InboundTransfers,
-    OutboundParties,
-    OutboundQuotes,
-    OutboundTransfers,
-} from '../../../../../packages/core/audit/domain/model';
-import {DbTarget} from '../../../../../packages/shared/typeorm';
-import {
-    ErrorInformationObject,
-    PartiesTypeIDPutResponse,
-    PartyIdType,
-    QuotesIDPutResponse,
-    QuotesPostRequest,
-    TransfersIDPutResponse,
-    TransfersPostRequest,
-} from '../../../../../packages/shared/fspiop';
+import {TransactionMessage} from '../../../../../packages/core/audit/common/index.ts';
+import {AuditPartiesRequestCommand} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.command.ts';
+import {AuditPartiesRequestHandler} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.handler.ts';
+import {AuditQuotesResponseCommand} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.command.ts';
+import {AuditQuotesResponseHandler} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.handler.ts';
+import {AuditTransfersErrorCommand} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.command.ts';
+import {AuditTransfersErrorHandler} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.handler.ts';
+import {DisputeTransactionCommand} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.command.ts';
+import {DisputeTransactionHandler} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.handler.ts';
+import {PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
 
-describe('Audit*Handler correlationId merge', () => {
+function createTransactionRepositoryStub() {
+    let upsertInput: unknown = null;
+    let disputedCorrelationId: string | null = null;
 
-    it('should merge inbound parties with an existing record', async () => {
-        const correlationId = 'corr-inbound-party';
-        const createdAt = new Date('2026-01-01T00:00:00.000Z');
-        const existing = new InboundParties(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            PartyIdType.Msisdn,
-            '959123456789',
-            'sub-1',
-            null,
-            {errorInformation: {errorCode: '3100'}} as ErrorInformationObject,
-            'fsp failed',
-            true,
-            createdAt,
-            null,
-        );
-        const response = {party: {partyIdInfo: {partyIdType: PartyIdType.Msisdn}}} as PartiesTypeIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: InboundParties | null = null;
+    return {
+        repository: {
+            async upsert(input: unknown): Promise<string> {
+                upsertInput = input;
 
-        const handler = new AuditInboundPartiesHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<InboundParties | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
+                return 'txn-1';
             },
-            async save(entity: InboundParties): Promise<InboundParties> {
-                saved = entity;
+            async dispute(correlationId: string): Promise<{id: string} | null> {
+                disputedCorrelationId = correlationId;
 
-                return entity;
+                if (correlationId === 'missing') {
+                    return null;
+                }
+
+                return {id: 'txn-1'};
             },
-        } as unknown as never);
+        },
+        get upsertInput(): unknown {
+            return upsertInput;
+        },
+        get disputedCorrelationId(): string | null {
+            return disputedCorrelationId;
+        },
+    };
+}
 
-        const output = await handler.execute(new AuditInboundPartiesCommand(
-            new AuditInboundPartiesCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
+describe('Audit transaction handlers', () => {
+
+    it('should project parties request payload into outbound transaction timestamps', async () => {
+        const repository = createTransactionRepositoryStub();
+        const handler = new AuditPartiesRequestHandler(repository.repository as never);
+        const occurredAt = new Date('2026-02-01T00:00:00.000Z');
+
+        await handler.execute(new AuditPartiesRequestCommand(
+            new AuditPartiesRequestCommand.Input(
+                'corr-1',
                 'payerfsp',
                 'payeefsp',
                 PartyIdType.Msisdn,
-                '959123456789',
-                undefined,
-                response,
-                null,
-                null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
-            ),
-        ));
-
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as InboundParties;
-
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.subId, 'sub-1');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.fspError, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
-    });
-
-    it('should merge inbound quotes with an existing record', async () => {
-        const correlationId = 'corr-inbound-quote';
-        const request = {
-            transactionType: {
-                scenario: 'TRANSFER',
-                subScenario: 'SUB',
-            },
-            amount: {
-                amount: '10',
-                currency: 'USD',
-            },
-        } as QuotesPostRequest;
-        const existing = new InboundQuotes(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            'quote-1',
-            request,
-            null,
-            {errorInformation: {errorCode: '3200'}} as ErrorInformationObject,
-            'fsp failed',
-            true,
-            new Date('2026-01-01T00:00:00.000Z'),
-            null,
-        );
-        const response = {transferAmount: {amount: '10', currency: 'USD'}} as QuotesIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: InboundQuotes | null = null;
-
-        const handler = new AuditInboundQuotesHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<InboundQuotes | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
-            },
-            async save(entity: InboundQuotes): Promise<InboundQuotes> {
-                saved = entity;
-
-                return entity;
-            },
-        } as unknown as never);
-
-        const output = await handler.execute(new AuditInboundQuotesCommand(
-            new AuditInboundQuotesCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
-                'payerfsp',
-                'payeefsp',
-                'quote-1',
-                request,
-                response,
-                null,
-                null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
-            ),
-        ));
-
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as InboundQuotes;
-
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.fspError, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), existing.createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
-    });
-
-    it('should merge inbound transfers with an existing record', async () => {
-        const correlationId = 'corr-inbound-transfer';
-        const request = {
-            transferId: 'transfer-1',
-            amount: {
-                amount: '10',
-                currency: 'USD',
-            },
-        } as TransfersPostRequest;
-        const existing = new InboundTransfers(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            'transfer-1',
-            request,
-            null,
-            {errorInformation: {errorCode: '3300'}} as ErrorInformationObject,
-            'fsp failed',
-            true,
-            new Date('2026-01-01T00:00:00.000Z'),
-            null,
-        );
-        const response = {transferState: 'COMMITTED'} as TransfersIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: InboundTransfers | null = null;
-
-        const handler = new AuditInboundTransfersHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<InboundTransfers | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
-            },
-            async save(entity: InboundTransfers): Promise<InboundTransfers> {
-                saved = entity;
-
-                return entity;
-            },
-        } as unknown as never);
-
-        const output = await handler.execute(new AuditInboundTransfersCommand(
-            new AuditInboundTransfersCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
-                'payerfsp',
-                'payeefsp',
-                'transfer-1',
-                request,
-                response,
-                null,
-                null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
-            ),
-        ));
-
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as InboundTransfers;
-
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.fspError, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), existing.createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
-    });
-
-    it('should merge outbound parties with an existing record', async () => {
-        const correlationId = 'corr-outbound-party';
-        const createdAt = new Date('2026-01-01T00:00:00.000Z');
-        const existing = new OutboundParties(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            PartyIdType.Msisdn,
-            '959123456789',
-            'sub-1',
-            null,
-            {errorInformation: {errorCode: '3400'}} as ErrorInformationObject,
-            true,
-            createdAt,
-            null,
-        );
-        const response = {party: {partyIdInfo: {partyIdType: PartyIdType.Msisdn}}} as PartiesTypeIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: OutboundParties | null = null;
-
-        const handler = new AuditOutboundPartiesHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<OutboundParties | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
-            },
-            async save(entity: OutboundParties): Promise<OutboundParties> {
-                saved = entity;
-
-                return entity;
-            },
-        } as unknown as never);
-
-        const output = await handler.execute(new AuditOutboundPartiesCommand(
-            new AuditOutboundPartiesCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
-                'payerfsp',
-                'payeefsp',
+                '959250000001',
+                'wallet-1',
                 PartyIdType.Msisdn,
-                '959123456789',
-                undefined,
-                response,
+                '959420000111',
                 null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
+                TransactionInitiatorType.Consumer,
+                'TRANSFER' as never,
+                'SUB',
+                TransactionMessage.InvocationGateway.Outbound,
+                {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
+                occurredAt,
             ),
         ));
 
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as OutboundParties;
-
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.subId, 'sub-1');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
+        assert.deepEqual(repository.upsertInput, {
+            correlationId: 'corr-1',
+            payerFsp: 'payerfsp',
+            payeeFsp: 'payeefsp',
+            payerIdType: PartyIdType.Msisdn,
+            payerId: '959250000001',
+            payerSubId: 'wallet-1',
+            payeeIdType: PartyIdType.Msisdn,
+            payeeId: '959420000111',
+            payeeSubId: null,
+            transactionStartedAt: occurredAt,
+            transactionInitiatorType: TransactionInitiatorType.Consumer,
+            transactionType: 'TRANSFER',
+            subScenario: 'SUB',
+            error: false,
+            partiesRequestedAt: occurredAt,
+            partiesRequest: {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
+            createdAt: occurredAt,
+            outboundPartiesRequestedAt: occurredAt,
+        });
     });
 
-    it('should merge outbound quotes with an existing record', async () => {
-        const correlationId = 'corr-outbound-quote';
+    it('should project quotes response payload into inbound transaction timestamps', async () => {
+        const repository = createTransactionRepositoryStub();
+        const handler = new AuditQuotesResponseHandler(repository.repository as never);
+        const occurredAt = new Date('2026-02-01T00:00:05.000Z');
         const request = {
-            transactionType: {
-                scenario: 'TRANSFER',
-                subScenario: 'SUB',
-            },
-            amount: {
-                amount: '10',
-                currency: 'USD',
-            },
-        } as QuotesPostRequest;
-        const existing = new OutboundQuotes(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            'quote-1',
-            request,
-            null,
-            {errorInformation: {errorCode: '3500'}} as ErrorInformationObject,
-            true,
-            new Date('2026-01-01T00:00:00.000Z'),
-            null,
-        );
-        const response = {transferAmount: {amount: '10', currency: 'USD'}} as QuotesIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: OutboundQuotes | null = null;
+            amount: {amount: '10', currency: 'USD'},
+            payer: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959250000001'}},
+            payee: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959420000111'}},
+            transactionType: {scenario: 'TRANSFER', subScenario: 'SUB'},
+        } as unknown as QuotesPostRequest;
+        const response = {transferAmount: {amount: '12', currency: 'USD'}} as const;
 
-        const handler = new AuditOutboundQuotesHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<OutboundQuotes | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
-            },
-            async save(entity: OutboundQuotes): Promise<OutboundQuotes> {
-                saved = entity;
-
-                return entity;
-            },
-        } as unknown as never);
-
-        const output = await handler.execute(new AuditOutboundQuotesCommand(
-            new AuditOutboundQuotesCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
+        await handler.execute(new AuditQuotesResponseCommand(
+            new AuditQuotesResponseCommand.Input(
+                'corr-2',
                 'payerfsp',
                 'payeefsp',
-                'quote-1',
+                TransactionMessage.InvocationGateway.Inbound,
                 request,
                 response,
-                null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
+                occurredAt,
             ),
         ));
 
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as OutboundQuotes;
-
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), existing.createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
+        assert.deepEqual(repository.upsertInput, {
+            correlationId: 'corr-2',
+            payerFsp: 'payerfsp',
+            payeeFsp: 'payeefsp',
+            payerIdType: PartyIdType.Msisdn,
+            payerId: '959250000001',
+            payerSubId: null,
+            payeeIdType: PartyIdType.Msisdn,
+            payeeId: '959420000111',
+            payeeSubId: null,
+            transactionInitiatorType: null,
+            quotingCurrency: 'USD',
+            quotingAmount: 10,
+            transferCurrency: 'USD',
+            transferAmount: 12,
+            transactionStartedAt: occurredAt,
+            transactionType: 'TRANSFER',
+            subScenario: 'SUB',
+            error: false,
+            quotesRespondedAt: occurredAt,
+            quotesRequest: request,
+            quotesResponse: response,
+            createdAt: occurredAt,
+            inboundQuotesRespondedAt: occurredAt,
+        });
     });
 
-    it('should merge outbound transfers with an existing record', async () => {
-        const correlationId = 'corr-outbound-transfer';
-        const request = {
-            transferId: 'transfer-1',
-            amount: {
-                amount: '10',
-                currency: 'USD',
-            },
-        } as TransfersPostRequest;
-        const existing = new OutboundTransfers(
-            'existing-id',
-            correlationId,
-            'mojaloop',
-            'payerfsp',
-            'payeefsp',
-            'transfer-1',
-            request,
-            null,
-            {errorInformation: {errorCode: '3600'}} as ErrorInformationObject,
-            true,
-            new Date('2026-01-01T00:00:00.000Z'),
-            null,
-        );
-        const response = {transferState: 'COMMITTED'} as TransfersIDPutResponse;
-        let findTarget: DbTarget | null = null;
-        let saved: OutboundTransfers | null = null;
+    it('should project transfers error payload into connector transaction timestamps', async () => {
+        const repository = createTransactionRepositoryStub();
+        const handler = new AuditTransfersErrorHandler(repository.repository as never);
+        const occurredAt = new Date('2026-02-01T00:00:09.000Z');
+        const request = {transferId: 'tx-1', payerFsp: 'payerfsp', payeeFsp: 'payeefsp', amount: {amount: '12', currency: 'USD'}} as const;
+        const error = {errorInformation: {errorCode: '3200'}} as const;
 
-        const handler = new AuditOutboundTransfersHandler({
-            async findByCorrelationId(value: string, target: DbTarget): Promise<OutboundTransfers | null> {
-                assert.equal(value, correlationId);
-                findTarget = target;
-
-                return existing;
-            },
-            async save(entity: OutboundTransfers): Promise<OutboundTransfers> {
-                saved = entity;
-
-                return entity;
-            },
-        } as unknown as never);
-
-        const output = await handler.execute(new AuditOutboundTransfersCommand(
-            new AuditOutboundTransfersCommand.Input(
-                'new-id',
-                correlationId,
-                'mojaloop',
+        await handler.execute(new AuditTransfersErrorCommand(
+            new AuditTransfersErrorCommand.Input(
+                'corr-3',
                 'payerfsp',
                 'payeefsp',
-                'transfer-1',
+                TransactionMessage.InvocationGateway.Connector,
                 request,
-                response,
-                null,
-                new Date('2026-02-01T00:00:00.000Z'),
-                undefined,
+                error,
+                occurredAt,
             ),
         ));
 
-        assert.equal(findTarget, DbTarget.Write);
-        assert.equal(output.id, 'existing-id');
-        assert.ok(saved);
-        const savedEntity = saved as OutboundTransfers;
+        assert.deepEqual(repository.upsertInput, {
+            correlationId: 'corr-3',
+            payerFsp: 'payerfsp',
+            payeeFsp: 'payeefsp',
+            transferCurrency: 'USD',
+            transferAmount: 12,
+            transactionStartedAt: occurredAt,
+            transactionCompletedAt: occurredAt,
+            error: true,
+            transfersRespondedAt: occurredAt,
+            transfersRequest: request,
+            transfersError: error,
+            createdAt: occurredAt,
+            connectorTransfersRespondedAt: occurredAt,
+        });
+    });
 
-        assert.equal(savedEntity.id, 'existing-id');
-        assert.equal(savedEntity.response, response);
-        assert.equal(savedEntity.error, null);
-        assert.equal(savedEntity.failed, false);
-        assert.equal(savedEntity.createdAt.getTime(), existing.createdAt.getTime());
-        assert.ok(savedEntity.completedAt instanceof Date);
+    it('should mark a transaction as disputed', async () => {
+        const repository = createTransactionRepositoryStub();
+        const handler = new DisputeTransactionHandler(repository.repository as never);
+
+        const output = await handler.execute(
+            new DisputeTransactionCommand(new DisputeTransactionCommand.Input('corr-5')),
+        );
+
+        assert.equal(repository.disputedCorrelationId, 'corr-5');
+        assert.equal(output.id, 'txn-1');
+    });
+
+    it('should fail when disputing a missing transaction', async () => {
+        const repository = createTransactionRepositoryStub();
+        const handler = new DisputeTransactionHandler(repository.repository as never);
+
+        await assert.rejects(
+            handler.execute(new DisputeTransactionCommand(new DisputeTransactionCommand.Input('missing'))),
+        );
     });
 });

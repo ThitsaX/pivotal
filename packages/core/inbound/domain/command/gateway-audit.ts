@@ -2,8 +2,6 @@ import {Snowflake} from '@shared/snowflake';
 
 const SNOWFLAKE = Snowflake.get();
 
-export const GATEWAY_RAIL = 'fspiop';
-
 export function nextGatewayAuditId(): string {
     return SNOWFLAKE.nextId().toString();
 }

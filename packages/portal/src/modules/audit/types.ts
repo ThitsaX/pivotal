@@ -6,14 +6,9 @@ export type ViewKey =
     | 'participant-add-signing-keys'
     | 'participant-add-new-currency'
     | 'participant-register-endpoint'
-    | 'inbound-parties'
-    | 'inbound-quotes'
-    | 'inbound-transfers'
-    | 'outbound-parties'
-    | 'outbound-quotes'
-    | 'outbound-transfers';
+    | 'transactions';
 
-export type ViewGroup = 'Hub' | 'Participant' | 'Inbound' | 'Outbound';
+export type ViewGroup = 'Hub' | 'Participant' | 'Audit';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';
