@@ -10,6 +10,7 @@ export namespace PostSendMoneyCommand {
 
     export class Input {
         constructor(
+            public readonly correlationId: string,
             public readonly source: string,
             public readonly request: SendMoneyRequest,
         ) {

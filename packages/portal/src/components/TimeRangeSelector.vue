@@ -21,7 +21,7 @@ const emit = defineEmits<{
 const padTwo = (value: number | string): string => String(value).padStart(2, '0');
 
 const RANGE_OPTIONS: Array<{label: string; value: string}> = [
-    {label: 'Select Range', value: ''},
+    {label: '(Any)', value: ''},
     {label: 'Today', value: 'today'},
     {label: 'Last 24Hours', value: 'last24'},
     {label: 'Yesterday & Today', value: 'yesterdayToday'},
@@ -432,7 +432,7 @@ watch(
             leave-to-class="opacity-0 -translate-y-1 max-h-0"
         >
             <div v-if="selectedMode === 'custom'" class="mt-3">
-                <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_1fr]">
+                <div class="datetime-cards-grid">
                     <!-- From -->
                     <div class="datetime-card">
                         <div class="datetime-card-header">
@@ -495,24 +495,6 @@ watch(
                                     />
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Arrow separator (desktop) -->
-                    <div class="hidden lg:flex items-center justify-center pt-6">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(25,151,231,0.1)]">
-                            <svg class="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 111.084-1.034l5.25 5.5a.75.75 0 010 1.034l-5.25 5.5a.75.75 0 01-1.084-1.034l3.96-4.158H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- Arrow separator (mobile) -->
-                    <div class="flex lg:hidden items-center justify-center">
-                        <div class="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(25,151,231,0.1)]">
-                            <svg class="h-3.5 w-3.5 text-accent rotate-90" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638l-3.96-4.158a.75.75 0 111.084-1.034l5.25 5.5a.75.75 0 010 1.034l-5.25 5.5a.75.75 0 01-1.084-1.034l3.96-4.158H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
-                            </svg>
                         </div>
                     </div>
 
@@ -593,8 +575,14 @@ watch(
     --tw-gradient-to: rgba(248, 250, 252, 0.5);
 }
 
+.datetime-cards-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
 .datetime-card {
-    @apply rounded-xl border bg-gradient-to-br from-[#f8fbff] to-[#f0f7ff] p-3 transition-all duration-200;
+    @apply min-w-0 rounded-xl border bg-gradient-to-br from-[#f8fbff] to-[#f0f7ff] p-3 transition-all duration-200;
     border-color: rgba(25, 151, 231, 0.12);
 }
 
@@ -639,7 +627,7 @@ watch(
 
 /* Time picker row - HH : MM : SS */
 .time-picker-row {
-    @apply flex items-center gap-1;
+    @apply flex flex-wrap items-center gap-1;
 }
 
 .time-sep {

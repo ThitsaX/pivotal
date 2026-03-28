@@ -1,7 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundQuotesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
     FspiopAxios,
     FspiopException,
@@ -14,8 +14,6 @@ import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component
 @CommandHandler(PerformPostQuotesCommand)
 export class PerformPostQuotesHandler
     implements ICommandHandler<PerformPostQuotesCommand, PerformPostQuotesCommand.Output> {
-
-    private static readonly RAIL = 'fspiop';
     private static readonly SNOWFLAKE = Snowflake.get();
 
     constructor(
@@ -25,8 +23,8 @@ export class PerformPostQuotesHandler
         private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundQuotesAuditPublisher)
-        private readonly auditPublisher: InboundQuotesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
     }
 
@@ -39,6 +37,20 @@ export class PerformPostQuotesHandler
         const id = PerformPostQuotesHandler.nextAuditId();
         const auditCorrelationId = correlationId ?? id;
 
+        await this.auditPublisher.publish(
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Quotes,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    request,
+                    occurredAt: createdAt,
+                },
+            ),
+        );
+
         try {
             const response = await this.fspConnector.postQuotes(request);
 
@@ -50,20 +62,17 @@ export class PerformPostQuotesHandler
             );
 
             await this.auditPublisher.publish(
-                new AuditInboundQuotesCommand.Input(
-                    id,
-                    auditCorrelationId,
-                    PerformPostQuotesHandler.RAIL,
-                    payerFsp,
-                    payeeFsp,
-                    request.quoteId,
-                    request,
-                    response,
-                    null,
-                    null,
-                    createdAt,
-                    new Date(),
-                    InboundStageEnum.AT_CONNECTOR,
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Quotes,
+                    TransactionMessage.InvocationGateway.Connector,
+                    {
+                        correlationId: auditCorrelationId,
+                        payerFsp,
+                        payeeFsp,
+                        request,
+                        response,
+                        occurredAt: new Date(),
+                    },
                 ),
             );
         } catch (error) {
@@ -88,20 +97,19 @@ export class PerformPostQuotesHandler
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundQuotesCommand.Input(
-                        id,
-                        auditCorrelationId,
-                        PerformPostQuotesHandler.RAIL,
-                        payerFsp,
-                        payeeFsp,
-                        request.quoteId,
-                        request,
-                        null,
-                        callbackAuditError,
-                        callbackFspError,
-                        createdAt,
-                        new Date(),
-                        InboundStageEnum.AT_CONNECTOR,
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Quotes,
+                        TransactionMessage.InvocationGateway.Connector,
+                        {
+                            correlationId: auditCorrelationId,
+                            payerFsp,
+                            payeeFsp,
+                            request,
+                            error: callbackFspError == null
+                                ? callbackAuditError
+                                : {audit: callbackAuditError, fspError: callbackFspError},
+                            occurredAt: new Date(),
+                        },
                     ),
                 );
             } catch {

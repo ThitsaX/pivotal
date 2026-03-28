@@ -1,5 +1,7 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
     Currency,
     ExtensionList,
@@ -7,6 +9,7 @@ import {
     FspiopAxiosError,
     FspiopCurrencies,
     FspiopErrors,
+    FspiopErrorTranslator,
     FspiopException,
     FspiopHeaders,
     FspiopMoney,
@@ -28,7 +31,6 @@ import {PutAcceptPartyCommand} from './put-accept-party.command';
 @CommandHandler(PutAcceptPartyCommand)
 export class PutAcceptPartyHandler
     implements ICommandHandler<PutAcceptPartyCommand, PutAcceptPartyCommand.Output> {
-
     private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
     private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
@@ -39,64 +41,104 @@ export class PutAcceptPartyHandler
         private readonly subscriber: FspiopResponseSubscriber,
         @Inject(RedisClient)
         private readonly redisClient: RedisClient,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
         const {transferId, acceptParty} = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
-
-        if (!acceptParty) {
-            throw new FspiopException(
-                FspiopErrors.PAYER_REJECTED_TRANSACTION_REQUEST,
-                'Payer rejected party confirmation.',
-            );
-        }
-
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);
         const {quoteId} = quoteRequest;
         const {quotesUrl} = this.fspiopAxios.settings;
+        const createdAt = new Date();
 
-        const headers = FspiopHeaders.Values.Quotes.forRequest(null, source, destination);
-        const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
-        const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
-
-        const waitPromise = this.subscriber.waitFor<QuotesIDPutResponse>(
-            successSubject,
-            errorSubject,
+        await this.auditPublisher.publish(
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Quotes,
+                TransactionMessage.InvocationGateway.Outbound,
+                {
+                    correlationId: transferId,
+                    payerFsp: source,
+                    payeeFsp: destination,
+                    request: quoteRequest,
+                    occurredAt: createdAt,
+                },
+            ),
         );
 
         try {
-            await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
-        } catch (error) {
-            this.subscriber.cancel(successSubject);
-
-            if (FspiopAxiosError.is(error)) {
-                const info = error.errorInformationResponse?.errorInformation;
-                const code = info?.errorCode ?? '';
-                const desc = info?.errorDescription?.trim().length
-                    ? info.errorDescription
-                    : 'Communication error';
-                const extensionList = info?.extensionList;
-                const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
-
-                throw new FspiopException(errorDef, desc, extensionList);
+            if (!acceptParty) {
+                throw new FspiopException(
+                    FspiopErrors.PAYER_REJECTED_TRANSACTION_REQUEST,
+                    'Payer rejected party confirmation.',
+                );
             }
 
-            throw error;
+            const headers = FspiopHeaders.Values.Quotes.forRequest(quoteId, source, destination);
+            const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
+            const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
+
+            const waitPromise = this.subscriber.waitFor<QuotesIDPutResponse>(
+                successSubject,
+                errorSubject,
+            );
+
+            try {
+                await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
+            } catch (error) {
+                this.subscriber.cancel(successSubject);
+                throw PutAcceptPartyHandler.toFspiopException(error, transferId);
+            }
+
+            const callback = await waitPromise;
+            transferRequest.quotes = callback;
+            transferRequest.transfer = undefined;
+
+            const response = PutAcceptPartyHandler.toResponse(transferRequest, callback);
+
+            await this.redisClient.set(transferId, transferRequest);
+            await this.auditPublisher.publish(
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Quotes,
+                    TransactionMessage.InvocationGateway.Outbound,
+                    {
+                        correlationId: transferId,
+                        payerFsp: source,
+                        payeeFsp: destination,
+                        request: quoteRequest,
+                        response: callback,
+                        occurredAt: new Date(),
+                    },
+                ),
+            );
+
+            return new PutAcceptPartyCommand.Output(response, callback);
+        } catch (error) {
+            const fspiopException = PutAcceptPartyHandler.toFspiopException(error, transferId);
+
+            try {
+                await this.auditPublisher.publish(
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Quotes,
+                        TransactionMessage.InvocationGateway.Outbound,
+                        {
+                            correlationId: transferId,
+                            payerFsp: source,
+                            payeeFsp: destination,
+                            request: quoteRequest,
+                            error: fspiopException.toErrorObject(),
+                            occurredAt: new Date(),
+                        },
+                    ),
+                );
+            } finally {
+                throw fspiopException;
+            }
         }
-
-        const callback = await waitPromise;
-        transferRequest.quotes = callback;
-        transferRequest.transfer = undefined;
-
-        const response = PutAcceptPartyHandler.toResponse(transferRequest, callback);
-
-        await this.redisClient.set(transferId, transferRequest);
-
-        return new PutAcceptPartyCommand.Output(response, callback);
     }
 
     private async getTransferRequest(transferId: string): Promise<TransferRequest> {
@@ -238,5 +280,21 @@ export class PutAcceptPartyHandler
         return normalizedValue == null || normalizedValue.length === 0
             ? undefined
             : normalizedValue;
+    }
+
+    private static toFspiopException(error: unknown, transferId: string): FspiopException {
+        if (FspiopAxiosError.is(error)) {
+            const info = error.errorInformationResponse?.errorInformation;
+            const code = info?.errorCode ?? '';
+            const desc = info?.errorDescription?.trim().length
+                ? info.errorDescription
+                : 'Communication error';
+            const extensionList = info?.extensionList;
+            const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
+
+            return new FspiopException(errorDef, desc, extensionList);
+        }
+
+        return FspiopErrorTranslator.toFspiopException(error, transferId);
     }
 }

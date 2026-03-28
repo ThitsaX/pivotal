@@ -1,18 +1,18 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundPartiesCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundPartiesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopPubSubSubjects, FspiopResponsePublisher} from '@shared/fspiop';
 import {HandlePutPartiesCommand} from './handle-put-parties.command';
-import {GATEWAY_RAIL, nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePutPartiesCommand)
 export class HandlePutPartiesHandler
     implements ICommandHandler<HandlePutPartiesCommand, HandlePutPartiesCommand.Output> {
 
     constructor(
-        @Inject(InboundPartiesAuditPublisher)
-        private readonly auditPublisher: InboundPartiesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(FspiopResponsePublisher)
         private readonly publisher: FspiopResponsePublisher,
     ) {
@@ -30,21 +30,19 @@ export class HandlePutPartiesHandler
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
-            new AuditInboundPartiesCommand.Input(
-                auditId,
-                auditCorrelationId,
-                GATEWAY_RAIL,
-                payerFsp,
-                payeeFsp,
-                partyIdType,
-                partyId,
-                subId,
-                response,
-                null,
-                null,
-                createdAt,
-                createdAt,
-                InboundStageEnum.AT_GATEWAY,
+            TransactionMessage.response(
+                TransactionMessage.InvocationPhase.Parties,
+                TransactionMessage.InvocationGateway.Inbound,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    payeeIdType: partyIdType,
+                    payeeId: partyId,
+                    payeeSubId: subId ?? null,
+                    response,
+                    occurredAt: createdAt,
+                },
             ),
         );
 

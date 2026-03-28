@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {InboundPartiesAuditPublisher, InboundQuotesAuditPublisher, InboundTransfersAuditPublisher} from '../../../../../packages/core/audit/producer';
+import {TransactionMessage} from '../../../../../packages/core/audit/common/index.ts';
+import {AuditTransactionPublisher} from '../../../../../packages/core/audit/producer';
 import {
     PerformGetPartiesCommand,
     PerformGetPartiesHandler,
@@ -13,15 +14,12 @@ import {ConnectorSettings, FspClientException} from '../../../../../packages/cor
 import {FspConnector} from '../../../../../packages/core/connector/domain/component';
 import {FspiopAxios, FspiopException, PartyIdType, QuotesPostRequest, TransfersPostRequest} from '../../../../../packages/shared/fspiop';
 
-type PublishedInput = {
-    fspError: string | null;
-    error?: unknown;
-};
+type PublishedMessage = TransactionMessage<{error?: unknown}>;
 
 describe('Perform*Handler fspError audit mapping', () => {
 
     it('should publish fspError for getParties failures', async () => {
-        let published: PublishedInput | null = null;
+        let published: PublishedMessage | null = null;
 
         const handler = new PerformGetPartiesHandler(
             {
@@ -38,10 +36,10 @@ describe('Perform*Handler fspError audit mapping', () => {
                 },
             } as unknown as FspiopAxios,
             {
-                async publish(input: PublishedInput): Promise<void> {
+                async publish(input: PublishedMessage): Promise<void> {
                     published = input;
                 },
-            } as unknown as InboundPartiesAuditPublisher,
+            } as unknown as AuditTransactionPublisher,
         );
 
         await assert.rejects(
@@ -52,13 +50,13 @@ describe('Perform*Handler fspError audit mapping', () => {
         );
 
         assert.ok(published);
-        const publishedInput = published as PublishedInput;
+        const publishedInput = published?.content as {error?: {fspError?: string} | null};
 
-        assert.equal(publishedInput.fspError, 'party lookup failed');
+        assert.equal((publishedInput.error as {fspError?: string}).fspError, 'party lookup failed');
     });
 
     it('should publish original fspError for quote failures even if callback fails later', async () => {
-        let published: PublishedInput | null = null;
+        let published: PublishedMessage | null = null;
 
         const request = {quoteId: 'quote-1'} as QuotesPostRequest;
         const handler = new PerformPostQuotesHandler(
@@ -77,10 +75,10 @@ describe('Perform*Handler fspError audit mapping', () => {
                 },
             } as unknown as FspiopAxios,
             {
-                async publish(input: PublishedInput): Promise<void> {
+                async publish(input: PublishedMessage): Promise<void> {
                     published = input;
                 },
-            } as unknown as InboundQuotesAuditPublisher,
+            } as unknown as AuditTransactionPublisher,
         );
 
         await assert.rejects(
@@ -91,18 +89,18 @@ describe('Perform*Handler fspError audit mapping', () => {
         );
 
         assert.ok(published);
-        const publishedInput = published as PublishedInput;
+        const publishedInput = published?.content as {error?: {fspError?: string; audit?: unknown} | null};
 
-        assert.equal(publishedInput.fspError, 'quote calculation failed');
+        assert.equal((publishedInput.error as {fspError?: string}).fspError, 'quote calculation failed');
         assert.equal(
-            (publishedInput.error as {errorInformation?: {errorDescription?: string}} | undefined)
+            ((publishedInput.error as {audit?: {errorInformation?: {errorDescription?: string}}}).audit)
                 ?.errorInformation?.errorDescription,
             'callback failed',
         );
     });
 
     it('should publish fspError for transfer failures', async () => {
-        let published: PublishedInput | null = null;
+        let published: PublishedMessage | null = null;
 
         const request = {transferId: 'transfer-1'} as TransfersPostRequest;
         const handler = new PerformPostTransfersHandler(
@@ -120,10 +118,10 @@ describe('Perform*Handler fspError audit mapping', () => {
                 },
             } as unknown as FspiopAxios,
             {
-                async publish(input: PublishedInput): Promise<void> {
+                async publish(input: PublishedMessage): Promise<void> {
                     published = input;
                 },
-            } as unknown as InboundTransfersAuditPublisher,
+            } as unknown as AuditTransactionPublisher,
         );
 
         await assert.rejects(
@@ -134,8 +132,8 @@ describe('Perform*Handler fspError audit mapping', () => {
         );
 
         assert.ok(published);
-        const publishedInput = published as PublishedInput;
+        const publishedInput = published?.content as {error?: {fspError?: string} | null};
 
-        assert.equal(publishedInput.fspError, 'transfer execution failed');
+        assert.equal((publishedInput.error as {fspError?: string}).fspError, 'transfer execution failed');
     });
 });

@@ -1,18 +1,18 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundTransfersCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundTransfersAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {ConnectorPatchTransfersPublisher} from '@core/connector/publisher';
 import {HandlePatchTransfersCommand} from './handle-patch-transfers.command';
-import {GATEWAY_RAIL, nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePatchTransfersCommand)
 export class HandlePatchTransfersHandler
     implements ICommandHandler<HandlePatchTransfersCommand, HandlePatchTransfersCommand.Output> {
 
     constructor(
-        @Inject(InboundTransfersAuditPublisher)
-        private readonly auditPublisher: InboundTransfersAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(ConnectorPatchTransfersPublisher)
         private readonly publisher: ConnectorPatchTransfersPublisher,
     ) {}
@@ -24,20 +24,16 @@ export class HandlePatchTransfersHandler
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
-            new AuditInboundTransfersCommand.Input(
-                auditId,
-                auditCorrelationId,
-                GATEWAY_RAIL,
-                payerFsp,
-                payeeFsp,
-                transferId,
-                null,
-                response,
-                null,
-                null,
-                createdAt,
-                createdAt,
-                InboundStageEnum.AT_GATEWAY,
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Transfers,
+                TransactionMessage.InvocationGateway.Inbound,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    request: response,
+                    occurredAt: createdAt,
+                },
             ),
         );
 

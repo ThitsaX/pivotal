@@ -1,20 +1,22 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {Ulid} from '@shared/ulid';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
     ExtensionList,
     FspiopAxios,
     FspiopAxiosError,
     FspiopErrors,
+    FspiopErrorTranslator,
     FspiopException,
     FspiopHeaders,
     FspiopPubSubSubjects,
     FspiopResponseSubscriber,
+    PartiesTypeIDPutResponse,
     Party,
     PartyComplexName,
     PartyIdInfo,
     PartyPersonalInfo,
-    PartiesTypeIDPutResponse,
 } from '@shared/fspiop';
 import {RedisClient} from '../component';
 import {TransferRequest} from '../cache';
@@ -32,60 +34,9 @@ export class PostSendMoneyHandler
         private readonly subscriber: FspiopResponseSubscriber,
         @Inject(RedisClient)
         private readonly redisClient: RedisClient,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
-    }
-
-    async execute(command: PostSendMoneyCommand): Promise<PostSendMoneyCommand.Output> {
-        const transferId = Ulid.generate();
-        const {source, request} = command.input;
-        const destination = request.to.fspId;
-        const type = request.to.idType;
-        const id = request.to.idValue;
-        const subId = PostSendMoneyHandler.toSubId(request.to.idSubValue);
-        const {partiesUrl, switchId} = this.fspiopAxios.settings;
-
-        const headers = FspiopHeaders.Values.Parties.forRequest(null, source, destination);
-
-        const successSubject = FspiopPubSubSubjects.Parties.forSuccess(source, destination, type, id, subId);
-        const errorSubject = FspiopPubSubSubjects.Parties.forError(source, destination, type, id, subId);
-        const hubErrorSubject = FspiopPubSubSubjects.Parties.forError(source, switchId, type, id, subId);
-
-        const waitPromise = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
-            successSubject,
-            errorSubject,
-            hubErrorSubject,
-        );
-
-        try {
-            await this.fspiopAxios.getParties(partiesUrl, headers, type, id, subId);
-        } catch (error) {
-            this.subscriber.cancel(successSubject);
-
-            if (FspiopAxiosError.is(error)) {
-                const info = error.errorInformationResponse?.errorInformation;
-                const code = info?.errorCode ?? '';
-                const desc = info?.errorDescription?.trim().length
-                    ? info.errorDescription
-                    : 'Communication error';
-                const extensionList = info?.extensionList;
-                const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
-
-                throw new FspiopException(errorDef, desc, extensionList);
-            }
-
-            throw error;
-        }
-
-        const callback = await waitPromise;
-        const response = PostSendMoneyHandler.toResponse(transferId, callback);
-        const cachedTransaction = PostSendMoneyHandler.toTransferRequest(request, response, callback);
-
-        await this.redisClient.set(transferId, cachedTransaction);
-
-        return new PostSendMoneyCommand.Output(
-            response,
-            callback,
-        );
     }
 
     private static toSubId(idSubValue: string | undefined): string | undefined {
@@ -218,5 +169,137 @@ export class PostSendMoneyHandler
         return normalizedValue == null || normalizedValue.length === 0
             ? undefined
             : normalizedValue;
+    }
+
+    async execute(command: PostSendMoneyCommand): Promise<PostSendMoneyCommand.Output> {
+
+        const {correlationId, source, request} = command.input;
+        const transferId = correlationId;
+        const destination = request.to.fspId;
+        const type = request.to.idType;
+        const id = request.to.idValue;
+        const subId = PostSendMoneyHandler.toSubId(request.to.idSubValue);
+        const payerSubId = PostSendMoneyHandler.toSubId(request.from.idSubValue);
+        const {partiesUrl, switchId} = this.fspiopAxios.settings;
+        const createdAt = new Date();
+
+        const headers = FspiopHeaders.Values.Parties.forRequest(correlationId, source, destination);
+        try {
+            await this.auditPublisher.publish(
+                TransactionMessage.request(
+                    TransactionMessage.InvocationPhase.Parties,
+                    TransactionMessage.InvocationGateway.Outbound,
+                    {
+                        correlationId,
+                        payerFsp: source,
+                        payeeFsp: destination,
+                        payerIdType: request.from.idType,
+                        payerId: request.from.idValue,
+                        payerSubId: payerSubId ?? null,
+                        payeeIdType: type,
+                        payeeId: id,
+                        payeeSubId: subId ?? null,
+                        transactionInitiatorType: request.from.type ?? null,
+                        transactionType: request.transactionType,
+                        subScenario: request.subScenario,
+                        request: {
+                            partyIdType: type,
+                            partyId: id,
+                            subId: subId ?? null,
+                        },
+                        occurredAt: createdAt,
+                    },
+                ),
+            );
+
+            const successSubject = FspiopPubSubSubjects.Parties.forSuccess(source, destination, type, id, subId);
+            const errorSubject = FspiopPubSubSubjects.Parties.forError(source, destination, type, id, subId);
+            const hubErrorSubject = FspiopPubSubSubjects.Parties.forError(source, switchId, type, id, subId);
+
+            const waitPromise = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
+                successSubject,
+                errorSubject,
+                hubErrorSubject,
+            );
+
+            try {
+                await this.fspiopAxios.getParties(partiesUrl, headers, type, id, subId);
+            } catch (error) {
+                this.subscriber.cancel(successSubject);
+                throw error;
+            }
+
+            const callback = await waitPromise;
+            const response = PostSendMoneyHandler.toResponse(transferId, callback);
+            const cachedTransaction = PostSendMoneyHandler.toTransferRequest(request, response, callback);
+
+            await this.redisClient.set(transferId, cachedTransaction);
+            await this.auditPublisher.publish(
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Parties,
+                    TransactionMessage.InvocationGateway.Outbound,
+                    {
+                        correlationId,
+                        payerFsp: source,
+                        payeeFsp: destination,
+                        payerIdType: request.from.idType,
+                        payerId: request.from.idValue,
+                        payerSubId: payerSubId ?? null,
+                        payeeIdType: type,
+                        payeeId: id,
+                        payeeSubId: subId ?? null,
+                        response: callback,
+                        occurredAt: new Date(),
+                    },
+                ),
+            );
+
+            return new PostSendMoneyCommand.Output(
+                response,
+                callback,
+            );
+        } catch (error) {
+            const fspiopException = PostSendMoneyHandler.toFspiopException(error);
+
+            try {
+                await this.auditPublisher.publish(
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Parties,
+                        TransactionMessage.InvocationGateway.Outbound,
+                        {
+                            correlationId,
+                            payerFsp: source,
+                            payeeFsp: destination,
+                            payerIdType: request.from.idType,
+                            payerId: request.from.idValue,
+                            payerSubId: payerSubId ?? null,
+                            payeeIdType: type,
+                            payeeId: id,
+                            payeeSubId: subId ?? null,
+                            error: fspiopException.toErrorObject(),
+                            occurredAt: new Date(),
+                        },
+                    ),
+                );
+            } finally {
+                throw fspiopException;
+            }
+        }
+    }
+
+    private static toFspiopException(error: unknown): FspiopException {
+        if (FspiopAxiosError.is(error)) {
+            const info = error.errorInformationResponse?.errorInformation;
+            const code = info?.errorCode ?? '';
+            const desc = info?.errorDescription?.trim().length
+                ? info.errorDescription
+                : 'Communication error';
+            const extensionList = info?.extensionList;
+            const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
+
+            return new FspiopException(errorDef, desc, extensionList);
+        }
+
+        return FspiopErrorTranslator.toFspiopException(error);
     }
 }

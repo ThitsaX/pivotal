@@ -1,5 +1,6 @@
 import {Logger} from '@nestjs/common';
 import {ConnectorSettings, FspClient} from '@core/connector/domain';
+import {FspClientException} from '@core/connector/domain/exception/fsp-client-exception';
 import {CatalystException, CatalystFeeEngine, FeeSplitRole} from '@shared/catalyst';
 import {
     AmountType,
@@ -17,6 +18,7 @@ import {
 } from '@shared/fspiop';
 
 export class Wallet2FspClient extends FspClient {
+    private static readonly PATCH_FAILURE_RATE = 0.5;
 
     private readonly logger = new Logger(Wallet2FspClient.name);
 
@@ -114,6 +116,14 @@ export class Wallet2FspClient extends FspClient {
         const fulfilment = response.transferState;
 
         this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}`);
+
+        if (Math.random() < Wallet2FspClient.PATCH_FAILURE_RATE) {
+            const description = `Simulated wallet2 PATCH failure for transfer ${transferId}.`;
+
+            this.logger.warn(description);
+
+            throw new FspClientException('PATCH_TRANSFER_SIMULATION_ERROR', description);
+        }
     }
 
 }

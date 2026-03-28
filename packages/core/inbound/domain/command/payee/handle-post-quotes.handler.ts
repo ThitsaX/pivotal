@@ -1,18 +1,18 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundQuotesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {ConnectorPostQuotesPublisher} from '@core/connector/publisher';
 import {HandlePostQuotesCommand} from './handle-post-quotes.command';
-import {GATEWAY_RAIL, nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePostQuotesCommand)
 export class HandlePostQuotesHandler
     implements ICommandHandler<HandlePostQuotesCommand, HandlePostQuotesCommand.Output> {
 
     constructor(
-        @Inject(InboundQuotesAuditPublisher)
-        private readonly auditPublisher: InboundQuotesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(ConnectorPostQuotesPublisher)
         private readonly publisher: ConnectorPostQuotesPublisher,
     ) {
@@ -25,20 +25,16 @@ export class HandlePostQuotesHandler
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
-            new AuditInboundQuotesCommand.Input(
-                auditId,
-                auditCorrelationId,
-                GATEWAY_RAIL,
-                payerFsp,
-                payeeFsp,
-                request.quoteId,
-                request,
-                null,
-                null,
-                null,
-                createdAt,
-                null,
-                InboundStageEnum.AT_GATEWAY,
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Quotes,
+                TransactionMessage.InvocationGateway.Inbound,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    request,
+                    occurredAt: createdAt,
+                },
             ),
         );
 

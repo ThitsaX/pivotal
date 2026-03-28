@@ -1,10 +1,10 @@
 import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundTransfersCommand, InboundStageEnum} from '@core/audit/domain';
-import {InboundTransfersAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopPubSubSubjects, FspiopResponsePublisher} from '@shared/fspiop';
 import {HandlePutTransfersCommand} from './handle-put-transfers.command';
-import {GATEWAY_RAIL, nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePutTransfersCommand)
 export class HandlePutTransfersHandler
@@ -12,8 +12,8 @@ export class HandlePutTransfersHandler
 {
 
     constructor(
-        @Inject(InboundTransfersAuditPublisher)
-        private readonly auditPublisher: InboundTransfersAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(FspiopResponsePublisher)
         private readonly publisher: FspiopResponsePublisher,
     ) {
@@ -31,20 +31,16 @@ export class HandlePutTransfersHandler
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
-            new AuditInboundTransfersCommand.Input(
-                auditId,
-                auditCorrelationId,
-                GATEWAY_RAIL,
-                payerFsp,
-                payeeFsp,
-                transferId,
-                null,
-                response,
-                null,
-                null,
-                createdAt,
-                createdAt,
-                InboundStageEnum.AT_GATEWAY,
+            TransactionMessage.response(
+                TransactionMessage.InvocationPhase.Transfers,
+                TransactionMessage.InvocationGateway.Inbound,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    response,
+                    occurredAt: createdAt,
+                },
             ),
         );
 
