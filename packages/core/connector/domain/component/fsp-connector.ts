@@ -159,13 +159,13 @@ export class FspConnector {
         return response;
     }
 
-    async patchTransfers(patchresponse: FspConnector.PatchTransfersInput): Promise<void> {
+    async patchTransfers(response: FspConnector.PatchTransfersInput): Promise<void> {
         await this.fspClient.patchTransfers(
             new FspClient.PatchTransfersInput(
-                patchresponse.payerFsp,
-                patchresponse.payeeFsp,
-                patchresponse.transferId,
-                patchresponse.response,
+                response.payerFsp,
+                response.payeeFsp,
+                response.transferId,
+                response.response,
             ),
         );
     }

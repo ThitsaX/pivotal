@@ -18,8 +18,6 @@ import {
 } from '@shared/fspiop';
 
 export class Wallet2FspClient extends FspClient {
-    private static readonly PATCH_FAILURE_RATE = 0.5;
-
     private readonly logger = new Logger(Wallet2FspClient.name);
 
     constructor(
@@ -114,15 +112,17 @@ export class Wallet2FspClient extends FspClient {
     async patchTransfers(input: FspClient.PatchTransfersInput): Promise<void> {
         const {transferId, response} = input;
         const fulfilment = response.transferState;
+        const minute = new Date().getMinutes();
 
-        this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}`);
+        this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}, minute=${minute}`);
 
-        if (Math.random() < Wallet2FspClient.PATCH_FAILURE_RATE) {
-            const description = `Simulated wallet2 PATCH failure for transfer ${transferId}.`;
+        //if (minute % 2 === 1)
+        {
+            const description = `Simulated wallet2 PATCH failure for transfer ${transferId} because minute ${minute} is odd.`;
 
             this.logger.warn(description);
 
-            throw new FspClientException('PATCH_TRANSFER_SIMULATION_ERROR', description);
+            throw new FspClientException(description);
         }
     }
 
