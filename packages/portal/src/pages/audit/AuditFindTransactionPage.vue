@@ -14,7 +14,6 @@ import type {
     DateTimeDisplayParts,
     QueryResponse,
     SelectOption,
-    SelectedPayload,
     ViewDefinition,
     ViewState,
 } from '../../modules/audit/types';
@@ -44,7 +43,10 @@ const results = ref<QueryResponse | null>(null);
 const lastRequestedUrl = ref<string>('');
 const lastLoadedAt = ref<string | null>(null);
 const isSearchFormVisible = ref(true);
-const selectedPayload = ref<SelectedPayload | null>(null);
+const selectedTransaction = ref<{title: string; record: Record<string, unknown>} | null>(null);
+const transactionDetailsLoading = ref(false);
+const transactionDetailsError = ref<string | null>(null);
+const activeDetailsTab = ref<'parties' | 'quotes' | 'transfers'>('parties');
 const isPageSizeDialogOpen = ref(false);
 const copiedCellKey = ref<string | null>(null);
 const lastSubmittedCriteria = ref<Record<string, string>>({});
@@ -109,7 +111,7 @@ const TIME_RANGE_MODE_KEYS = [
 
 const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
-        selectedPayload.value = null;
+        selectedTransaction.value = null;
         isPageSizeDialogOpen.value = false;
     }
 };
@@ -616,14 +618,22 @@ const toDateTimeParts = (value: unknown): DateTimeDisplayParts | null => {
     };
 };
 
-const formatDateTimeDisplay = (value: unknown): string => {
+const toDisplayDateTime = (value: unknown): {dateTime: string; zone: string; hasValue: boolean} => {
     const parts = toDateTimeParts(value);
 
     if (parts == null) {
-        return '-';
+        return {
+            dateTime: '-',
+            zone: '',
+            hasValue: false,
+        };
     }
 
-    return `${parts.date} ${parts.time} (${parts.zone})`;
+    return {
+        dateTime: `${parts.date} ${parts.time}`,
+        zone: parts.zone,
+        hasValue: true,
+    };
 };
 
 const getPartyDisplay = (record: Record<string, unknown>, prefix: 'payer' | 'payee'): {
@@ -640,14 +650,56 @@ const getPartyDisplay = (record: Record<string, unknown>, prefix: 'payer' | 'pay
     };
 };
 
+const hasVisibleValue = (value: string): boolean => value.trim().length > 0 && value !== '-';
+
 const getDateTimeDisplay = (record: Record<string, unknown>): {
-    startedAt: string;
-    completedAt: string;
+    startedAt: {dateTime: string; zone: string; hasValue: boolean};
+    completedAt: {dateTime: string; zone: string; hasValue: boolean};
 } => {
+    const startedValue = record.transactionStartAt ?? record.transactionStartedAt;
+    const completedValue = record.transactionCompletedAt;
+
     return {
-        startedAt: formatDateTimeDisplay(record.transactionStartAt),
-        completedAt: formatDateTimeDisplay(record.transactionCompletedAt),
+        startedAt: toDisplayDateTime(startedValue),
+        completedAt: toDisplayDateTime(completedValue),
     };
+};
+
+const getDurationDisplay = (record: Record<string, unknown>): string => {
+    const startValue = record.transactionStartAt ?? record.transactionStartedAt;
+    const endValue = record.transactionCompletedAt;
+
+    if (typeof startValue !== 'string' || typeof endValue !== 'string') {
+        return '-';
+    }
+
+    const startAt = new Date(startValue);
+    const endAt = new Date(endValue);
+
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+        return '-';
+    }
+
+    const durationMs = endAt.getTime() - startAt.getTime();
+
+    if (durationMs < 0) {
+        return '-';
+    }
+
+    const totalSeconds = Math.floor(durationMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${seconds}s`;
+    }
+
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
 };
 
 const getAmountDisplay = (record: Record<string, unknown>): {
@@ -672,35 +724,65 @@ const getAmountDisplay = (record: Record<string, unknown>): {
     };
 };
 
-const isTrueValue = (value: unknown): boolean => value === true;
+const STATUS_BADGE_BASE_CLASS =
+    'inline-flex min-w-[5.75rem] justify-center rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]';
+
+const isTrueValue = (value: unknown): boolean => {
+    return value === true || value === 'true' || value === 1 || value === '1';
+};
 
 const getStatusDisplay = (record: Record<string, unknown>): {
     statusLabel: string;
     statusClass: string;
+    disputeLabel: string;
+    disputeClass: string;
     showDispute: boolean;
 } => {
-    const failed = isTrueValue(record.failed);
-    const dispute = isTrueValue(record.dispute);
+    const failed = isTrueValue(record.failed) || isTrueValue(record.error);
+    const dispute = isTrueValue(record.dispute) || isTrueValue(record.possibleDispute);
 
     return {
         statusLabel: failed ? 'FAILED' : 'SUCCESS',
         statusClass: failed
             ? 'border-red-200 bg-red-50 text-red-700'
             : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        disputeLabel: dispute ? 'DISPUTE' : 'NO DISPUTE',
+        disputeClass: dispute
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : 'border-slate-200 bg-slate-50 text-slate-500',
         showDispute: dispute,
+    };
+};
+
+const getDetailPayloads = (
+    record: Record<string, unknown>,
+    key: 'parties' | 'quotes' | 'transfers',
+): {request: unknown; response: unknown; error: unknown} => {
+    return {
+        request: record[`${key}Request`],
+        response: record[`${key}Response`],
+        error: record[`${key}Error`],
     };
 };
 
 const getDesktopHeaderCellClass = (columnKey: string): string => {
     switch (columnKey) {
         case 'correlationId':
-            return 'w-[18rem]';
+            return 'w-[15%]';
+        case 'payer':
+            return 'w-[12%]';
+        case 'payee':
+            return 'w-[12%]';
+        case 'transferType':
+            return 'w-[10%]';
         case 'amount':
-            return 'w-[10rem] text-right';
+            return 'w-[10%] text-right';
+        case 'transactionStartAt':
+            return 'w-[15%]';
         case 'status':
-            return 'w-[7rem]';
+            return 'w-[7%]';
         case 'details':
-            return 'w-[4.5rem] text-center';
+            return 'w-[10%] text-center';
         default:
             return '';
     }
@@ -745,15 +827,63 @@ const recordKey = (record: Record<string, unknown>, index: number): string => {
     return `${props.viewDefinition.key}-${index}`;
 };
 
-const openDetailsModal = (record: Record<string, unknown>): void => {
-    selectedPayload.value = {
-        title: `Transaction Details - ${formatValue(record[props.viewDefinition.primaryKey])}`,
-        value: record,
+const openDetailsModal = async (record: Record<string, unknown>): Promise<void> => {
+    const transferIdValue = record.correlationId;
+
+    if (typeof transferIdValue !== 'string' || transferIdValue.trim().length === 0) {
+        return;
+    }
+
+    const transferId = transferIdValue.trim();
+
+    selectedTransaction.value = {
+        title: `Transaction Details - ${transferId}`,
+        record: {},
     };
+    transactionDetailsLoading.value = true;
+    transactionDetailsError.value = null;
+    activeDetailsTab.value = 'parties';
+
+    try {
+        const requestUrl = `${API_BASE_URL}${props.viewDefinition.endpoint}/${encodeURIComponent(transferId)}`;
+        const response = await fetch(requestUrl, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const body = await response.text();
+
+            throw new Error(`${response.status} ${response.statusText} ${body}`.trim());
+        }
+
+        const payload = await response.json() as {record?: Record<string, unknown>};
+        const detailRecord = payload.record;
+
+        if (detailRecord == null || typeof detailRecord !== 'object') {
+            throw new Error('Transaction detail response is invalid.');
+        }
+
+        selectedTransaction.value = {
+            title: `Transaction Details - ${transferId}`,
+            record: detailRecord,
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        transactionDetailsError.value = message;
+    } finally {
+        transactionDetailsLoading.value = false;
+    }
 };
 
 const closePayloadModal = (): void => {
-    selectedPayload.value = null;
+    selectedTransaction.value = null;
+    transactionDetailsLoading.value = false;
+    transactionDetailsError.value = null;
+    activeDetailsTab.value = 'parties';
 };
 
 const closeRequestErrorDialog = (): void => {
@@ -898,8 +1028,11 @@ const jumpToPage = (pageNumber: number): void => {
                         <span class="rounded-full bg-accentSoft px-3 py-1 font-semibold text-accent">
                             Total: {{ results.totalRecords }}
                         </span>
-                        <span class="rounded-full border border-accent/25 bg-white px-3 py-1 text-accent">
-                            Time Zone: {{ selectedTimeZone }}
+                        <span class="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-white px-3 py-1 text-accent">
+                            <span>Time Zone:</span>
+                            <span class="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                                {{ selectedTimeZone }}
+                            </span>
                         </span>
                     </template>
                 </div>
@@ -957,7 +1090,22 @@ const jumpToPage = (pageNumber: number): void => {
                                                 :disabled="!isSortableColumn(column.key)"
                                                 @click="sortByColumn(column.key)"
                                             >
-                                                <span>{{ column.label.toUpperCase() }}</span>
+                                                <span v-if="column.key !== 'details'">{{ column.label.toUpperCase() }}</span>
+                                                <svg
+                                                    v-else
+                                                    class="h-4 w-4"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <circle cx="12" cy="12" r="1" />
+                                                    <circle cx="19" cy="12" r="1" />
+                                                    <circle cx="5" cy="12" r="1" />
+                                                </svg>
                                                 <span class="text-[10px]">{{ sortIndicator(column.key) }}</span>
                                             </button>
                                         </th>
@@ -1003,25 +1151,67 @@ const jumpToPage = (pageNumber: number): void => {
                                                 </button>
                                             </div>
                                             <div v-else-if="column.key === 'payer'" class="space-y-1.5">
-                                                <p class="font-semibold leading-4 text-ink">
+                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-1 font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payer').fsp }}
                                                 </p>
-                                                <p class="text-[11px] leading-4 text-slate-600">
-                                                    {{ getPartyDisplay(record, 'payer').idType }} | {{ getPartyDisplay(record, 'payer').id }}
-                                                </p>
-                                                <p class="text-[11px] leading-4 text-slate-500">
-                                                    Sub ID: {{ getPartyDisplay(record, 'payer').subId }}
+                                                <div class="space-y-1 text-[11px] leading-4 text-slate-600">
+                                                    <p>
+                                                        <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                                            {{ getPartyDisplay(record, 'payer').idType }}
+                                                        </span>
+                                                    </p>
+                                                    <p class="flex items-center gap-1.5">
+                                                        <svg
+                                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path d="M5 12h12" />
+                                                            <path d="m13 6 6 6-6 6" />
+                                                        </svg>
+                                                        <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
+                                                    </p>
+                                                </div>
+                                                <p v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)" class="text-[11px] leading-4 text-slate-500">
+                                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                                    {{ ' ' }}{{ getPartyDisplay(record, 'payer').subId }}
                                                 </p>
                                             </div>
                                             <div v-else-if="column.key === 'payee'" class="space-y-1.5">
-                                                <p class="font-semibold leading-4 text-ink">
+                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-1 font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payee').fsp }}
                                                 </p>
-                                                <p class="text-[11px] leading-4 text-slate-600">
-                                                    {{ getPartyDisplay(record, 'payee').idType }} | {{ getPartyDisplay(record, 'payee').id }}
-                                                </p>
-                                                <p class="text-[11px] leading-4 text-slate-500">
-                                                    Sub ID: {{ getPartyDisplay(record, 'payee').subId }}
+                                                <div class="space-y-1 text-[11px] leading-4 text-slate-600">
+                                                    <p>
+                                                        <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                                            {{ getPartyDisplay(record, 'payee').idType }}
+                                                        </span>
+                                                    </p>
+                                                    <p class="flex items-center gap-1.5">
+                                                        <svg
+                                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path d="M5 12h12" />
+                                                            <path d="m13 6 6 6-6 6" />
+                                                        </svg>
+                                                        <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
+                                                    </p>
+                                                </div>
+                                                <p v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)" class="text-[11px] leading-4 text-slate-500">
+                                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                                    {{ ' ' }}{{ getPartyDisplay(record, 'payee').subId }}
                                                 </p>
                                             </div>
                                             <div v-else-if="column.key === 'transferType'" class="space-y-1">
@@ -1050,40 +1240,60 @@ const jumpToPage = (pageNumber: number): void => {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div v-else-if="column.key === 'status'" class="space-y-1.5">
+                                            <div v-else-if="column.key === 'status'" class="flex flex-col items-start gap-1.5">
                                                 <span
                                                     :class="[
-                                                        'inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
+                                                        STATUS_BADGE_BASE_CLASS,
                                                         getStatusDisplay(record).statusClass,
                                                     ]"
                                                 >
                                                     {{ getStatusDisplay(record).statusLabel }}
                                                 </span>
-                                                <div v-if="getStatusDisplay(record).showDispute">
-                                                    <span class="inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                                                        Dispute
-                                                    </span>
-                                                </div>
+                                                <span
+                                                    v-if="getStatusDisplay(record).showDispute"
+                                                    :class="[
+                                                        STATUS_BADGE_BASE_CLASS,
+                                                        getStatusDisplay(record).disputeClass,
+                                                    ]"
+                                                >
+                                                    {{ getStatusDisplay(record).disputeLabel }}
+                                                </span>
                                             </div>
                                             <div v-else-if="column.key === 'transactionStartAt'" class="space-y-1.5">
                                                 <div>
                                                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                         Started
                                                     </p>
-                                                    <p class="text-[11px] leading-4 text-slate-700">
-                                                        {{ getDateTimeDisplay(record).startedAt }}
-                                                    </p>
+                                                    <div class="space-y-1">
+                                                        <p class="text-[11px] leading-4 text-slate-700">
+                                                            {{ getDateTimeDisplay(record).startedAt.dateTime }}
+                                                        </p>
+                                                        <span
+                                                            v-if="getDateTimeDisplay(record).startedAt.hasValue"
+                                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                        >
+                                                            {{ getDateTimeDisplay(record).startedAt.zone }}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                         Completed
                                                     </p>
-                                                    <p class="text-[11px] leading-4 text-slate-700">
-                                                        {{ getDateTimeDisplay(record).completedAt }}
-                                                    </p>
+                                                    <div class="space-y-1">
+                                                        <p class="text-[11px] leading-4 text-slate-700">
+                                                            {{ getDateTimeDisplay(record).completedAt.dateTime }}
+                                                        </p>
+                                                        <span
+                                                            v-if="getDateTimeDisplay(record).completedAt.hasValue"
+                                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                        >
+                                                            {{ getDateTimeDisplay(record).completedAt.zone }}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div v-else-if="column.key === 'details'" class="flex justify-center xl:justify-start">
+                                            <div v-else-if="column.key === 'details'" class="flex justify-center">
                                                 <button
                                                     type="button"
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-[#f8fbff] text-base font-semibold text-slate-700 transition hover:border-accent hover:text-accent"
@@ -1146,14 +1356,35 @@ const jumpToPage = (pageNumber: number): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payer
                                         </p>
-                                        <p class="font-semibold text-ink">
+                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payer').fsp }}
                                         </p>
-                                        <p class="text-sm text-slate-600">
-                                            {{ getPartyDisplay(record, 'payer').idType }} | {{ getPartyDisplay(record, 'payer').id }}
-                                        </p>
-                                        <p class="text-sm text-slate-500">
-                                            Sub ID: {{ getPartyDisplay(record, 'payer').subId }}
+                                        <div class="space-y-1 text-sm text-slate-600">
+                                            <p>
+                                                <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                                    {{ getPartyDisplay(record, 'payer').idType }}
+                                                </span>
+                                            </p>
+                                            <p class="flex items-center gap-2">
+                                                <svg
+                                                    class="h-4 w-4 shrink-0 text-accent"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M5 12h12" />
+                                                    <path d="m13 6 6 6-6 6" />
+                                                </svg>
+                                                <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
+                                            </p>
+                                        </div>
+                                        <p v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)" class="text-sm text-slate-500">
+                                            <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                            {{ ' ' }}{{ getPartyDisplay(record, 'payer').subId }}
                                         </p>
                                     </section>
 
@@ -1161,14 +1392,35 @@ const jumpToPage = (pageNumber: number): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payee
                                         </p>
-                                        <p class="font-semibold text-ink">
+                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payee').fsp }}
                                         </p>
-                                        <p class="text-sm text-slate-600">
-                                            {{ getPartyDisplay(record, 'payee').idType }} | {{ getPartyDisplay(record, 'payee').id }}
-                                        </p>
-                                        <p class="text-sm text-slate-500">
-                                            Sub ID: {{ getPartyDisplay(record, 'payee').subId }}
+                                        <div class="space-y-1 text-sm text-slate-600">
+                                            <p>
+                                                <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                                    {{ getPartyDisplay(record, 'payee').idType }}
+                                                </span>
+                                            </p>
+                                            <p class="flex items-center gap-2">
+                                                <svg
+                                                    class="h-4 w-4 shrink-0 text-accent"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M5 12h12" />
+                                                    <path d="m13 6 6 6-6 6" />
+                                                </svg>
+                                                <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
+                                            </p>
+                                        </div>
+                                        <p v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)" class="text-sm text-slate-500">
+                                            <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                            {{ ' ' }}{{ getPartyDisplay(record, 'payee').subId }}
                                         </p>
                                     </section>
 
@@ -1210,20 +1462,24 @@ const jumpToPage = (pageNumber: number): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Status
                                         </p>
-                                        <div class="space-y-1.5">
+                                        <div class="flex flex-col items-start gap-1.5">
                                             <span
                                                 :class="[
-                                                    'inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
+                                                    STATUS_BADGE_BASE_CLASS,
                                                     getStatusDisplay(record).statusClass,
                                                 ]"
                                             >
                                                 {{ getStatusDisplay(record).statusLabel }}
                                             </span>
-                                            <div v-if="getStatusDisplay(record).showDispute">
-                                                <span class="inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                                                    Dispute
-                                                </span>
-                                            </div>
+                                            <span
+                                                v-if="getStatusDisplay(record).showDispute"
+                                                :class="[
+                                                    STATUS_BADGE_BASE_CLASS,
+                                                    getStatusDisplay(record).disputeClass,
+                                                ]"
+                                            >
+                                                {{ getStatusDisplay(record).disputeLabel }}
+                                            </span>
                                         </div>
                                     </section>
 
@@ -1235,17 +1491,33 @@ const jumpToPage = (pageNumber: number): void => {
                                             <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Started
                                             </p>
-                                            <p class="text-sm text-slate-700">
-                                                {{ getDateTimeDisplay(record).startedAt }}
-                                            </p>
+                                            <div class="space-y-1">
+                                                <p class="text-sm text-slate-700">
+                                                    {{ getDateTimeDisplay(record).startedAt.dateTime }}
+                                                </p>
+                                                <span
+                                                    v-if="getDateTimeDisplay(record).startedAt.hasValue"
+                                                    class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                >
+                                                    {{ getDateTimeDisplay(record).startedAt.zone }}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div>
                                             <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                                 Completed
                                             </p>
-                                            <p class="text-sm text-slate-700">
-                                                {{ getDateTimeDisplay(record).completedAt }}
-                                            </p>
+                                            <div class="space-y-1">
+                                                <p class="text-sm text-slate-700">
+                                                    {{ getDateTimeDisplay(record).completedAt.dateTime }}
+                                                </p>
+                                                <span
+                                                    v-if="getDateTimeDisplay(record).completedAt.hasValue"
+                                                    class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                >
+                                                    {{ getDateTimeDisplay(record).completedAt.zone }}
+                                                </span>
+                                            </div>
                                         </div>
                                     </section>
                                 </div>
@@ -1317,13 +1589,13 @@ const jumpToPage = (pageNumber: number): void => {
 
     <Teleport to="body">
         <div
-            v-if="selectedPayload"
+            v-if="selectedTransaction"
             class="fixed inset-0 z-[80] flex items-center justify-center p-4"
         >
             <div class="absolute inset-0 bg-slate-950/45" @click="closePayloadModal" />
-            <div class="relative w-full max-w-5xl rounded-2xl bg-[#f8fbff] p-4 shadow-soft">
+            <div class="relative flex max-h-[85vh] w-full max-w-6xl flex-col rounded-2xl bg-[#f8fbff] p-4 shadow-soft">
                 <div class="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
-                    <h3 class="font-display text-lg text-ink">{{ selectedPayload.title }}</h3>
+                    <h3 class="font-display text-lg text-ink">{{ selectedTransaction.title }}</h3>
                     <button
                         type="button"
                         class="rounded-lg px-2 py-1 text-slate-500 transition hover:bg-slate-100"
@@ -1333,10 +1605,249 @@ const jumpToPage = (pageNumber: number): void => {
                     </button>
                 </div>
 
-                <PrettyJsonViewer
-                    :title="selectedPayload.title"
-                    :value="selectedPayload.value"
-                />
+                <div class="overflow-y-auto pr-1">
+                <div v-if="transactionDetailsLoading" class="space-y-3">
+                    <div class="h-5 w-48 animate-pulse rounded bg-slate-200" />
+                    <div class="grid gap-3 md:grid-cols-4">
+                        <div class="h-20 animate-pulse rounded-xl bg-slate-100" />
+                        <div class="h-20 animate-pulse rounded-xl bg-slate-100" />
+                        <div class="h-20 animate-pulse rounded-xl bg-slate-100" />
+                        <div class="h-20 animate-pulse rounded-xl bg-slate-100" />
+                    </div>
+                    <div class="h-64 animate-pulse rounded-xl bg-slate-100" />
+                </div>
+
+                <div v-else-if="transactionDetailsError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {{ transactionDetailsError }}
+                </div>
+
+                <div v-else class="space-y-4">
+                    <div class="space-y-3 rounded-xl border border-accent/15 bg-white px-3 py-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2.5">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Transfer ID</p>
+                                <p class="mt-1 truncate font-mono text-[13px] text-ink sm:break-all sm:whitespace-normal">
+                                    {{ formatValue(selectedTransaction.record.transferId ?? selectedTransaction.record.correlationId) }}
+                                </p>
+                            </div>
+                            <div class="flex flex-col items-end gap-1.5">
+                                <span
+                                    :class="[
+                                        STATUS_BADGE_BASE_CLASS,
+                                        getStatusDisplay(selectedTransaction.record).statusClass,
+                                    ]"
+                                >
+                                    {{ getStatusDisplay(selectedTransaction.record).statusLabel }}
+                                </span>
+                                <span
+                                    :class="[
+                                        STATUS_BADGE_BASE_CLASS,
+                                        getStatusDisplay(selectedTransaction.record).disputeClass,
+                                    ]"
+                                >
+                                    {{ getStatusDisplay(selectedTransaction.record).disputeLabel }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-2.5 xl:grid-cols-4">
+                            <section class="space-y-1.5 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                                    Payer
+                                </p>
+                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-sm font-semibold text-accent">
+                                    {{ getPartyDisplay(selectedTransaction.record, 'payer').fsp }}
+                                </p>
+                                <div class="space-y-0.5 text-[12px] text-slate-600">
+                                    <p class="leading-5">
+                                        <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                            {{ getPartyDisplay(selectedTransaction.record, 'payer').idType }}
+                                        </span>
+                                    </p>
+                                    <p class="flex items-center gap-1.5 leading-5">
+                                        <svg
+                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payer').id }}</span>
+                                    </p>
+                                </div>
+                                <p v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payer').subId)" class="text-[12px] leading-5 text-slate-500">
+                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                    {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payer').subId }}
+                                </p>
+                            </section>
+
+                            <section class="space-y-1.5 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                                    Payee
+                                </p>
+                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-sm font-semibold text-accent">
+                                    {{ getPartyDisplay(selectedTransaction.record, 'payee').fsp }}
+                                </p>
+                                <div class="space-y-0.5 text-[12px] text-slate-600">
+                                    <p class="leading-5">
+                                        <span class="font-semibold text-ink underline decoration-accent/50 underline-offset-2">
+                                            {{ getPartyDisplay(selectedTransaction.record, 'payee').idType }}
+                                        </span>
+                                    </p>
+                                    <p class="flex items-center gap-1.5 leading-5">
+                                        <svg
+                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payee').id }}</span>
+                                    </p>
+                                </div>
+                                <p v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payee').subId)" class="text-[12px] leading-5 text-slate-500">
+                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
+                                    {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payee').subId }}
+                                </p>
+                            </section>
+
+                            <section class="space-y-2 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                                    Amount
+                                </p>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Quoting
+                                    </p>
+                                    <p class="text-right text-sm font-semibold text-slate-700 tabular-nums">
+                                        {{ getAmountDisplay(selectedTransaction.record).quoting }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Transfer
+                                    </p>
+                                    <p class="text-right text-sm font-semibold text-slate-700 tabular-nums">
+                                        {{ getAmountDisplay(selectedTransaction.record).transfer }}
+                                    </p>
+                                </div>
+                            </section>
+
+                            <section class="space-y-2 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                                    Timeline
+                                </p>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Started
+                                    </p>
+                                    <div class="space-y-1">
+                                        <p class="text-[12px] leading-5 text-slate-700">
+                                            {{ getDateTimeDisplay(selectedTransaction.record).startedAt.dateTime }}
+                                        </p>
+                                        <span
+                                            v-if="getDateTimeDisplay(selectedTransaction.record).startedAt.hasValue"
+                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                        >
+                                            {{ getDateTimeDisplay(selectedTransaction.record).startedAt.zone }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Completed
+                                    </p>
+                                    <div class="space-y-1">
+                                        <p class="text-[12px] leading-5 text-slate-700">
+                                            {{ getDateTimeDisplay(selectedTransaction.record).completedAt.dateTime }}
+                                        </p>
+                                        <span
+                                            v-if="getDateTimeDisplay(selectedTransaction.record).completedAt.hasValue"
+                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                        >
+                                            {{ getDateTimeDisplay(selectedTransaction.record).completedAt.zone }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Duration
+                                    </p>
+                                    <p class="text-[12px] font-semibold leading-5 text-ink">
+                                        {{ getDurationDisplay(selectedTransaction.record) }}
+                                    </p>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition',
+                                activeDetailsTab === 'parties'
+                                    ? 'border-accent bg-accent text-white'
+                                    : 'border-accent/20 bg-white text-accent hover:border-accent',
+                            ]"
+                            @click="activeDetailsTab = 'parties'"
+                        >
+                            Parties
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition',
+                                activeDetailsTab === 'quotes'
+                                    ? 'border-accent bg-accent text-white'
+                                    : 'border-accent/20 bg-white text-accent hover:border-accent',
+                            ]"
+                            @click="activeDetailsTab = 'quotes'"
+                        >
+                            Quotes
+                        </button>
+                        <button
+                            type="button"
+                            :class="[
+                                'rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition',
+                                activeDetailsTab === 'transfers'
+                                    ? 'border-accent bg-accent text-white'
+                                    : 'border-accent/20 bg-white text-accent hover:border-accent',
+                            ]"
+                            @click="activeDetailsTab = 'transfers'"
+                        >
+                            Transfers
+                        </button>
+                    </div>
+
+                    <div class="grid gap-4 xl:grid-cols-3 xl:auto-rows-fr">
+                        <PrettyJsonViewer
+                            title="Request"
+                            :value="getDetailPayloads(selectedTransaction.record, activeDetailsTab).request"
+                        />
+                        <PrettyJsonViewer
+                            title="Response"
+                            :value="getDetailPayloads(selectedTransaction.record, activeDetailsTab).response"
+                        />
+                        <PrettyJsonViewer
+                            title="Error"
+                            :value="getDetailPayloads(selectedTransaction.record, activeDetailsTab).error"
+                        />
+                    </div>
+                </div>
+                </div>
             </div>
         </div>
     </Teleport>

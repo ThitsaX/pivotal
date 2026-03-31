@@ -5,7 +5,8 @@ import {Snowflake} from '@shared/snowflake';
 import {DbTarget} from '@shared/typeorm';
 import {Repository, SelectQueryBuilder} from 'typeorm';
 import {Transaction} from '../model';
-import {FindTransactionQuery} from '../query/find-transaction.query';
+import {GetTransactionQuery} from '../query/get-transaction.query';
+import {FindTransactionsQuery} from '../query/find-transactions.query';
 import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from './pivotal-connection-name';
 
 @Injectable()
@@ -340,6 +341,12 @@ export class TransactionRepository {
         return this.getRepository(target).findOne({where: {correlationId}});
     }
 
+    async get(transferId: string, target: DbTarget = DbTarget.Read): Promise<Record<string, unknown> | null> {
+        const record = await this.findByCorrelationId(transferId, target);
+
+        return record == null ? null : TransactionRepository.toDetailRecord(record);
+    }
+
     async dispute(correlationId: string): Promise<Transaction | null> {
         const existing = await this.findByCorrelationId(correlationId, DbTarget.Write);
 
@@ -354,11 +361,11 @@ export class TransactionRepository {
     }
 
     async find(
-        criteria: FindTransactionQuery.Criteria,
-        pageRequest: FindTransactionQuery.PageRequest,
-        order: FindTransactionQuery.Order,
+        criteria: FindTransactionsQuery.Criteria,
+        pageRequest: FindTransactionsQuery.PageRequest,
+        order: FindTransactionsQuery.Order,
         target: DbTarget = DbTarget.Read,
-    ): Promise<FindTransactionQuery.Output> {
+    ): Promise<FindTransactionsQuery.Output> {
         const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
 
         this.applyCriteria(queryBuilder, criteria);
@@ -366,10 +373,10 @@ export class TransactionRepository {
         const finalPageRequest = this.applyPagination(queryBuilder, pageRequest.page, pageRequest.size);
         const [records, totalRecords] = await queryBuilder.getManyAndCount();
 
-        return new FindTransactionQuery.Output(
+        return new FindTransactionsQuery.Output(
             records.map((record) => TransactionRepository.toRecord(record)),
             totalRecords,
-            new FindTransactionQuery.PageRequest(finalPageRequest.page, finalPageRequest.size),
+            new FindTransactionsQuery.PageRequest(finalPageRequest.page, finalPageRequest.size),
         );
     }
 
@@ -384,7 +391,7 @@ export class TransactionRepository {
 
     private applyCriteria(
         queryBuilder: SelectQueryBuilder<Transaction>,
-        criteria: FindTransactionQuery.Criteria,
+        criteria: FindTransactionsQuery.Criteria,
     ): void {
         if (criteria.payerFsp !== undefined) {
             queryBuilder.andWhere('transaction.payerFsp = :payerFsp', {payerFsp: criteria.payerFsp});
@@ -426,6 +433,10 @@ export class TransactionRepository {
             }
         }
 
+        if (criteria.transferId !== undefined) {
+            queryBuilder.andWhere('transaction.correlationId = :transferId', {transferId: criteria.transferId});
+        }
+
         if (criteria.transferType !== undefined) {
             queryBuilder.andWhere('transaction.transactionType = :transferType', {transferType: criteria.transferType});
         }
@@ -460,7 +471,7 @@ export class TransactionRepository {
         queryBuilder: SelectQueryBuilder<Transaction>,
         column: string,
         range:
-            | FindTransactionQuery.DateRange
+            | FindTransactionsQuery.DateRange
             | undefined,
         parameterPrefix: string,
     ): void {
@@ -479,7 +490,7 @@ export class TransactionRepository {
 
     private applyOrdering(
         queryBuilder: SelectQueryBuilder<Transaction>,
-        order: FindTransactionQuery.Order,
+        order: FindTransactionsQuery.Order,
     ): void {
         queryBuilder.orderBy(TransactionRepository.toOrderColumn(order.column), order.direction);
     }
@@ -497,31 +508,31 @@ export class TransactionRepository {
         return {page: finalPage, size: finalSize};
     }
 
-    private static toOrderColumn(column: FindTransactionQuery.Order.Column): string {
+    private static toOrderColumn(column: FindTransactionsQuery.Order.Column): string {
         switch (column) {
-            case FindTransactionQuery.Order.Column.Id:
+            case FindTransactionsQuery.Order.Column.Id:
                 return 'transaction.id';
-            case FindTransactionQuery.Order.Column.CorrelationId:
+            case FindTransactionsQuery.Order.Column.CorrelationId:
                 return 'transaction.correlationId';
-            case FindTransactionQuery.Order.Column.PayerFsp:
+            case FindTransactionsQuery.Order.Column.PayerFsp:
                 return 'transaction.payerFsp';
-            case FindTransactionQuery.Order.Column.PayeeFsp:
+            case FindTransactionsQuery.Order.Column.PayeeFsp:
                 return 'transaction.payeeFsp';
-            case FindTransactionQuery.Order.Column.PayerId:
+            case FindTransactionsQuery.Order.Column.PayerId:
                 return 'transaction.payerId';
-            case FindTransactionQuery.Order.Column.PayeeId:
+            case FindTransactionsQuery.Order.Column.PayeeId:
                 return 'transaction.payeeId';
-            case FindTransactionQuery.Order.Column.TransferType:
+            case FindTransactionsQuery.Order.Column.TransferType:
                 return 'transaction.transactionType';
-            case FindTransactionQuery.Order.Column.SubScenario:
+            case FindTransactionsQuery.Order.Column.SubScenario:
                 return 'transaction.subScenario';
-            case FindTransactionQuery.Order.Column.TransactionCompletedAt:
+            case FindTransactionsQuery.Order.Column.TransactionCompletedAt:
                 return 'transaction.transactionCompletedAt';
-            case FindTransactionQuery.Order.Column.Error:
+            case FindTransactionsQuery.Order.Column.Error:
                 return 'transaction.error';
-            case FindTransactionQuery.Order.Column.Dispute:
+            case FindTransactionsQuery.Order.Column.Dispute:
                 return 'transaction.possibleDispute';
-            case FindTransactionQuery.Order.Column.TransactionStartAt:
+            case FindTransactionsQuery.Order.Column.TransactionStartAt:
             default:
                 return 'transaction.transactionStartedAt';
         }
@@ -551,6 +562,73 @@ export class TransactionRepository {
             failed: record.error,
             transactionStartAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
+        };
+    }
+
+    private static toDetailRecord(record: Transaction): Record<string, unknown> {
+        return {
+            id: record.id,
+            transferId: record.correlationId,
+            correlationId: record.correlationId,
+            payerFsp: record.payerFsp,
+            payeeFsp: record.payeeFsp,
+            payerIdType: record.payerIdType,
+            payerId: record.payerId,
+            payerSubId: record.payerSubId,
+            payeeIdType: record.payeeIdType,
+            payeeId: record.payeeId,
+            payeeSubId: record.payeeSubId,
+            transactionInitiatorType: record.transactionInitiatorType,
+            quotingCurrency: record.quotingCurrency,
+            quotingAmount: record.quotingAmount,
+            transferCurrency: record.transferCurrency,
+            transferAmount: record.transferAmount,
+            transactionType: record.transactionType,
+            subScenario: record.subScenario,
+            transferState: record.transferState,
+            transactionStartedAt: record.transactionStartedAt,
+            transactionCompletedAt: record.transactionCompletedAt,
+            possibleDispute: record.possibleDispute,
+            error: record.error,
+            partiesRequestedAt: record.partiesRequestedAt,
+            partiesRespondedAt: record.partiesRespondedAt,
+            partiesRequest: record.partiesRequest,
+            partiesResponse: record.partiesResponse,
+            partiesError: record.partiesError,
+            outboundPartiesRequestedAt: record.outboundPartiesRequestedAt,
+            outboundPartiesRespondedAt: record.outboundPartiesRespondedAt,
+            inboundPartiesRequestedAt: record.inboundPartiesRequestedAt,
+            inboundPartiesRespondedAt: record.inboundPartiesRespondedAt,
+            connectorPartiesRequestedAt: record.connectorPartiesRequestedAt,
+            connectorPartiesRespondedAt: record.connectorPartiesRespondedAt,
+            quotesRequestedAt: record.quotesRequestedAt,
+            quotesRespondedAt: record.quotesRespondedAt,
+            quotesRequest: record.quotesRequest,
+            quotesResponse: record.quotesResponse,
+            quotesError: record.quotesError,
+            outboundQuotesRequestedAt: record.outboundQuotesRequestedAt,
+            outboundQuotesRespondedAt: record.outboundQuotesRespondedAt,
+            inboundQuotesRequestedAt: record.inboundQuotesRequestedAt,
+            inboundQuotesRespondedAt: record.inboundQuotesRespondedAt,
+            connectorQuotesRequestedAt: record.connectorQuotesRequestedAt,
+            connectorQuotesRespondedAt: record.connectorQuotesRespondedAt,
+            transfersRequestedAt: record.transfersRequestedAt,
+            transfersRespondedAt: record.transfersRespondedAt,
+            transfersRequest: record.transfersRequest,
+            transfersResponse: record.transfersResponse,
+            transfersError: record.transfersError,
+            outboundTransfersRequestedAt: record.outboundTransfersRequestedAt,
+            outboundTransfersRespondedAt: record.outboundTransfersRespondedAt,
+            inboundTransfersRequestedAt: record.inboundTransfersRequestedAt,
+            inboundTransfersRespondedAt: record.inboundTransfersRespondedAt,
+            connectorTransfersRequestedAt: record.connectorTransfersRequestedAt,
+            connectorTransfersRespondedAt: record.connectorTransfersRespondedAt,
+            patchRequestedAt: record.patchRequestedAt,
+            patchRespondedAt: record.patchRespondedAt,
+            patchRequest: record.patchRequest,
+            patchError: record.patchError,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
         };
     }
 }

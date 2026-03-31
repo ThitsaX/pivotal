@@ -24,16 +24,24 @@ const emit = defineEmits<{
 }>();
 
 const getSectionClass = (sectionKey: string): string => {
-    if (sectionKey === 'parties' || sectionKey === 'transactionPeriod') {
+    if (sectionKey === 'status' || sectionKey === 'participant') {
         return 'xl:col-span-3';
+    }
+
+    if (sectionKey === 'transaction' || sectionKey === 'parties' || sectionKey === 'transactionPeriod') {
+        return 'xl:col-span-6';
     }
 
     return '';
 };
 
 const getFieldGridClass = (sectionKey: string): string => {
-    if (sectionKey === 'participant' || sectionKey === 'transaction' || sectionKey === 'status') {
+    if (sectionKey === 'participant' || sectionKey === 'status') {
         return 'grid gap-3 sm:grid-cols-2';
+    }
+
+    if (sectionKey === 'transaction') {
+        return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
     }
 
     if (sectionKey === 'parties') {
@@ -117,7 +125,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                 leave-to-class="max-h-0 -translate-y-1 opacity-0"
             >
                 <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="emit('submit')">
-                    <div class="grid gap-4 xl:grid-cols-3">
+                    <div class="grid gap-4 xl:grid-cols-6">
                         <section
                             v-for="section in sections"
                             :key="section.key"

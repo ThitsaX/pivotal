@@ -1,11 +1,11 @@
 import {PartyIdType, TransactionScenario} from '@shared/fspiop';
 
-export class FindTransactionQuery {
-    constructor(public readonly input: FindTransactionQuery.Input) {
+export class FindTransactionsQuery {
+    constructor(public readonly input: FindTransactionsQuery.Input) {
     }
 }
 
-export namespace FindTransactionQuery {
+export namespace FindTransactionsQuery {
 
     export class Input {
         constructor(
@@ -26,6 +26,7 @@ export namespace FindTransactionQuery {
             public readonly payeeIdType?: PartyIdType,
             public readonly payeeId?: string,
             public readonly payeeSubId?: string | null,
+            public readonly transferId?: string,
             public readonly transferType?: TransactionScenario,
             public readonly subScenario?: string,
             public readonly transactionStartAt?: DateRange,

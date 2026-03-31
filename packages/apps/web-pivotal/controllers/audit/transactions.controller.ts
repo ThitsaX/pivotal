@@ -1,6 +1,6 @@
-import {Controller, Get, Inject, Query} from '@nestjs/common';
+import {Controller, Get, Inject, Param, Query} from '@nestjs/common';
 import {QueryBus} from '@nestjs/cqrs';
-import {FindTransactionQuery} from '@core/audit/domain';
+import {FindTransactionsQuery, GetTransactionQuery} from '@core/audit/domain';
 import {PartyIdType, TransactionScenario} from '@shared/fspiop';
 import {QueryParamsUtil} from '../query-params.util';
 
@@ -23,6 +23,7 @@ export class TransactionsAuditController {
         @Query('payeeIdType') payeeIdType: string | undefined,
         @Query('payeeId') payeeId: string | undefined,
         @Query('payeeSubId') payeeSubId: string | undefined,
+        @Query('transferId') transferId: string | undefined,
         @Query('transferType') transferType: string | undefined,
         @Query('subScenario') subScenario: string | undefined,
         @Query('transactionStartAtStart') transactionStartAtStart: string | undefined,
@@ -35,8 +36,8 @@ export class TransactionsAuditController {
         @Query('size') size: string | undefined,
         @Query('orderColumn') orderColumn: string | undefined,
         @Query('orderDirection') orderDirection: string | undefined,
-    ): Promise<FindTransactionQuery.Output> {
-        const criteria = new FindTransactionQuery.Criteria(
+    ): Promise<FindTransactionsQuery.Output> {
+        const criteria = new FindTransactionsQuery.Criteria(
             QueryParamsUtil.toOptionalString(payerFsp),
             QueryParamsUtil.toOptionalString(payeeFsp),
             QueryParamsUtil.toOptionalEnum(payerIdType, PartyIdType, 'payerIdType'),
@@ -45,6 +46,7 @@ export class TransactionsAuditController {
             QueryParamsUtil.toOptionalEnum(payeeIdType, PartyIdType, 'payeeIdType'),
             QueryParamsUtil.toOptionalString(payeeId),
             QueryParamsUtil.toOptionalNullableString(payeeSubId),
+            QueryParamsUtil.toOptionalString(transferId),
             QueryParamsUtil.toOptionalEnum(transferType, TransactionScenario, 'transferType'),
             QueryParamsUtil.toOptionalString(subScenario),
             QueryParamsUtil.toDateRange(
@@ -52,42 +54,53 @@ export class TransactionsAuditController {
                 transactionStartAtEnd,
                 'transactionStartAtStart',
                 'transactionStartAtEnd',
-                (start?: Date, end?: Date) => new FindTransactionQuery.DateRange(start, end),
+                (start?: Date, end?: Date) => new FindTransactionsQuery.DateRange(start, end),
             ),
             QueryParamsUtil.toDateRange(
                 transactionCompletedAtStart,
                 transactionCompletedAtEnd,
                 'transactionCompletedAtStart',
                 'transactionCompletedAtEnd',
-                (start?: Date, end?: Date) => new FindTransactionQuery.DateRange(start, end),
+                (start?: Date, end?: Date) => new FindTransactionsQuery.DateRange(start, end),
             ),
             QueryParamsUtil.toOptionalBoolean(error, 'error'),
             QueryParamsUtil.toOptionalBoolean(dispute, 'dispute'),
         );
 
-        const pageRequest = new FindTransactionQuery.PageRequest(
+        const pageRequest = new FindTransactionsQuery.PageRequest(
             QueryParamsUtil.toNonNegativeInteger(page, 0, 'page'),
             QueryParamsUtil.toPositiveInteger(size, 20, 'size'),
         );
 
-        const order = new FindTransactionQuery.Order(
+        const order = new FindTransactionsQuery.Order(
             QueryParamsUtil.toEnum(
                 orderColumn,
-                FindTransactionQuery.Order.Column,
-                FindTransactionQuery.Order.Column.TransactionStartAt,
+                FindTransactionsQuery.Order.Column,
+                FindTransactionsQuery.Order.Column.TransactionStartAt,
                 'orderColumn',
             ),
             QueryParamsUtil.toEnum(
                 orderDirection,
-                FindTransactionQuery.Order.Direction,
-                FindTransactionQuery.Order.Direction.Desc,
+                FindTransactionsQuery.Order.Direction,
+                FindTransactionsQuery.Order.Direction.Desc,
                 'orderDirection',
             ),
         );
 
         return this.queryBus.execute(
-            new FindTransactionQuery(
-                new FindTransactionQuery.Input(criteria, pageRequest, order),
+            new FindTransactionsQuery(
+                new FindTransactionsQuery.Input(criteria, pageRequest, order),
+            ),
+        );
+    }
+
+    @Get(':transferId')
+    async getTransaction(
+        @Param('transferId') transferId: string,
+    ): Promise<GetTransactionQuery.Output> {
+        return this.queryBus.execute(
+            new GetTransactionQuery(
+                new GetTransactionQuery.Input(transferId),
             ),
         );
     }

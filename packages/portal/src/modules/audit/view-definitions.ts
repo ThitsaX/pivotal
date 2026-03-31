@@ -128,6 +128,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
             {key: 'payeeIdType', label: 'Payee ID Type', type: 'select', options: PARTY_ID_TYPE_OPTIONS},
             {key: 'payeeId', label: 'Payee ID', type: 'text', placeholder: '(Any)'},
             {key: 'payeeSubId', label: 'Payee Sub ID', type: 'text', placeholder: '(Any)'},
+            {key: 'transferId', label: 'Transfer ID', type: 'text', placeholder: '(Any)'},
             {key: 'transferType', label: 'Transaction Type', type: 'select', options: TRANSACTION_SCENARIO_OPTIONS},
             {key: 'subScenario', label: 'Sub Scenario', type: 'text', placeholder: '(Any)'},
             {key: 'error', label: 'Has Error', type: 'select', options: BOOL_OPTIONS},

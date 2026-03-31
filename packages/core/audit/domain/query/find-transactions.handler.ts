@@ -1,11 +1,11 @@
 import {Inject} from '@nestjs/common';
 import {IQueryHandler, QueryHandler} from '@nestjs/cqrs';
 import {TransactionRepository} from '../repository';
-import {FindTransactionQuery} from './find-transaction.query';
+import {FindTransactionsQuery} from './find-transactions.query';
 
-@QueryHandler(FindTransactionQuery)
-export class FindTransactionHandler
-    implements IQueryHandler<FindTransactionQuery, FindTransactionQuery.Output> {
+@QueryHandler(FindTransactionsQuery)
+export class FindTransactionsHandler
+    implements IQueryHandler<FindTransactionsQuery, FindTransactionsQuery.Output> {
 
     constructor(
         @Inject(TransactionRepository)
@@ -13,7 +13,7 @@ export class FindTransactionHandler
     ) {
     }
 
-    async execute(query: FindTransactionQuery): Promise<FindTransactionQuery.Output> {
+    async execute(query: FindTransactionsQuery): Promise<FindTransactionsQuery.Output> {
         const {criteria, pageRequest, order} = query.input;
 
         return this.repository.find(criteria, pageRequest, order);

@@ -56,7 +56,7 @@ export const getCriteriaSections = (fields: FilterField[]): CriteriaSection[] =>
             continue;
         }
 
-        if (field.key === 'transferType' || field.key === 'subScenario') {
+        if (field.key === 'transferId' || field.key === 'transferType' || field.key === 'subScenario') {
             sectionMap.get('transaction')?.fields.push(field);
             continue;
         }

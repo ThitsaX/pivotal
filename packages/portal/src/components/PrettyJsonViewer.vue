@@ -72,7 +72,7 @@ const copyToClipboard = async (): Promise<void> => {
 </script>
 
 <template>
-    <section class="rounded-xl border border-slate-700/50 bg-[#0f1e31] shadow-soft">
+    <section class="flex h-[28rem] flex-col rounded-xl border border-slate-700/50 bg-[#0f1e31] shadow-soft">
         <header class="flex items-center justify-between border-b border-slate-700/50 px-3 py-2">
             <h4 class="font-display text-xs uppercase tracking-[0.14em] text-slate-200">
                 {{ title }}
@@ -86,7 +86,7 @@ const copyToClipboard = async (): Promise<void> => {
             </button>
         </header>
         <pre
-            class="max-h-[24rem] overflow-auto px-3 py-3 font-mono text-xs leading-6 text-slate-50"
+            class="min-h-0 flex-1 overflow-auto px-3 py-3 font-mono text-xs leading-6 text-slate-50"
             v-html="highlightedJson"
         />
     </section>

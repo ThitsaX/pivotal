@@ -18,7 +18,7 @@ import {
     DisputeTransactionHandler,
 } from './command';
 import {Transaction} from './model';
-import {FindTransactionHandler} from './query';
+import {FindTransactionsHandler, GetTransactionHandler} from './query';
 import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME, TransactionRepository,} from './repository';
 
 const Entities = [Transaction];
@@ -42,7 +42,8 @@ const CommandHandlers = [
 ];
 
 const QueryHandlers = [
-    FindTransactionHandler,
+    GetTransactionHandler,
+    FindTransactionsHandler,
 ];
 
 @Module({})
