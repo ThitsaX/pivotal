@@ -33,7 +33,7 @@ export const buildInitialState = (viewDefinitions: ViewDefinition[]): Record<Vie
 };
 
 export const groupViews = (viewDefinitions: ViewDefinition[]): Array<{group: ViewGroup; views: ViewDefinition[]}> => {
-    return ['Hub', 'Participant', 'Audit'].map((group): {group: ViewGroup; views: ViewDefinition[]} => {
+    return ['Hub', 'Participant', 'Catalyst', 'Audit'].map((group): {group: ViewGroup; views: ViewDefinition[]} => {
         return {
             group: group as ViewGroup,
             views: viewDefinitions.filter((view: ViewDefinition): boolean => view.group === group),
@@ -56,7 +56,7 @@ export const getCriteriaSections = (fields: FilterField[]): CriteriaSection[] =>
             continue;
         }
 
-        if (field.key === 'transferId' || field.key === 'transferType' || field.key === 'subScenario') {
+        if (field.key === 'transferId' || field.key === 'flow' || field.key === 'transferType' || field.key === 'subScenario') {
             sectionMap.get('transaction')?.fields.push(field);
             continue;
         }

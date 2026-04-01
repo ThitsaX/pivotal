@@ -27,6 +27,7 @@ export namespace FindTransactionsQuery {
             public readonly payeeId?: string,
             public readonly payeeSubId?: string | null,
             public readonly transferId?: string,
+            public readonly flow?: number,
             public readonly transferType?: TransactionScenario,
             public readonly subScenario?: string,
             public readonly transactionStartAt?: DateRange,
@@ -74,7 +75,7 @@ export namespace FindTransactionsQuery {
             SubScenario = 'subScenario',
             TransactionStartAt = 'transactionStartAt',
             TransactionCompletedAt = 'transactionCompletedAt',
-            Error = 'failed',
+            Error = 'error',
             Dispute = 'dispute',
         }
 

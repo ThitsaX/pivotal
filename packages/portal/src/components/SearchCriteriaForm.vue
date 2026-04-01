@@ -41,7 +41,7 @@ const getFieldGridClass = (sectionKey: string): string => {
     }
 
     if (sectionKey === 'transaction') {
-        return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
+        return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-4';
     }
 
     if (sectionKey === 'parties') {
@@ -162,7 +162,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                             </div>
 
                             <div v-else :class="getFieldGridClass(section.key)">
-                                <label
+                                <div
                                     v-for="field in section.fields"
                                     :key="field.key"
                                     class="block"
@@ -195,7 +195,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             button-class="!pb-1.5 !pt-5 text-xs"
                                         />
                                     </div>
-                                </label>
+                                </div>
                             </div>
                         </section>
                     </div>

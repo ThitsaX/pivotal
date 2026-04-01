@@ -1,5 +1,7 @@
 export * from './fee-types';
 export * from './fee-policy';
+export * from './admin-fee-policy';
+export * from './admin-scenario';
 export * from './fee-calculation-result';
 export * from './calculate-fee-input';
 export * from './calculate-fee-output';

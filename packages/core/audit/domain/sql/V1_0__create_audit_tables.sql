@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transfer_state VARCHAR(32),
     possible_dispute BOOLEAN NOT NULL DEFAULT FALSE,
     error BOOLEAN NOT NULL DEFAULT FALSE,
+    flow INTEGER,
     parties_requested_at TIMESTAMPTZ,
     parties_responded_at TIMESTAMPTZ,
     parties_request JSONB,

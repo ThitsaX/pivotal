@@ -24,6 +24,7 @@ export class TransactionsAuditController {
         @Query('payeeId') payeeId: string | undefined,
         @Query('payeeSubId') payeeSubId: string | undefined,
         @Query('transferId') transferId: string | undefined,
+        @Query('flow') flow: string | undefined,
         @Query('transferType') transferType: string | undefined,
         @Query('subScenario') subScenario: string | undefined,
         @Query('transactionStartAtStart') transactionStartAtStart: string | undefined,
@@ -47,6 +48,7 @@ export class TransactionsAuditController {
             QueryParamsUtil.toOptionalString(payeeId),
             QueryParamsUtil.toOptionalNullableString(payeeSubId),
             QueryParamsUtil.toOptionalString(transferId),
+            QueryParamsUtil.toOptionalInteger(flow, 'flow'),
             QueryParamsUtil.toOptionalEnum(transferType, TransactionScenario, 'transferType'),
             QueryParamsUtil.toOptionalString(subScenario),
             QueryParamsUtil.toDateRange(
