@@ -725,7 +725,7 @@ const getAmountDisplay = (record: Record<string, unknown>): {
 };
 
 const STATUS_BADGE_BASE_CLASS =
-    'inline-flex min-w-[5.75rem] justify-center rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]';
+    'inline-flex w-[6.75rem] justify-center rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]';
 
 const isTrueValue = (value: unknown): boolean => {
     return value === true || value === 'true' || value === 1 || value === '1';
@@ -738,7 +738,7 @@ const getStatusDisplay = (record: Record<string, unknown>): {
     disputeClass: string;
     showDispute: boolean;
 } => {
-    const failed = isTrueValue(record.failed) || isTrueValue(record.error);
+    const failed = isTrueValue(record.error);
     const dispute = isTrueValue(record.dispute) || isTrueValue(record.possibleDispute);
 
     return {
@@ -751,6 +751,53 @@ const getStatusDisplay = (record: Record<string, unknown>): {
             ? 'border-red-200 bg-red-50 text-red-700'
             : 'border-slate-200 bg-slate-50 text-slate-500',
         showDispute: dispute,
+    };
+};
+
+const getFlowDisplay = (record: Record<string, unknown>): {
+    stages: Array<{label: string; className: string}>;
+    transferState: string | null;
+} => {
+    const rawFlow = record.flow;
+    const flow = typeof rawFlow === 'number'
+        ? rawFlow
+        : typeof rawFlow === 'string' && rawFlow.trim().length > 0
+            ? Number(rawFlow)
+            : null;
+
+    if (flow == null || Number.isNaN(flow) || flow <= 0) {
+        return {
+            stages: [],
+            transferState: null,
+        };
+    }
+
+    const stages: Array<{label: string; className: string}> = [];
+
+    if (flow >= 1) {
+        stages.push({
+            label: 'P',
+            className: 'border-amber-200 bg-amber-100 text-amber-700',
+        });
+    }
+
+    if (flow >= 2) {
+        stages.push({
+            label: 'Q',
+            className: 'border-violet-200 bg-violet-100 text-violet-700',
+        });
+    }
+
+    if (flow >= 3) {
+        stages.push({
+            label: 'T',
+            className: 'border-rose-200 bg-rose-100 text-rose-700',
+        });
+    }
+
+    return {
+        stages,
+        transferState: flow >= 3 ? formatOptionalValue(record.transferState) : null,
     };
 };
 
@@ -780,7 +827,7 @@ const getDesktopHeaderCellClass = (columnKey: string): string => {
         case 'transactionStartAt':
             return 'w-[15%]';
         case 'status':
-            return 'w-[7%]';
+            return 'w-[7%] text-center';
         case 'details':
             return 'w-[10%] text-center';
         default:
@@ -792,6 +839,8 @@ const getDesktopBodyCellClass = (columnKey: string): string => {
     switch (columnKey) {
         case 'amount':
             return 'text-right';
+        case 'status':
+            return 'text-center';
         case 'details':
             return 'text-center';
         default:
@@ -1240,7 +1289,7 @@ const jumpToPage = (pageNumber: number): void => {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div v-else-if="column.key === 'status'" class="flex flex-col items-start gap-1.5">
+                                            <div v-else-if="column.key === 'status'" class="flex flex-col items-center gap-1.5 text-center">
                                                 <span
                                                     :class="[
                                                         STATUS_BADGE_BASE_CLASS,
@@ -1258,6 +1307,30 @@ const jumpToPage = (pageNumber: number): void => {
                                                 >
                                                     {{ getStatusDisplay(record).disputeLabel }}
                                                 </span>
+                                                <span
+                                                    v-if="hasVisibleValue(getFlowDisplay(record).transferState ?? '-')"
+                                                    :class="[
+                                                        STATUS_BADGE_BASE_CLASS,
+                                                        'border-rose-200 bg-rose-50 text-rose-700',
+                                                    ]"
+                                                >
+                                                    {{ getFlowDisplay(record).transferState }}
+                                                </span>
+                                                <div
+                                                    v-if="getFlowDisplay(record).stages.length > 0"
+                                                    class="flex flex-wrap items-center justify-center gap-1"
+                                                >
+                                                    <span
+                                                        v-for="stage in getFlowDisplay(record).stages"
+                                                        :key="stage.label"
+                                                        :class="[
+                                                            'inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold uppercase',
+                                                            stage.className,
+                                                        ]"
+                                                    >
+                                                        {{ stage.label }}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div v-else-if="column.key === 'transactionStartAt'" class="space-y-1.5">
                                                 <div>
@@ -1462,7 +1535,7 @@ const jumpToPage = (pageNumber: number): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Status
                                         </p>
-                                        <div class="flex flex-col items-start gap-1.5">
+                                        <div class="flex flex-col items-center gap-1.5 text-center">
                                             <span
                                                 :class="[
                                                     STATUS_BADGE_BASE_CLASS,
@@ -1480,6 +1553,30 @@ const jumpToPage = (pageNumber: number): void => {
                                             >
                                                 {{ getStatusDisplay(record).disputeLabel }}
                                             </span>
+                                            <span
+                                                v-if="hasVisibleValue(getFlowDisplay(record).transferState ?? '-')"
+                                                :class="[
+                                                    STATUS_BADGE_BASE_CLASS,
+                                                    'border-rose-200 bg-rose-50 text-rose-700',
+                                                ]"
+                                            >
+                                                {{ getFlowDisplay(record).transferState }}
+                                            </span>
+                                            <div
+                                                v-if="getFlowDisplay(record).stages.length > 0"
+                                                class="flex flex-wrap items-center justify-center gap-1"
+                                            >
+                                                <span
+                                                    v-for="stage in getFlowDisplay(record).stages"
+                                                    :key="stage.label"
+                                                    :class="[
+                                                        'inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold uppercase',
+                                                        stage.className,
+                                                    ]"
+                                                >
+                                                    {{ stage.label }}
+                                                </span>
+                                            </div>
                                         </div>
                                     </section>
 

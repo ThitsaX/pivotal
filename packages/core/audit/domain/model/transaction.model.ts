@@ -119,6 +119,9 @@ export class Transaction {
     @Column({type: 'boolean', name: 'error', default: false})
     public error!: boolean;
 
+    @Column({type: 'integer', name: 'flow', nullable: true})
+    public flow!: number | null;
+
     @Column({type: 'timestamptz', name: 'parties_requested_at', nullable: true})
     public partiesRequestedAt!: Date | null;
 

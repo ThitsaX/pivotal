@@ -53,6 +53,7 @@ export class TransactionRepository {
             input.transferState ?? null,
             input.possibleDispute ?? false,
             input.error,
+            input.flow ?? null,
             input.partiesRequestedAt ?? null,
             input.partiesRespondedAt ?? null,
             input.partiesRequest ?? null,
@@ -120,6 +121,7 @@ export class TransactionRepository {
                 transfer_state,
                 possible_dispute,
                 error,
+                flow,
                 parties_requested_at,
                 parties_responded_at,
                 parties_request,
@@ -187,6 +189,11 @@ export class TransactionRepository {
                 transfer_state = COALESCE(EXCLUDED.transfer_state, transactions.transfer_state),
                 possible_dispute = transactions.possible_dispute OR COALESCE(EXCLUDED.possible_dispute, FALSE),
                 error = transactions.error OR EXCLUDED.error,
+                flow = CASE
+                    WHEN transactions.flow IS NULL THEN EXCLUDED.flow
+                    WHEN EXCLUDED.flow IS NULL THEN transactions.flow
+                    ELSE GREATEST(transactions.flow, EXCLUDED.flow)
+                END,
                 parties_requested_at = CASE
                     WHEN transactions.parties_requested_at IS NULL THEN EXCLUDED.parties_requested_at
                     WHEN EXCLUDED.parties_requested_at IS NULL THEN transactions.parties_requested_at
@@ -437,6 +444,10 @@ export class TransactionRepository {
             queryBuilder.andWhere('transaction.correlationId = :transferId', {transferId: criteria.transferId});
         }
 
+        if (criteria.flow !== undefined) {
+            queryBuilder.andWhere('transaction.flow = :flow', {flow: criteria.flow});
+        }
+
         if (criteria.transferType !== undefined) {
             queryBuilder.andWhere('transaction.transactionType = :transferType', {transferType: criteria.transferType});
         }
@@ -558,8 +569,9 @@ export class TransactionRepository {
             transferType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
+            error: record.error,
             dispute: record.possibleDispute,
-            failed: record.error,
+            flow: record.flow,
             transactionStartAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
         };
@@ -590,6 +602,7 @@ export class TransactionRepository {
             transactionCompletedAt: record.transactionCompletedAt,
             possibleDispute: record.possibleDispute,
             error: record.error,
+            flow: record.flow,
             partiesRequestedAt: record.partiesRequestedAt,
             partiesRespondedAt: record.partiesRespondedAt,
             partiesRequest: record.partiesRequest,
@@ -657,6 +670,7 @@ export namespace TransactionRepository {
         transferState?: TransferState | null;
         possibleDispute?: boolean | null;
         error: boolean;
+        flow?: number | null;
         partiesRequestedAt?: Date | null;
         partiesRespondedAt?: Date | null;
         partiesRequest?: unknown | null;

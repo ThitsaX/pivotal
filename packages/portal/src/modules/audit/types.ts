@@ -8,7 +8,7 @@ export type ViewKey =
     | 'participant-register-endpoint'
     | 'transactions';
 
-export type ViewGroup = 'Hub' | 'Participant' | 'Audit';
+export type ViewGroup = 'Hub' | 'Participant' | 'Catalyst' | 'Audit';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';

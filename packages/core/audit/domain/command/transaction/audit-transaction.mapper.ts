@@ -24,6 +24,10 @@ import {AuditTransfersResponseCommand} from '../transfers/audit-transfers-respon
 
 export class AuditTransactionMapper {
 
+    private static readonly PARTIES_FLOW = 1;
+    private static readonly QUOTES_FLOW = 2;
+    private static readonly TRANSFERS_FLOW = 3;
+
     static toPartiesRequestInput(
         input: AuditPartiesRequestCommand.Input,
     ): TransactionRepository.UpsertInput {
@@ -69,6 +73,7 @@ export class AuditTransactionMapper {
             payeeSubId: responsePartyIdInfo?.partySubIdOrType ?? input.payeeSubId,
             transactionStartedAt: occurredAt,
             error: false,
+            flow: AuditTransactionMapper.PARTIES_FLOW,
             partiesRespondedAt: occurredAt,
             partiesResponse: input.response,
             createdAt: occurredAt,
@@ -94,6 +99,7 @@ export class AuditTransactionMapper {
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,
+            flow: AuditTransactionMapper.PARTIES_FLOW,
             partiesRespondedAt: occurredAt,
             partiesError: input.error,
             createdAt: occurredAt,
@@ -162,6 +168,7 @@ export class AuditTransactionMapper {
             transactionType: request?.transactionType?.scenario ?? null,
             subScenario: request?.transactionType?.subScenario ?? null,
             error: false,
+            flow: AuditTransactionMapper.QUOTES_FLOW,
             quotesRespondedAt: occurredAt,
             quotesRequest: request,
             quotesResponse: response,
@@ -196,6 +203,7 @@ export class AuditTransactionMapper {
             transactionType: request?.transactionType?.scenario ?? null,
             subScenario: request?.transactionType?.subScenario ?? null,
             error: true,
+            flow: AuditTransactionMapper.QUOTES_FLOW,
             quotesRespondedAt: occurredAt,
             quotesRequest: request,
             quotesError: input.error,
@@ -242,6 +250,7 @@ export class AuditTransactionMapper {
             transactionCompletedAt: occurredAt,
             transferState: response?.transferState ?? null,
             error: false,
+            flow: AuditTransactionMapper.TRANSFERS_FLOW,
             transfersRespondedAt: occurredAt,
             transfersRequest: input.request,
             transfersResponse: input.response,
@@ -265,6 +274,7 @@ export class AuditTransactionMapper {
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,
+            flow: AuditTransactionMapper.TRANSFERS_FLOW,
             transfersRespondedAt: occurredAt,
             transfersRequest: input.request,
             transfersError: input.error,

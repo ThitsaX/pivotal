@@ -9,10 +9,10 @@ import {VIEW_BY_KEY, VIEW_DEFINITIONS} from './modules/audit/view-definitions';
 import TransactionsPage from './pages/audit/TransactionsPage.vue';
 import DashboardPage from './pages/DashboardPage.vue';
 import HubAddCurrencyPage from './pages/hub/HubAddCurrencyPage.vue';
-import HubAddSigningKeysPage from './pages/hub/HubAddSigningKeysPage.vue';
+import HubUpdateSigningKeysPage from './pages/hub/HubUpdateSigningKeysPage.vue';
 import HubListParticipantsPage from './pages/hub/HubListParticipantsPage.vue';
 import ParticipantAddNewCurrencyPage from './pages/participant/ParticipantAddNewCurrencyPage.vue';
-import ParticipantAddSigningKeysPage from './pages/participant/ParticipantAddSigningKeysPage.vue';
+import ParticipantUpdateSigningKeysPage from './pages/participant/ParticipantUpdateSigningKeysPage.vue';
 import ParticipantOnboardingPage from './pages/participant/ParticipantOnboardingPage.vue';
 import ParticipantRegisterEndpointPage from './pages/participant/ParticipantRegisterEndpointPage.vue';
 
@@ -38,9 +38,9 @@ const activeView = computed(() => {
 const pageComponentByKey: Record<ViewKey, Component> = {
     'hub-add-currency': HubAddCurrencyPage,
     'hub-list-participants': HubListParticipantsPage,
-    'hub-add-signing-keys': HubAddSigningKeysPage,
+    'hub-add-signing-keys': HubUpdateSigningKeysPage,
     'participant-onboarding': ParticipantOnboardingPage,
-    'participant-add-signing-keys': ParticipantAddSigningKeysPage,
+    'participant-add-signing-keys': ParticipantUpdateSigningKeysPage,
     'participant-add-new-currency': ParticipantAddNewCurrencyPage,
     'participant-register-endpoint': ParticipantRegisterEndpointPage,
     transactions: TransactionsPage,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AuditFindTransactionPage from './AuditFindTransactionPage.vue';
+import AuditFindTransactionsPage from './AuditFindTransactionsPage.vue';
 import {VIEW_BY_KEY} from '../../modules/audit/view-definitions';
 
 defineProps<{
@@ -14,7 +14,7 @@ const viewDefinition = VIEW_BY_KEY.transactions;
 </script>
 
 <template>
-    <AuditFindTransactionPage
+    <AuditFindTransactionsPage
         :view-definition="viewDefinition"
         :selected-time-zone="selectedTimeZone"
         @update:selected-time-zone="emit('update:selectedTimeZone', $event)"

@@ -27,6 +27,13 @@ const TRANSACTION_SCENARIO_OPTIONS: SelectOption[] = [
     })),
 ];
 
+const FLOW_OPTIONS: SelectOption[] = [
+    {label: '(Any)', value: ''},
+    {label: 'Parties', value: '1'},
+    {label: 'Quotes', value: '2'},
+    {label: 'Transfers', value: '3'},
+];
+
 export const VIEW_DEFINITIONS: ViewDefinition[] = [
     {
         key: 'hub-add-currency',
@@ -56,7 +63,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
         key: 'hub-add-signing-keys',
         group: 'Hub',
         title: 'Add Signing Keys',
-        menuLabel: 'Add Signing Keys',
+        menuLabel: 'Update Signing Keys',
         subtitle: 'Create or update the JWS signing key pair for Hub.',
         endpoint: '/hub/signing-keys',
         criteriaFields: [],
@@ -104,7 +111,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
         key: 'participant-add-signing-keys',
         group: 'Participant',
         title: 'Add Signing Keys',
-        menuLabel: 'Add Signing Keys',
+        menuLabel: 'Update Signing Keys',
         subtitle: 'Create or update the JWS signing key pair for a participant by name.',
         endpoint: '/participant/signing-keys',
         criteriaFields: [],
@@ -129,6 +136,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
             {key: 'payeeId', label: 'Payee ID', type: 'text', placeholder: '(Any)'},
             {key: 'payeeSubId', label: 'Payee Sub ID', type: 'text', placeholder: '(Any)'},
             {key: 'transferId', label: 'Transfer ID', type: 'text', placeholder: '(Any)'},
+            {key: 'flow', label: 'Flow', type: 'select', options: FLOW_OPTIONS},
             {key: 'transferType', label: 'Transaction Type', type: 'select', options: TRANSACTION_SCENARIO_OPTIONS},
             {key: 'subScenario', label: 'Sub Scenario', type: 'text', placeholder: '(Any)'},
             {key: 'error', label: 'Has Error', type: 'select', options: BOOL_OPTIONS},
@@ -146,7 +154,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
             {label: 'Payer FSP', value: 'payerFsp'},
             {label: 'Payee FSP', value: 'payeeFsp'},
             {label: 'Transfer Type', value: 'transferType'},
-            {label: 'Error', value: 'failed'},
+            {label: 'Error', value: 'error'},
             {label: 'Dispute', value: 'dispute'},
         ],
         columns: [
