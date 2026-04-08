@@ -27,6 +27,7 @@ import {TransferRequest} from '../cache';
 import {RedisClient} from '../component';
 import {SendMoneyResponse} from '../dto';
 import {PutAcceptPartyCommand} from './put-accept-party.command';
+import {SendMoneyResponseMapper} from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptPartyCommand)
 export class PutAcceptPartyHandler
@@ -207,10 +208,23 @@ export class PutAcceptPartyHandler
         transferRequest: TransferRequest,
         callback: QuotesIDPutResponse,
     ): SendMoneyResponse {
-        const response = new SendMoneyResponse();
-        response.schemeFee = PutAcceptPartyHandler.toSchemeFee(callback, transferRequest.currency);
+        const payeeFspFeeAmount = PutAcceptPartyHandler.toPayeeFspFeeAmount(callback, transferRequest.currency);
 
-        return response;
+        return SendMoneyResponseMapper.toWaitingForQuoteAcceptance(
+            transferRequest,
+            payeeFspFeeAmount,
+            callback.extensionList,
+        );
+    }
+
+    private static toPayeeFspFeeAmount(callback: QuotesIDPutResponse, fallbackCurrency: Currency): string {
+        const payeeFspFeeAmount = callback.payeeFspFee?.amount?.trim();
+
+        if (payeeFspFeeAmount != null && payeeFspFeeAmount.length > 0) {
+            return payeeFspFeeAmount;
+        }
+
+        return PutAcceptPartyHandler.toSchemeFee(callback, fallbackCurrency).amount;
     }
 
     private static toSchemeFee(callback: QuotesIDPutResponse, fallbackCurrency: Currency): Money {

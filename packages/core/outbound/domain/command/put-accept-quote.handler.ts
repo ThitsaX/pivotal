@@ -20,6 +20,7 @@ import {TransferRequest} from '../cache';
 import {RedisClient} from '../component';
 import {SendMoneyResponse} from '../dto';
 import {PutAcceptQuoteCommand} from './put-accept-quote.command';
+import {SendMoneyResponseMapper} from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptQuoteCommand)
 export class PutAcceptQuoteHandler
@@ -84,11 +85,13 @@ export class PutAcceptQuoteHandler
 
     private static toResponse(
         transferRequest: TransferRequest,
+        callback: TransfersIDPutResponse,
     ): SendMoneyResponse {
-        const response = new SendMoneyResponse();
-        response.transferId = transferRequest.transferId;
-
-        return response;
+        return SendMoneyResponseMapper.toFinalState(
+            transferRequest,
+            callback.transferState,
+            callback.extensionList,
+        );
     }
 
     private static toFspiopException(error: unknown, transferId: string): FspiopException {
@@ -156,7 +159,7 @@ export class PutAcceptQuoteHandler
 
             const callback = await waitPromise;
             transferRequest.transfer = callback;
-            const response = PutAcceptQuoteHandler.toResponse(transferRequest);
+            const response = PutAcceptQuoteHandler.toResponse(transferRequest, callback);
 
             await this.auditPublisher.publish(
                 TransactionMessage.response(

@@ -15,6 +15,8 @@ export class TransferRequest {
 
     homeTransactionId!: string;
 
+    initiatedTimestamp!: string;
+
     from!: FspParty;
 
     to!: FspParty;
