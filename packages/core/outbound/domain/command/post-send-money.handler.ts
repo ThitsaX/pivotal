@@ -20,8 +20,9 @@ import {
 } from '@shared/fspiop';
 import {RedisClient} from '../component';
 import {TransferRequest} from '../cache';
-import {FspParty, SendMoneyRequest, SendMoneyResponse} from '../dto';
+import {FspParty, SendMoneyRequest} from '../dto';
 import {PostSendMoneyCommand} from './post-send-money.command';
+import {SendMoneyResponseMapper} from './send-money-response.mapper';
 
 @CommandHandler(PostSendMoneyCommand)
 export class PostSendMoneyHandler
@@ -42,18 +43,6 @@ export class PostSendMoneyHandler
     private static toSubId(idSubValue: string | undefined): string | undefined {
         const subId = idSubValue?.trim();
         return subId == null || subId.length === 0 ? undefined : subId;
-    }
-
-    private static toResponse(
-        transferId: string,
-        callback: PartiesTypeIDPutResponse,
-    ): SendMoneyResponse {
-        const response = new SendMoneyResponse();
-        response.transferId = transferId;
-        response.to = PostSendMoneyHandler.toFspParty(callback);
-        response.supportedCurrencies = callback.party.supportedCurrencies;
-
-        return response;
     }
 
     private static toFspParty(callback: PartiesTypeIDPutResponse): FspParty {
@@ -79,18 +68,20 @@ export class PostSendMoneyHandler
 
     private static toTransferRequest(
         request: SendMoneyRequest,
-        response: SendMoneyResponse,
         callback: PartiesTypeIDPutResponse,
+        transferId: string,
+        initiatedTimestamp: string,
     ): TransferRequest {
         const transferRequest = new TransferRequest();
         transferRequest.payer = PostSendMoneyHandler.toParty(request.from);
         transferRequest.payee = callback.party;
         transferRequest.quotes = undefined;
         transferRequest.transfer = undefined;
-        transferRequest.transferId = response.transferId ?? '';
+        transferRequest.transferId = transferId;
         transferRequest.homeTransactionId = request.homeTransactionId;
+        transferRequest.initiatedTimestamp = initiatedTimestamp;
         transferRequest.from = request.from;
-        transferRequest.to = response.to ?? request.to;
+        transferRequest.to = PostSendMoneyHandler.toFspParty(callback);
         transferRequest.amountType = request.amountType;
         transferRequest.currency = request.currency;
         transferRequest.amount = request.amount;
@@ -230,8 +221,13 @@ export class PostSendMoneyHandler
             }
 
             const callback = await waitPromise;
-            const response = PostSendMoneyHandler.toResponse(transferId, callback);
-            const cachedTransaction = PostSendMoneyHandler.toTransferRequest(request, response, callback);
+            const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
+                request,
+                callback,
+                transferId,
+                createdAt.toISOString(),
+            );
+            const response = SendMoneyResponseMapper.toWaitingForPartyAcceptance(cachedTransaction);
 
             await this.redisClient.set(transferId, cachedTransaction);
             await this.auditPublisher.publish(
