@@ -9,7 +9,7 @@ export class RedisClient implements OnModuleInit, OnModuleDestroy {
 
     constructor(private readonly outboundSettings: OutboundSettings) {
         this.client = createClient({url: this.outboundSettings.redisUrl});
-        this.defaultTtlMs = this.outboundSettings.redisTtlMs;
+        this.defaultTtlMs = this.outboundSettings.redisCacheItemTimeoutMs;
     }
 
     async onModuleInit(): Promise<void> {

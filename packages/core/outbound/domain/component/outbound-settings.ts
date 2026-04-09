@@ -1,7 +1,7 @@
 export class OutboundSettings {
     constructor(
         public readonly redisUrl: string,
-        public readonly redisTtlMs: number,
+        public readonly redisCacheItemTimeoutMs: number,
     ) {
     }
 }

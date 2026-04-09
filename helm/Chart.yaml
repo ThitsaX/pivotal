@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pivotal-stack
+description: Helm chart for the pivotal docker-compose stack
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

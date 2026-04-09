@@ -20,7 +20,7 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
     private static readonly DEFAULT_REDIS_URL = 'redis://localhost:6379';
-    private static readonly DEFAULT_REDIS_TTL_MS = 300000;
+    private static readonly DEFAULT_REDIS_CACHE_ITEM_TIMEOUT_MS = 300000;
     private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
     private static readonly DEFAULT_QUOTES_URL = 'http://localhost:5003';
     private static readonly DEFAULT_TRANSFERS_URL = 'http://localhost:5003';
@@ -47,9 +47,13 @@ export class WebOutboundDependencies implements WebOutboundModule.RequiredDepend
     }
 
     outboundSettings(): OutboundSettings {
+        const redisCacheItemTimeoutMs = this.readPositiveInteger('REDIS_CACHE_ITEM_TIMEOUT_MS')
+            ?? this.readPositiveInteger('REDIS_TTL_MS')
+            ?? WebOutboundDependencies.DEFAULT_REDIS_CACHE_ITEM_TIMEOUT_MS;
+
         return new OutboundSettings(
             this.readString('REDIS_URL', WebOutboundDependencies.DEFAULT_REDIS_URL),
-            this.readPositiveInteger('REDIS_TTL_MS') ?? WebOutboundDependencies.DEFAULT_REDIS_TTL_MS,
+            redisCacheItemTimeoutMs,
         );
     }
 
