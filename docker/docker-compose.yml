@@ -84,7 +84,7 @@ services:
       WEB_OUTBOUND_PORT: ${WEB_OUTBOUND_PORT:-3200}
       NATS_URL: ${NATS_URL:-nats://nats:4222}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      REDIS_TTL_MS: ${REDIS_TTL_MS:-300000}
+      REDIS_CACHE_ITEM_TIMEOUT_MS: ${REDIS_CACHE_ITEM_TIMEOUT_MS:-300000}
       <<: *common_fspiop_env
     ports:
       - "${WEB_OUTBOUND_HOST_PORT:-3200}:${WEB_OUTBOUND_PORT:-3200}"

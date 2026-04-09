@@ -175,6 +175,7 @@ export class PutAcceptQuoteHandler
                     },
                 ),
             );
+            await this.redisClient.delete(transferId);
 
             return new PutAcceptQuoteCommand.Output(response, callback);
         } catch (error) {
@@ -196,8 +197,11 @@ export class PutAcceptQuoteHandler
                     ),
                 );
             } finally {
-                await this.redisClient.delete(transferId);
-                throw fspiopException;
+                try {
+                    await this.redisClient.delete(transferId);
+                } finally {
+                    throw fspiopException;
+                }
             }
         }
     }

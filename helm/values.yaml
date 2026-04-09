@@ -1,0 +1,196 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullPolicy: IfNotPresent
+
+  commonFspiopEnv:
+    FSPIOP_PARTIES_URL: http://web-inbound:3201
+    FSPIOP_QUOTES_URL: http://web-inbound:3201
+    FSPIOP_TRANSFERS_URL: http://web-inbound:3201
+    FSPIOP_SWITCH_ID: hub
+    FSPIOP_USE_JWS: "false"
+    FSPIOP_USE_MUTUAL_TLS: "false"
+    FSPIOP_SIGN_JWS: "false"
+    FSPIOP_VERIFY_JWS: "false"
+    FSPIOP_MUTUAL_TLS: "false"
+    FSPIOP_SOCKET_TIMEOUT_MS: "30000"
+    FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
+    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
+    FSPIOP_TLS_VERIFY_DOMAIN: "false"
+    FSPIOP_JWS_PRIVATE_KEY: ""
+    FSPIOP_JWS_PUBLIC_KEY: ""
+    FSPIOP_MTLS_CA: ""
+    FSPIOP_MTLS_CLIENT_CERT: ""
+    FSPIOP_MTLS_CLIENT_KEY: ""
+
+  commonDbEnv:
+    DB_WRITE_HOST: postgres
+    DB_WRITE_PORT: "5432"
+    DB_WRITE_USERNAME: postgres
+    DB_WRITE_PASSWORD: postgres
+    DB_WRITE_NAME: pivotal
+    DB_WRITE_SCHEMA: public
+    DB_READ_HOST: postgres
+    DB_READ_PORT: "5432"
+    DB_READ_USERNAME: postgres
+    DB_READ_PASSWORD: postgres
+    DB_READ_NAME: pivotal
+    DB_READ_SCHEMA: public
+
+postgres:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: postgres
+    tag: 16-alpine
+  service:
+    type: ClusterIP
+    port: 5432
+  persistence:
+    enabled: true
+    size: 8Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ""
+  env:
+    POSTGRES_DB: pivotal
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+
+nats:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: nats
+    tag: 2.11-alpine
+  service:
+    type: ClusterIP
+    clientPort: 4222
+    monitorPort: 8222
+  command:
+    - -js
+    - -m
+    - "8222"
+
+redis:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: 7-alpine
+  service:
+    type: ClusterIP
+    port: 6379
+  persistence:
+    enabled: true
+    size: 2Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ""
+
+webOutbound:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-web-outbound
+    tag: local
+  service:
+    type: ClusterIP
+    port: 3200
+  env:
+    WEB_OUTBOUND_PORT: "3200"
+    NATS_URL: nats://nats:4222
+    REDIS_URL: redis://redis:6379
+    REDIS_CACHE_ITEM_TIMEOUT_MS: "300000"
+
+webInbound:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-web-inbound
+    tag: local
+  service:
+    type: ClusterIP
+    port: 3201
+  env:
+    WEB_INBOUND_PORT: "3201"
+    NATS_URL: nats://nats:4222
+
+appAuditor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-app-auditor
+    tag: local
+  env:
+    NATS_URL: nats://nats:4222
+    PIVOTAL_AUDIT_STREAM_NAME: PIVOTAL_AUDIT
+
+webPivotal:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-web-pivotal
+    tag: local
+  service:
+    type: ClusterIP
+    port: 3202
+  env:
+    WEB_PIVOTAL_PORT: "3202"
+    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
+
+portal:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-portal
+    tag: local
+  service:
+    type: ClusterIP
+    port: 4173
+
+wallet1Connector:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-wallet1-connector
+    tag: local
+  env:
+    NATS_URL: nats://nats:4222
+    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
+    CONNECTOR_ID: wallet1
+    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
+    CONNECTOR_ILP_SECRET: wallet1-ilp-secret
+    CATALYST_URL: http://host.docker.internal:4000
+    CATALYST_ENGINE_MODE: STRICT
+
+wallet2Connector:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-wallet2-connector
+    tag: local
+  env:
+    NATS_URL: nats://nats:4222
+    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
+    CONNECTOR_ID: wallet2
+    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
+    CONNECTOR_ILP_SECRET: wallet2-ilp-secret
+    CATALYST_URL: http://host.docker.internal:4000
+    CATALYST_ENGINE_MODE: STRICT
+
+wallet3Connector:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-wallet3-connector
+    tag: local
+  env:
+    NATS_URL: nats://nats:4222
+    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
+    CONNECTOR_ID: wallet3
+    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
+    CONNECTOR_ILP_SECRET: wallet3-ilp-secret
+    CATALYST_URL: http://host.docker.internal:4000
+    CATALYST_ENGINE_MODE: STRICT

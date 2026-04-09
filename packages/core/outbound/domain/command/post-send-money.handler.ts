@@ -278,7 +278,11 @@ export class PostSendMoneyHandler
                     ),
                 );
             } finally {
-                throw fspiopException;
+                try {
+                    await this.redisClient.delete(transferId);
+                } finally {
+                    throw fspiopException;
+                }
             }
         }
     }
