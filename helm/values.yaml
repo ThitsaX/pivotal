@@ -25,28 +25,26 @@ global:
     FSPIOP_MTLS_CLIENT_KEY: ""
 
   commonDbEnv:
-    DB_WRITE_HOST: postgres
-    DB_WRITE_PORT: "5432"
-    DB_WRITE_USERNAME: postgres
-    DB_WRITE_PASSWORD: postgres
+    DB_WRITE_HOST: mysql
+    DB_WRITE_PORT: "3306"
+    DB_WRITE_USERNAME: root
+    DB_WRITE_PASSWORD: mysql
     DB_WRITE_NAME: pivotal
-    DB_WRITE_SCHEMA: public
-    DB_READ_HOST: postgres
-    DB_READ_PORT: "5432"
-    DB_READ_USERNAME: postgres
-    DB_READ_PASSWORD: postgres
+    DB_READ_HOST: mysql
+    DB_READ_PORT: "3306"
+    DB_READ_USERNAME: root
+    DB_READ_PASSWORD: mysql
     DB_READ_NAME: pivotal
-    DB_READ_SCHEMA: public
 
-postgres:
+mysql:
   enabled: true
   replicaCount: 1
   image:
-    repository: postgres
-    tag: 16-alpine
+    repository: mysql
+    tag: "8.4"
   service:
     type: ClusterIP
-    port: 5432
+    port: 3306
   persistence:
     enabled: true
     size: 8Gi
@@ -54,9 +52,8 @@ postgres:
       - ReadWriteOnce
     storageClassName: ""
   env:
-    POSTGRES_DB: pivotal
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: postgres
+    MYSQL_DATABASE: pivotal
+    MYSQL_ROOT_PASSWORD: mysql
 
 nats:
   enabled: true

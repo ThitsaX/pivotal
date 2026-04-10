@@ -42,16 +42,14 @@ const findRepoRoot = (): string => {
 };
 
 const createMigrationSettings = (
-    schema: string,
     historyTable: string,
     locations: string[],
 ): PgMigrationSettings => ({
     host:         process.env['DB_WRITE_HOST']     ?? 'localhost',
-    port:         Number(process.env['DB_WRITE_PORT'] ?? 5432),
-    username:     process.env['DB_WRITE_USERNAME'] ?? 'postgres',
-    password:     process.env['DB_WRITE_PASSWORD'] ?? 'postgres',
+    port:         Number(process.env['DB_WRITE_PORT'] ?? 3306),
+    username:     process.env['DB_WRITE_USERNAME'] ?? 'root',
+    password:     process.env['DB_WRITE_PASSWORD'] ?? 'mysql',
     database:     process.env['DB_WRITE_NAME']     ?? 'pivotal',
-    schema,
     historyTable,
     locations,
 });
@@ -72,13 +70,12 @@ const bootstrap = async (): Promise<void> => {
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
 
-    const schema = process.env['DB_WRITE_SCHEMA'] ?? 'public';
     const auditLocation = resolve(repoRoot, AUDIT_SQL_LOCATION);
     const participantLocation = resolve(repoRoot, PARTICIPANT_SQL_LOCATION);
 
     Logger.log(`Running audit migrations from ${auditLocation}.`, 'Bootstrap');
     const auditResult = await PgMigration.migrate(
-        createMigrationSettings(schema, AUDIT_MIGRATION_TABLE, [auditLocation]),
+        createMigrationSettings(AUDIT_MIGRATION_TABLE, [auditLocation]),
     );
 
     Logger.log(
@@ -88,7 +85,7 @@ const bootstrap = async (): Promise<void> => {
 
     Logger.log(`Running participant migrations from ${participantLocation}.`, 'Bootstrap');
     const participantResult = await PgMigration.migrate(
-        createMigrationSettings(schema, PARTICIPANT_MIGRATION_TABLE, [participantLocation]),
+        createMigrationSettings(PARTICIPANT_MIGRATION_TABLE, [participantLocation]),
     );
 
     Logger.log(

@@ -1,39 +1,39 @@
-{{- if .Values.postgres.enabled }}
+{{- if .Values.mysql.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: mysql
   labels:
     {{- include "pivotal-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: postgres
+    app.kubernetes.io/component: mysql
 spec:
-  replicas: {{ .Values.postgres.replicaCount }}
+  replicas: {{ .Values.mysql.replicaCount }}
   selector:
     matchLabels:
       {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: postgres
+      app.kubernetes.io/component: mysql
   template:
     metadata:
       labels:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: postgres
+        app.kubernetes.io/component: mysql
     spec:
       containers:
-        - name: postgres
-          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+        - name: mysql
+          image: "{{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
-            - name: postgres
-              containerPort: {{ .Values.postgres.service.port }}
+            - name: mysql
+              containerPort: {{ .Values.mysql.service.port }}
               protocol: TCP
           env:
-            {{- include "pivotal-stack.envVars" .Values.postgres.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.mysql.env | nindent 12 }}
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - pg_isready -h localhost -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
             initialDelaySeconds: 5
             timeoutSeconds: 5
             periodSeconds: 10
@@ -43,19 +43,19 @@ spec:
               command:
                 - sh
                 - -c
-                - pg_isready -h localhost -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
             initialDelaySeconds: 20
             timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 6
           volumeMounts:
-            - name: postgres-data
-              mountPath: /var/lib/postgresql/data
+            - name: mysql-data
+              mountPath: /var/lib/mysql
       volumes:
-        - name: postgres-data
-          {{- if .Values.postgres.persistence.enabled }}
+        - name: mysql-data
+          {{- if .Values.mysql.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: postgres-data
+            claimName: mysql-data
           {{- else }}
           emptyDir: {}
           {{- end }}
@@ -63,37 +63,37 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: mysql
   labels:
     {{- include "pivotal-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: postgres
+    app.kubernetes.io/component: mysql
 spec:
-  type: {{ .Values.postgres.service.type }}
+  type: {{ .Values.mysql.service.type }}
   selector:
     {{- include "pivotal-stack.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: postgres
+    app.kubernetes.io/component: mysql
   ports:
-    - name: postgres
-      port: {{ .Values.postgres.service.port }}
-      targetPort: postgres
+    - name: mysql
+      port: {{ .Values.mysql.service.port }}
+      targetPort: mysql
       protocol: TCP
-{{- if .Values.postgres.persistence.enabled }}
+{{- if .Values.mysql.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-data
+  name: mysql-data
   labels:
     {{- include "pivotal-stack.labels" . | nindent 4 }}
-    app.kubernetes.io/component: postgres
+    app.kubernetes.io/component: mysql
 spec:
   accessModes:
-    {{- toYaml .Values.postgres.persistence.accessModes | nindent 4 }}
+    {{- toYaml .Values.mysql.persistence.accessModes | nindent 4 }}
   resources:
     requests:
-      storage: {{ .Values.postgres.persistence.size }}
-  {{- if .Values.postgres.persistence.storageClassName }}
-  storageClassName: {{ .Values.postgres.persistence.storageClassName }}
+      storage: {{ .Values.mysql.persistence.size }}
+  {{- if .Values.mysql.persistence.storageClassName }}
+  storageClassName: {{ .Values.mysql.persistence.storageClassName }}
   {{- end }}
 {{- end }}
 {{- end }}
