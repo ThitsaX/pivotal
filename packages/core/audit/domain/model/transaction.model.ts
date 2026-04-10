@@ -107,10 +107,10 @@ export class Transaction {
     @Column({type: 'varchar', length: 32, name: 'transfer_state', nullable: true})
     public transferState!: TransferState | null;
 
-    @Column({type: 'timestamptz', name: 'transaction_started_at'})
+    @Column({type: 'datetime', name: 'transaction_started_at'})
     public transactionStartedAt!: Date;
 
-    @Column({type: 'timestamptz', name: 'transaction_completed_at', nullable: true})
+    @Column({type: 'datetime', name: 'transaction_completed_at', nullable: true})
     public transactionCompletedAt!: Date | null;
 
     @Column({type: 'boolean', name: 'possible_dispute', default: false})
@@ -122,121 +122,121 @@ export class Transaction {
     @Column({type: 'integer', name: 'flow', nullable: true})
     public flow!: number | null;
 
-    @Column({type: 'timestamptz', name: 'parties_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'parties_requested_at', nullable: true})
     public partiesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'parties_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'parties_responded_at', nullable: true})
     public partiesRespondedAt!: Date | null;
 
-    @Column({type: 'jsonb', name: 'parties_request', nullable: true})
+    @Column({type: 'json', name: 'parties_request', nullable: true})
     public partiesRequest!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'parties_response', nullable: true})
+    @Column({type: 'json', name: 'parties_response', nullable: true})
     public partiesResponse!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'parties_error', nullable: true})
+    @Column({type: 'json', name: 'parties_error', nullable: true})
     public partiesError!: unknown | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_parties_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_parties_requested_at', nullable: true})
     public outboundPartiesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_parties_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_parties_responded_at', nullable: true})
     public outboundPartiesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_parties_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_parties_requested_at', nullable: true})
     public inboundPartiesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_parties_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_parties_responded_at', nullable: true})
     public inboundPartiesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_parties_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_parties_requested_at', nullable: true})
     public connectorPartiesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_parties_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_parties_responded_at', nullable: true})
     public connectorPartiesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'quotes_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'quotes_requested_at', nullable: true})
     public quotesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'quotes_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'quotes_responded_at', nullable: true})
     public quotesRespondedAt!: Date | null;
 
-    @Column({type: 'jsonb', name: 'quotes_request', nullable: true})
+    @Column({type: 'json', name: 'quotes_request', nullable: true})
     public quotesRequest!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'quotes_response', nullable: true})
+    @Column({type: 'json', name: 'quotes_response', nullable: true})
     public quotesResponse!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'quotes_error', nullable: true})
+    @Column({type: 'json', name: 'quotes_error', nullable: true})
     public quotesError!: unknown | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_quotes_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_quotes_requested_at', nullable: true})
     public outboundQuotesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_quotes_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_quotes_responded_at', nullable: true})
     public outboundQuotesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_quotes_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_quotes_requested_at', nullable: true})
     public inboundQuotesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_quotes_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_quotes_responded_at', nullable: true})
     public inboundQuotesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_quotes_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_quotes_requested_at', nullable: true})
     public connectorQuotesRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_quotes_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_quotes_responded_at', nullable: true})
     public connectorQuotesRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'transfers_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'transfers_requested_at', nullable: true})
     public transfersRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'transfers_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'transfers_responded_at', nullable: true})
     public transfersRespondedAt!: Date | null;
 
-    @Column({type: 'jsonb', name: 'transfers_request', nullable: true})
+    @Column({type: 'json', name: 'transfers_request', nullable: true})
     public transfersRequest!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'transfers_response', nullable: true})
+    @Column({type: 'json', name: 'transfers_response', nullable: true})
     public transfersResponse!: unknown | null;
 
-    @Column({type: 'jsonb', name: 'transfers_error', nullable: true})
+    @Column({type: 'json', name: 'transfers_error', nullable: true})
     public transfersError!: unknown | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_transfers_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_transfers_requested_at', nullable: true})
     public outboundTransfersRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'outbound_transfers_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'outbound_transfers_responded_at', nullable: true})
     public outboundTransfersRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_transfers_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_transfers_requested_at', nullable: true})
     public inboundTransfersRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'inbound_transfers_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'inbound_transfers_responded_at', nullable: true})
     public inboundTransfersRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_transfers_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_transfers_requested_at', nullable: true})
     public connectorTransfersRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'connector_transfers_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'connector_transfers_responded_at', nullable: true})
     public connectorTransfersRespondedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'patch_requested_at', nullable: true})
+    @Column({type: 'datetime', name: 'patch_requested_at', nullable: true})
     public patchRequestedAt!: Date | null;
 
-    @Column({type: 'timestamptz', name: 'patch_responded_at', nullable: true})
+    @Column({type: 'datetime', name: 'patch_responded_at', nullable: true})
     public patchRespondedAt!: Date | null;
 
-    @Column({type: 'jsonb', name: 'patch_request', nullable: true})
+    @Column({type: 'json', name: 'patch_request', nullable: true})
     public patchRequest!: unknown | null;
 
     @Column({type: 'text', name: 'patch_error', nullable: true})
     public patchError!: string | null;
 
-    @Column({type: 'timestamptz', name: 'created_at'})
+    @Column({type: 'datetime', name: 'created_at'})
     public createdAt!: Date;
 
-    @Column({type: 'timestamptz', name: 'updated_at'})
+    @Column({type: 'datetime', name: 'updated_at'})
     public updatedAt!: Date;
 
     @BeforeInsert()

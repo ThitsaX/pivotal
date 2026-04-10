@@ -1,6 +1,6 @@
 import {readdir, readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {Client} from 'pg';
+import {Connection, createConnection} from 'mysql2/promise';
 
 export type PgMigrationSettings = {
     host: string;
@@ -8,8 +8,6 @@ export type PgMigrationSettings = {
     username: string;
     password: string;
     database: string;
-    /** Schema that owns the migration history table and where migrations run. Default: `public`. */
-    schema?: string;
     /** Name of the migration history table. Default: `migration_history`. */
     historyTable?: string;
     /** Absolute paths to directories that contain `V{version}__{description}.sql` files. */
@@ -27,7 +25,7 @@ interface MigrationFile {
 }
 
 /**
- * Lightweight PostgreSQL migration runner — no Java, no CLI, no extra dependencies.
+ * Lightweight SQL migration runner for MySQL — no Java, no CLI, no extra dependencies.
  *
  * Follows Flyway's file-naming convention:
  *   `V{version}__{description}.sql`   e.g. `V1_1__create_tables.sql`
@@ -45,7 +43,7 @@ export class PgMigration {
     private static readonly MIGRATION_FILE_RE = /^V([\d]+(?:_[\d]+)*)__(.+)\.sql$/i;
 
     private static escapeIdentifier(value: string): string {
-        return value.replace(/"/g, '""');
+        return value.replace(/`/g, '``');
     }
 
     // ── version helpers ──────────────────────────────────────────────────────
@@ -58,7 +56,9 @@ export class PgMigration {
         const len = Math.max(a.length, b.length);
         for (let i = 0; i < len; i++) {
             const diff = (a[i] ?? 0) - (b[i] ?? 0);
-            if (diff !== 0) return diff;
+            if (diff !== 0) {
+                return diff;
+            }
         }
         return 0;
     }
@@ -78,17 +78,19 @@ export class PgMigration {
 
             for (const file of files) {
                 const match = file.match(PgMigration.MIGRATION_FILE_RE);
-                if (!match) continue;
+                if (!match) {
+                    continue;
+                }
 
-                const versionRaw  = match[1];
+                const versionRaw = match[1];
                 const description = match[2].replace(/_/g, ' ');
 
                 migrations.push({
-                    version:      versionRaw.replace(/_/g, '.'),
+                    version: versionRaw.replace(/_/g, '.'),
                     versionTuple: PgMigration.parseVersionTuple(versionRaw),
                     description,
-                    filename:  file,
-                    fullPath:  join(location, file),
+                    filename: file,
+                    fullPath: join(location, file),
                 });
             }
         }
@@ -100,31 +102,23 @@ export class PgMigration {
 
     // ── history table ────────────────────────────────────────────────────────
 
-    private static async ensureSchema(client: Client, schema: string): Promise<void> {
-        const escapedSchema = PgMigration.escapeIdentifier(schema);
-
-        await client.query(`CREATE SCHEMA IF NOT EXISTS "${escapedSchema}"`);
-    }
-
-    private static async ensureHistoryTable(
-        client: Client,
-        schema: string,
-        table: string,
-    ): Promise<void> {
-        const escapedSchema = PgMigration.escapeIdentifier(schema);
+    private static async ensureHistoryTable(connection: Connection, table: string): Promise<void> {
         const escapedTable = PgMigration.escapeIdentifier(table);
 
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS "${escapedSchema}"."${escapedTable}" (
-                installed_rank   SERIAL        PRIMARY KEY,
-                version          VARCHAR(50)   NOT NULL UNIQUE,
-                description      VARCHAR(200)  NOT NULL,
-                script           VARCHAR(1000) NOT NULL UNIQUE,
-                installed_by     VARCHAR(100)  NOT NULL DEFAULT CURRENT_USER,
-                installed_on     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-                execution_time   INTEGER       NOT NULL,
-                success          BOOLEAN       NOT NULL
-            )
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS \`${escapedTable}\` (
+                \`installed_rank\` BIGINT NOT NULL AUTO_INCREMENT,
+                \`version\` VARCHAR(50) NOT NULL,
+                \`description\` VARCHAR(200) NOT NULL,
+                \`script\` VARCHAR(1000) NOT NULL,
+                \`installed_by\` VARCHAR(100) NOT NULL DEFAULT 'migration',
+                \`installed_on\` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                \`execution_time\` INT NOT NULL,
+                \`success\` BOOLEAN NOT NULL,
+                PRIMARY KEY (\`installed_rank\`),
+                UNIQUE KEY \`${escapedTable}_version_uk\` (\`version\`),
+                UNIQUE KEY \`${escapedTable}_script_uk\` (\`script\`)
+            ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci
         `);
     }
 
@@ -133,32 +127,29 @@ export class PgMigration {
      * Used to detect already-applied migrations and version conflicts.
      */
     private static async getAppliedMigrations(
-        client: Client,
-        schema: string,
+        connection: Connection,
         table: string,
     ): Promise<Map<string, string>> {
-        const escapedSchema = PgMigration.escapeIdentifier(schema);
         const escapedTable = PgMigration.escapeIdentifier(table);
-        const {rows} = await client.query<{version: string; script: string}>(
-            `SELECT version, script FROM "${escapedSchema}"."${escapedTable}" WHERE success = true`,
-        );
-        return new Map(rows.map(r => [r.version, r.script]));
+        const [rows] = await connection.query(
+            `SELECT version, script FROM \`${escapedTable}\` WHERE success = true`,
+        ) as [{version: string; script: string}[], unknown];
+
+        return new Map(rows.map((row) => [row.version, row.script]));
     }
 
     private static async recordMigration(
-        client: Client,
-        schema: string,
+        connection: Connection,
         table: string,
         migration: MigrationFile,
         executionTime: number,
     ): Promise<void> {
-        const escapedSchema = PgMigration.escapeIdentifier(schema);
         const escapedTable = PgMigration.escapeIdentifier(table);
 
-        await client.query(
-            `INSERT INTO "${escapedSchema}"."${escapedTable}"
-             (version, description, script, execution_time, success)
-             VALUES ($1, $2, $3, $4, true)`,
+        await connection.query(
+            `INSERT INTO \`${escapedTable}\`
+             (version, description, script, installed_by, execution_time, success)
+             VALUES (?, ?, ?, CURRENT_USER(), ?, true)`,
             [migration.version, migration.description, migration.filename, executionTime],
         );
     }
@@ -166,25 +157,22 @@ export class PgMigration {
     // ── public API ───────────────────────────────────────────────────────────
 
     static async migrate(settings: PgMigrationSettings): Promise<PgMigration.Result> {
-        const schema       = settings.schema       ?? 'public';
         const historyTable = settings.historyTable ?? 'migration_history';
 
-        const client = new Client({
-            host:     settings.host,
-            port:     settings.port,
-            user:     settings.username,
+        const connection = await createConnection({
+            host: settings.host,
+            port: settings.port,
+            user: settings.username,
             password: settings.password,
             database: settings.database,
+            multipleStatements: true,
         });
 
-        await client.connect();
-
         try {
-            await PgMigration.ensureSchema(client, schema);
-            await PgMigration.ensureHistoryTable(client, schema, historyTable);
+            await PgMigration.ensureHistoryTable(connection, historyTable);
 
-            const all     = await PgMigration.discoverMigrations(settings.locations);
-            const applied = await PgMigration.getAppliedMigrations(client, schema, historyTable);
+            const all = await PgMigration.discoverMigrations(settings.locations);
+            const applied = await PgMigration.getAppliedMigrations(connection, historyTable);
 
             let migrationsExecuted = 0;
 
@@ -196,6 +184,7 @@ export class PgMigration {
                         // Same version, same filename — already applied, skip.
                         continue;
                     }
+
                     // Same version, different filename — conflict.
                     throw new Error(
                         `Migration version conflict: version ${migration.version} was previously applied` +
@@ -204,22 +193,22 @@ export class PgMigration {
                 }
 
                 // New migration — execute inside a transaction.
-                const sql   = await readFile(migration.fullPath, 'utf-8');
+                const sql = await readFile(migration.fullPath, 'utf-8');
                 const start = Date.now();
 
-                await client.query('BEGIN');
+                await connection.beginTransaction();
                 try {
-                    const escapedSchema = PgMigration.escapeIdentifier(schema);
-
-                    await client.query(`SET LOCAL search_path TO "${escapedSchema}"`);
-                    await client.query(sql);
+                    await connection.query(sql);
                     await PgMigration.recordMigration(
-                        client, schema, historyTable, migration, Date.now() - start,
+                        connection,
+                        historyTable,
+                        migration,
+                        Date.now() - start,
                     );
-                    await client.query('COMMIT');
+                    await connection.commit();
                     migrationsExecuted++;
                 } catch (error) {
-                    await client.query('ROLLBACK');
+                    await connection.rollback();
                     throw new Error(
                         `Migration ${migration.filename} failed: ${(error as Error).message}`,
                     );
@@ -228,11 +217,10 @@ export class PgMigration {
 
             return {
                 database: settings.database,
-                schema,
                 migrationsExecuted,
             };
         } finally {
-            await client.end();
+            await connection.end();
         }
     }
 }
@@ -240,7 +228,6 @@ export class PgMigration {
 export namespace PgMigration {
     export type Result = {
         database: string;
-        schema: string;
         migrationsExecuted: number;
     };
 }

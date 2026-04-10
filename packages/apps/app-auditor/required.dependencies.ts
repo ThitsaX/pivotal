@@ -6,11 +6,10 @@ export class AuditConsumerDependencies implements AuditConsumerModule.RequiredDe
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
     private static readonly DEFAULT_DB_HOST = 'localhost';
-    private static readonly DEFAULT_DB_PORT = 5432;
-    private static readonly DEFAULT_DB_USERNAME = 'postgres';
-    private static readonly DEFAULT_DB_PASSWORD = 'postgres';
+    private static readonly DEFAULT_DB_PORT = 3306;
+    private static readonly DEFAULT_DB_USERNAME = 'root';
+    private static readonly DEFAULT_DB_PASSWORD = 'mysql';
     private static readonly DEFAULT_DB_NAME = 'pivotal';
-    private static readonly DEFAULT_DB_SCHEMA = 'public';
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {}
 
@@ -25,7 +24,6 @@ export class AuditConsumerDependencies implements AuditConsumerModule.RequiredDe
             this.readValue('DB_WRITE_USERNAME', AuditConsumerDependencies.DEFAULT_DB_USERNAME),
             this.readValue('DB_WRITE_PASSWORD', AuditConsumerDependencies.DEFAULT_DB_PASSWORD),
             this.readValue('DB_WRITE_NAME', AuditConsumerDependencies.DEFAULT_DB_NAME),
-            this.readValue('DB_WRITE_SCHEMA', AuditConsumerDependencies.DEFAULT_DB_SCHEMA),
         );
     }
 
@@ -36,7 +34,6 @@ export class AuditConsumerDependencies implements AuditConsumerModule.RequiredDe
             this.readValue('DB_READ_USERNAME', this.readValue('DB_WRITE_USERNAME', AuditConsumerDependencies.DEFAULT_DB_USERNAME)),
             this.readValue('DB_READ_PASSWORD', this.readValue('DB_WRITE_PASSWORD', AuditConsumerDependencies.DEFAULT_DB_PASSWORD)),
             this.readValue('DB_READ_NAME', this.readValue('DB_WRITE_NAME', AuditConsumerDependencies.DEFAULT_DB_NAME)),
-            this.readValue('DB_READ_SCHEMA', this.readValue('DB_WRITE_SCHEMA', AuditConsumerDependencies.DEFAULT_DB_SCHEMA)),
         );
     }
 

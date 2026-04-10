@@ -6,6 +6,5 @@ export class TypeOrmSettings {
         readonly username: string,
         readonly password: string,
         readonly database: string,
-        readonly schema: string,
     ) {}
 }

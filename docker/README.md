@@ -9,7 +9,7 @@ This folder contains a complete Docker Compose stack for:
 - `wallet1-connector`
 - `wallet2-connector`
 - `wallet3-connector`
-- `postgres`
+- `mysql`
 - `nats`
 - `redis`
 
@@ -41,7 +41,7 @@ docker compose down -v
 - Web Pivotal API: `http://localhost:3202`
 - Web Outbound API: `http://localhost:3200`
 - Web Inbound API: `http://localhost:3201`
-- PostgreSQL: `localhost:5432`
+- MySQL: `localhost:3306`
 - NATS: `localhost:4222`
 - NATS monitor: `http://localhost:8222`
 - Redis: `localhost:6379`
@@ -49,7 +49,7 @@ docker compose down -v
 ## 3) Configuration
 
 `docker/.env` is the Docker-side options file. Key defaults:
-- DB host is `postgres` for app containers.
+- DB host is `mysql` for app containers.
 - NATS URL is `nats://nats:4222`.
 - Redis URL is `redis://redis:6379`.
 - FSPIOP callback URLs point to `web-inbound` inside the Docker network.

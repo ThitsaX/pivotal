@@ -21,32 +21,29 @@ x-common-fspiop-env: &common_fspiop_env
   FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
 
 x-common-db-env: &common_db_env
-  DB_WRITE_HOST: ${DB_WRITE_HOST:-postgres}
-  DB_WRITE_PORT: ${DB_WRITE_PORT:-5432}
-  DB_WRITE_USERNAME: ${DB_WRITE_USERNAME:-postgres}
-  DB_WRITE_PASSWORD: ${DB_WRITE_PASSWORD:-postgres}
+  DB_WRITE_HOST: ${DB_WRITE_HOST:-mysql}
+  DB_WRITE_PORT: ${DB_WRITE_PORT:-3306}
+  DB_WRITE_USERNAME: ${DB_WRITE_USERNAME:-root}
+  DB_WRITE_PASSWORD: ${DB_WRITE_PASSWORD:-mysql}
   DB_WRITE_NAME: ${DB_WRITE_NAME:-pivotal}
-  DB_WRITE_SCHEMA: ${DB_WRITE_SCHEMA:-public}
-  DB_READ_HOST: ${DB_READ_HOST:-postgres}
-  DB_READ_PORT: ${DB_READ_PORT:-5432}
-  DB_READ_USERNAME: ${DB_READ_USERNAME:-postgres}
-  DB_READ_PASSWORD: ${DB_READ_PASSWORD:-postgres}
+  DB_READ_HOST: ${DB_READ_HOST:-mysql}
+  DB_READ_PORT: ${DB_READ_PORT:-3306}
+  DB_READ_USERNAME: ${DB_READ_USERNAME:-root}
+  DB_READ_PASSWORD: ${DB_READ_PASSWORD:-mysql}
   DB_READ_NAME: ${DB_READ_NAME:-pivotal}
-  DB_READ_SCHEMA: ${DB_READ_SCHEMA:-public}
 
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     environment:
-      POSTGRES_DB: ${DB_WRITE_NAME:-pivotal}
-      POSTGRES_USER: ${DB_WRITE_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_WRITE_PASSWORD:-postgres}
+      MYSQL_DATABASE: ${DB_WRITE_NAME:-pivotal}
+      MYSQL_ROOT_PASSWORD: ${DB_WRITE_PASSWORD:-mysql}
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - "${MYSQL_HOST_PORT:-3306}:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U ${DB_WRITE_USERNAME:-postgres} -d ${DB_WRITE_NAME:-pivotal}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p${DB_WRITE_PASSWORD:-mysql} --silent"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -112,7 +109,7 @@ services:
       context: ..
       dockerfile: docker/app-auditor.Dockerfile
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       nats:
         condition: service_started
@@ -128,7 +125,7 @@ services:
       context: ..
       dockerfile: docker/web-pivotal.Dockerfile
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
     environment:
       WEB_PIVOTAL_PORT: ${WEB_PIVOTAL_PORT:-3202}
@@ -216,5 +213,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  mysql_data:
   redis_data:

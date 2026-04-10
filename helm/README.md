@@ -2,7 +2,7 @@
 
 This chart reproduces the services from `docker/docker-compose.yml`:
 
-- `postgres`
+- `mysql`
 - `nats`
 - `redis`
 - `web-inbound`

@@ -94,10 +94,10 @@ export class TransactionRepository {
             input.createdAt ?? input.transactionStartedAt,
             now,
         ];
-        const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+        const placeholders = values.map(() => '?').join(', ');
 
         // Use a single statement upsert so concurrent JetStream consumers do not race on read-before-write.
-        const rows = await this.writeRepository.query(
+        await this.writeRepository.query(
             `INSERT INTO transactions (
                 id,
                 correlation_id,
@@ -162,183 +162,188 @@ export class TransactionRepository {
                 created_at,
                 updated_at
             ) VALUES (${placeholders})
-            ON CONFLICT (correlation_id) DO UPDATE SET
-                payer_fsp = EXCLUDED.payer_fsp,
-                payee_fsp = EXCLUDED.payee_fsp,
-                payer_id_type = COALESCE(EXCLUDED.payer_id_type, transactions.payer_id_type),
-                payer_id = COALESCE(EXCLUDED.payer_id, transactions.payer_id),
-                payer_sub_id = COALESCE(EXCLUDED.payer_sub_id, transactions.payer_sub_id),
-                payee_id_type = COALESCE(EXCLUDED.payee_id_type, transactions.payee_id_type),
-                payee_id = COALESCE(EXCLUDED.payee_id, transactions.payee_id),
-                payee_sub_id = COALESCE(EXCLUDED.payee_sub_id, transactions.payee_sub_id),
+            ON DUPLICATE KEY UPDATE
+                payer_fsp = VALUES(payer_fsp),
+                payee_fsp = VALUES(payee_fsp),
+                payer_id_type = COALESCE(VALUES(payer_id_type), transactions.payer_id_type),
+                payer_id = COALESCE(VALUES(payer_id), transactions.payer_id),
+                payer_sub_id = COALESCE(VALUES(payer_sub_id), transactions.payer_sub_id),
+                payee_id_type = COALESCE(VALUES(payee_id_type), transactions.payee_id_type),
+                payee_id = COALESCE(VALUES(payee_id), transactions.payee_id),
+                payee_sub_id = COALESCE(VALUES(payee_sub_id), transactions.payee_sub_id),
                 transaction_initiator_type = COALESCE(
-                    EXCLUDED.transaction_initiator_type,
+                    VALUES(transaction_initiator_type),
                     transactions.transaction_initiator_type
                 ),
-                quoting_currency = COALESCE(EXCLUDED.quoting_currency, transactions.quoting_currency),
-                quoting_amount = COALESCE(EXCLUDED.quoting_amount, transactions.quoting_amount),
-                transfer_currency = COALESCE(EXCLUDED.transfer_currency, transactions.transfer_currency),
-                transfer_amount = COALESCE(EXCLUDED.transfer_amount, transactions.transfer_amount),
-                transaction_started_at = LEAST(transactions.transaction_started_at, EXCLUDED.transaction_started_at),
+                quoting_currency = COALESCE(VALUES(quoting_currency), transactions.quoting_currency),
+                quoting_amount = COALESCE(VALUES(quoting_amount), transactions.quoting_amount),
+                transfer_currency = COALESCE(VALUES(transfer_currency), transactions.transfer_currency),
+                transfer_amount = COALESCE(VALUES(transfer_amount), transactions.transfer_amount),
+                transaction_started_at = LEAST(transactions.transaction_started_at, VALUES(transaction_started_at)),
                 transaction_completed_at = COALESCE(
-                    EXCLUDED.transaction_completed_at,
+                    VALUES(transaction_completed_at),
                     transactions.transaction_completed_at
                 ),
-                transaction_type = COALESCE(EXCLUDED.transaction_type, transactions.transaction_type),
-                sub_scenario = COALESCE(EXCLUDED.sub_scenario, transactions.sub_scenario),
-                transfer_state = COALESCE(EXCLUDED.transfer_state, transactions.transfer_state),
-                possible_dispute = transactions.possible_dispute OR COALESCE(EXCLUDED.possible_dispute, FALSE),
-                error = transactions.error OR EXCLUDED.error,
+                transaction_type = COALESCE(VALUES(transaction_type), transactions.transaction_type),
+                sub_scenario = COALESCE(VALUES(sub_scenario), transactions.sub_scenario),
+                transfer_state = COALESCE(VALUES(transfer_state), transactions.transfer_state),
+                possible_dispute = transactions.possible_dispute OR COALESCE(VALUES(possible_dispute), FALSE),
+                error = transactions.error OR VALUES(error),
                 flow = CASE
-                    WHEN transactions.flow IS NULL THEN EXCLUDED.flow
-                    WHEN EXCLUDED.flow IS NULL THEN transactions.flow
-                    ELSE GREATEST(transactions.flow, EXCLUDED.flow)
+                    WHEN transactions.flow IS NULL THEN VALUES(flow)
+                    WHEN VALUES(flow) IS NULL THEN transactions.flow
+                    ELSE GREATEST(transactions.flow, VALUES(flow))
                 END,
                 parties_requested_at = CASE
-                    WHEN transactions.parties_requested_at IS NULL THEN EXCLUDED.parties_requested_at
-                    WHEN EXCLUDED.parties_requested_at IS NULL THEN transactions.parties_requested_at
-                    ELSE LEAST(transactions.parties_requested_at, EXCLUDED.parties_requested_at)
+                    WHEN transactions.parties_requested_at IS NULL THEN VALUES(parties_requested_at)
+                    WHEN VALUES(parties_requested_at) IS NULL THEN transactions.parties_requested_at
+                    ELSE LEAST(transactions.parties_requested_at, VALUES(parties_requested_at))
                 END,
                 parties_responded_at = CASE
-                    WHEN transactions.parties_responded_at IS NULL THEN EXCLUDED.parties_responded_at
-                    WHEN EXCLUDED.parties_responded_at IS NULL THEN transactions.parties_responded_at
-                    ELSE GREATEST(transactions.parties_responded_at, EXCLUDED.parties_responded_at)
+                    WHEN transactions.parties_responded_at IS NULL THEN VALUES(parties_responded_at)
+                    WHEN VALUES(parties_responded_at) IS NULL THEN transactions.parties_responded_at
+                    ELSE GREATEST(transactions.parties_responded_at, VALUES(parties_responded_at))
                 END,
-                parties_request = COALESCE(EXCLUDED.parties_request, transactions.parties_request),
-                parties_response = COALESCE(EXCLUDED.parties_response, transactions.parties_response),
-                parties_error = COALESCE(EXCLUDED.parties_error, transactions.parties_error),
+                parties_request = COALESCE(VALUES(parties_request), transactions.parties_request),
+                parties_response = COALESCE(VALUES(parties_response), transactions.parties_response),
+                parties_error = COALESCE(VALUES(parties_error), transactions.parties_error),
                 outbound_parties_requested_at = CASE
-                    WHEN transactions.outbound_parties_requested_at IS NULL THEN EXCLUDED.outbound_parties_requested_at
-                    WHEN EXCLUDED.outbound_parties_requested_at IS NULL THEN transactions.outbound_parties_requested_at
-                    ELSE LEAST(transactions.outbound_parties_requested_at, EXCLUDED.outbound_parties_requested_at)
+                    WHEN transactions.outbound_parties_requested_at IS NULL THEN VALUES(outbound_parties_requested_at)
+                    WHEN VALUES(outbound_parties_requested_at) IS NULL THEN transactions.outbound_parties_requested_at
+                    ELSE LEAST(transactions.outbound_parties_requested_at, VALUES(outbound_parties_requested_at))
                 END,
                 outbound_parties_responded_at = CASE
-                    WHEN transactions.outbound_parties_responded_at IS NULL THEN EXCLUDED.outbound_parties_responded_at
-                    WHEN EXCLUDED.outbound_parties_responded_at IS NULL THEN transactions.outbound_parties_responded_at
-                    ELSE GREATEST(transactions.outbound_parties_responded_at, EXCLUDED.outbound_parties_responded_at)
+                    WHEN transactions.outbound_parties_responded_at IS NULL THEN VALUES(outbound_parties_responded_at)
+                    WHEN VALUES(outbound_parties_responded_at) IS NULL THEN transactions.outbound_parties_responded_at
+                    ELSE GREATEST(transactions.outbound_parties_responded_at, VALUES(outbound_parties_responded_at))
                 END,
                 inbound_parties_requested_at = CASE
-                    WHEN transactions.inbound_parties_requested_at IS NULL THEN EXCLUDED.inbound_parties_requested_at
-                    WHEN EXCLUDED.inbound_parties_requested_at IS NULL THEN transactions.inbound_parties_requested_at
-                    ELSE LEAST(transactions.inbound_parties_requested_at, EXCLUDED.inbound_parties_requested_at)
+                    WHEN transactions.inbound_parties_requested_at IS NULL THEN VALUES(inbound_parties_requested_at)
+                    WHEN VALUES(inbound_parties_requested_at) IS NULL THEN transactions.inbound_parties_requested_at
+                    ELSE LEAST(transactions.inbound_parties_requested_at, VALUES(inbound_parties_requested_at))
                 END,
                 inbound_parties_responded_at = CASE
-                    WHEN transactions.inbound_parties_responded_at IS NULL THEN EXCLUDED.inbound_parties_responded_at
-                    WHEN EXCLUDED.inbound_parties_responded_at IS NULL THEN transactions.inbound_parties_responded_at
-                    ELSE GREATEST(transactions.inbound_parties_responded_at, EXCLUDED.inbound_parties_responded_at)
+                    WHEN transactions.inbound_parties_responded_at IS NULL THEN VALUES(inbound_parties_responded_at)
+                    WHEN VALUES(inbound_parties_responded_at) IS NULL THEN transactions.inbound_parties_responded_at
+                    ELSE GREATEST(transactions.inbound_parties_responded_at, VALUES(inbound_parties_responded_at))
                 END,
                 connector_parties_requested_at = CASE
-                    WHEN transactions.connector_parties_requested_at IS NULL THEN EXCLUDED.connector_parties_requested_at
-                    WHEN EXCLUDED.connector_parties_requested_at IS NULL THEN transactions.connector_parties_requested_at
-                    ELSE LEAST(transactions.connector_parties_requested_at, EXCLUDED.connector_parties_requested_at)
+                    WHEN transactions.connector_parties_requested_at IS NULL THEN VALUES(connector_parties_requested_at)
+                    WHEN VALUES(connector_parties_requested_at) IS NULL THEN transactions.connector_parties_requested_at
+                    ELSE LEAST(transactions.connector_parties_requested_at, VALUES(connector_parties_requested_at))
                 END,
                 connector_parties_responded_at = CASE
-                    WHEN transactions.connector_parties_responded_at IS NULL THEN EXCLUDED.connector_parties_responded_at
-                    WHEN EXCLUDED.connector_parties_responded_at IS NULL THEN transactions.connector_parties_responded_at
-                    ELSE GREATEST(transactions.connector_parties_responded_at, EXCLUDED.connector_parties_responded_at)
+                    WHEN transactions.connector_parties_responded_at IS NULL THEN VALUES(connector_parties_responded_at)
+                    WHEN VALUES(connector_parties_responded_at) IS NULL THEN transactions.connector_parties_responded_at
+                    ELSE GREATEST(transactions.connector_parties_responded_at, VALUES(connector_parties_responded_at))
                 END,
                 quotes_requested_at = CASE
-                    WHEN transactions.quotes_requested_at IS NULL THEN EXCLUDED.quotes_requested_at
-                    WHEN EXCLUDED.quotes_requested_at IS NULL THEN transactions.quotes_requested_at
-                    ELSE LEAST(transactions.quotes_requested_at, EXCLUDED.quotes_requested_at)
+                    WHEN transactions.quotes_requested_at IS NULL THEN VALUES(quotes_requested_at)
+                    WHEN VALUES(quotes_requested_at) IS NULL THEN transactions.quotes_requested_at
+                    ELSE LEAST(transactions.quotes_requested_at, VALUES(quotes_requested_at))
                 END,
                 quotes_responded_at = CASE
-                    WHEN transactions.quotes_responded_at IS NULL THEN EXCLUDED.quotes_responded_at
-                    WHEN EXCLUDED.quotes_responded_at IS NULL THEN transactions.quotes_responded_at
-                    ELSE GREATEST(transactions.quotes_responded_at, EXCLUDED.quotes_responded_at)
+                    WHEN transactions.quotes_responded_at IS NULL THEN VALUES(quotes_responded_at)
+                    WHEN VALUES(quotes_responded_at) IS NULL THEN transactions.quotes_responded_at
+                    ELSE GREATEST(transactions.quotes_responded_at, VALUES(quotes_responded_at))
                 END,
-                quotes_request = COALESCE(EXCLUDED.quotes_request, transactions.quotes_request),
-                quotes_response = COALESCE(EXCLUDED.quotes_response, transactions.quotes_response),
-                quotes_error = COALESCE(EXCLUDED.quotes_error, transactions.quotes_error),
+                quotes_request = COALESCE(VALUES(quotes_request), transactions.quotes_request),
+                quotes_response = COALESCE(VALUES(quotes_response), transactions.quotes_response),
+                quotes_error = COALESCE(VALUES(quotes_error), transactions.quotes_error),
                 outbound_quotes_requested_at = CASE
-                    WHEN transactions.outbound_quotes_requested_at IS NULL THEN EXCLUDED.outbound_quotes_requested_at
-                    WHEN EXCLUDED.outbound_quotes_requested_at IS NULL THEN transactions.outbound_quotes_requested_at
-                    ELSE LEAST(transactions.outbound_quotes_requested_at, EXCLUDED.outbound_quotes_requested_at)
+                    WHEN transactions.outbound_quotes_requested_at IS NULL THEN VALUES(outbound_quotes_requested_at)
+                    WHEN VALUES(outbound_quotes_requested_at) IS NULL THEN transactions.outbound_quotes_requested_at
+                    ELSE LEAST(transactions.outbound_quotes_requested_at, VALUES(outbound_quotes_requested_at))
                 END,
                 outbound_quotes_responded_at = CASE
-                    WHEN transactions.outbound_quotes_responded_at IS NULL THEN EXCLUDED.outbound_quotes_responded_at
-                    WHEN EXCLUDED.outbound_quotes_responded_at IS NULL THEN transactions.outbound_quotes_responded_at
-                    ELSE GREATEST(transactions.outbound_quotes_responded_at, EXCLUDED.outbound_quotes_responded_at)
+                    WHEN transactions.outbound_quotes_responded_at IS NULL THEN VALUES(outbound_quotes_responded_at)
+                    WHEN VALUES(outbound_quotes_responded_at) IS NULL THEN transactions.outbound_quotes_responded_at
+                    ELSE GREATEST(transactions.outbound_quotes_responded_at, VALUES(outbound_quotes_responded_at))
                 END,
                 inbound_quotes_requested_at = CASE
-                    WHEN transactions.inbound_quotes_requested_at IS NULL THEN EXCLUDED.inbound_quotes_requested_at
-                    WHEN EXCLUDED.inbound_quotes_requested_at IS NULL THEN transactions.inbound_quotes_requested_at
-                    ELSE LEAST(transactions.inbound_quotes_requested_at, EXCLUDED.inbound_quotes_requested_at)
+                    WHEN transactions.inbound_quotes_requested_at IS NULL THEN VALUES(inbound_quotes_requested_at)
+                    WHEN VALUES(inbound_quotes_requested_at) IS NULL THEN transactions.inbound_quotes_requested_at
+                    ELSE LEAST(transactions.inbound_quotes_requested_at, VALUES(inbound_quotes_requested_at))
                 END,
                 inbound_quotes_responded_at = CASE
-                    WHEN transactions.inbound_quotes_responded_at IS NULL THEN EXCLUDED.inbound_quotes_responded_at
-                    WHEN EXCLUDED.inbound_quotes_responded_at IS NULL THEN transactions.inbound_quotes_responded_at
-                    ELSE GREATEST(transactions.inbound_quotes_responded_at, EXCLUDED.inbound_quotes_responded_at)
+                    WHEN transactions.inbound_quotes_responded_at IS NULL THEN VALUES(inbound_quotes_responded_at)
+                    WHEN VALUES(inbound_quotes_responded_at) IS NULL THEN transactions.inbound_quotes_responded_at
+                    ELSE GREATEST(transactions.inbound_quotes_responded_at, VALUES(inbound_quotes_responded_at))
                 END,
                 connector_quotes_requested_at = CASE
-                    WHEN transactions.connector_quotes_requested_at IS NULL THEN EXCLUDED.connector_quotes_requested_at
-                    WHEN EXCLUDED.connector_quotes_requested_at IS NULL THEN transactions.connector_quotes_requested_at
-                    ELSE LEAST(transactions.connector_quotes_requested_at, EXCLUDED.connector_quotes_requested_at)
+                    WHEN transactions.connector_quotes_requested_at IS NULL THEN VALUES(connector_quotes_requested_at)
+                    WHEN VALUES(connector_quotes_requested_at) IS NULL THEN transactions.connector_quotes_requested_at
+                    ELSE LEAST(transactions.connector_quotes_requested_at, VALUES(connector_quotes_requested_at))
                 END,
                 connector_quotes_responded_at = CASE
-                    WHEN transactions.connector_quotes_responded_at IS NULL THEN EXCLUDED.connector_quotes_responded_at
-                    WHEN EXCLUDED.connector_quotes_responded_at IS NULL THEN transactions.connector_quotes_responded_at
-                    ELSE GREATEST(transactions.connector_quotes_responded_at, EXCLUDED.connector_quotes_responded_at)
+                    WHEN transactions.connector_quotes_responded_at IS NULL THEN VALUES(connector_quotes_responded_at)
+                    WHEN VALUES(connector_quotes_responded_at) IS NULL THEN transactions.connector_quotes_responded_at
+                    ELSE GREATEST(transactions.connector_quotes_responded_at, VALUES(connector_quotes_responded_at))
                 END,
                 transfers_requested_at = CASE
-                    WHEN transactions.transfers_requested_at IS NULL THEN EXCLUDED.transfers_requested_at
-                    WHEN EXCLUDED.transfers_requested_at IS NULL THEN transactions.transfers_requested_at
-                    ELSE LEAST(transactions.transfers_requested_at, EXCLUDED.transfers_requested_at)
+                    WHEN transactions.transfers_requested_at IS NULL THEN VALUES(transfers_requested_at)
+                    WHEN VALUES(transfers_requested_at) IS NULL THEN transactions.transfers_requested_at
+                    ELSE LEAST(transactions.transfers_requested_at, VALUES(transfers_requested_at))
                 END,
                 transfers_responded_at = CASE
-                    WHEN transactions.transfers_responded_at IS NULL THEN EXCLUDED.transfers_responded_at
-                    WHEN EXCLUDED.transfers_responded_at IS NULL THEN transactions.transfers_responded_at
-                    ELSE GREATEST(transactions.transfers_responded_at, EXCLUDED.transfers_responded_at)
+                    WHEN transactions.transfers_responded_at IS NULL THEN VALUES(transfers_responded_at)
+                    WHEN VALUES(transfers_responded_at) IS NULL THEN transactions.transfers_responded_at
+                    ELSE GREATEST(transactions.transfers_responded_at, VALUES(transfers_responded_at))
                 END,
-                transfers_request = COALESCE(EXCLUDED.transfers_request, transactions.transfers_request),
-                transfers_response = COALESCE(EXCLUDED.transfers_response, transactions.transfers_response),
-                transfers_error = COALESCE(EXCLUDED.transfers_error, transactions.transfers_error),
+                transfers_request = COALESCE(VALUES(transfers_request), transactions.transfers_request),
+                transfers_response = COALESCE(VALUES(transfers_response), transactions.transfers_response),
+                transfers_error = COALESCE(VALUES(transfers_error), transactions.transfers_error),
                 outbound_transfers_requested_at = CASE
-                    WHEN transactions.outbound_transfers_requested_at IS NULL THEN EXCLUDED.outbound_transfers_requested_at
-                    WHEN EXCLUDED.outbound_transfers_requested_at IS NULL THEN transactions.outbound_transfers_requested_at
-                    ELSE LEAST(transactions.outbound_transfers_requested_at, EXCLUDED.outbound_transfers_requested_at)
+                    WHEN transactions.outbound_transfers_requested_at IS NULL THEN VALUES(outbound_transfers_requested_at)
+                    WHEN VALUES(outbound_transfers_requested_at) IS NULL THEN transactions.outbound_transfers_requested_at
+                    ELSE LEAST(transactions.outbound_transfers_requested_at, VALUES(outbound_transfers_requested_at))
                 END,
                 outbound_transfers_responded_at = CASE
-                    WHEN transactions.outbound_transfers_responded_at IS NULL THEN EXCLUDED.outbound_transfers_responded_at
-                    WHEN EXCLUDED.outbound_transfers_responded_at IS NULL THEN transactions.outbound_transfers_responded_at
-                    ELSE GREATEST(transactions.outbound_transfers_responded_at, EXCLUDED.outbound_transfers_responded_at)
+                    WHEN transactions.outbound_transfers_responded_at IS NULL THEN VALUES(outbound_transfers_responded_at)
+                    WHEN VALUES(outbound_transfers_responded_at) IS NULL THEN transactions.outbound_transfers_responded_at
+                    ELSE GREATEST(transactions.outbound_transfers_responded_at, VALUES(outbound_transfers_responded_at))
                 END,
                 inbound_transfers_requested_at = CASE
-                    WHEN transactions.inbound_transfers_requested_at IS NULL THEN EXCLUDED.inbound_transfers_requested_at
-                    WHEN EXCLUDED.inbound_transfers_requested_at IS NULL THEN transactions.inbound_transfers_requested_at
-                    ELSE LEAST(transactions.inbound_transfers_requested_at, EXCLUDED.inbound_transfers_requested_at)
+                    WHEN transactions.inbound_transfers_requested_at IS NULL THEN VALUES(inbound_transfers_requested_at)
+                    WHEN VALUES(inbound_transfers_requested_at) IS NULL THEN transactions.inbound_transfers_requested_at
+                    ELSE LEAST(transactions.inbound_transfers_requested_at, VALUES(inbound_transfers_requested_at))
                 END,
                 inbound_transfers_responded_at = CASE
-                    WHEN transactions.inbound_transfers_responded_at IS NULL THEN EXCLUDED.inbound_transfers_responded_at
-                    WHEN EXCLUDED.inbound_transfers_responded_at IS NULL THEN transactions.inbound_transfers_responded_at
-                    ELSE GREATEST(transactions.inbound_transfers_responded_at, EXCLUDED.inbound_transfers_responded_at)
+                    WHEN transactions.inbound_transfers_responded_at IS NULL THEN VALUES(inbound_transfers_responded_at)
+                    WHEN VALUES(inbound_transfers_responded_at) IS NULL THEN transactions.inbound_transfers_responded_at
+                    ELSE GREATEST(transactions.inbound_transfers_responded_at, VALUES(inbound_transfers_responded_at))
                 END,
                 connector_transfers_requested_at = CASE
-                    WHEN transactions.connector_transfers_requested_at IS NULL THEN EXCLUDED.connector_transfers_requested_at
-                    WHEN EXCLUDED.connector_transfers_requested_at IS NULL THEN transactions.connector_transfers_requested_at
-                    ELSE LEAST(transactions.connector_transfers_requested_at, EXCLUDED.connector_transfers_requested_at)
+                    WHEN transactions.connector_transfers_requested_at IS NULL THEN VALUES(connector_transfers_requested_at)
+                    WHEN VALUES(connector_transfers_requested_at) IS NULL THEN transactions.connector_transfers_requested_at
+                    ELSE LEAST(transactions.connector_transfers_requested_at, VALUES(connector_transfers_requested_at))
                 END,
                 connector_transfers_responded_at = CASE
-                    WHEN transactions.connector_transfers_responded_at IS NULL THEN EXCLUDED.connector_transfers_responded_at
-                    WHEN EXCLUDED.connector_transfers_responded_at IS NULL THEN transactions.connector_transfers_responded_at
-                    ELSE GREATEST(transactions.connector_transfers_responded_at, EXCLUDED.connector_transfers_responded_at)
+                    WHEN transactions.connector_transfers_responded_at IS NULL THEN VALUES(connector_transfers_responded_at)
+                    WHEN VALUES(connector_transfers_responded_at) IS NULL THEN transactions.connector_transfers_responded_at
+                    ELSE GREATEST(transactions.connector_transfers_responded_at, VALUES(connector_transfers_responded_at))
                 END,
                 patch_requested_at = CASE
-                    WHEN transactions.patch_requested_at IS NULL THEN EXCLUDED.patch_requested_at
-                    WHEN EXCLUDED.patch_requested_at IS NULL THEN transactions.patch_requested_at
-                    ELSE LEAST(transactions.patch_requested_at, EXCLUDED.patch_requested_at)
+                    WHEN transactions.patch_requested_at IS NULL THEN VALUES(patch_requested_at)
+                    WHEN VALUES(patch_requested_at) IS NULL THEN transactions.patch_requested_at
+                    ELSE LEAST(transactions.patch_requested_at, VALUES(patch_requested_at))
                 END,
                 patch_responded_at = CASE
-                    WHEN transactions.patch_responded_at IS NULL THEN EXCLUDED.patch_responded_at
-                    WHEN EXCLUDED.patch_responded_at IS NULL THEN transactions.patch_responded_at
-                    ELSE GREATEST(transactions.patch_responded_at, EXCLUDED.patch_responded_at)
+                    WHEN transactions.patch_responded_at IS NULL THEN VALUES(patch_responded_at)
+                    WHEN VALUES(patch_responded_at) IS NULL THEN transactions.patch_responded_at
+                    ELSE GREATEST(transactions.patch_responded_at, VALUES(patch_responded_at))
                 END,
-                patch_request = COALESCE(EXCLUDED.patch_request, transactions.patch_request),
-                patch_error = COALESCE(EXCLUDED.patch_error, transactions.patch_error),
-                created_at = LEAST(transactions.created_at, EXCLUDED.created_at),
-                updated_at = EXCLUDED.updated_at
-            RETURNING id`,
+                patch_request = COALESCE(VALUES(patch_request), transactions.patch_request),
+                patch_error = COALESCE(VALUES(patch_error), transactions.patch_error),
+                created_at = LEAST(transactions.created_at, VALUES(created_at)),
+                updated_at = VALUES(updated_at)
+            `,
             values,
+        );
+
+        const rows = await this.writeRepository.query(
+            `SELECT id FROM transactions WHERE correlation_id = ? LIMIT 1`,
+            [input.correlationId],
         );
 
         return rows[0]?.id ?? values[0];
