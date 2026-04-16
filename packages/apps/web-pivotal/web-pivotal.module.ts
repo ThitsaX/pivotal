@@ -1,4 +1,4 @@
-import {DynamicModule, Module} from '@nestjs/common';
+import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {AuditDomainModule} from '@core/audit/domain';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {
@@ -7,20 +7,22 @@ import {
     AddHubSigningKeysController,
     AddSigningKeysController,
     GenerateSigningKeyController,
-    ListParticipantsController,
+    ListCentralLedgerParticipantsController,
     OnboardFspController,
     TransactionsAuditController,
     UpsertEndpointController,
 } from './controllers';
-import {WebPivotalDependencies} from './required.dependencies';
+import {WebPivotalSettings} from './required.settings';
+
+const REQUIRED_SETTINGS = Symbol('WebPivotalRequiredSettings');
 
 @Module({})
 export class WebPivotalModule {
 
     static forRoot(): DynamicModule {
         return WebPivotalModule.forRootAsync({
-            useFactory: (): WebPivotalModule.RequiredDependencies => new WebPivotalDependencies(),
-        });
+                                                 useFactory: (): WebPivotalModule.RequiredSettings => new WebPivotalSettings(),
+                                             });
     }
 
     static forRootAsync(asyncOptions: WebPivotalModule.AsyncOptions): DynamicModule {
@@ -28,15 +30,15 @@ export class WebPivotalModule {
             module: WebPivotalModule,
             imports: [
                 AuditDomainModule.forRootAsync({
-                    imports: asyncOptions.imports ?? [],
-                    inject: asyncOptions.inject ?? [],
-                    useFactory: asyncOptions.useFactory,
-                }),
+                                                   imports: asyncOptions.imports ?? [],
+                                                   inject: asyncOptions.inject ?? [],
+                                                   useFactory: asyncOptions.useFactory,
+                                               }),
                 ParticipantDomainModule.forRootAsync({
-                    imports: asyncOptions.imports ?? [],
-                    inject: asyncOptions.inject ?? [],
-                    useFactory: asyncOptions.useFactory,
-                }),
+                                                         imports: asyncOptions.imports ?? [],
+                                                         inject: asyncOptions.inject ?? [],
+                                                         useFactory: asyncOptions.useFactory,
+                                                     }),
                 ...(asyncOptions.imports ?? []),
             ],
             controllers: [
@@ -45,25 +47,38 @@ export class WebPivotalModule {
                 AddHubCurrencyController,
                 AddHubSigningKeysController,
                 AddSigningKeysController,
-                ListParticipantsController,
+                ListCentralLedgerParticipantsController,
                 UpsertEndpointController,
                 GenerateSigningKeyController,
                 TransactionsAuditController,
             ],
+            providers: [
+                ...WebPivotalModule.createProviders(asyncOptions),
+            ],
         };
+    }
+
+    private static createProviders(asyncOptions: WebPivotalModule.AsyncOptions): Provider[] {
+        return [
+            {
+                provide: REQUIRED_SETTINGS,
+                useFactory: asyncOptions.useFactory,
+                inject: asyncOptions.inject ?? [],
+            },
+        ];
     }
 }
 
 export namespace WebPivotalModule {
 
-    export interface RequiredDependencies
-        extends AuditDomainModule.RequiredDependencies,
-                ParticipantDomainModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends AuditDomainModule.RequiredSettings,
+            ParticipantDomainModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

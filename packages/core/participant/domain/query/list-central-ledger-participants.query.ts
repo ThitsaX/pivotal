@@ -1,9 +1,9 @@
 import {CentralLedgerParticipant} from '@shared/central-ledger';
 
-export class ListParticipantsQuery {
+export class ListCentralLedgerParticipantsQuery {
 }
 
-export namespace ListParticipantsQuery {
+export namespace ListCentralLedgerParticipantsQuery {
 
     export type Output = CentralLedgerParticipant[];
 }

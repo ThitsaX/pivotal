@@ -4,7 +4,7 @@ import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
 import {ConnectorGetPartiesPublisher} from '@core/connector/publisher';
 import {HandleGetPartiesCommand} from './handle-get-parties.command';
-import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandleGetPartiesCommand)
 export class HandleGetPartiesHandler
@@ -20,8 +20,7 @@ export class HandleGetPartiesHandler
 
     async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
-        const auditId = nextGatewayAuditId();
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, auditId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(

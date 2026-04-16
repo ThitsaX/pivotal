@@ -3,7 +3,7 @@ import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
 import {FspiopResponsePublisher} from './fspiop-response-publisher';
 import {FspiopResponseSubscriber} from './fspiop-response-subscriber';
 
-const REQUIRED_DEPENDENCIES = Symbol('FspiopPubSubRequiredDependencies');
+const REQUIRED_SETTINGS = Symbol('FspiopPubSubRequiredSettings');
 
 @Module({})
 export class FspiopPubSubModule {
@@ -21,7 +21,7 @@ export class FspiopPubSubModule {
             ],
             providers: [
                 {
-                    provide: REQUIRED_DEPENDENCIES,
+                    provide: REQUIRED_SETTINGS,
                     useFactory: asyncOptions.useFactory,
                     inject: asyncOptions.inject ?? [],
                 },
@@ -53,12 +53,12 @@ export class FspiopPubSubModule {
 
 export namespace FspiopPubSubModule {
 
-    export interface RequiredDependencies extends NatsClientServiceModule.RequiredDependencies {
+    export interface RequiredSettings extends NatsClientServiceModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

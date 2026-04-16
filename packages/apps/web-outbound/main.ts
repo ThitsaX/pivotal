@@ -7,7 +7,7 @@ import {DocumentBuilder, SwaggerModule} from '@nestjs/swagger';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
 import {FspiopHeaders} from '@shared/fspiop';
-import {OutboundExceptionFilter} from './component';
+import {AccessGuard, OutboundExceptionFilter} from './component';
 import {WebOutboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -64,6 +64,7 @@ const bootstrap = async (): Promise<void> => {
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
     app.useGlobalFilters(new OutboundExceptionFilter());
+    app.useGlobalGuards(app.get(AccessGuard));
 
     const swaggerConfig = new DocumentBuilder()
         .setTitle('Pivotal - Outbound API')
@@ -71,21 +72,14 @@ const bootstrap = async (): Promise<void> => {
             'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows.',
         )
         .setVersion('1.0.0')
-        .addBearerAuth(
-            {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-                description: 'Authorization header with RS256-signed JWT',
-            },
-            'authorization',
-        )
+        .addApiKey({type: 'apiKey', name: 'authorization', in: 'header', description: 'Authorization header with raw RS256-signed JWT'}, 'authorization')
         .addApiKey({type: 'apiKey', name: FspiopHeaders.Names.FSPIOP_SOURCE, in: 'header'}, FspiopHeaders.Names.FSPIOP_SOURCE)
         .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('v1.0.0/api-docs', app, document);
 
     await app.listen(port);
+    Logger.log('AccessGuard is enabled.', 'Bootstrap');
     Logger.log(`Web outbound is listening on port ${port}.`, 'Bootstrap');
 };
 

@@ -1,20 +1,20 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
     FspiopAxios,
+    FspiopErrors,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
 import {PerformPostQuotesCommand} from './perform-post-quotes.command';
 import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformPostQuotesCommand)
 export class PerformPostQuotesHandler
     implements ICommandHandler<PerformPostQuotesCommand, PerformPostQuotesCommand.Output> {
-    private static readonly SNOWFLAKE = Snowflake.get();
+    private readonly logger = new Logger(PerformPostQuotesHandler.name);
 
     constructor(
         @Inject(FspConnector)
@@ -32,10 +32,9 @@ export class PerformPostQuotesHandler
         const {correlationId, payerFsp, payeeFsp, request} = command.input;
         const {quotesUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
-        const headers = FspiopHeaders.Values.Quotes.forResult(correlationId, payerFsp, connectorId);
         const createdAt = new Date();
-        const id = PerformPostQuotesHandler.nextAuditId();
-        const auditCorrelationId = correlationId ?? id;
+        const auditCorrelationId = PerformPostQuotesHandler.resolveCorrelationId(correlationId);
+        const headers = FspiopHeaders.Values.Quotes.forResult(auditCorrelationId, payerFsp, connectorId);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -76,6 +75,10 @@ export class PerformPostQuotesHandler
                 ),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`postQuotes callback flow failed for quoteId=${request.quoteId}`, stack ?? message);
             let callbackError = error;
             let callbackAuditError = AuditErrorConverter.toAuditError(error);
             let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
@@ -89,6 +92,10 @@ export class PerformPostQuotesHandler
                     callbackErrorResponse,
                 );
             } catch (putError) {
+                const putMessage = putError instanceof Error ? putError.message : String(putError);
+                const putStack = putError instanceof Error ? putError.stack : undefined;
+
+                this.logger.error(`putQuotesError failed for quoteId=${request.quoteId}`, putStack ?? putMessage);
                 callbackError = putError;
                 callbackAuditError = AuditErrorConverter.toAuditError(putError);
                 callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
@@ -112,7 +119,11 @@ export class PerformPostQuotesHandler
                         },
                     ),
                 );
-            } catch {
+            } catch (publishError) {
+                const publishMessage = publishError instanceof Error ? publishError.message : String(publishError);
+                const publishStack = publishError instanceof Error ? publishError.stack : undefined;
+
+                this.logger.error(`audit publish failed for quoteId=${request.quoteId}`, publishStack ?? publishMessage);
                 // Preserve the callback error as the command failure.
             }
 
@@ -122,7 +133,14 @@ export class PerformPostQuotesHandler
         return new PerformPostQuotesCommand.Output();
     }
 
-    private static nextAuditId(): string {
-        return PerformPostQuotesHandler.SNOWFLAKE.nextId().toString();
+    private static resolveCorrelationId(correlationId: string | null): string {
+        if (correlationId == null || correlationId.trim().length === 0) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'traceparent correlationId is required',
+            );
+        }
+
+        return correlationId;
     }
 }

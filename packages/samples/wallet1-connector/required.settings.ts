@@ -1,7 +1,5 @@
 import {ConfigService} from '@nestjs/config';
 import {ConnectorConsumerModule} from '@core/connector/consumer';
-import {ConnectorSettings, FspClient} from '@core/connector/domain';
-import {CatalystFeeEngine} from '@shared/catalyst';
 import {
     Currency,
     FspiopAxiosParams,
@@ -17,9 +15,8 @@ import {
     PrivateKeyStore,
     PublicKeyStore,
 } from '@shared/security';
-import {Wallet2FspClient} from './wallet2-fsp-client';
 
-export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.RequiredDependencies {
+export class Wallet1ConnectorSettings implements ConnectorConsumerModule.RequiredSettings {
 
     private static readonly DEFAULT_NATS_URL = 'nats://localhost:4222';
     private static readonly DEFAULT_PARTIES_URL = 'http://localhost:5003';
@@ -30,7 +27,7 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
     private static readonly DEFAULT_USE_MUTUAL_TLS = false;
     private static readonly DEFAULT_VERIFY_SERVER_CERTIFICATE = true;
     private static readonly DEFAULT_VERIFY_DOMAIN = true;
-    private static readonly DEFAULT_CONNECTOR_ID = 'wallet2';
+    private static readonly DEFAULT_CONNECTOR_ID = 'wallet1';
     private static readonly DEFAULT_SUPPORTED_CURRENCIES: Currency[] = [Currency.Usd];
     private static readonly DEFAULT_ILP_SECRET = '';
     private static readonly CURRENCY_CODES = new Set(Object.values(Currency));
@@ -39,32 +36,29 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
     private readonly privateKeyStoreValue: PrivateKeyStore;
     private readonly caStoreValue: CaStore;
     private readonly clientCertStoreValue: ClientCertStore;
-    private readonly fspClientValue: FspClient;
 
     constructor(
         private readonly configService: ConfigService,
-        catalystFeeEngine: CatalystFeeEngine,
     ) {
+
         this.publicKeyStoreValue = new FspiopJwsPublicKeyStore().load();
         this.privateKeyStoreValue = new FspiopJwsPrivateKeyStore().load();
         this.caStoreValue = new FspiopMtlsCaStore().load();
         this.clientCertStoreValue = new FspiopMtlsClientCertStore().load();
-
-        this.fspClientValue = new Wallet2FspClient(this.connectorSettings(), catalystFeeEngine);
     }
 
     natsUrl(): string {
-        return this.configService.get<string>('NATS_URL') ?? Wallet2ConnectorDependencies.DEFAULT_NATS_URL;
+        return this.configService.get<string>('NATS_URL') ?? Wallet1ConnectorSettings.DEFAULT_NATS_URL;
     }
 
     fspiopSettings(): FspiopSettings {
         return new FspiopSettings(
-            this.readString('FSPIOP_SWITCH_ID', Wallet2ConnectorDependencies.DEFAULT_SWITCH_ID),
-            this.readString('FSPIOP_PARTIES_URL', Wallet2ConnectorDependencies.DEFAULT_PARTIES_URL),
-            this.readString('FSPIOP_QUOTES_URL', Wallet2ConnectorDependencies.DEFAULT_QUOTES_URL),
-            this.readString('FSPIOP_TRANSFERS_URL', Wallet2ConnectorDependencies.DEFAULT_TRANSFERS_URL),
-            this.readBoolean('FSPIOP_USE_JWS', Wallet2ConnectorDependencies.DEFAULT_USE_JWS),
-            this.readBoolean('FSPIOP_USE_MUTUAL_TLS', Wallet2ConnectorDependencies.DEFAULT_USE_MUTUAL_TLS),
+            this.readString('FSPIOP_SWITCH_ID', Wallet1ConnectorSettings.DEFAULT_SWITCH_ID),
+            this.readString('FSPIOP_PARTIES_URL', Wallet1ConnectorSettings.DEFAULT_PARTIES_URL),
+            this.readString('FSPIOP_QUOTES_URL', Wallet1ConnectorSettings.DEFAULT_QUOTES_URL),
+            this.readString('FSPIOP_TRANSFERS_URL', Wallet1ConnectorSettings.DEFAULT_TRANSFERS_URL),
+            this.readBoolean('FSPIOP_USE_JWS', Wallet1ConnectorSettings.DEFAULT_USE_JWS),
+            this.readBoolean('FSPIOP_USE_MUTUAL_TLS', Wallet1ConnectorSettings.DEFAULT_USE_MUTUAL_TLS),
         );
     }
 
@@ -73,11 +67,11 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
         const connectionTimeoutMs = this.readPositiveInteger('FSPIOP_CONNECTION_TIMEOUT_MS');
         const verifyServerCertificate = this.readBoolean(
             'FSPIOP_TLS_VERIFY_SERVER_CERT',
-            Wallet2ConnectorDependencies.DEFAULT_VERIFY_SERVER_CERTIFICATE,
+            Wallet1ConnectorSettings.DEFAULT_VERIFY_SERVER_CERTIFICATE,
         );
         const verifyDomain = this.readBoolean(
             'FSPIOP_TLS_VERIFY_DOMAIN',
-            Wallet2ConnectorDependencies.DEFAULT_VERIFY_DOMAIN,
+            Wallet1ConnectorSettings.DEFAULT_VERIFY_DOMAIN,
         );
 
         return {
@@ -104,16 +98,16 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
         return this.clientCertStoreValue;
     }
 
-    fspClient(): FspClient {
-        return this.fspClientValue;
+    connectorId(): string {
+        return this.readString('CONNECTOR_ID', Wallet1ConnectorSettings.DEFAULT_CONNECTOR_ID);
     }
 
-    connectorSettings(): ConnectorSettings {
-        return new ConnectorSettings(
-            this.readString('CONNECTOR_ID', Wallet2ConnectorDependencies.DEFAULT_CONNECTOR_ID),
-            this.readCurrencies('CONNECTOR_SUPPORTED_CURRENCIES', Wallet2ConnectorDependencies.DEFAULT_SUPPORTED_CURRENCIES),
-            this.readString('CONNECTOR_ILP_SECRET', Wallet2ConnectorDependencies.DEFAULT_ILP_SECRET),
-        );
+    supportedCurrencies(): Currency[] {
+        return this.readCurrencies('CONNECTOR_SUPPORTED_CURRENCIES', Wallet1ConnectorSettings.DEFAULT_SUPPORTED_CURRENCIES);
+    }
+
+    ilpSecret(): string {
+        return this.readString('CONNECTOR_ILP_SECRET', Wallet1ConnectorSettings.DEFAULT_ILP_SECRET);
     }
 
     private readString(name: string, fallback: string): string {
@@ -147,7 +141,7 @@ export class Wallet2ConnectorDependencies implements ConnectorConsumerModule.Req
             .split(',')
             .map((entry) => entry.trim().toUpperCase())
             .filter((entry) => entry.length > 0)
-            .filter((entry): entry is Currency => Wallet2ConnectorDependencies.CURRENCY_CODES.has(entry as Currency));
+            .filter((entry): entry is Currency => Wallet1ConnectorSettings.CURRENCY_CODES.has(entry as Currency));
 
         if (currencies.length === 0) {
             return [...fallback];

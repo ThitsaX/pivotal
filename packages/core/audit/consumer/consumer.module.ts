@@ -46,14 +46,14 @@ export class AuditConsumerModule {
 
 export namespace AuditConsumerModule {
 
-    export interface RequiredDependencies
-        extends NatsClientServiceModule.RequiredDependencies,
-                AuditDomainModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends NatsClientServiceModule.RequiredSettings,
+                AuditDomainModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

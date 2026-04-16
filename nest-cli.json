@@ -176,13 +176,13 @@
         "tsConfigPath": "packages/shared/central-ledger/tsconfig.app.json"
       }
     },
-    "shared-pg-migration": {
+    "shared-dbmigration": {
       "type": "library",
-      "root": "packages/shared/pg-migration",
+      "root": "packages/shared/dbmigration",
       "entryFile": "index",
-      "sourceRoot": "packages/shared/pg-migration",
+      "sourceRoot": "packages/shared/dbmigration",
       "compilerOptions": {
-        "tsConfigPath": "packages/shared/pg-migration/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/dbmigration/tsconfig.app.json"
       }
     },
     "shared-snowflake": {

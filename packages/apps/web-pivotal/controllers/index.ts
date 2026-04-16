@@ -5,5 +5,5 @@ export * from './participant/upsert-endpoint.controller';
 export * from './participant/generate-signing-key.controller';
 export * from './hub/add-currency.controller';
 export * from './hub/add-signing-keys.controller';
-export * from './hub/list-participants.controller';
+export * from './hub/list-central-ledger-participants.controller';
 export * from './audit/transactions.controller';

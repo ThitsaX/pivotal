@@ -1,16 +1,15 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
-import {FspiopAxios, FspiopException, FspiopHeaders,} from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
+import {FspiopAxios, FspiopErrors, FspiopException, FspiopHeaders,} from '@shared/fspiop';
 import {PerformGetPartiesCommand} from './perform-get-parties.command';
 import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformGetPartiesCommand)
 export class PerformGetPartiesHandler
     implements ICommandHandler<PerformGetPartiesCommand, PerformGetPartiesCommand.Output> {
-    private static readonly SNOWFLAKE = Snowflake.get();
+    private readonly logger = new Logger(PerformGetPartiesHandler.name);
 
     constructor(
         @Inject(FspConnector)
@@ -27,10 +26,13 @@ export class PerformGetPartiesHandler
     async execute(command: PerformGetPartiesCommand): Promise<PerformGetPartiesCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
         const {partiesUrl} = this.fspiopAxios.settings;
-        const headers = FspiopHeaders.Values.Parties.forResult(correlationId, payerFsp, this.connectorSettings.connectorId);
         const createdAt = new Date();
-        const id = PerformGetPartiesHandler.nextAuditId();
-        const auditCorrelationId = correlationId ?? id;
+        const auditCorrelationId = PerformGetPartiesHandler.resolveCorrelationId(correlationId);
+        const headers = FspiopHeaders.Values.Parties.forResult(
+            auditCorrelationId,
+            payerFsp,
+            this.connectorSettings.connectorId,
+        );
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -81,6 +83,10 @@ export class PerformGetPartiesHandler
                 ),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`getParties callback flow failed for partyId=${partyId}`, stack ?? message);
             let callbackError = error;
             let callbackAuditError = AuditErrorConverter.toAuditError(error);
             let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
@@ -96,6 +102,10 @@ export class PerformGetPartiesHandler
                     subId ?? undefined,
                 );
             } catch (putError) {
+                const putMessage = putError instanceof Error ? putError.message : String(putError);
+                const putStack = putError instanceof Error ? putError.stack : undefined;
+
+                this.logger.error(`putPartiesError failed for partyId=${partyId}`, putStack ?? putMessage);
                 callbackError = putError;
                 callbackAuditError = AuditErrorConverter.toAuditError(putError);
                 callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
@@ -121,7 +131,11 @@ export class PerformGetPartiesHandler
                         },
                     ),
                 );
-            } catch {
+            } catch (publishError) {
+                const publishMessage = publishError instanceof Error ? publishError.message : String(publishError);
+                const publishStack = publishError instanceof Error ? publishError.stack : undefined;
+
+                this.logger.error(`audit publish failed for partyId=${partyId}`, publishStack ?? publishMessage);
                 // Preserve the callback error as the command failure.
             }
 
@@ -131,7 +145,14 @@ export class PerformGetPartiesHandler
         return new PerformGetPartiesCommand.Output();
     }
 
-    private static nextAuditId(): string {
-        return PerformGetPartiesHandler.SNOWFLAKE.nextId().toString();
+    private static resolveCorrelationId(correlationId: string | null): string {
+        if (correlationId == null || correlationId.trim().length === 0) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'traceparent correlationId is required',
+            );
+        }
+
+        return correlationId;
     }
 }

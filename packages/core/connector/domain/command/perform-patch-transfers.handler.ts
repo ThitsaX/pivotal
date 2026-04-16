@@ -1,15 +1,15 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
-import {Snowflake} from '@shared/snowflake';
+import {FspiopErrors, FspiopException} from '@shared/fspiop';
 import {PerformPatchTransfersCommand} from './perform-patch-transfers.command';
 import {AuditErrorConverter, FspConnector} from '../component';
 
 @CommandHandler(PerformPatchTransfersCommand)
 export class PerformPatchTransfersHandler
     implements ICommandHandler<PerformPatchTransfersCommand, PerformPatchTransfersCommand.Output> {
-    private static readonly SNOWFLAKE = Snowflake.get();
+    private readonly logger = new Logger(PerformPatchTransfersHandler.name);
 
     constructor(
         @Inject(FspConnector)
@@ -21,8 +21,7 @@ export class PerformPatchTransfersHandler
 
     async execute(command: PerformPatchTransfersCommand): Promise<PerformPatchTransfersCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, transferId, response} = command.input;
-        const id = PerformPatchTransfersHandler.nextAuditId();
-        const auditCorrelationId = correlationId ?? id;
+        const auditCorrelationId = PerformPatchTransfersHandler.resolveCorrelationId(correlationId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
@@ -58,6 +57,10 @@ export class PerformPatchTransfersHandler
                 ),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`patchTransfers callback flow failed for transferId=${transferId}`, stack ?? message);
             const patchError = AuditErrorConverter.toFspError(error);
 
             if (patchError != null) {
@@ -82,7 +85,14 @@ export class PerformPatchTransfersHandler
         return new PerformPatchTransfersCommand.Output();
     }
 
-    private static nextAuditId(): string {
-        return PerformPatchTransfersHandler.SNOWFLAKE.nextId().toString();
+    private static resolveCorrelationId(correlationId: string | null): string {
+        if (correlationId == null || correlationId.trim().length === 0) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'traceparent correlationId is required',
+            );
+        }
+
+        return correlationId;
     }
 }

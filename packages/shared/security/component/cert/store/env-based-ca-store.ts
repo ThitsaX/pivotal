@@ -1,9 +1,7 @@
 import {Ca} from '../ca';
-import {Injectable} from '@nestjs/common';
 import {CaCert} from '../ca-cert';
 import {CaStore} from '../ca-store';
 
-@Injectable()
 export class EnvBasedCaStore extends CaStore {
 
     private static readonly ENV_CA_COUNT   = 'FSPIOP_MTLS_CA_COUNT';

@@ -4,7 +4,7 @@ import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
 import {ConnectorPatchTransfersPublisher} from '@core/connector/publisher';
 import {HandlePatchTransfersCommand} from './handle-patch-transfers.command';
-import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePatchTransfersCommand)
 export class HandlePatchTransfersHandler
@@ -19,8 +19,7 @@ export class HandlePatchTransfersHandler
 
     async execute(command: HandlePatchTransfersCommand): Promise<HandlePatchTransfersCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, transferId, response} = command.input;
-        const auditId = nextGatewayAuditId();
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, auditId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(

@@ -1,8 +1,6 @@
-import {Injectable} from '@nestjs/common';
 import {ClientCert} from '../client-cert';
 import {ClientCertStore} from '../client-cert-store';
 
-@Injectable()
 export class EnvBasedClientCertStore extends ClientCertStore {
 
     private static readonly ENV_CLIENT_CERT_CONTENT = 'CLIENT_CERT_CONTENT';

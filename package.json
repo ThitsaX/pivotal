@@ -39,7 +39,7 @@
     "build:shared-catalyst": "nest build shared-catalyst",
     "build:shared-central-ledger": "nest build shared-central-ledger",
     "build:shared-fspiop": "nest build shared-fspiop",
-    "build:shared-pg-migration": "nest build shared-pg-migration",
+    "build:shared-dbmigration": "nest build shared-dbmigration",
     "build:shared-snowflake": "nest build shared-snowflake",
     "build:shared-interledger": "nest build shared-interledger",
     "build:shared-persistence": "nest build shared-persistence",

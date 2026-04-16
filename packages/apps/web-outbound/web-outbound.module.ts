@@ -1,31 +1,48 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {OutboundDomainModule} from '@core/outbound/domain';
-import {FspiopSettings} from '@shared/fspiop';
-import {PrivateKeyStore} from '@shared/security';
-import {FspiopSigner} from './component';
+import {ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore,} from '@core/participant/domain';
+import {AccessGuard} from './component';
 import {SendMoneyController} from './controllers';
-import {WebOutboundDependencies} from './required.dependencies';
+import {WebOutboundSettings} from './required.settings';
+import {AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore} from '@shared/security';
+import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
+import {FspiopMtlsCaStore, FspiopMtlsClientCertStore} from "@shared/fspiop";
 
-const REQUIRED_DEPENDENCIES = Symbol('WebOutboundRequiredDependencies');
+const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 
 @Module({})
 export class WebOutboundModule {
 
     static forRoot(): DynamicModule {
         return WebOutboundModule.forRootAsync({
-            useFactory: (): WebOutboundModule.RequiredDependencies => new WebOutboundDependencies(),
-        });
+                                                  useFactory: (): WebOutboundModule.RequiredSettings => new WebOutboundSettings(),
+                                              });
     }
 
     static forRootAsync(asyncOptions: WebOutboundModule.AsyncOptions): DynamicModule {
-        return {
-            module: WebOutboundModule,
-            imports: [
-                OutboundDomainModule.forRootAsync({
+
+        const participantDomainModule =
+            ParticipantDomainModule.forRootAsync(
+                {
                     imports: asyncOptions.imports ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
-                }),
+                });
+
+        const outboundDomainModule =
+            OutboundDomainModule.forRootAsync(
+                {
+                    imports: [participantDomainModule, ...(asyncOptions.imports ?? [])],
+                    providers: WebOutboundModule.createOutboundDomainProviders(),
+                    useFactory: asyncOptions.useFactory,
+                    inject: asyncOptions.inject ?? [],
+                });
+
+        return {
+            module: WebOutboundModule,
+            imports: [
+                participantDomainModule,
+                outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
             controllers: [SendMoneyController],
@@ -38,26 +55,50 @@ export class WebOutboundModule {
     private static createProviders(asyncOptions: WebOutboundModule.AsyncOptions): Provider[] {
         return [
             {
-                provide: REQUIRED_DEPENDENCIES,
+                provide: REQUIRED_SETTINGS,
                 useFactory: asyncOptions.useFactory,
                 inject: asyncOptions.inject ?? [],
             },
             {
-                provide: FspiopSettings,
-                useFactory: (deps: WebOutboundModule.RequiredDependencies): FspiopSettings => deps.fspiopSettings(),
-                inject: [REQUIRED_DEPENDENCIES],
+                provide: AccessKeyStore,
+                useFactory: (cache: ParticipantSigningKeysCache): AccessKeyStore => {
+                    return new ParticipantAccessKeyStore(cache);
+                },
+                inject: [ParticipantSigningKeysCache],
             },
+            {
+                provide: AccessGuard,
+                useFactory: (accessKeyStore: AccessKeyStore): AccessGuard => {
+                    return new AccessGuard(accessKeyStore);
+                },
+                inject: [AccessKeyStore],
+            }
+
+        ];
+    }
+
+    private static createOutboundDomainProviders(): Provider[] {
+        return [
             {
                 provide: PrivateKeyStore,
-                useFactory: (deps: WebOutboundModule.RequiredDependencies): PrivateKeyStore => deps.privateKeyStore(),
-                inject: [REQUIRED_DEPENDENCIES],
+                useFactory: (cache: ParticipantSigningKeysCache): PrivateKeyStore => {
+                    return new ParticipantJwsPrivateKeyStore(cache);
+                },
+                inject: [ParticipantSigningKeysCache],
             },
             {
-                provide: FspiopSigner,
-                useFactory: (settings: FspiopSettings, privateKeyStore: PrivateKeyStore): FspiopSigner => {
-                    return new FspiopSigner(settings, privateKeyStore);
+                provide: CaStore,
+                useFactory: (): CaStore => {
+                    return new FspiopMtlsCaStore().load();
                 },
-                inject: [FspiopSettings, PrivateKeyStore],
+                inject: [],
+            },
+            {
+                provide: ClientCertStore,
+                useFactory: (): ClientCertStore => {
+                    return new FspiopMtlsClientCertStore().load();
+                },
+                inject: [],
             },
         ];
     }
@@ -65,13 +106,13 @@ export class WebOutboundModule {
 
 export namespace WebOutboundModule {
 
-    export interface RequiredDependencies
-        extends OutboundDomainModule.RequiredDependencies {
+    export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings, OutboundDomainModule.RequiredSettings {
+
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

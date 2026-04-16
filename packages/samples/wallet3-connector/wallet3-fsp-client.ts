@@ -72,6 +72,11 @@ export class Wallet3FspClient extends FspClient {
 
             return new FspClient.PostQuotesOutput(amount, amount, fees);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`postQuotes failed for scenario=${scenarioName}`, stack ?? message);
+
             if (error instanceof CatalystException) {
                 throw new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, error.message);
             }

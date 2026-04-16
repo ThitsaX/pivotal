@@ -1,11 +1,12 @@
-import {Snowflake} from '@shared/snowflake';
+import {FspiopErrors, FspiopException} from '@shared/fspiop';
 
-const SNOWFLAKE = Snowflake.get();
+export function resolveGatewayCorrelationId(correlationId: string | null | undefined): string {
+    if (correlationId == null || correlationId.trim().length === 0) {
+        throw new FspiopException(
+            FspiopErrors.MISSING_MANDATORY_ELEMENT,
+            'traceparent correlationId is required',
+        );
+    }
 
-export function nextGatewayAuditId(): string {
-    return SNOWFLAKE.nextId().toString();
-}
-
-export function resolveGatewayCorrelationId(correlationId: string | null | undefined, auditId: string): string {
-    return correlationId ?? auditId;
+    return correlationId;
 }

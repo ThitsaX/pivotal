@@ -23,6 +23,7 @@ export class ConnectorConsumerModule {
                 }),
                 ConnectorDomainModule.forRootAsync({
                     imports: asyncOptions.imports ?? [],
+                    providers: asyncOptions.providers ?? [],
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
@@ -83,14 +84,15 @@ export class ConnectorConsumerModule {
 
 export namespace ConnectorConsumerModule {
 
-    export interface RequiredDependencies
-        extends NatsClientServiceModule.RequiredDependencies,
-                ConnectorDomainModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends NatsClientServiceModule.RequiredSettings,
+                ConnectorDomainModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        providers?: Provider[];
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }
