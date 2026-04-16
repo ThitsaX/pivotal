@@ -28,6 +28,10 @@ export class ParticipantRepository {
         return this.getRepository(target).findOne({where: {name}});
     }
 
+    async findAll(target: DbTarget = DbTarget.Read): Promise<Participant[]> {
+        return this.getRepository(target).find();
+    }
+
     private getRepository(target: DbTarget): Repository<Participant> {
 
         if (target === DbTarget.Write) {

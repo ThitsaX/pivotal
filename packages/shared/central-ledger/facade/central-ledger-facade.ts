@@ -1,3 +1,4 @@
+import {Logger} from '@nestjs/common';
 import {FspiopCurrency} from '@shared/fspiop';
 import {PivotalException} from '@shared/foundation';
 import {CentralLedgerAxios, PARTICIPANT_ENDPOINT_TYPES} from '../component';
@@ -27,6 +28,8 @@ export class CentralLedgerFacade {
     private static readonly HUB_RECONCILIATION_ACCOUNT_TYPE = 'HUB_RECONCILIATION';
     private static readonly DEFERRED_NET_SETTLEMENT_MODEL_PREFIX = 'DEFERREDNET';
 
+    private readonly logger = new Logger(CentralLedgerFacade.name);
+
     private static rethrowAsPivotalException(error: unknown): void {
         if (error instanceof PivotalException) {
             throw error;
@@ -46,6 +49,10 @@ export class CentralLedgerFacade {
         try {
             return await this.centralLedgerAxios.getEnums();
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error('listAvailableEnums failed.', stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -66,6 +73,10 @@ export class CentralLedgerFacade {
 
             await this.registerEndpoints(name, endpoint);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`onboardFsp failed for participant=${name}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -93,6 +104,10 @@ export class CentralLedgerFacade {
                 CentralLedgerFacade.toInitialPositionAndLimitsRequest(currency),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`addFspCurrency failed for participant=${name}, currency=${currency}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -113,6 +128,10 @@ export class CentralLedgerFacade {
                 CentralLedgerFacade.toDeferredNetSettlementModelRequest(currency),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`createDeferredNetSettlementModel failed for currency=${currency}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -125,6 +144,10 @@ export class CentralLedgerFacade {
             await this.createHubReconciliationAccount(currency);
             await this.createDeferredNetSettlementModel(currency);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`addHubCurrency failed for currency=${currency}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -135,6 +158,10 @@ export class CentralLedgerFacade {
         try {
             return await this.centralLedgerAxios.getParticipants();
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error('listAllParticipants failed.', stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -211,6 +238,10 @@ export class CentralLedgerFacade {
                 CentralLedgerFacade.toCreateHubAccountRequest(currency, ledgerAccountType),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`createHubAccount failed for currency=${currency}, ledgerAccountType=${ledgerAccountType}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;
@@ -264,6 +295,10 @@ export class CentralLedgerFacade {
                 await this.centralLedgerAxios.upsertParticipantEndpoints(name, request);
             }
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`registerParticipantEndpoints failed for participant=${name}`, stack ?? message);
             CentralLedgerFacade.rethrowAsPivotalException(error);
 
             throw error;

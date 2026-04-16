@@ -4,7 +4,7 @@ import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopPubSubSubjects, FspiopResponsePublisher} from '@shared/fspiop';
 import {HandlePutQuotesErrorCommand} from './handle-put-quotes-error.command';
-import {nextGatewayAuditId, resolveGatewayCorrelationId} from '../gateway-audit';
+import {resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandlePutQuotesErrorCommand)
 export class HandlePutQuotesErrorHandler
@@ -26,8 +26,7 @@ export class HandlePutQuotesErrorHandler
             return new HandlePutQuotesErrorCommand.Output();
         }
 
-        const auditId = nextGatewayAuditId();
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, auditId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(

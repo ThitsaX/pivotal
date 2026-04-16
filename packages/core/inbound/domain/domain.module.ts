@@ -64,15 +64,15 @@ export class InboundDomainModule {
 
 export namespace InboundDomainModule {
 
-    export interface RequiredDependencies
-        extends FspiopPubSubModule.RequiredDependencies,
-                ConnectorPublisherModule.RequiredDependencies,
-                AuditProducerModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends FspiopPubSubModule.RequiredSettings,
+                ConnectorPublisherModule.RequiredSettings,
+                AuditProducerModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

@@ -55,6 +55,10 @@ export class AuditTransactionConsumer implements OnModuleInit {
             const maybeNatsError = error as {code?: string};
 
             if (maybeNatsError.code !== '404') {
+                this.logger.error(
+                    `Failed to inspect consumer for stream='${stream}' durable='${AuditTransactionConsumer.DURABLE}'.`,
+                    error instanceof Error ? error.stack : String(error),
+                );
                 throw error;
             }
         }

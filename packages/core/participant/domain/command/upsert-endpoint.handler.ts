@@ -1,4 +1,4 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {
     CentralLedgerAxios,
@@ -14,6 +14,8 @@ import {UpsertEndpointCommand} from './upsert-endpoint.command';
 @CommandHandler(UpsertEndpointCommand)
 export class UpsertEndpointHandler
     implements ICommandHandler<UpsertEndpointCommand, UpsertEndpointCommand.Output> {
+
+    private readonly logger = new Logger(UpsertEndpointHandler.name);
 
     private static toParticipantNotFoundError(name: string): PivotalException {
         return new PivotalException('PARTICIPANT_NOT_FOUND', `Participant not found for name: ${name}`);
@@ -65,6 +67,10 @@ export class UpsertEndpointHandler
                 await this.centralLedgerAxios.upsertParticipantEndpoints(command.input.name, request);
             }
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`upsertParticipantEndpoints failed for participant=${command.input.name}`, stack ?? message);
             UpsertEndpointHandler.rethrowAsPivotalException(error);
 
             throw error;

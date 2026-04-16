@@ -1,4 +1,3 @@
-import {Injectable} from '@nestjs/common';
 import {ClientCert} from '../client-cert';
 import {ClientCertStore} from '../client-cert-store';
 
@@ -8,7 +7,6 @@ interface JsonClientCertSource {
     clientKey:  string;
 }
 
-@Injectable()
 export class JsonBasedClientCertStore extends ClientCertStore {
 
     private static readonly ENV_JSON_CLIENT_CERT = 'JSON_CLIENT_CERT';

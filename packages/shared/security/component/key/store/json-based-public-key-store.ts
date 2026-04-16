@@ -1,8 +1,6 @@
-import {Injectable} from '@nestjs/common';
 import {PublicKey} from '../public-key';
 import {PublicKeyStore} from '../public-key-store';
 
-@Injectable()
 export class JsonBasedPublicKeyStore extends PublicKeyStore {
 
     private static readonly ENV_JSON_PUBLIC_KEYS = 'JSON_PUBLIC_KEYS';

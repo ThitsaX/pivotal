@@ -1,4 +1,4 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
@@ -25,6 +25,8 @@ import {SendMoneyResponseMapper} from './send-money-response.mapper';
 @CommandHandler(PutAcceptQuoteCommand)
 export class PutAcceptQuoteHandler
     implements ICommandHandler<PutAcceptQuoteCommand, PutAcceptQuoteCommand.Output> {
+
+    private readonly logger = new Logger(PutAcceptQuoteHandler.name);
 
     constructor(
         @Inject(FspiopAxios)
@@ -153,6 +155,10 @@ export class PutAcceptQuoteHandler
             try {
                 await this.fspiopAxios.postTransfers(transfersUrl, headers, transfersPostRequest);
             } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                const stack = error instanceof Error ? error.stack : undefined;
+
+                this.logger.error(`postTransfers failed for transferId=${transferId}`, stack ?? message);
                 this.subscriber.cancel(successSubject);
                 throw PutAcceptQuoteHandler.toFspiopException(error, transferId);
             }
@@ -179,6 +185,10 @@ export class PutAcceptQuoteHandler
 
             return new PutAcceptQuoteCommand.Output(response, callback);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`putAcceptQuote failed for transferId=${transferId}`, stack ?? message);
             const fspiopException = PutAcceptQuoteHandler.toFspiopException(error, transferId);
 
             try {

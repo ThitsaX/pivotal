@@ -1,6 +1,6 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
-import {WebInboundDependencies} from './required.dependencies';
+import {WebInboundSettings} from './required.settings';
 import {WebInboundModule} from './web-inbound.module';
 
 @Module({
@@ -12,8 +12,8 @@ import {WebInboundModule} from './web-inbound.module';
         WebInboundModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: (configService: ConfigService): WebInboundModule.RequiredDependencies => {
-                return new WebInboundDependencies(configService);
+            useFactory: (configService: ConfigService): WebInboundModule.RequiredSettings => {
+                return new WebInboundSettings(configService);
             },
         }),
     ],

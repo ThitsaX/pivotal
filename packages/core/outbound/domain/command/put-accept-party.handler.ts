@@ -1,4 +1,4 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
@@ -34,6 +34,8 @@ export class PutAcceptPartyHandler
     implements ICommandHandler<PutAcceptPartyCommand, PutAcceptPartyCommand.Output> {
     private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
     private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
+
+    private readonly logger = new Logger(PutAcceptPartyHandler.name);
 
     constructor(
         @Inject(FspiopAxios)
@@ -91,6 +93,10 @@ export class PutAcceptPartyHandler
             try {
                 await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
             } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                const stack = error instanceof Error ? error.stack : undefined;
+
+                this.logger.error(`postQuotes failed for transferId=${transferId}`, stack ?? message);
                 this.subscriber.cancel(successSubject);
                 throw PutAcceptPartyHandler.toFspiopException(error, transferId);
             }
@@ -119,6 +125,10 @@ export class PutAcceptPartyHandler
 
             return new PutAcceptPartyCommand.Output(response, callback);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`putAcceptParty failed for transferId=${transferId}`, stack ?? message);
             const fspiopException = PutAcceptPartyHandler.toFspiopException(error, transferId);
 
             try {

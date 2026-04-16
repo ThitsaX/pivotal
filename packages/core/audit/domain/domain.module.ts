@@ -79,12 +79,12 @@ export class AuditDomainModule {
 
 export namespace AuditDomainModule {
 
-    export interface RequiredDependencies extends TypeOrmModule.RequiredDependencies {
+    export interface RequiredSettings extends TypeOrmModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

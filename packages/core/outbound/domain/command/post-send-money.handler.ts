@@ -1,4 +1,4 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
@@ -27,6 +27,8 @@ import {SendMoneyResponseMapper} from './send-money-response.mapper';
 @CommandHandler(PostSendMoneyCommand)
 export class PostSendMoneyHandler
     implements ICommandHandler<PostSendMoneyCommand, PostSendMoneyCommand.Output> {
+
+    private readonly logger = new Logger(PostSendMoneyHandler.name);
 
     constructor(
         @Inject(FspiopAxios)
@@ -216,6 +218,10 @@ export class PostSendMoneyHandler
             try {
                 await this.fspiopAxios.getParties(partiesUrl, headers, type, id, subId);
             } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                const stack = error instanceof Error ? error.stack : undefined;
+
+                this.logger.error(`getParties failed for payeeId=${id}`, stack ?? message);
                 this.subscriber.cancel(successSubject);
                 throw error;
             }
@@ -255,6 +261,10 @@ export class PostSendMoneyHandler
                 callback,
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`postSendMoney failed for correlationId=${correlationId}`, stack ?? message);
             const fspiopException = PostSendMoneyHandler.toFspiopException(error);
 
             try {

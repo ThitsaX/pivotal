@@ -5,7 +5,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {PgMigration, PgMigrationSettings} from '@shared/pg-migration';
+import {DbMigration, DbMigrationSettings} from '@shared/dbmigration';
 import {PivotalExceptionFilter} from '@shared/foundation';
 import {WebPivotalAppModule} from './app.module';
 
@@ -15,9 +15,29 @@ const ROOT_ENV_LOCATION = '.env';
 const MODULE_ENV_LOCATION = 'packages/apps/web-pivotal/.env';
 const AUDIT_MIGRATION_TABLE = 'audit_migration_history';
 const PARTICIPANT_MIGRATION_TABLE = 'participant_migration_history';
-const DEFAULT_HTTP_PORT = 3202;
 const ROOT_MARKER_FILE = 'package.json';
 const ROOT_MARKER_DIR = 'packages';
+
+const readRequiredEnvironmentVariable = (name: string): string => {
+    const value = process.env[name];
+
+    if (value == null || value.trim().length === 0) {
+        throw new Error(`Missing required environment variable: ${name}`);
+    }
+
+    return value;
+};
+
+const readRequiredPort = (name: string): number => {
+    const value = readRequiredEnvironmentVariable(name);
+    const parsed = Number(value);
+
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`Invalid environment variable ${name}: expected a positive integer.`);
+    }
+
+    return parsed;
+};
 
 const findRepoRoot = (): string => {
     const startPoints = [process.cwd(), dirname(process.argv[1] ?? process.cwd())];
@@ -49,12 +69,12 @@ const findRepoRoot = (): string => {
 const createMigrationSettings = (
     historyTable: string,
     locations: string[],
-): PgMigrationSettings => ({
-    host:         process.env['DB_WRITE_HOST']     ?? 'localhost',
-    port:         Number(process.env['DB_WRITE_PORT'] ?? 3306),
-    username:     process.env['DB_WRITE_USERNAME'] ?? 'root',
-    password:     process.env['DB_WRITE_PASSWORD'] ?? 'mysql',
-    database:     process.env['DB_WRITE_NAME']     ?? 'pivotal',
+): DbMigrationSettings => ({
+    host:         readRequiredEnvironmentVariable('DB_WRITE_HOST'),
+    port:         readRequiredPort('DB_WRITE_PORT'),
+    username:     readRequiredEnvironmentVariable('DB_WRITE_USERNAME'),
+    password:     readRequiredEnvironmentVariable('DB_WRITE_PASSWORD'),
+    database:     readRequiredEnvironmentVariable('DB_WRITE_NAME'),
     historyTable,
     locations,
 });
@@ -79,7 +99,7 @@ const bootstrap = async (): Promise<void> => {
     const participantLocation = resolve(repoRoot, PARTICIPANT_SQL_LOCATION);
 
     Logger.log(`Running audit migrations from ${auditLocation}.`, 'Bootstrap');
-    const auditResult = await PgMigration.migrate(
+    const auditResult = await DbMigration.migrate(
         createMigrationSettings(AUDIT_MIGRATION_TABLE, [auditLocation]),
     );
 
@@ -89,7 +109,7 @@ const bootstrap = async (): Promise<void> => {
     );
 
     Logger.log(`Running participant migrations from ${participantLocation}.`, 'Bootstrap');
-    const participantResult = await PgMigration.migrate(
+    const participantResult = await DbMigration.migrate(
         createMigrationSettings(PARTICIPANT_MIGRATION_TABLE, [participantLocation]),
     );
 
@@ -98,11 +118,7 @@ const bootstrap = async (): Promise<void> => {
         'Bootstrap',
     );
 
-    const port = Number(
-        process.env['WEB_PIVOTAL_PORT']
-        ?? process.env['WEB_AUDIT_PORT']
-        ?? DEFAULT_HTTP_PORT,
-    );
+    const port = readRequiredPort('WEB_PIVOTAL_PORT');
 
     const app = await NestFactory.create(WebPivotalAppModule);
     app.enableShutdownHooks();
