@@ -1,5 +1,6 @@
 import {NatsClientService} from '@shared/nats';
 import {TransfersPostRequest} from '@shared/fspiop';
+import {resolveFspiopStream} from '../consumer/listener/fspiop-stream.resolver';
 
 export class ConnectorPostTransfersPublisher {
 
@@ -11,7 +12,11 @@ export class ConnectorPostTransfersPublisher {
 
     async publish(message: ConnectorPostTransfersPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(ConnectorPostTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
+        const subject = ConnectorPostTransfersPublisher.subjectFor(message.payeeFsp);
+        const jsm = await js.jetstreamManager();
+
+        await resolveFspiopStream(jsm, subject);
+        await js.publish(subject, this.nats.codec.encode(message));
     }
 }
 
