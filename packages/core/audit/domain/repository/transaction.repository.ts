@@ -15,6 +15,9 @@ export class TransactionRepository {
     private static readonly DEFAULT_PAGE = 0;
     private static readonly SNOWFLAKE = Snowflake.get();
     private static readonly DEFAULT_SIZE = 20;
+    private static readonly JSON_REPLACER = (_key: string, value: unknown): unknown => {
+        return typeof value === 'bigint' ? value.toString() : value;
+    };
 
     constructor(
         @InjectRepository(Transaction, PIVOTAL_DB_WRITE_CONNECTION_NAME)
@@ -56,9 +59,9 @@ export class TransactionRepository {
             input.flow ?? null,
             input.partiesRequestedAt ?? null,
             input.partiesRespondedAt ?? null,
-            input.partiesRequest ?? null,
-            input.partiesResponse ?? null,
-            input.partiesError ?? null,
+            TransactionRepository.toJsonValue(input.partiesRequest),
+            TransactionRepository.toJsonValue(input.partiesResponse),
+            TransactionRepository.toJsonValue(input.partiesError),
             input.outboundPartiesRequestedAt ?? null,
             input.outboundPartiesRespondedAt ?? null,
             input.inboundPartiesRequestedAt ?? null,
@@ -67,9 +70,9 @@ export class TransactionRepository {
             input.connectorPartiesRespondedAt ?? null,
             input.quotesRequestedAt ?? null,
             input.quotesRespondedAt ?? null,
-            input.quotesRequest ?? null,
-            input.quotesResponse ?? null,
-            input.quotesError ?? null,
+            TransactionRepository.toJsonValue(input.quotesRequest),
+            TransactionRepository.toJsonValue(input.quotesResponse),
+            TransactionRepository.toJsonValue(input.quotesError),
             input.outboundQuotesRequestedAt ?? null,
             input.outboundQuotesRespondedAt ?? null,
             input.inboundQuotesRequestedAt ?? null,
@@ -78,9 +81,9 @@ export class TransactionRepository {
             input.connectorQuotesRespondedAt ?? null,
             input.transfersRequestedAt ?? null,
             input.transfersRespondedAt ?? null,
-            input.transfersRequest ?? null,
-            input.transfersResponse ?? null,
-            input.transfersError ?? null,
+            TransactionRepository.toJsonValue(input.transfersRequest),
+            TransactionRepository.toJsonValue(input.transfersResponse),
+            TransactionRepository.toJsonValue(input.transfersError),
             input.outboundTransfersRequestedAt ?? null,
             input.outboundTransfersRespondedAt ?? null,
             input.inboundTransfersRequestedAt ?? null,
@@ -89,7 +92,7 @@ export class TransactionRepository {
             input.connectorTransfersRespondedAt ?? null,
             input.patchRequestedAt ?? null,
             input.patchRespondedAt ?? null,
-            input.patchRequest ?? null,
+            TransactionRepository.toJsonValue(input.patchRequest),
             input.patchError ?? null,
             input.createdAt ?? input.transactionStartedAt,
             now,
@@ -347,6 +350,14 @@ export class TransactionRepository {
         );
 
         return rows[0]?.id ?? values[0];
+    }
+
+    private static toJsonValue(value: unknown | null | undefined): string | null {
+        if (value == null) {
+            return null;
+        }
+
+        return JSON.stringify(value, TransactionRepository.JSON_REPLACER);
     }
 
     async findByCorrelationId(correlationId: string, target: DbTarget = DbTarget.Read): Promise<Transaction | null> {
