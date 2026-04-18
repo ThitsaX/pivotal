@@ -41,5 +41,6 @@ helm upgrade --install pivotal-stack ./helm --set wallet3Connector.enabled=false
 ```bash
 helm upgrade --install pivotal-stack ./helm \
   --set global.commonFspiopEnv.FSPIOP_SWITCH_ID=hub \
+  --set global.commonDbEnv.DB_WRITE_HOST=mysql \
   --set webPivotal.env.CENTRAL_LEDGER_URL=http://central-ledger:3001
 ```

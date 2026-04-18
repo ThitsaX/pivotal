@@ -28,6 +28,7 @@ spec:
               protocol: TCP
           env:
             {{- include "pivotal-stack.envVars" .Values.webInbound.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
 ---
 apiVersion: v1
@@ -79,6 +80,7 @@ spec:
               protocol: TCP
           env:
             {{- include "pivotal-stack.envVars" .Values.webOutbound.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
 ---
 apiVersion: v1
