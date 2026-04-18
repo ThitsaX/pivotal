@@ -71,6 +71,8 @@ services:
       context: ..
       dockerfile: docker/web-outbound.Dockerfile
     depends_on:
+      mysql:
+        condition: service_healthy
       web-inbound:
         condition: service_started
       nats:
@@ -79,10 +81,14 @@ services:
         condition: service_started
     environment:
       WEB_OUTBOUND_PORT: ${WEB_OUTBOUND_PORT:-3200}
+      PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: ${PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS:-5}
       NATS_URL: ${NATS_URL:-nats://nats:4222}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      REDIS_CACHE_ITEM_TIMEOUT_MS: ${REDIS_CACHE_ITEM_TIMEOUT_MS:-300000}
-      <<: *common_fspiop_env
+      REDIS_CACHE_ITEM_TIMEOUT_MS: ${REDIS_CACHE_ITEM_TIMEOUT_MS:-900000}
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
+      <<: [*common_db_env, *common_fspiop_env]
     ports:
       - "${WEB_OUTBOUND_HOST_PORT:-3200}:${WEB_OUTBOUND_PORT:-3200}"
     restart: unless-stopped
@@ -93,12 +99,17 @@ services:
       context: ..
       dockerfile: docker/web-inbound.Dockerfile
     depends_on:
+      mysql:
+        condition: service_healthy
       nats:
         condition: service_started
     environment:
       WEB_INBOUND_PORT: ${WEB_INBOUND_PORT:-3201}
       NATS_URL: ${NATS_URL:-nats://nats:4222}
-      <<: *common_fspiop_env
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
+      <<: [*common_db_env, *common_fspiop_env]
     ports:
       - "${WEB_INBOUND_HOST_PORT:-3201}:${WEB_INBOUND_PORT:-3201}"
     restart: unless-stopped
@@ -130,6 +141,8 @@ services:
     environment:
       WEB_PIVOTAL_PORT: ${WEB_PIVOTAL_PORT:-3202}
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
       <<: *common_db_env
     ports:
       - "${WEB_PIVOTAL_HOST_PORT:-3202}:${WEB_PIVOTAL_PORT:-3202}"

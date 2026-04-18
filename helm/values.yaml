@@ -97,9 +97,13 @@ webOutbound:
     port: 3200
   env:
     WEB_OUTBOUND_PORT: "3200"
+    PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: "5"
     NATS_URL: nats://nats:4222
     REDIS_URL: redis://redis:6379
-    REDIS_CACHE_ITEM_TIMEOUT_MS: "300000"
+    REDIS_CACHE_ITEM_TIMEOUT_MS: "900000"
+    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
+    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
+    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
 
 webInbound:
   enabled: true
@@ -113,6 +117,9 @@ webInbound:
   env:
     WEB_INBOUND_PORT: "3201"
     NATS_URL: nats://nats:4222
+    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
+    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
+    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
 
 appAuditor:
   enabled: true
@@ -136,6 +143,8 @@ webPivotal:
   env:
     WEB_PIVOTAL_PORT: "3202"
     CENTRAL_LEDGER_URL: http://host.docker.internal:3001
+    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
+    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
 
 portal:
   enabled: true
