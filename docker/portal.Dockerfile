@@ -4,7 +4,8 @@ WORKDIR /app
 COPY packages/portal/package*.json ./packages/portal/
 RUN npm --prefix packages/portal ci
 COPY packages/portal ./packages/portal
-ARG VITE_WEB_PIVOTAL_API_BASE_URL=http://localhost:3202
+COPY packages/shared ./packages/shared
+ARG VITE_WEB_PIVOTAL_API_BASE_URL
 ENV VITE_WEB_PIVOTAL_API_BASE_URL=${VITE_WEB_PIVOTAL_API_BASE_URL}
 RUN npm --prefix packages/portal run build
 
