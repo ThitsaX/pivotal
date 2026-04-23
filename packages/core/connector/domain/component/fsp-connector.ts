@@ -126,7 +126,9 @@ export class FspConnector {
         response.expiration = expiration;
         response.ilpPacket = prepare.base64PreparePacket;
         response.condition = prepare.base64Condition;
-        response.extensionList = postQuotesOutput.fees;
+        response.extensionList = (postQuotesOutput.fees?.extension?.length ?? 0) > 0
+            ? postQuotesOutput.fees
+            : undefined;
 
         return response;
     }
