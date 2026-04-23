@@ -31,5 +31,8 @@ jobs:
           npm run build:apps-app-auditor
           npm run build:apps-web-pivotal
 
+      - name: Install portal dependencies
+        run: npm ci --prefix packages/portal
+
       - name: Build portal
         run: npm run build:portal
