@@ -84,7 +84,7 @@ export class Jwt {
                 }
 
                 const parsedPayload = Jwt.toJsonPayload(payload);
-                const content = JsonWebToken.verify(tokenOrTokenObject, Jwt.toSecret(key));
+                const content = JsonWebToken.verify(tokenOrTokenObject, Jwt.toSecret(key), {algorithms: ['RS256']});
 
                 if (!Jwt.isJsonObjectPayload(content)) {
                     return false;
@@ -93,7 +93,7 @@ export class Jwt {
                 return Jwt.toCanonicalJson(content) === Jwt.toCanonicalJson(parsedPayload);
             }
 
-            const content = JsonWebToken.verify(tokenOrTokenObject.full, Jwt.toSecret(key));
+            const content = JsonWebToken.verify(tokenOrTokenObject.full, Jwt.toSecret(key), {algorithms: ['RS256']});
 
             if (!Jwt.isJsonObjectPayload(content)) {
                 return false;
