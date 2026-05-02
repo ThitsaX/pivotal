@@ -4,6 +4,7 @@ import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm/component/typeorm-settings';
 import {FspiopAxiosParams, FspiopSettings,} from '@shared/fspiop';
 import type {WebOutboundModule} from './web-outbound.module';
+import {JwtPolicy} from './component';
 
 export class WebOutboundSettings
     implements WebOutboundModule.RequiredSettings {
@@ -62,6 +63,12 @@ export class WebOutboundSettings
                 this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS')
             ), fspiopAxiosParams
         );
+    }
+
+    jwtPolicy(): JwtPolicy {
+        return {
+            enabled: this.readOptionalBoolean('ACCESS_JWT_ENABLED') ?? true,
+        };
     }
 
     centralLedgerUrl(): string {
@@ -124,6 +131,17 @@ export class WebOutboundSettings
         }
 
         return parsed;
+    }
+
+    private readOptionalBoolean(name: string): boolean | undefined {
+        const value = this.configService.get<string>(name);
+        if (value == null || value.trim().length === 0) {
+            return undefined;
+        }
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+        if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+        return undefined;
     }
 
     private readPositiveInteger(name: string): number | undefined {
