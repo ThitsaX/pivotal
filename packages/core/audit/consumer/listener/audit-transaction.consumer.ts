@@ -73,10 +73,18 @@ export class AuditTransactionConsumer implements OnModuleInit {
     }
 
     private async consume(messages: ConsumerMessages): Promise<void> {
-        for await (const msg of messages) {
-            try {
-                const message = this.nats.codec.decode(msg.data) as TransactionMessage;
+        const validPhases = new Set<string>(Object.values(TransactionMessage.InvocationPhase));
 
+        for await (const msg of messages) {
+            const message = this.nats.codec.decode(msg.data) as TransactionMessage;
+
+            if (message.phase == null || !validPhases.has(message.phase as string)) {
+                this.logger.warn(`Terminating message with unknown phase: ${String(message.phase)}`);
+                msg.term();
+                continue;
+            }
+
+            try {
                 await this.dispatch(message);
                 msg.ack();
             } catch (error) {
