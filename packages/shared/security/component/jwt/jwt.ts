@@ -65,7 +65,7 @@ export class Jwt {
             throw new Error('JWT signing failed to produce 3 token parts.');
         }
 
-        return new Jwt.Token(parts[0], parts[1], parts[2], token);
+        return new Jwt.Token(parts[0], parts[1], parts[2]);
     }
 
     static verify(privateKey: PrivateKey, token: string, payload: Record<string, unknown>): boolean;
@@ -151,7 +151,7 @@ export namespace Jwt {
 
         readonly full: string;
 
-        constructor(header: string, body: string, signature: string, full?: string) {
+        constructor(header: string, body: string, signature: string) {
             if (header == null || body == null || signature == null) {
                 throw new Error('JWT token parts cannot be null.');
             }
@@ -159,7 +159,7 @@ export namespace Jwt {
             this.header = header;
             this.body = body;
             this.signature = signature;
-            this.full = full ?? `${header}.${body}.${signature}`;
+            this.full = `${header}.${body}.${signature}`;
         }
     }
 }
