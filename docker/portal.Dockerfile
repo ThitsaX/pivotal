@@ -9,17 +9,8 @@ ARG VITE_WEB_PIVOTAL_API_BASE_URL
 ENV VITE_WEB_PIVOTAL_API_BASE_URL=${VITE_WEB_PIVOTAL_API_BASE_URL}
 RUN npm --prefix packages/portal run build
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 WORKDIR /usr/share/nginx/html
 COPY --from=builder /app/packages/portal/dist ./
-RUN mkdir -p /var/cache/nginx/client_temp \
-              /var/cache/nginx/proxy_temp \
-              /var/cache/nginx/fastcgi_temp \
-              /var/cache/nginx/uwsgi_temp \
-              /var/cache/nginx/scgi_temp && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    touch /var/run/nginx.pid && \
-    chown nginx:nginx /var/run/nginx.pid
-USER nginx
-EXPOSE 80
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
