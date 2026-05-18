@@ -151,7 +151,6 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
             {label: 'Transaction Completed', value: 'transactionCompletedAt'},
             {label: 'ID', value: 'id'},
             {label: 'Transfer ID', value: 'transferId'},
-            {label: 'Correlation ID', value: 'correlationId'},
             {label: 'Payer FSP', value: 'payerFsp'},
             {label: 'Payee FSP', value: 'payeeFsp'},
             {label: 'Transfer Type', value: 'transferType'},
@@ -160,7 +159,6 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
         ],
         columns: [
             {key: 'transferId', label: 'Transfer ID'},
-            {key: 'correlationId', label: 'Correlation ID'},
             {key: 'payer', label: 'Payer'},
             {key: 'payee', label: 'Payee'},
             {key: 'transferType', label: 'Scenario'},
