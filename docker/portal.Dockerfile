@@ -9,8 +9,8 @@ ARG VITE_WEB_PIVOTAL_API_BASE_URL
 ENV VITE_WEB_PIVOTAL_API_BASE_URL=${VITE_WEB_PIVOTAL_API_BASE_URL}
 RUN npm --prefix packages/portal run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginx:1.27-alpine AS runtime
 WORKDIR /usr/share/nginx/html
 COPY --from=builder /app/packages/portal/dist ./
-EXPOSE 8080
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
