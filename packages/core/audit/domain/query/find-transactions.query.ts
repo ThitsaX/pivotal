@@ -66,6 +66,7 @@ export namespace FindTransactionsQuery {
 
         export enum Column {
             Id = 'id',
+            TransferId = 'transferId',
             CorrelationId = 'correlationId',
             PayerFsp = 'payerFsp',
             PayeeFsp = 'payeeFsp',

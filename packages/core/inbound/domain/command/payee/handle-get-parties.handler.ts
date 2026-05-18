@@ -34,6 +34,11 @@ export class HandleGetPartiesHandler
                     payeeIdType: partyIdType,
                     payeeId: partyId,
                     payeeSubId: subId ?? null,
+                    request: {
+                        partyIdType,
+                        partyId,
+                        subId: subId ?? null,
+                    },
                     occurredAt: createdAt,
                 },
             ),

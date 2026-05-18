@@ -814,12 +814,14 @@ const getDetailPayloads = (
 
 const getDesktopHeaderCellClass = (columnKey: string): string => {
     switch (columnKey) {
+        case 'transferId':
+            return 'w-[13%]';
         case 'correlationId':
-            return 'w-[15%]';
+            return 'w-[13%]';
         case 'payer':
-            return 'w-[12%]';
+            return 'w-[11%]';
         case 'payee':
-            return 'w-[12%]';
+            return 'w-[11%]';
         case 'transferType':
             return 'w-[10%]';
         case 'amount':
@@ -877,7 +879,9 @@ const recordKey = (record: Record<string, unknown>, index: number): string => {
 };
 
 const openDetailsModal = async (record: Record<string, unknown>): Promise<void> => {
-    const transferIdValue = record.correlationId;
+    const transferIdValue = typeof record.transferId === 'string' && record.transferId.trim().length > 0
+        ? record.transferId
+        : record.correlationId;
 
     if (typeof transferIdValue !== 'string' || transferIdValue.trim().length === 0) {
         return;
@@ -1174,13 +1178,13 @@ const jumpToPage = (pageNumber: number): void => {
                                                 getDesktopBodyCellClass(column.key),
                                             ]"
                                         >
-                                            <div v-if="column.key === 'correlationId'" class="inline-flex items-start gap-1.5">
-                                                <span class="break-all font-mono text-[11px] tracking-tight">{{ formatValue(record.correlationId) }}</span>
+                                            <div v-if="column.key === 'transferId' || column.key === 'correlationId'" class="inline-flex items-start gap-1.5">
+                                                <span class="break-all font-mono text-[11px] tracking-tight">{{ formatValue(record[column.key]) }}</span>
                                                 <button
                                                     type="button"
                                                     class="inline-flex h-5 w-5 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
                                                     :title="copiedCellKey === `${recordKey(record, index)}-${column.key}` ? 'Copied' : `Copy ${column.label}`"
-                                                    @click="copyText(`${recordKey(record, index)}-${column.key}`, record.correlationId)"
+                                                    @click="copyText(`${recordKey(record, index)}-${column.key}`, record[column.key])"
                                                 >
                                                     <span v-if="copiedCellKey === `${recordKey(record, index)}-${column.key}`">✓</span>
                                                     <svg
@@ -1395,19 +1399,19 @@ const jumpToPage = (pageNumber: number): void => {
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                         Transfer ID
                                     </p>
-                                    <div class="flex items-start gap-2">
-                                        <p class="min-w-0 break-all font-mono text-[12px] text-ink">
-                                            {{ formatValue(record.correlationId) }}
-                                        </p>
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
-                                            :title="copiedCellKey === `${recordKey(record, index)}-card-correlationId` ? 'Copied' : 'Copy Transfer ID'"
-                                            @click="copyText(`${recordKey(record, index)}-card-correlationId`, record.correlationId)"
-                                        >
-                                            <span v-if="copiedCellKey === `${recordKey(record, index)}-card-correlationId`">✓</span>
-                                            <svg
-                                                v-else
+	                                    <div class="flex items-start gap-2">
+	                                        <p class="min-w-0 break-all font-mono text-[12px] text-ink">
+	                                            {{ formatValue(record.transferId) }}
+	                                        </p>
+	                                        <button
+	                                            type="button"
+	                                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
+	                                            :title="copiedCellKey === `${recordKey(record, index)}-card-transferId` ? 'Copied' : 'Copy Transfer ID'"
+	                                            @click="copyText(`${recordKey(record, index)}-card-transferId`, record.transferId)"
+	                                        >
+	                                            <span v-if="copiedCellKey === `${recordKey(record, index)}-card-transferId`">✓</span>
+	                                            <svg
+	                                                v-else
                                                 class="h-3.5 w-3.5"
                                                 viewBox="0 0 24 24"
                                                 fill="none"
@@ -1421,8 +1425,40 @@ const jumpToPage = (pageNumber: number): void => {
                                                 <path d="M5 15V5a2 2 0 0 1 2-2h10" />
                                             </svg>
                                         </button>
-                                    </div>
-                                </section>
+	                                    </div>
+	                                    <div class="space-y-1">
+	                                        <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+	                                            Correlation ID
+	                                        </p>
+	                                        <div class="flex items-start gap-2">
+	                                            <p class="min-w-0 break-all font-mono text-[11px] text-slate-600">
+	                                                {{ formatValue(record.correlationId) }}
+	                                            </p>
+	                                            <button
+	                                                type="button"
+	                                                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
+	                                                :title="copiedCellKey === `${recordKey(record, index)}-card-correlationId` ? 'Copied' : 'Copy Correlation ID'"
+	                                                @click="copyText(`${recordKey(record, index)}-card-correlationId`, record.correlationId)"
+	                                            >
+	                                                <span v-if="copiedCellKey === `${recordKey(record, index)}-card-correlationId`">✓</span>
+	                                                <svg
+	                                                    v-else
+	                                                    class="h-3.5 w-3.5"
+	                                                    viewBox="0 0 24 24"
+	                                                    fill="none"
+	                                                    stroke="currentColor"
+	                                                    stroke-width="2"
+	                                                    stroke-linecap="round"
+	                                                    stroke-linejoin="round"
+	                                                    aria-hidden="true"
+	                                                >
+	                                                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
+	                                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+	                                                </svg>
+	                                            </button>
+	                                        </div>
+	                                    </div>
+	                                </section>
 
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <section class="space-y-1.5">
@@ -1721,12 +1757,16 @@ const jumpToPage = (pageNumber: number): void => {
                 <div v-else class="space-y-4">
                     <div class="space-y-3 rounded-xl border border-accent/15 bg-white px-3 py-3">
                         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2.5">
-                            <div class="min-w-0">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Transfer ID</p>
-                                <p class="mt-1 truncate font-mono text-[13px] text-ink sm:break-all sm:whitespace-normal">
-                                    {{ formatValue(selectedTransaction.record.transferId ?? selectedTransaction.record.correlationId) }}
-                                </p>
-                            </div>
+	                            <div class="min-w-0">
+	                                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Transfer ID</p>
+	                                <p class="mt-1 truncate font-mono text-[13px] text-ink sm:break-all sm:whitespace-normal">
+	                                    {{ formatValue(selectedTransaction.record.transferId) }}
+	                                </p>
+	                                <p class="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Correlation ID</p>
+	                                <p class="mt-1 truncate font-mono text-[12px] text-slate-600 sm:break-all sm:whitespace-normal">
+	                                    {{ formatValue(selectedTransaction.record.correlationId) }}
+	                                </p>
+	                            </div>
                             <div class="flex flex-col items-end gap-1.5">
                                 <span
                                     :class="[

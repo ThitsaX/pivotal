@@ -9,6 +9,18 @@ import {GetTransactionQuery} from '../query/get-transaction.query';
 import {FindTransactionsQuery} from '../query/find-transactions.query';
 import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from './pivotal-connection-name';
 
+type AuditPartyDisplay = {
+    fsp: string | null;
+    idType: PartyIdType | null;
+    id: string | null;
+    subId: string | null;
+};
+
+type AuditTransactionDisplay = {
+    payer: AuditPartyDisplay;
+    payee: AuditPartyDisplay;
+};
+
 @Injectable()
 export class TransactionRepository {
 
@@ -166,14 +178,14 @@ export class TransactionRepository {
                 updated_at
             ) VALUES (${placeholders})
             ON DUPLICATE KEY UPDATE
-                payer_fsp = VALUES(payer_fsp),
-                payee_fsp = VALUES(payee_fsp),
-                payer_id_type = COALESCE(VALUES(payer_id_type), transactions.payer_id_type),
-                payer_id = COALESCE(VALUES(payer_id), transactions.payer_id),
-                payer_sub_id = COALESCE(VALUES(payer_sub_id), transactions.payer_sub_id),
-                payee_id_type = COALESCE(VALUES(payee_id_type), transactions.payee_id_type),
-                payee_id = COALESCE(VALUES(payee_id), transactions.payee_id),
-                payee_sub_id = COALESCE(VALUES(payee_sub_id), transactions.payee_sub_id),
+                payer_fsp = COALESCE(NULLIF(VALUES(payer_fsp), ''), transactions.payer_fsp),
+                payee_fsp = COALESCE(NULLIF(VALUES(payee_fsp), ''), transactions.payee_fsp),
+                payer_id_type = COALESCE(NULLIF(VALUES(payer_id_type), ''), transactions.payer_id_type),
+                payer_id = COALESCE(NULLIF(VALUES(payer_id), ''), transactions.payer_id),
+                payer_sub_id = COALESCE(NULLIF(VALUES(payer_sub_id), ''), transactions.payer_sub_id),
+                payee_id_type = COALESCE(NULLIF(VALUES(payee_id_type), ''), transactions.payee_id_type),
+                payee_id = COALESCE(NULLIF(VALUES(payee_id), ''), transactions.payee_id),
+                payee_sub_id = COALESCE(NULLIF(VALUES(payee_sub_id), ''), transactions.payee_sub_id),
                 transaction_initiator_type = COALESCE(
                     VALUES(transaction_initiator_type),
                     transactions.transaction_initiator_type
@@ -457,7 +469,16 @@ export class TransactionRepository {
         }
 
         if (criteria.transferId !== undefined) {
-            queryBuilder.andWhere('transaction.correlationId = :transferId', {transferId: criteria.transferId});
+            queryBuilder.andWhere(
+                `(
+                    transaction.correlationId = :transferId
+                    OR JSON_UNQUOTE(JSON_EXTRACT(transaction.quotesRequest, '$.quoteId')) = :transferId
+                    OR JSON_UNQUOTE(JSON_EXTRACT(transaction.quotesRequest, '$.transactionId')) = :transferId
+                    OR JSON_UNQUOTE(JSON_EXTRACT(transaction.quotesRequest, '$.transactionRequestId')) = :transferId
+                    OR JSON_UNQUOTE(JSON_EXTRACT(transaction.transfersRequest, '$.transferId')) = :transferId
+                )`,
+                {transferId: criteria.transferId},
+            );
         }
 
         if (criteria.flow !== undefined) {
@@ -539,6 +560,7 @@ export class TransactionRepository {
         switch (column) {
             case FindTransactionsQuery.Order.Column.Id:
                 return 'transaction.id';
+            case FindTransactionsQuery.Order.Column.TransferId:
             case FindTransactionsQuery.Order.Column.CorrelationId:
                 return 'transaction.correlationId';
             case FindTransactionsQuery.Order.Column.PayerFsp:
@@ -566,17 +588,20 @@ export class TransactionRepository {
     }
 
     private static toRecord(record: Transaction): Record<string, unknown> {
+        const display = TransactionRepository.toDisplayFields(record);
+
         return {
             id: record.id,
+            transferId: TransactionRepository.toTransferId(record),
             correlationId: record.correlationId,
-            payerFsp: record.payerFsp,
-            payeeFsp: record.payeeFsp,
-            payerIdType: record.payerIdType,
-            payerId: record.payerId,
-            payerSubId: record.payerSubId,
-            payeeIdType: record.payeeIdType,
-            payeeId: record.payeeId,
-            payeeSubId: record.payeeSubId,
+            payerFsp: display.payer.fsp,
+            payeeFsp: display.payee.fsp,
+            payerIdType: display.payer.idType,
+            payerId: display.payer.id,
+            payerSubId: display.payer.subId,
+            payeeIdType: display.payee.idType,
+            payeeId: display.payee.id,
+            payeeSubId: display.payee.subId,
             transactionInitiatorType: record.transactionInitiatorType,
             quotingCurrency: record.quotingCurrency,
             quotingAmount: record.quotingAmount,
@@ -594,18 +619,20 @@ export class TransactionRepository {
     }
 
     private static toDetailRecord(record: Transaction): Record<string, unknown> {
+        const display = TransactionRepository.toDisplayFields(record);
+
         return {
             id: record.id,
-            transferId: record.correlationId,
+            transferId: TransactionRepository.toTransferId(record),
             correlationId: record.correlationId,
-            payerFsp: record.payerFsp,
-            payeeFsp: record.payeeFsp,
-            payerIdType: record.payerIdType,
-            payerId: record.payerId,
-            payerSubId: record.payerSubId,
-            payeeIdType: record.payeeIdType,
-            payeeId: record.payeeId,
-            payeeSubId: record.payeeSubId,
+            payerFsp: display.payer.fsp,
+            payeeFsp: display.payee.fsp,
+            payerIdType: display.payer.idType,
+            payerId: display.payer.id,
+            payerSubId: display.payer.subId,
+            payeeIdType: display.payee.idType,
+            payeeId: display.payee.id,
+            payeeSubId: display.payee.subId,
             transactionInitiatorType: record.transactionInitiatorType,
             quotingCurrency: record.quotingCurrency,
             quotingAmount: record.quotingAmount,
@@ -621,9 +648,9 @@ export class TransactionRepository {
             flow: record.flow,
             partiesRequestedAt: record.partiesRequestedAt,
             partiesRespondedAt: record.partiesRespondedAt,
-            partiesRequest: record.partiesRequest,
-            partiesResponse: record.partiesResponse,
-            partiesError: record.partiesError,
+            partiesRequest: TransactionRepository.toJsonOutput(record.partiesRequest),
+            partiesResponse: TransactionRepository.toJsonOutput(record.partiesResponse),
+            partiesError: TransactionRepository.toJsonOutput(record.partiesError),
             outboundPartiesRequestedAt: record.outboundPartiesRequestedAt,
             outboundPartiesRespondedAt: record.outboundPartiesRespondedAt,
             inboundPartiesRequestedAt: record.inboundPartiesRequestedAt,
@@ -632,9 +659,9 @@ export class TransactionRepository {
             connectorPartiesRespondedAt: record.connectorPartiesRespondedAt,
             quotesRequestedAt: record.quotesRequestedAt,
             quotesRespondedAt: record.quotesRespondedAt,
-            quotesRequest: record.quotesRequest,
-            quotesResponse: record.quotesResponse,
-            quotesError: record.quotesError,
+            quotesRequest: TransactionRepository.toJsonOutput(record.quotesRequest),
+            quotesResponse: TransactionRepository.toJsonOutput(record.quotesResponse),
+            quotesError: TransactionRepository.toJsonOutput(record.quotesError),
             outboundQuotesRequestedAt: record.outboundQuotesRequestedAt,
             outboundQuotesRespondedAt: record.outboundQuotesRespondedAt,
             inboundQuotesRequestedAt: record.inboundQuotesRequestedAt,
@@ -643,9 +670,9 @@ export class TransactionRepository {
             connectorQuotesRespondedAt: record.connectorQuotesRespondedAt,
             transfersRequestedAt: record.transfersRequestedAt,
             transfersRespondedAt: record.transfersRespondedAt,
-            transfersRequest: record.transfersRequest,
-            transfersResponse: record.transfersResponse,
-            transfersError: record.transfersError,
+            transfersRequest: TransactionRepository.toJsonOutput(record.transfersRequest),
+            transfersResponse: TransactionRepository.toJsonOutput(record.transfersResponse),
+            transfersError: TransactionRepository.toJsonOutput(record.transfersError),
             outboundTransfersRequestedAt: record.outboundTransfersRequestedAt,
             outboundTransfersRespondedAt: record.outboundTransfersRespondedAt,
             inboundTransfersRequestedAt: record.inboundTransfersRequestedAt,
@@ -654,11 +681,178 @@ export class TransactionRepository {
             connectorTransfersRespondedAt: record.connectorTransfersRespondedAt,
             patchRequestedAt: record.patchRequestedAt,
             patchRespondedAt: record.patchRespondedAt,
-            patchRequest: record.patchRequest,
+            patchRequest: TransactionRepository.toJsonOutput(record.patchRequest),
             patchError: record.patchError,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
         };
+    }
+
+    private static toDisplayFields(record: Transaction): AuditTransactionDisplay {
+        const partiesRequest = TransactionRepository.toRecordObject(record.partiesRequest);
+        const partiesResponse = TransactionRepository.toRecordObject(record.partiesResponse);
+        const quotesRequest = TransactionRepository.toRecordObject(record.quotesRequest);
+        const transfersRequest = TransactionRepository.toRecordObject(record.transfersRequest);
+        const quotePayer = TransactionRepository.toPartyDisplayFromParty(quotesRequest?.payer);
+        const quotePayee = TransactionRepository.toPartyDisplayFromParty(quotesRequest?.payee);
+        const partiesResponsePayee = TransactionRepository.toPartyDisplayFromParty(partiesResponse?.party);
+        const partiesRequestPayee = TransactionRepository.toPartyDisplayFromLookupRequest(partiesRequest);
+
+        return {
+            payer: {
+                fsp: TransactionRepository.firstText(
+                    record.payerFsp,
+                    quotePayer.fsp,
+                    TransactionRepository.toText(transfersRequest?.payerFsp),
+                ),
+                idType: TransactionRepository.firstPartyIdType(record.payerIdType, quotePayer.idType),
+                id: TransactionRepository.firstText(record.payerId, quotePayer.id),
+                subId: TransactionRepository.firstText(record.payerSubId, quotePayer.subId),
+            },
+            payee: {
+                fsp: TransactionRepository.firstText(
+                    record.payeeFsp,
+                    partiesResponsePayee.fsp,
+                    quotePayee.fsp,
+                    TransactionRepository.toText(transfersRequest?.payeeFsp),
+                ),
+                idType: TransactionRepository.firstPartyIdType(
+                    record.payeeIdType,
+                    partiesResponsePayee.idType,
+                    quotePayee.idType,
+                    partiesRequestPayee.idType,
+                ),
+                id: TransactionRepository.firstText(
+                    record.payeeId,
+                    partiesResponsePayee.id,
+                    quotePayee.id,
+                    partiesRequestPayee.id,
+                ),
+                subId: TransactionRepository.firstText(
+                    record.payeeSubId,
+                    partiesResponsePayee.subId,
+                    quotePayee.subId,
+                    partiesRequestPayee.subId,
+                ),
+            },
+        };
+    }
+
+    private static toTransferId(record: Transaction): string | null {
+        const quotesRequest = TransactionRepository.toRecordObject(record.quotesRequest);
+        const transfersRequest = TransactionRepository.toRecordObject(record.transfersRequest);
+
+        return TransactionRepository.firstText(
+            TransactionRepository.isTraceparent(record.correlationId) ? null : record.correlationId,
+            TransactionRepository.toText(transfersRequest?.transferId),
+            TransactionRepository.toText(quotesRequest?.quoteId),
+            TransactionRepository.toText(quotesRequest?.transactionId),
+            TransactionRepository.toText(quotesRequest?.transactionRequestId),
+        );
+    }
+
+    private static isTraceparent(value: unknown): boolean {
+        const text = TransactionRepository.toText(value);
+
+        return text == null
+            ? false
+            : /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/i.test(text);
+    }
+
+    private static toPartyDisplayFromParty(value: unknown): AuditPartyDisplay {
+        const party = TransactionRepository.toRecordObject(value);
+        const partyIdInfo = TransactionRepository.toRecordObject(party?.partyIdInfo);
+
+        return {
+            fsp: TransactionRepository.toText(partyIdInfo?.fspId),
+            idType: TransactionRepository.toPartyIdType(partyIdInfo?.partyIdType),
+            id: TransactionRepository.toText(partyIdInfo?.partyIdentifier),
+            subId: TransactionRepository.toText(partyIdInfo?.partySubIdOrType),
+        };
+    }
+
+    private static toPartyDisplayFromLookupRequest(value: unknown): AuditPartyDisplay {
+        const request = TransactionRepository.toRecordObject(value);
+
+        return {
+            fsp: null,
+            idType: TransactionRepository.toPartyIdType(request?.partyIdType),
+            id: TransactionRepository.firstText(
+                TransactionRepository.toText(request?.partyId),
+                TransactionRepository.toText(request?.id),
+                TransactionRepository.toText(request?.partyIdentifier),
+            ),
+            subId: TransactionRepository.firstText(
+                TransactionRepository.toText(request?.subId),
+                TransactionRepository.toText(request?.partySubIdOrType),
+            ),
+        };
+    }
+
+    private static toRecordObject(value: unknown): Record<string, unknown> | null {
+        const output = TransactionRepository.toJsonOutput(value);
+
+        if (output == null || typeof output !== 'object' || Array.isArray(output)) {
+            return null;
+        }
+
+        return output as Record<string, unknown>;
+    }
+
+    private static toJsonOutput(value: unknown): unknown {
+        if (typeof value !== 'string') {
+            return value;
+        }
+
+        const trimmed = value.trim();
+
+        if (trimmed.length === 0) {
+            return value;
+        }
+
+        try {
+            return JSON.parse(trimmed) as unknown;
+        } catch {
+            return value;
+        }
+    }
+
+    private static toText(value: unknown): string | null {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const trimmed = value.trim();
+
+        return trimmed.length > 0 ? trimmed : null;
+    }
+
+    private static toPartyIdType(value: unknown): PartyIdType | null {
+        return TransactionRepository.toText(value) as PartyIdType | null;
+    }
+
+    private static firstText(...values: Array<string | null | undefined>): string | null {
+        for (const value of values) {
+            const normalized = TransactionRepository.toText(value);
+
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private static firstPartyIdType(...values: Array<PartyIdType | null | undefined>): PartyIdType | null {
+        for (const value of values) {
+            const normalized = TransactionRepository.toPartyIdType(value);
+
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 }
 
