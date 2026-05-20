@@ -882,12 +882,20 @@ const openDetailsModal = async (record: Record<string, unknown>): Promise<void> 
     const transferIdValue = typeof record.transferId === 'string' && record.transferId.trim().length > 0
         ? record.transferId
         : record.correlationId;
+    const lookupIdValue = typeof record.correlationId === 'string' && record.correlationId.trim().length > 0
+        ? record.correlationId
+        : transferIdValue;
 
     if (typeof transferIdValue !== 'string' || transferIdValue.trim().length === 0) {
         return;
     }
 
+    if (typeof lookupIdValue !== 'string' || lookupIdValue.trim().length === 0) {
+        return;
+    }
+
     const transferId = transferIdValue.trim();
+    const lookupId = lookupIdValue.trim();
 
     selectedTransaction.value = {
         title: `Transaction Details - ${transferId}`,
@@ -898,7 +906,7 @@ const openDetailsModal = async (record: Record<string, unknown>): Promise<void> 
     activeDetailsTab.value = 'parties';
 
     try {
-        const requestUrl = `${API_BASE_URL}${props.viewDefinition.endpoint}/${encodeURIComponent(transferId)}`;
+        const requestUrl = `${API_BASE_URL}${props.viewDefinition.endpoint}/${encodeURIComponent(lookupId)}`;
         const response = await fetch(requestUrl, {
             method: 'GET',
             headers: {
