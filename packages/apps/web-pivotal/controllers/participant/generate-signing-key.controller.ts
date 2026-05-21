@@ -1,4 +1,5 @@
 import {Body, Controller, Post} from '@nestjs/common';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {PivotalException} from '@shared/foundation';
 import {RsaKeyPair} from '@shared/security/component/key/rsa-key-pair';
 
@@ -20,6 +21,7 @@ export class GenerateSigningKeyController {
     private static readonly SUPPORTED_KEY_SIZES = new Set<number>([2048, 4096]);
 
     @Post('signing-key')
+    @RequiresPermission(PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE)
     generateSigningKey(
         @Body() request: GenerateSigningKeyRequest,
     ): GenerateSigningKeyResponse {

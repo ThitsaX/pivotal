@@ -1,3 +1,6 @@
+export * from './auth/auth.controller';
+export * from './health/health.controller';
+export * from './me/me.controller';
 export * from './participant/onboard-fsp.controller';
 export * from './participant/add-fsp-currency.controller';
 export * from './participant/add-signing-keys.controller';

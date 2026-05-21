@@ -1,5 +1,6 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {AddFspCurrencyCommand} from '@core/participant/domain';
 import {FspiopCurrency} from '@shared/fspiop';
 
@@ -20,6 +21,7 @@ export class AddFspCurrencyController {
     }
 
     @Post('currency')
+    @RequiresPermission(PermissionKey.PARTICIPANT_CURRENCY_ADD)
     async addFspCurrency(
         @Body() request: AddFspCurrencyRequest,
     ): Promise<AddFspCurrencyCommand.Output> {

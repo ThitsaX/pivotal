@@ -399,11 +399,13 @@ export class TransactionRepository {
         criteria: FindTransactionsQuery.Criteria,
         pageRequest: FindTransactionsQuery.PageRequest,
         order: FindTransactionsQuery.Order,
+        accessScope?: FindTransactionsQuery.AccessScope,
         target: DbTarget = DbTarget.Read,
     ): Promise<FindTransactionsQuery.Output> {
         const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
 
         this.applyCriteria(queryBuilder, criteria);
+        this.applyAccessScope(queryBuilder, accessScope);
         this.applyOrdering(queryBuilder, order);
         const finalPageRequest = this.applyPagination(queryBuilder, pageRequest.page, pageRequest.size);
         const [records, totalRecords] = await queryBuilder.getManyAndCount();
@@ -412,6 +414,20 @@ export class TransactionRepository {
             records.map((record) => TransactionRepository.toRecord(record)),
             totalRecords,
             new FindTransactionsQuery.PageRequest(finalPageRequest.page, finalPageRequest.size),
+        );
+    }
+
+    private applyAccessScope(
+        queryBuilder: SelectQueryBuilder<Transaction>,
+        accessScope: FindTransactionsQuery.AccessScope | undefined,
+    ): void {
+        if (accessScope === undefined) {
+            return;
+        }
+
+        queryBuilder.andWhere(
+            '(transaction.payerFsp = :accessScopeFspId OR transaction.payeeFsp = :accessScopeFspId)',
+            {accessScopeFspId: accessScope.fspId},
         );
     }
 

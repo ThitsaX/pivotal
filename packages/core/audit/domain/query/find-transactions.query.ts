@@ -12,6 +12,14 @@ export namespace FindTransactionsQuery {
             public readonly criteria: Criteria = new Criteria(),
             public readonly pageRequest: PageRequest = new PageRequest(),
             public readonly order: Order = new Order(),
+            public readonly accessScope?: AccessScope,
+        ) {
+        }
+    }
+
+    export class AccessScope {
+        constructor(
+            public readonly fspId: string,
         ) {
         }
     }

@@ -120,7 +120,7 @@ const submit = async (): Promise<void> => {
 
 <template>
     <ActionPage
-        :eyebrow="viewDefinition.group"
+        eyebrow="Participant"
         :title="viewDefinition.title"
         :subtitle="viewDefinition.subtitle"
         form-description="Select an existing participant and choose the currencies to add to that participant."
