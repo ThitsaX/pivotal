@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import TimeZoneSelector from '../components/TimeZoneSelector.vue';
-import type {ViewDefinition, ViewGroup, ViewKey} from '../modules/audit/types';
+import type {MenuGroup} from '../stores/menu.store';
 
 defineProps<{
-    groupedViews: Array<{group: ViewGroup; views: ViewDefinition[]}>;
+    groups: MenuGroup[];
     selectedTimeZone: string;
 }>();
 
 const emit = defineEmits<{
     (event: 'update:selectedTimeZone', value: string): void;
-    (event: 'openView', viewKey: ViewKey): void;
+    (event: 'openGroup', group: MenuGroup): void;
 }>();
 </script>
 
@@ -63,14 +63,14 @@ const emit = defineEmits<{
             <div class="px-5 pb-5">
                 <div class="flex flex-wrap gap-2">
                     <button
-                        v-for="group in groupedViews"
-                        :key="`dashboard-${group.group}`"
+                        v-for="group in groups"
+                        :key="`dashboard-${group.label}`"
                         type="button"
                         class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3 py-2 text-sm font-semibold text-accent transition hover:border-accent"
-                        :disabled="group.views.length === 0"
-                        @click="group.views.length > 0 && emit('openView', group.views[0].key)"
+                        :disabled="group.menus.length === 0"
+                        @click="group.menus.length > 0 && emit('openGroup', group)"
                     >
-                        Open {{ group.group }}
+                        Open {{ group.label }}
                     </button>
                 </div>
             </div>

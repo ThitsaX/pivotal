@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue';
+import {apiClient} from '../../api/client';
 import PageSizeDialog from '../../components/PageSizeDialog.vue';
 import PaginationInfoBar from '../../components/PaginationInfoBar.vue';
 import PrettyJsonViewer from '../../components/PrettyJsonViewer.vue';
@@ -27,12 +28,6 @@ const emit = defineEmits<{
     (event: 'update:selectedTimeZone', value: string): void;
 }>();
 
-const DEFAULT_WEB_PIVOTAL_API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3202`;
-const API_BASE_URL = (
-    import.meta.env.VITE_WEB_PIVOTAL_API_BASE_URL ??
-    import.meta.env.VITE_AUDIT_API_BASE_URL ??
-    DEFAULT_WEB_PIVOTAL_API_BASE_URL
-).replace(/\/$/, '');
 const MAX_SEARCH_RESULT_ROWS = 500_000;
 
 const loading = ref(false);
@@ -352,28 +347,16 @@ const buildQueryParams = (criteria: Record<string, string>): URLSearchParams => 
 
 const runSearch = async (): Promise<void> => {
     const params = buildQueryParams(lastSubmittedCriteria.value);
-    const requestUrl = `${API_BASE_URL}${props.viewDefinition.endpoint}?${params.toString()}`;
+    const requestPath = `${props.viewDefinition.endpoint}?${params.toString()}`;
 
     loading.value = true;
     requestError.value = null;
     requestErrorEyebrow.value = 'Search Failed';
     requestErrorTitle.value = 'Audit search could not be completed';
-    lastRequestedUrl.value = requestUrl;
+    lastRequestedUrl.value = requestPath;
 
     try {
-        const response = await fetch(requestUrl, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            const body = await response.text();
-            throw new Error(`${response.status} ${response.statusText} ${body}`.trim());
-        }
-
-        const payload = await response.json() as QueryResponse;
+        const payload = await apiClient.get<QueryResponse>(requestPath);
 
         if (payload.totalRecords > MAX_SEARCH_RESULT_ROWS) {
             requestErrorEyebrow.value = 'Query Too Broad';
@@ -894,21 +877,8 @@ const openDetailsModal = async (record: Record<string, unknown>): Promise<void> 
     activeDetailsTab.value = 'parties';
 
     try {
-        const requestUrl = `${API_BASE_URL}${props.viewDefinition.endpoint}/${encodeURIComponent(transferId)}`;
-        const response = await fetch(requestUrl, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            const body = await response.text();
-
-            throw new Error(`${response.status} ${response.statusText} ${body}`.trim());
-        }
-
-        const payload = await response.json() as {record?: Record<string, unknown>};
+        const requestPath = `${props.viewDefinition.endpoint}/${encodeURIComponent(transferId)}`;
+        const payload = await apiClient.get<{record?: Record<string, unknown>}>(requestPath);
         const detailRecord = payload.record;
 
         if (detailRecord == null || typeof detailRecord !== 'object') {
@@ -1040,7 +1010,7 @@ const jumpToPage = (pageNumber: number): void => {
             <div class="border-b border-accent/15 bg-[linear-gradient(135deg,rgba(20,127,195,0.14),rgba(255,255,255,0.95))] px-5 py-5">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-                        {{ viewDefinition.group }}
+                        Audit
                     </p>
                     <h3 class="mt-2 font-display text-2xl text-ink">
                         {{ viewDefinition.title }}

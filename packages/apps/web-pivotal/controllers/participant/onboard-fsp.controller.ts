@@ -1,5 +1,6 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {OnboardFspCommand} from '@core/participant/domain';
 import {FspiopCurrency} from '@shared/fspiop';
 
@@ -28,6 +29,7 @@ export class OnboardFspController {
     }
 
     @Post('onboard')
+    @RequiresPermission(PermissionKey.PARTICIPANT_ONBOARD)
     async onboardFsp(
         @Body() request: OnboardFspRequest,
     ): Promise<OnboardFspCommand.Output> {

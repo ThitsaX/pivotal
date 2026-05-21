@@ -1,5 +1,6 @@
 import {Body, Controller, Inject, Put} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {UpsertEndpointCommand} from '@core/participant/domain';
 
 export class UpsertEndpointRequest {
@@ -19,6 +20,7 @@ export class UpsertEndpointController {
     }
 
     @Put('endpoint')
+    @RequiresPermission(PermissionKey.PARTICIPANT_ENDPOINT_REGISTER)
     async upsertEndpoint(
         @Body() request: UpsertEndpointRequest,
     ): Promise<UpsertEndpointCommand.Output> {

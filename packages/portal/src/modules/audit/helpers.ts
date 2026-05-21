@@ -2,7 +2,6 @@ import type {
     CriteriaSection,
     FilterField,
     ViewDefinition,
-    ViewGroup,
     ViewKey,
     ViewState,
 } from './types';
@@ -30,15 +29,6 @@ export const buildInitialState = (viewDefinitions: ViewDefinition[]): Record<Vie
     });
 
     return Object.fromEntries(entries) as Record<ViewKey, ViewState>;
-};
-
-export const groupViews = (viewDefinitions: ViewDefinition[]): Array<{group: ViewGroup; views: ViewDefinition[]}> => {
-    return ['Hub', 'Participant', 'Catalyst', 'Audit'].map((group): {group: ViewGroup; views: ViewDefinition[]} => {
-        return {
-            group: group as ViewGroup,
-            views: viewDefinitions.filter((view: ViewDefinition): boolean => view.group === group),
-        };
-    });
 };
 
 export const getCriteriaSections = (fields: FilterField[]): CriteriaSection[] => {

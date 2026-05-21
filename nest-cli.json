@@ -59,6 +59,15 @@
         "tsConfigPath": "packages/core/audit/domain/tsconfig.app.json"
       }
     },
+    "core-auth-domain": {
+      "type": "library",
+      "root": "packages/core/auth/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/auth/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/auth/domain/tsconfig.app.json"
+      }
+    },
     "core-audit-consumer": {
       "type": "library",
       "root": "packages/core/audit/consumer",

@@ -1,0 +1,15 @@
+export const PermissionKey = {
+    HUB_CURRENCY_ADD:                'hub.currency.add',
+    HUB_SIGNING_KEYS_UPDATE:         'hub.signing-keys.update',
+    PARTICIPANT_LIST:                'participant.list',
+    PARTICIPANT_ONBOARD:             'participant.onboard',
+    PARTICIPANT_CURRENCY_ADD:        'participant.currency.add',
+    PARTICIPANT_ENDPOINT_REGISTER:   'participant.endpoint.register',
+    PARTICIPANT_SIGNING_KEYS_UPDATE: 'participant.signing-keys.update',
+    AUDIT_TRANSACTIONS_LIST:         'audit.transactions.list',
+    AUDIT_TRANSACTIONS_VIEW:         'audit.transactions.view',
+} as const;
+
+export type PermissionKeyValue = typeof PermissionKey[keyof typeof PermissionKey];
+
+export const ALL_PERMISSION_KEYS: PermissionKeyValue[] = Object.values(PermissionKey);
