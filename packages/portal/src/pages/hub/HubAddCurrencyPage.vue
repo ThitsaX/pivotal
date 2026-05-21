@@ -114,7 +114,7 @@ const submit = async (): Promise<void> => {
 
 <template>
     <ActionPage
-        :eyebrow="viewDefinition.group"
+        eyebrow="Hub"
         :title="viewDefinition.title"
         :subtitle="viewDefinition.subtitle"
         form-description="Choose one or more currencies to provision the required Hub accounts and settlement model."

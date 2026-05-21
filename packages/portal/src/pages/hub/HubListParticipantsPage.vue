@@ -154,7 +154,7 @@ onMounted((): void => {
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-                            {{ viewDefinition.group }}
+                            Hub
                         </p>
                         <h3 class="mt-2 font-display text-2xl text-ink">
                             {{ viewDefinition.title }}
