@@ -1,7 +1,7 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {OutboundDomainModule} from '@core/outbound/domain';
 import {ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore,} from '@core/participant/domain';
-import {AccessGuard} from './component';
+import {AccessGuard, JwtPolicy} from './component';
 import {SendMoneyController} from './controllers';
 import {WebOutboundSettings} from './required.settings';
 import {AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore} from '@shared/security';
@@ -68,10 +68,10 @@ export class WebOutboundModule {
             },
             {
                 provide: AccessGuard,
-                useFactory: (accessKeyStore: AccessKeyStore): AccessGuard => {
-                    return new AccessGuard(accessKeyStore);
+                useFactory: (accessKeyStore: AccessKeyStore, settings: WebOutboundModule.RequiredSettings): AccessGuard => {
+                    return new AccessGuard(accessKeyStore, settings.jwtPolicy());
                 },
-                inject: [AccessKeyStore],
+                inject: [AccessKeyStore, REQUIRED_SETTINGS],
             }
 
         ];
@@ -107,7 +107,7 @@ export class WebOutboundModule {
 export namespace WebOutboundModule {
 
     export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings, OutboundDomainModule.RequiredSettings {
-
+        jwtPolicy(): JwtPolicy;
     }
 
     export type AsyncOptions = {
