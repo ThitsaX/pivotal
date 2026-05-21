@@ -8,6 +8,14 @@ export namespace GetTransactionQuery {
     export class Input {
         constructor(
             public readonly transferId: string,
+            public readonly accessScope?: AccessScope,
+        ) {
+        }
+    }
+
+    export class AccessScope {
+        constructor(
+            public readonly fspId: string,
         ) {
         }
     }

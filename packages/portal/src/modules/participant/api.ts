@@ -1,10 +1,6 @@
-const DEFAULT_WEB_PIVOTAL_API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3202`;
+import {apiClient, API_BASE_URL, ApiError} from '../../api/client';
 
-export const PARTICIPANT_API_BASE_URL = (
-    import.meta.env.VITE_WEB_PIVOTAL_API_BASE_URL ??
-    import.meta.env.VITE_AUDIT_API_BASE_URL ??
-    DEFAULT_WEB_PIVOTAL_API_BASE_URL
-).replace(/\/$/, '');
+export const PARTICIPANT_API_BASE_URL = API_BASE_URL;
 
 export interface ParticipantActionResult {
     status: number;
@@ -32,102 +28,52 @@ export interface ParticipantSummary {
     accounts?: ParticipantAccountSummary[];
 }
 
-interface ErrorPayload {
-    code?: string;
-    message?: string;
-}
+function formatApiError(error: ApiError): Error {
 
-const toErrorPayload = (value: unknown): ErrorPayload | null => {
-    if (value == null || typeof value !== 'object') {
-        return null;
-    }
+    if (error.code != null && error.code.length > 0) {
 
-    return value as ErrorPayload;
-};
-
-const toErrorMessage = (status: number, payload: unknown, fallbackStatusText: string): string => {
-    const errorPayload = toErrorPayload(payload);
-    const code = errorPayload?.code?.trim();
-    const message = errorPayload?.message?.trim();
-
-    if (code != null && code.length > 0 && message != null && message.length > 0) {
         if (
-            message === code
-            || message.startsWith(`${code}:`)
-            || message.includes(`(${code})`)
+            error.message === error.code
+            || error.message.startsWith(`${error.code}:`)
+            || error.message.includes(`(${error.code})`)
         ) {
-            return message;
+            return new Error(error.message);
         }
 
-        return `${code}: ${message}`;
+        return new Error(`${error.code}: ${error.message}`);
     }
 
-    if (message != null && message.length > 0) {
-        return message;
-    }
-
-    if (code != null && code.length > 0) {
-        return code;
-    }
-
-    return `${status} ${fallbackStatusText}`.trim();
-};
-
-const parseResponseBody = async (response: Response): Promise<unknown> => {
-    const contentType = response.headers.get('content-type') ?? '';
-
-    if (contentType.includes('application/json')) {
-        return response.json();
-    }
-
-    const text = await response.text();
-
-    if (text.trim().length === 0) {
-        return null;
-    }
-
-    return text;
-};
+    return new Error(error.message);
+}
 
 export const executeParticipantAction = async (
     method: 'POST' | 'PUT',
     path: string,
     body: Record<string, unknown>,
 ): Promise<ParticipantActionResult> => {
-    const response = await fetch(`${PARTICIPANT_API_BASE_URL}${path}`, {
-        method,
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-    });
 
-    const payload = await parseResponseBody(response);
+    try {
+        const payload = method === 'POST'
+            ? await apiClient.post<unknown>(path, body)
+            : await apiClient.put<unknown>(path, body);
 
-    if (!response.ok) {
-        throw new Error(toErrorMessage(response.status, payload, response.statusText));
+        return {status: 200, payload};
+    } catch (error) {
+        if (error instanceof ApiError) {
+            throw formatApiError(error);
+        }
+        throw error;
     }
-
-    return {
-        status: response.status,
-        payload,
-    };
 };
 
 export const fetchParticipantResource = async <T>(path: string): Promise<T> => {
-    const response = await fetch(`${PARTICIPANT_API_BASE_URL}${path}`, {
-        method: 'GET',
-        headers: {
-            Accept: 'application/json',
-        },
-    });
 
-    const payload = await parseResponseBody(response);
-
-    if (!response.ok) {
-        throw new Error(toErrorMessage(response.status, payload, response.statusText));
+    try {
+        return await apiClient.get<T>(path);
+    } catch (error) {
+        if (error instanceof ApiError) {
+            throw formatApiError(error);
+        }
+        throw error;
     }
-
-    return payload as T;
 };

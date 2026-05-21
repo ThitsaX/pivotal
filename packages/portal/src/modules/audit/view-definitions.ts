@@ -37,9 +37,7 @@ const FLOW_OPTIONS: SelectOption[] = [
 export const VIEW_DEFINITIONS: ViewDefinition[] = [
     {
         key: 'hub-add-currency',
-        group: 'Hub',
         title: 'Add Currency',
-        menuLabel: 'Add Currency',
         subtitle: 'Provision Hub settlement and reconciliation accounts plus the deferred net settlement model for a currency.',
         endpoint: '/hub/currency',
         criteriaFields: [],
@@ -49,9 +47,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'hub-list-participants',
-        group: 'Hub',
         title: 'List Participants',
-        menuLabel: 'List Participants',
         subtitle: 'Review the participants currently registered in central ledger, including their status and currencies.',
         endpoint: '/participant/list',
         criteriaFields: [],
@@ -61,9 +57,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'hub-add-signing-keys',
-        group: 'Hub',
         title: 'Add Signing Keys',
-        menuLabel: 'Update Signing Keys',
         subtitle: 'Create or update the JWS signing key pair for Hub.',
         endpoint: '/hub/signing-keys',
         criteriaFields: [],
@@ -73,9 +67,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-onboarding',
-        group: 'Participant',
         title: 'Onboard FSP',
-        menuLabel: 'Onboard FSP',
         subtitle: 'Provision a new FSP with its endpoint, signing keys, and supported currencies.',
         endpoint: '/participant/onboard',
         criteriaFields: [],
@@ -85,9 +77,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-add-new-currency',
-        group: 'Participant',
         title: 'Add Currency',
-        menuLabel: 'Add Currency',
         subtitle: 'Enable one or more additional currencies for an existing participant.',
         endpoint: '/participant/currency',
         criteriaFields: [],
@@ -97,9 +87,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-register-endpoint',
-        group: 'Participant',
         title: 'Register Endpoint',
-        menuLabel: 'Register Endpoint',
         subtitle: 'Register or replace the callback endpoint configuration for an existing participant.',
         endpoint: '/participant/endpoint',
         criteriaFields: [],
@@ -109,9 +97,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-add-signing-keys',
-        group: 'Participant',
         title: 'Add Signing Keys',
-        menuLabel: 'Update Signing Keys',
         subtitle: 'Create or update the JWS signing key pair for a participant by name.',
         endpoint: '/participant/signing-keys',
         criteriaFields: [],
@@ -121,9 +107,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'transactions',
-        group: 'Audit',
         title: 'Find Transactions',
-        menuLabel: 'Find Transactions',
         subtitle: 'Search audited transactions across parties, quotes, and transfers from one place.',
         endpoint: '/audit/transactions',
         criteriaFields: [

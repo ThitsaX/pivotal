@@ -1,5 +1,6 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {AddHubCurrencyCommand} from '@core/participant/domain';
 import {FspiopCurrency} from '@shared/fspiop';
 
@@ -18,6 +19,7 @@ export class AddHubCurrencyController {
     }
 
     @Post('currency')
+    @RequiresPermission(PermissionKey.HUB_CURRENCY_ADD)
     async addHubCurrency(
         @Body() request: AddHubCurrencyRequest,
     ): Promise<AddHubCurrencyCommand.Output> {
