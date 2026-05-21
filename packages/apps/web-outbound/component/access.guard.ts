@@ -2,7 +2,8 @@ import {CanActivate, ExecutionContext} from '@nestjs/common';
 import {FspiopErrors, FspiopException, FspiopHeaders} from '@shared/fspiop';
 import {Jwt} from '@shared/security/component/jwt';
 import {Request} from 'express';
-import {AccessKeyStore} from "@shared/security";
+import {AccessKeyStore} from '@shared/security';
+import {JwtPolicy} from './jwt-policy';
 
 export class AccessGuard implements CanActivate {
 
@@ -10,6 +11,7 @@ export class AccessGuard implements CanActivate {
 
     constructor(
         private readonly accessKeyStore: AccessKeyStore,
+        private readonly policy: JwtPolicy,
     ) {
     }
 
@@ -23,6 +25,10 @@ export class AccessGuard implements CanActivate {
     }
 
     canActivate(context: ExecutionContext): boolean {
+        if (!this.policy.enabled) {
+            return true;
+        }
+
         const request = context.switchToHttp().getRequest<Request>();
 
         const rawSource = request.headers[FspiopHeaders.Names.FSPIOP_SOURCE];
@@ -73,13 +79,13 @@ export class AccessGuard implements CanActivate {
 
         const body = AccessGuard.resolveBody(request);
         const bodyEncoded = Jwt.encode(body);
-        const token = new Jwt.Token(tokenParts[0], bodyEncoded, tokenParts[2], authorization);
+        const token = new Jwt.Token(tokenParts[0], bodyEncoded, tokenParts[2]);
 
         if (!Jwt.verify(publicKey, token)) {
-            // throw new FspiopException(
-            //     FspiopErrors.INVALID_SIGNATURE,
-            //     'Authorization signature verification failed.',
-            // );
+            throw new FspiopException(
+                FspiopErrors.INVALID_SIGNATURE,
+                'Authorization signature verification failed.',
+            );
         }
 
         return true;
