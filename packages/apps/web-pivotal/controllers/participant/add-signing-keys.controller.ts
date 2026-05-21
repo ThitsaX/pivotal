@@ -1,5 +1,6 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {AddSigningKeysCommand} from '@core/participant/domain';
 
 export class AddSigningKeysRequest {
@@ -21,6 +22,7 @@ export class AddSigningKeysController {
     }
 
     @Post('signing-keys')
+    @RequiresPermission(PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE)
     async addSigningKeys(
         @Body() request: AddSigningKeysRequest,
     ): Promise<AddSigningKeysCommand.Output> {

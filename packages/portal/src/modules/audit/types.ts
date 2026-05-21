@@ -8,8 +8,6 @@ export type ViewKey =
     | 'participant-register-endpoint'
     | 'transactions';
 
-export type ViewGroup = 'Hub' | 'Participant' | 'Catalyst' | 'Audit';
-
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';
 export type PayloadKey = 'request' | 'response' | 'error';
@@ -34,9 +32,7 @@ export interface ColumnDefinition {
 
 export interface ViewDefinition {
     key: ViewKey;
-    group: ViewGroup;
     title: string;
-    menuLabel: string;
     subtitle: string;
     endpoint: string;
     criteriaFields: FilterField[];

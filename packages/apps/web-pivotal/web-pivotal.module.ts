@@ -1,17 +1,23 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
+import {APP_GUARD} from '@nestjs/core';
 import {AuditDomainModule} from '@core/audit/domain';
+import {AuthDomainModule} from '@core/auth/domain';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {
     AddFspCurrencyController,
     AddHubCurrencyController,
     AddHubSigningKeysController,
     AddSigningKeysController,
+    AuthController,
     GenerateSigningKeyController,
+    HealthController,
     ListCentralLedgerParticipantsController,
+    MeController,
     OnboardFspController,
     TransactionsAuditController,
     UpsertEndpointController,
 } from './controllers';
+import {JwtAuthGuard, PermissionsGuard} from './guards';
 import {WebPivotalSettings} from './required.settings';
 
 const REQUIRED_SETTINGS = Symbol('WebPivotalRequiredSettings');
@@ -34,6 +40,11 @@ export class WebPivotalModule {
                                                    inject: asyncOptions.inject ?? [],
                                                    useFactory: asyncOptions.useFactory,
                                                }),
+                AuthDomainModule.forRootAsync({
+                                                  imports: asyncOptions.imports ?? [],
+                                                  inject: asyncOptions.inject ?? [],
+                                                  useFactory: asyncOptions.useFactory,
+                                              }),
                 ParticipantDomainModule.forRootAsync({
                                                          imports: asyncOptions.imports ?? [],
                                                          inject: asyncOptions.inject ?? [],
@@ -42,6 +53,9 @@ export class WebPivotalModule {
                 ...(asyncOptions.imports ?? []),
             ],
             controllers: [
+                AuthController,
+                MeController,
+                HealthController,
                 OnboardFspController,
                 AddFspCurrencyController,
                 AddHubCurrencyController,
@@ -53,6 +67,16 @@ export class WebPivotalModule {
                 TransactionsAuditController,
             ],
             providers: [
+                JwtAuthGuard,
+                PermissionsGuard,
+                {
+                    provide:  APP_GUARD,
+                    useClass: JwtAuthGuard,
+                },
+                {
+                    provide:  APP_GUARD,
+                    useClass: PermissionsGuard,
+                },
                 ...WebPivotalModule.createProviders(asyncOptions),
             ],
         };
@@ -73,6 +97,7 @@ export namespace WebPivotalModule {
 
     export interface RequiredSettings
         extends AuditDomainModule.RequiredSettings,
+            AuthDomainModule.RequiredSettings,
             ParticipantDomainModule.RequiredSettings {
     }
 

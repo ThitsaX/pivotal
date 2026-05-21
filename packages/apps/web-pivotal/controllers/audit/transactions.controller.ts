@@ -1,7 +1,14 @@
-import {Controller, Get, Inject, Param, Query} from '@nestjs/common';
+import {BadRequestException, Controller, Get, Inject, Param, Query} from '@nestjs/common';
 import {QueryBus} from '@nestjs/cqrs';
+import {
+    AccessTokenClaims,
+    DFSP_USER_ROLE_CODE,
+    PermissionKey,
+    RequiresPermission,
+} from '@core/auth/domain';
 import {FindTransactionsQuery, GetTransactionQuery} from '@core/audit/domain';
 import {PartyIdType, TransactionScenario} from '@shared/fspiop';
+import {AuthUser} from '../../decorators';
 import {QueryParamsUtil} from '../query-params.util';
 
 @Controller('audit/transactions')
@@ -14,7 +21,9 @@ export class TransactionsAuditController {
     }
 
     @Get()
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
     async findTransactions(
+        @AuthUser() claims: AccessTokenClaims | undefined,
         @Query('payerFsp') payerFsp: string | undefined,
         @Query('payeeFsp') payeeFsp: string | undefined,
         @Query('payerIdType') payerIdType: string | undefined,
@@ -38,6 +47,8 @@ export class TransactionsAuditController {
         @Query('orderColumn') orderColumn: string | undefined,
         @Query('orderDirection') orderDirection: string | undefined,
     ): Promise<FindTransactionsQuery.Output> {
+        const accessScope = TransactionsAuditController.resolveListAccessScope(claims, payerFsp, payeeFsp);
+
         const criteria = new FindTransactionsQuery.Criteria(
             QueryParamsUtil.toOptionalString(payerFsp),
             QueryParamsUtil.toOptionalString(payeeFsp),
@@ -91,19 +102,77 @@ export class TransactionsAuditController {
 
         return this.queryBus.execute(
             new FindTransactionsQuery(
-                new FindTransactionsQuery.Input(criteria, pageRequest, order),
+                new FindTransactionsQuery.Input(criteria, pageRequest, order, accessScope),
             ),
         );
     }
 
     @Get(':transferId')
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_VIEW)
     async getTransaction(
+        @AuthUser() claims: AccessTokenClaims | undefined,
         @Param('transferId') transferId: string,
     ): Promise<GetTransactionQuery.Output> {
+        const accessScope = TransactionsAuditController.resolveDetailAccessScope(claims);
+
         return this.queryBus.execute(
             new GetTransactionQuery(
-                new GetTransactionQuery.Input(transferId),
+                new GetTransactionQuery.Input(transferId, accessScope),
             ),
         );
+    }
+
+    private static resolveListAccessScope(
+        claims: AccessTokenClaims | undefined,
+        payerFsp: string | undefined,
+        payeeFsp: string | undefined,
+    ): FindTransactionsQuery.AccessScope | undefined {
+
+        if (claims == null || claims.role !== DFSP_USER_ROLE_CODE) {
+            return undefined;
+        }
+
+        if (claims.fspId == null) {
+            throw new BadRequestException({
+                code: 'AUTH_FSP_SCOPE_MISSING',
+                message: 'DFSP user has no fspId associated with the session.',
+            });
+        }
+
+        const scopedFspId = claims.fspId;
+
+        if (payerFsp !== undefined && payerFsp !== scopedFspId) {
+            throw new BadRequestException({
+                code: 'AUTH_FSP_SCOPE_VIOLATION',
+                message: 'payerFsp must match the caller fspId.',
+            });
+        }
+
+        if (payeeFsp !== undefined && payeeFsp !== scopedFspId) {
+            throw new BadRequestException({
+                code: 'AUTH_FSP_SCOPE_VIOLATION',
+                message: 'payeeFsp must match the caller fspId.',
+            });
+        }
+
+        return new FindTransactionsQuery.AccessScope(scopedFspId);
+    }
+
+    private static resolveDetailAccessScope(
+        claims: AccessTokenClaims | undefined,
+    ): GetTransactionQuery.AccessScope | undefined {
+
+        if (claims == null || claims.role !== DFSP_USER_ROLE_CODE) {
+            return undefined;
+        }
+
+        if (claims.fspId == null) {
+            throw new BadRequestException({
+                code: 'AUTH_FSP_SCOPE_MISSING',
+                message: 'DFSP user has no fspId associated with the session.',
+            });
+        }
+
+        return new GetTransactionQuery.AccessScope(claims.fspId);
     }
 }
