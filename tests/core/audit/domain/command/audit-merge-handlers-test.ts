@@ -1,14 +1,14 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {TransactionMessage} from '../../../../../packages/core/audit/common/index.ts';
-import {AuditPartiesRequestCommand} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.command.ts';
-import {AuditPartiesRequestHandler} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.handler.ts';
-import {AuditQuotesResponseCommand} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.command.ts';
-import {AuditQuotesResponseHandler} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.handler.ts';
-import {AuditTransfersErrorCommand} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.command.ts';
-import {AuditTransfersErrorHandler} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.handler.ts';
-import {DisputeTransactionCommand} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.command.ts';
-import {DisputeTransactionHandler} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.handler.ts';
+import {TransactionMessage} from '../../../../../packages/core/audit/common';
+import {AuditPartiesRequestCommand} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.command';
+import {AuditPartiesRequestHandler} from '../../../../../packages/core/audit/domain/command/parties/audit-parties-request.handler';
+import {AuditQuotesResponseCommand} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.command';
+import {AuditQuotesResponseHandler} from '../../../../../packages/core/audit/domain/command/quotes/audit-quotes-response.handler';
+import {AuditTransfersErrorCommand} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.command';
+import {AuditTransfersErrorHandler} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.handler';
+import {DisputeTransactionCommand} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.command';
+import {DisputeTransactionHandler} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.handler';
 import {PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
 
 function createTransactionRepositoryStub() {
@@ -95,6 +95,8 @@ describe('Audit transaction handlers', () => {
         const handler = new AuditQuotesResponseHandler(repository.repository as never);
         const occurredAt = new Date('2026-02-01T00:00:05.000Z');
         const request = {
+            quoteId: 'quote-1',
+            transactionId: 'transfer-1',
             amount: {amount: '10', currency: 'USD'},
             payer: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959250000001'}},
             payee: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959420000111'}},
@@ -115,7 +117,7 @@ describe('Audit transaction handlers', () => {
         ));
 
         assert.deepEqual(repository.upsertInput, {
-            correlationId: 'corr-2',
+            correlationId: 'transfer-1',
             payerFsp: 'payerfsp',
             payeeFsp: 'payeefsp',
             payerIdType: PartyIdType.Msisdn,
@@ -133,6 +135,7 @@ describe('Audit transaction handlers', () => {
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
             error: false,
+            flow: 2,
             quotesRespondedAt: occurredAt,
             quotesRequest: request,
             quotesResponse: response,
@@ -161,7 +164,7 @@ describe('Audit transaction handlers', () => {
         ));
 
         assert.deepEqual(repository.upsertInput, {
-            correlationId: 'corr-3',
+            correlationId: 'tx-1',
             payerFsp: 'payerfsp',
             payeeFsp: 'payeefsp',
             transferCurrency: 'USD',
@@ -169,6 +172,7 @@ describe('Audit transaction handlers', () => {
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,
+            flow: 3,
             transfersRespondedAt: occurredAt,
             transfersRequest: request,
             transfersError: error,

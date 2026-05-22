@@ -20,7 +20,8 @@ export class HandlePostTransfersHandler
 
     async execute(command: HandlePostTransfersCommand): Promise<HandlePostTransfersCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, request} = command.input;
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, request.transferId);
+        const connectorCorrelationId = correlationId?.trim() || auditCorrelationId;
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
@@ -37,7 +38,7 @@ export class HandlePostTransfersHandler
             ),
         );
 
-        await this.publisher.publish(new ConnectorPostTransfersPublisher.Message(auditCorrelationId, payerFsp, payeeFsp, request));
+        await this.publisher.publish(new ConnectorPostTransfersPublisher.Message(connectorCorrelationId, payerFsp, payeeFsp, request));
         return new HandlePostTransfersCommand.Output();
     }
 }

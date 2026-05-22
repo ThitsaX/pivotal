@@ -112,11 +112,12 @@ export class AuditTransactionMapper {
     ): TransactionRepository.UpsertInput {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toQuotesRequest(input.request);
+        const correlationId = AuditTransactionMapper.toQuotesCorrelationId(input.correlationId, request);
         const payerParty = request?.payer?.partyIdInfo;
         const payeeParty = request?.payee?.partyIdInfo;
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: payerParty?.fspId ?? input.payerFsp,
             payeeFsp: payeeParty?.fspId ?? input.payeeFsp,
             payerIdType: payerParty?.partyIdType ?? null,
@@ -145,12 +146,13 @@ export class AuditTransactionMapper {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toQuotesRequest(input.request);
         const response = AuditTransactionMapper.toQuotesResponse(input.response);
+        const correlationId = AuditTransactionMapper.toQuotesCorrelationId(input.correlationId, request);
         const payerParty = request?.payer?.partyIdInfo;
         const payeeParty = request?.payee?.partyIdInfo;
         const transferAmount = response?.transferAmount;
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: payerParty?.fspId ?? input.payerFsp,
             payeeFsp: payeeParty?.fspId ?? input.payeeFsp,
             payerIdType: payerParty?.partyIdType ?? null,
@@ -182,11 +184,12 @@ export class AuditTransactionMapper {
     ): TransactionRepository.UpsertInput {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toQuotesRequest(input.request);
+        const correlationId = AuditTransactionMapper.toQuotesCorrelationId(input.correlationId, request);
         const payerParty = request?.payer?.partyIdInfo;
         const payeeParty = request?.payee?.partyIdInfo;
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: payerParty?.fspId ?? input.payerFsp,
             payeeFsp: payeeParty?.fspId ?? input.payeeFsp,
             payerIdType: payerParty?.partyIdType ?? null,
@@ -217,9 +220,10 @@ export class AuditTransactionMapper {
     ): TransactionRepository.UpsertInput {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toTransfersRequest(input.request);
+        const correlationId = AuditTransactionMapper.toTransfersCorrelationId(input.correlationId, request);
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: request?.payerFsp ?? input.payerFsp,
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
@@ -239,9 +243,10 @@ export class AuditTransactionMapper {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toTransfersRequest(input.request);
         const response = AuditTransactionMapper.toTransfersResponse(input.response);
+        const correlationId = AuditTransactionMapper.toTransfersCorrelationId(input.correlationId, request);
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: request?.payerFsp ?? input.payerFsp,
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
@@ -264,9 +269,10 @@ export class AuditTransactionMapper {
     ): TransactionRepository.UpsertInput {
         const occurredAt = AuditTransactionMapper.resolveOccurredAt(input.occurredAt);
         const request = AuditTransactionMapper.toTransfersRequest(input.request);
+        const correlationId = AuditTransactionMapper.toTransfersCorrelationId(input.correlationId, request);
 
         return {
-            correlationId: input.correlationId,
+            correlationId,
             payerFsp: request?.payerFsp ?? input.payerFsp,
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
@@ -375,6 +381,40 @@ export class AuditTransactionMapper {
         response: unknown,
     ): (TransfersIDPutResponse | TransfersIDPatchResponse) | null {
         return response == null ? null : response as TransfersIDPutResponse | TransfersIDPatchResponse;
+    }
+
+    private static toQuotesCorrelationId(
+        fallbackCorrelationId: string,
+        request: QuotesPostRequest | null,
+    ): string {
+        return AuditTransactionMapper.firstNonBlank(
+            request?.transactionId,
+            request?.transactionRequestId,
+            request?.quoteId,
+            fallbackCorrelationId,
+        );
+    }
+
+    private static toTransfersCorrelationId(
+        fallbackCorrelationId: string,
+        request: TransfersPostRequest | null,
+    ): string {
+        return AuditTransactionMapper.firstNonBlank(
+            request?.transferId,
+            fallbackCorrelationId,
+        );
+    }
+
+    private static firstNonBlank(...values: Array<string | null | undefined>): string {
+        for (const value of values) {
+            const normalized = value?.trim();
+
+            if (normalized != null && normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return '';
     }
 
     private static toPartyIdInfo(

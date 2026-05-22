@@ -26,7 +26,7 @@ export class HandlePutTransfersHandler
             return new HandlePutTransfersCommand.Output();
         }
 
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, transferId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
