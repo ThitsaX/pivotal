@@ -1,6 +1,7 @@
-import {ArgumentsHost, Catch, ExceptionFilter, Logger} from '@nestjs/common';
-import {Response} from 'express';
-import {ExtensionList, FspiopException, FspiopStatusTranslator} from '@shared/fspiop';
+import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } from '@nestjs/common';
+import { Response } from 'express';
+import { ExtensionList, FspiopException, FspiopStatusTranslator } from '@shared/fspiop';
+import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error'
 
 export class OutboundErrorInformation {
     statusCode!: string;
@@ -19,6 +20,16 @@ export class OutboundExceptionFilter implements ExceptionFilter {
 
     catch(exception: unknown, host: ArgumentsHost): void {
         const response = host.switchToHttp().getResponse<Response>();
+
+        const validationError = OutboundExceptionFilter.getValidationErrorResponse(exception);
+
+        if (validationError != null) {
+            response
+                .status(400)
+                .json(validationError);
+
+            return;
+        }
 
         const fspiopException = OutboundExceptionFilter.toFspiopException(exception);
         const status = FspiopStatusTranslator.toHttpStatus(fspiopException);
@@ -70,5 +81,21 @@ export class OutboundExceptionFilter implements ExceptionFilter {
         return descriptions.length === 0
             ? undefined
             : descriptions.join(', ');
+    }
+
+    private static getValidationErrorResponse(
+        exception: unknown,
+    ): OutboundValidationErrorResponse | undefined {
+        if (!(exception instanceof BadRequestException)) {
+            return undefined;
+        }
+
+        const exceptionResponse = exception.getResponse();
+
+        if (!isOutboundValidationErrorResponse(exceptionResponse)) {
+            return undefined;
+        }
+
+        return exceptionResponse;
     }
 }

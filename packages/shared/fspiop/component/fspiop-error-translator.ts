@@ -1,6 +1,8 @@
-import {Extension} from '../dto/extension';
-import {ExtensionList} from '../dto/extension-list';
-import {FspiopException} from '../exception/fspiop-exception';
+import { Logger } from '@nestjs/common';
+import { Extension } from '../dto/extension';
+import { ExtensionList } from '../dto/extension-list';
+import { FspiopErrors } from '../exception';
+import { FspiopException } from '../exception/fspiop-exception';
 
 export class FspiopErrorTranslator {
 
@@ -20,7 +22,15 @@ export class FspiopErrorTranslator {
         );
 
         if (extensionList === normalized.extensionList) {
-            return normalized;
+            const errorDef = FspiopErrors.find(normalized.errorDefinition.errorType.code) ?? FspiopErrors.GENERIC_VALIDATION_ERROR;
+            return new FspiopException(errorDef, {
+                extension: [
+                    {
+                        key: '',
+                        value: normalized.errorDefinition.description,
+                    },
+                ],
+            },)
         }
 
         return new FspiopException(normalized.errorDefinition, extensionList);

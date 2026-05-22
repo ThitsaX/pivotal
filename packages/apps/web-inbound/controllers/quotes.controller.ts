@@ -1,7 +1,7 @@
-import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put,} from '@nestjs/common';
-import {CommandBus, ICommand} from '@nestjs/cqrs';
-import {HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCommand,} from '@core/inbound/domain';
-import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, QuotesIDPutResponse, QuotesPostRequest,} from '@shared/fspiop';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put, } from '@nestjs/common';
+import { CommandBus, ICommand } from '@nestjs/cqrs';
+import { HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCommand, } from '@core/inbound/domain';
+import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, QuotesIDPutResponse, QuotesPostRequest, } from '@shared/fspiop';
 
 @Controller('quotes')
 export class QuotesController {
@@ -35,9 +35,9 @@ export class QuotesController {
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
     postQuotes(@Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
-               @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-               @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-               @Body() request: QuotesPostRequest): void {
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Body() request: QuotesPostRequest): void {
         this.dispatch(() => {
             const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(sourceHeader);
@@ -45,32 +45,6 @@ export class QuotesController {
 
             return new HandlePostQuotesCommand(
                 new HandlePostQuotesCommand.Input(correlationId, payerFsp, payeeFsp, request),
-            );
-        });
-    }
-
-    @Put(':quoteId')
-    @HttpCode(HttpStatus.ACCEPTED)
-    putQuotes(
-        @Param('quoteId') quoteId: string,
-        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Body() request: QuotesIDPutResponse,
-    ): void {
-        this.dispatch(() => {
-            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = QuotesController.headerValue(destinationHeader);
-            const payeeFsp = QuotesController.headerValue(sourceHeader);
-
-            return new HandlePutQuotesCommand(
-                new HandlePutQuotesCommand.Input(
-                    correlationId,
-                    payerFsp,
-                    payeeFsp,
-                    quoteId,
-                    request,
-                ),
             );
         });
     }
@@ -101,6 +75,33 @@ export class QuotesController {
             );
         });
     }
+
+    @Put(':quoteId')
+    @HttpCode(HttpStatus.ACCEPTED)
+    putQuotes(
+        @Param('quoteId') quoteId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Body() request: QuotesIDPutResponse,
+    ): void {
+        this.dispatch(() => {
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
+            const payerFsp = QuotesController.headerValue(destinationHeader);
+            const payeeFsp = QuotesController.headerValue(sourceHeader);
+
+            return new HandlePutQuotesCommand(
+                new HandlePutQuotesCommand.Input(
+                    correlationId,
+                    payerFsp,
+                    payeeFsp,
+                    quoteId,
+                    request,
+                ),
+            );
+        });
+    }
+
 
     private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {
         return {

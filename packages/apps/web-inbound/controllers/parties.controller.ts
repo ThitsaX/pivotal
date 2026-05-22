@@ -10,7 +10,7 @@ import {
     Param,
     Put,
 } from '@nestjs/common';
-import {CommandBus, ICommand} from '@nestjs/cqrs';
+import { CommandBus, ICommand } from '@nestjs/cqrs';
 import {
     HandleGetPartiesCommand,
     HandlePutPartiesCommand,
@@ -48,42 +48,13 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
     ): void {
         this.dispatch(() => {
+
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(sourceHeader);
             const payeeFsp = PartiesController.headerValue(destinationHeader);
 
             return new HandleGetPartiesCommand(
                 new HandleGetPartiesCommand.Input(correlationId, payerFsp, payeeFsp, type, id, subId ?? null),
-            );
-        });
-    }
-
-    @Put(':type/:id{/:subId}')
-    @HttpCode(HttpStatus.ACCEPTED)
-    putParties(
-        @Param('type') type: PartyIdType,
-        @Param('id') id: string,
-        @Param('subId') subId: string | undefined,
-        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Body() request: PartiesTypeIDPutResponse,
-    ): void {
-        this.dispatch(() => {
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = PartiesController.headerValue(destinationHeader);
-            const payeeFsp = PartiesController.headerValue(sourceHeader);
-
-            return new HandlePutPartiesCommand(
-                new HandlePutPartiesCommand.Input(
-                    correlationId,
-                    payerFsp,
-                    payeeFsp,
-                    type,
-                    id,
-                    subId ?? null,
-                    request,
-                ),
             );
         });
     }
@@ -118,6 +89,37 @@ export class PartiesController {
             );
         });
     }
+
+    @Put(':type/:id{/:subId}')
+    @HttpCode(HttpStatus.ACCEPTED)
+    putParties(
+        @Param('type') type: PartyIdType,
+        @Param('id') id: string,
+        @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Body() request: PartiesTypeIDPutResponse,
+    ): void {
+        this.dispatch(() => {
+            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+            const payerFsp = PartiesController.headerValue(destinationHeader);
+            const payeeFsp = PartiesController.headerValue(sourceHeader);
+
+            return new HandlePutPartiesCommand(
+                new HandlePutPartiesCommand.Input(
+                    correlationId,
+                    payerFsp,
+                    payeeFsp,
+                    type,
+                    id,
+                    subId ?? null,
+                    request,
+                ),
+            );
+        });
+    }
+
 
     private static headerValue(value: string | string[] | undefined, fallback = ''): string {
         if (value == null) {
