@@ -18,6 +18,7 @@ function createHeaders(
 
     if (traceparent != null) {
         headers[FspiopHeaders.Names.TRACE_PARENT] = traceparent;
+        headers[FspiopHeaders.Names.PIVOTAL_CORRELATION_ID] = traceparent;
     }
 
     headers[FspiopHeaders.Names.CONTENT_TYPE] = contentType;
@@ -41,6 +42,8 @@ export namespace FspiopHeaders {
         static readonly ACCEPT = 'accept';
 
         static readonly TRACE_PARENT = 'traceparent';
+
+        static readonly PIVOTAL_CORRELATION_ID = 'x-pivotal-correlation-id';
 
         static readonly CONTENT_TYPE = 'content-type';
 

@@ -20,7 +20,13 @@ export class HandlePostQuotesHandler
 
     async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, request} = command.input;
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
+        const auditCorrelationId = resolveGatewayCorrelationId(
+            correlationId,
+            request.transactionId,
+            request.transactionRequestId,
+            request.quoteId,
+        );
+        const connectorCorrelationId = correlationId?.trim() || auditCorrelationId;
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
@@ -37,7 +43,7 @@ export class HandlePostQuotesHandler
             ),
         );
 
-        await this.publisher.publish(new ConnectorPostQuotesPublisher.Message(auditCorrelationId, payerFsp, payeeFsp, request));
+        await this.publisher.publish(new ConnectorPostQuotesPublisher.Message(connectorCorrelationId, payerFsp, payeeFsp, request));
         return new HandlePostQuotesCommand.Output();
     }
 }

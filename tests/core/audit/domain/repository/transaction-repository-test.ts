@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {TransactionRepository} from '../../../../../packages/core/audit/domain/repository/transaction.repository.ts';
+import {TransactionRepository} from '../../../../../packages/core/audit/domain/repository/transaction.repository';
 
 describe('TransactionRepository', () => {
 
@@ -48,6 +48,14 @@ describe('TransactionRepository', () => {
 
         assert.equal(queries.length, 2);
         assert.match(queries[0]?.sql ?? '', /INSERT INTO transactions/);
+        assert.match(
+            queries[0]?.sql ?? '',
+            /WHEN transactions\.payer_id IS NOT NULL AND VALUES\(payer_id\) IS NULL THEN transactions\.payer_fsp/,
+        );
+        assert.match(
+            queries[0]?.sql ?? '',
+            /WHEN transactions\.payee_id IS NOT NULL AND VALUES\(payee_id\) IS NULL THEN transactions\.payee_fsp/,
+        );
         assert.equal(
             queries[0]?.params[26],
             JSON.stringify(partiesResponse),
