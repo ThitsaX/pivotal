@@ -33,8 +33,17 @@ export class PerformPostQuotesHandler
         const {quotesUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
         const createdAt = new Date();
-        const auditCorrelationId = PerformPostQuotesHandler.resolveCorrelationId(correlationId);
-        const headers = FspiopHeaders.Values.Quotes.forResult(auditCorrelationId, payerFsp, connectorId);
+        const auditCorrelationId = PerformPostQuotesHandler.resolveCorrelationId(
+            correlationId,
+            request.transactionId,
+            request.transactionRequestId,
+            request.quoteId,
+        );
+        const traceCorrelationId = PerformPostQuotesHandler.resolveTraceCorrelationId(
+            correlationId,
+            auditCorrelationId,
+        );
+        const headers = FspiopHeaders.Values.Quotes.forResult(traceCorrelationId, payerFsp, connectorId);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -133,14 +142,41 @@ export class PerformPostQuotesHandler
         return new PerformPostQuotesCommand.Output();
     }
 
-    private static resolveCorrelationId(correlationId: string | null): string {
-        if (correlationId == null || correlationId.trim().length === 0) {
+    private static resolveCorrelationId(
+        correlationId: string | null,
+        ...businessIds: Array<string | null | undefined>
+    ): string {
+        const businessId = PerformPostQuotesHandler.firstNonBlank(...businessIds);
+
+        if (businessId != null) {
+            return businessId;
+        }
+
+        const traceCorrelationId = PerformPostQuotesHandler.firstNonBlank(correlationId);
+
+        if (traceCorrelationId == null) {
             throw new FspiopException(
                 FspiopErrors.MISSING_MANDATORY_ELEMENT,
-                'traceparent correlationId is required',
+                'traceparent correlationId or transaction identifier is required',
             );
         }
 
-        return correlationId;
+        return traceCorrelationId;
+    }
+
+    private static firstNonBlank(...values: Array<string | null | undefined>): string | null {
+        for (const value of values) {
+            const normalized = value?.trim();
+
+            if (normalized != null && normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private static resolveTraceCorrelationId(correlationId: string | null, fallback: string): string {
+        return PerformPostQuotesHandler.firstNonBlank(correlationId, fallback) ?? fallback;
     }
 }

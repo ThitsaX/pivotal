@@ -43,12 +43,13 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
     ): void {
         this.dispatch(() => {
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+            const correlationId = PartiesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
             const payerFsp = PartiesController.headerValue(sourceHeader);
             const payeeFsp = PartiesController.headerValue(destinationHeader);
 
@@ -64,13 +65,14 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
     ): void {
         this.dispatch(() => {
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+            const correlationId = PartiesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
 
@@ -94,13 +96,14 @@ export class PartiesController {
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
+        @Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+            const correlationId = PartiesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
             const error = PartiesController.toErrorInformationObject(request);
@@ -134,6 +137,14 @@ export class PartiesController {
     private static optionalHeaderValue(value: string | string[] | undefined): string | null {
         const header = PartiesController.headerValue(value).trim();
         return header.length > 0 ? header : null;
+    }
+
+    private static correlationHeaderValue(
+        pivotalCorrelationHeader: string | string[] | undefined,
+        traceparentHeader: string | string[] | undefined,
+    ): string | null {
+        return PartiesController.optionalHeaderValue(pivotalCorrelationHeader)
+            ?? PartiesController.optionalHeaderValue(traceparentHeader);
     }
 
     private static toErrorInformationObject(response: ErrorInformationResponse | undefined): ErrorInformationObject {

@@ -166,8 +166,14 @@ export class TransactionRepository {
                 updated_at
             ) VALUES (${placeholders})
             ON DUPLICATE KEY UPDATE
-                payer_fsp = VALUES(payer_fsp),
-                payee_fsp = VALUES(payee_fsp),
+                payer_fsp = CASE
+                    WHEN transactions.payer_id IS NOT NULL AND VALUES(payer_id) IS NULL THEN transactions.payer_fsp
+                    ELSE VALUES(payer_fsp)
+                END,
+                payee_fsp = CASE
+                    WHEN transactions.payee_id IS NOT NULL AND VALUES(payee_id) IS NULL THEN transactions.payee_fsp
+                    ELSE VALUES(payee_fsp)
+                END,
                 payer_id_type = COALESCE(VALUES(payer_id_type), transactions.payer_id_type),
                 payer_id = COALESCE(VALUES(payer_id), transactions.payer_id),
                 payer_sub_id = COALESCE(VALUES(payer_sub_id), transactions.payer_sub_id),

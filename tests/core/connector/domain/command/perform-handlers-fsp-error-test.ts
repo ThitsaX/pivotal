@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {TransactionMessage} from '../../../../../packages/core/audit/common/index.ts';
+import {TransactionMessage} from '../../../../../packages/core/audit/common';
 import {AuditTransactionPublisher} from '../../../../../packages/core/audit/producer';
 import {
     PerformGetPartiesCommand,
@@ -149,6 +149,7 @@ describe('Perform*Handler fspError audit mapping', () => {
 
     it('should propagate the same correlation id in getParties callback headers', async () => {
         let callbackTraceparent: string | null = null;
+        let callbackPivotalCorrelationId: string | null = null;
         const correlationId = 'corr-parties-2';
 
         const handler = new PerformGetPartiesHandler(
@@ -175,6 +176,7 @@ describe('Perform*Handler fspError audit mapping', () => {
                     headers: Record<string, string>,
                 ): Promise<void> {
                     callbackTraceparent = headers[FspiopHeaders.Names.TRACE_PARENT] ?? null;
+                    callbackPivotalCorrelationId = headers[FspiopHeaders.Names.PIVOTAL_CORRELATION_ID] ?? null;
                 },
             } as unknown as FspiopAxios,
             {
@@ -188,10 +190,12 @@ describe('Perform*Handler fspError audit mapping', () => {
         ));
 
         assert.equal(callbackTraceparent, correlationId);
+        assert.equal(callbackPivotalCorrelationId, correlationId);
     });
 
     it('should propagate the same correlation id in postQuotes callback headers', async () => {
         let callbackTraceparent: string | null = null;
+        let callbackPivotalCorrelationId: string | null = null;
         const correlationId = 'corr-quotes-2';
 
         const request = {quoteId: 'quote-1'} as QuotesPostRequest;
@@ -213,6 +217,7 @@ describe('Perform*Handler fspError audit mapping', () => {
                     headers: Record<string, string>,
                 ): Promise<void> {
                     callbackTraceparent = headers[FspiopHeaders.Names.TRACE_PARENT] ?? null;
+                    callbackPivotalCorrelationId = headers[FspiopHeaders.Names.PIVOTAL_CORRELATION_ID] ?? null;
                 },
             } as unknown as FspiopAxios,
             {
@@ -226,10 +231,12 @@ describe('Perform*Handler fspError audit mapping', () => {
         ));
 
         assert.equal(callbackTraceparent, correlationId);
+        assert.equal(callbackPivotalCorrelationId, correlationId);
     });
 
     it('should propagate the same correlation id in postTransfers callback headers', async () => {
         let callbackTraceparent: string | null = null;
+        let callbackPivotalCorrelationId: string | null = null;
         const correlationId = 'corr-transfers-2';
 
         const request = {transferId: 'transfer-1'} as TransfersPostRequest;
@@ -251,6 +258,7 @@ describe('Perform*Handler fspError audit mapping', () => {
                     headers: Record<string, string>,
                 ): Promise<void> {
                     callbackTraceparent = headers[FspiopHeaders.Names.TRACE_PARENT] ?? null;
+                    callbackPivotalCorrelationId = headers[FspiopHeaders.Names.PIVOTAL_CORRELATION_ID] ?? null;
                 },
             } as unknown as FspiopAxios,
             {
@@ -264,6 +272,7 @@ describe('Perform*Handler fspError audit mapping', () => {
         ));
 
         assert.equal(callbackTraceparent, correlationId);
+        assert.equal(callbackPivotalCorrelationId, correlationId);
     });
 
     it('should reject getParties when correlation id is missing', async () => {

@@ -33,8 +33,12 @@ export class PerformPostTransfersHandler
         const {transfersUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
         const createdAt = new Date();
-        const auditCorrelationId = PerformPostTransfersHandler.resolveCorrelationId(correlationId);
-        const headers = FspiopHeaders.Values.Transfers.forResult(auditCorrelationId, payerFsp, connectorId);
+        const auditCorrelationId = PerformPostTransfersHandler.resolveCorrelationId(correlationId, request.transferId);
+        const traceCorrelationId = PerformPostTransfersHandler.resolveTraceCorrelationId(
+            correlationId,
+            auditCorrelationId,
+        );
+        const headers = FspiopHeaders.Values.Transfers.forResult(traceCorrelationId, payerFsp, connectorId);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -133,14 +137,41 @@ export class PerformPostTransfersHandler
         return new PerformPostTransfersCommand.Output();
     }
 
-    private static resolveCorrelationId(correlationId: string | null): string {
-        if (correlationId == null || correlationId.trim().length === 0) {
+    private static resolveCorrelationId(
+        correlationId: string | null,
+        ...businessIds: Array<string | null | undefined>
+    ): string {
+        const businessId = PerformPostTransfersHandler.firstNonBlank(...businessIds);
+
+        if (businessId != null) {
+            return businessId;
+        }
+
+        const traceCorrelationId = PerformPostTransfersHandler.firstNonBlank(correlationId);
+
+        if (traceCorrelationId == null) {
             throw new FspiopException(
                 FspiopErrors.MISSING_MANDATORY_ELEMENT,
-                'traceparent correlationId is required',
+                'traceparent correlationId or transaction identifier is required',
             );
         }
 
-        return correlationId;
+        return traceCorrelationId;
+    }
+
+    private static firstNonBlank(...values: Array<string | null | undefined>): string | null {
+        for (const value of values) {
+            const normalized = value?.trim();
+
+            if (normalized != null && normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private static resolveTraceCorrelationId(correlationId: string | null, fallback: string): string {
+        return PerformPostTransfersHandler.firstNonBlank(correlationId, fallback) ?? fallback;
     }
 }
