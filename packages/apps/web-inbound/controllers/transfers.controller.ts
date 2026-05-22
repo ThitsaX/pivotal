@@ -1,7 +1,7 @@
-import {Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Patch, Post, Put,} from '@nestjs/common';
-import {CommandBus, ICommand} from '@nestjs/cqrs';
-import {HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand,} from '@core/inbound/domain';
-import {ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest,} from '@shared/fspiop';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Patch, Post, Put, } from '@nestjs/common';
+import { CommandBus, ICommand } from '@nestjs/cqrs';
+import { HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand, } from '@core/inbound/domain';
+import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest, } from '@shared/fspiop';
 
 @Controller('transfers')
 export class TransfersController {
@@ -35,9 +35,9 @@ export class TransfersController {
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
     postTransfers(@Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
-                  @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-                  @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-                  @Body() request: TransfersPostRequest): void {
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Body() request: TransfersPostRequest): void {
         this.dispatch(() => {
             const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(sourceHeader);
@@ -69,32 +69,6 @@ export class TransfersController {
         });
     }
 
-    @Put(':transferId')
-    @HttpCode(HttpStatus.ACCEPTED)
-    putTransfers(
-        @Param('transferId') transferId: string,
-        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
-        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
-        @Body() request: TransfersIDPutResponse,
-    ): void {
-        this.dispatch(() => {
-            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = TransfersController.headerValue(destinationHeader);
-            const payeeFsp = TransfersController.headerValue(sourceHeader);
-
-            return new HandlePutTransfersCommand(
-                new HandlePutTransfersCommand.Input(
-                    correlationId,
-                    payerFsp,
-                    payeeFsp,
-                    transferId,
-                    request,
-                ),
-            );
-        });
-    }
-
     @Put(':transferId/error')
     @HttpCode(HttpStatus.ACCEPTED)
     putTransfersError(
@@ -117,6 +91,32 @@ export class TransfersController {
                     payeeFsp,
                     transferId,
                     error,
+                ),
+            );
+        });
+    }
+
+    @Put(':transferId')
+    @HttpCode(HttpStatus.ACCEPTED)
+    putTransfers(
+        @Param('transferId') transferId: string,
+        @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Body() request: TransfersIDPutResponse,
+    ): void {
+        this.dispatch(() => {
+            const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
+            const payerFsp = TransfersController.headerValue(destinationHeader);
+            const payeeFsp = TransfersController.headerValue(sourceHeader);
+
+            return new HandlePutTransfersCommand(
+                new HandlePutTransfersCommand.Input(
+                    correlationId,
+                    payerFsp,
+                    payeeFsp,
+                    transferId,
+                    request,
                 ),
             );
         });
