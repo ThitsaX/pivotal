@@ -2,12 +2,12 @@ import {FspiopErrors, FspiopException} from '@shared/fspiop';
 
 export function resolveGatewayCorrelationId(
     correlationId: string | null | undefined,
-    ...businessIds: Array<string | null | undefined>
+    ...transactionIdentifiers: Array<string | null | undefined>
 ): string {
-    const businessId = firstNonBlank(...businessIds);
+    const transactionIdentifier = firstNonBlank(...transactionIdentifiers);
 
-    if (businessId != null) {
-        return businessId;
+    if (transactionIdentifier != null) {
+        return transactionIdentifier;
     }
 
     const traceCorrelationId = firstNonBlank(correlationId);

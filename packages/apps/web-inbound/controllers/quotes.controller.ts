@@ -32,23 +32,14 @@ export class QuotesController {
         return header.length > 0 ? header : null;
     }
 
-    private static correlationHeaderValue(
-        pivotalCorrelationHeader: string | string[] | undefined,
-        traceparentHeader: string | string[] | undefined,
-    ): string | null {
-        return QuotesController.optionalHeaderValue(pivotalCorrelationHeader)
-            ?? QuotesController.optionalHeaderValue(traceparentHeader);
-    }
-
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
-    postQuotes(@Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
-               @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
+    postQuotes(@Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
                @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
                @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
                @Body() request: QuotesPostRequest): void {
         this.dispatch(() => {
-            const correlationId = QuotesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(sourceHeader);
             const payeeFsp = QuotesController.headerValue(destinationHeader);
 
@@ -62,14 +53,13 @@ export class QuotesController {
     @HttpCode(HttpStatus.ACCEPTED)
     putQuotes(
         @Param('quoteId') quoteId: string,
-        @Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesIDPutResponse,
     ): void {
         this.dispatch(() => {
-            const correlationId = QuotesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
 
@@ -89,14 +79,13 @@ export class QuotesController {
     @HttpCode(HttpStatus.ACCEPTED)
     putQuotesError(
         @Param('quoteId') quoteId: string,
-        @Headers(FspiopHeaders.Names.PIVOTAL_CORRELATION_ID) pivotalCorrelationHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
-            const correlationId = QuotesController.correlationHeaderValue(pivotalCorrelationHeader, traceparentHeader);
+            const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
             const error = QuotesController.toErrorInformationObject(request);
