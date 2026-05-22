@@ -25,7 +25,7 @@ export class HandlePutQuotesHandler
             return new HandlePutQuotesCommand.Output();
         }
 
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, quoteId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(

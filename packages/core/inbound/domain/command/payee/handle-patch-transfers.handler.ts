@@ -19,7 +19,7 @@ export class HandlePatchTransfersHandler
 
     async execute(command: HandlePatchTransfersCommand): Promise<HandlePatchTransfersCommand.Output> {
         const {correlationId, payerFsp, payeeFsp, transferId, response} = command.input;
-        const auditCorrelationId = resolveGatewayCorrelationId(correlationId);
+        const auditCorrelationId = resolveGatewayCorrelationId(correlationId, transferId);
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
