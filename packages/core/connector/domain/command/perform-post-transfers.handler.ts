@@ -34,11 +34,11 @@ export class PerformPostTransfersHandler
         const connectorId = this.connectorSettings.connectorId;
         const createdAt = new Date();
         const auditCorrelationId = PerformPostTransfersHandler.resolveCorrelationId(correlationId, request.transferId);
-        const traceCorrelationId = PerformPostTransfersHandler.resolveTraceCorrelationId(
-            correlationId,
-            auditCorrelationId,
+        const headers = FspiopHeaders.Values.Transfers.forResult(
+            correlationId?.trim() || auditCorrelationId,
+            payerFsp,
+            connectorId,
         );
-        const headers = FspiopHeaders.Values.Transfers.forResult(traceCorrelationId, payerFsp, connectorId);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -139,12 +139,12 @@ export class PerformPostTransfersHandler
 
     private static resolveCorrelationId(
         correlationId: string | null,
-        ...businessIds: Array<string | null | undefined>
+        ...transactionIdentifiers: Array<string | null | undefined>
     ): string {
-        const businessId = PerformPostTransfersHandler.firstNonBlank(...businessIds);
+        const transactionIdentifier = PerformPostTransfersHandler.firstNonBlank(...transactionIdentifiers);
 
-        if (businessId != null) {
-            return businessId;
+        if (transactionIdentifier != null) {
+            return transactionIdentifier;
         }
 
         const traceCorrelationId = PerformPostTransfersHandler.firstNonBlank(correlationId);
@@ -169,9 +169,5 @@ export class PerformPostTransfersHandler
         }
 
         return null;
-    }
-
-    private static resolveTraceCorrelationId(correlationId: string | null, fallback: string): string {
-        return PerformPostTransfersHandler.firstNonBlank(correlationId, fallback) ?? fallback;
     }
 }

@@ -39,11 +39,11 @@ export class PerformPostQuotesHandler
             request.transactionRequestId,
             request.quoteId,
         );
-        const traceCorrelationId = PerformPostQuotesHandler.resolveTraceCorrelationId(
-            correlationId,
-            auditCorrelationId,
+        const headers = FspiopHeaders.Values.Quotes.forResult(
+            correlationId?.trim() || auditCorrelationId,
+            payerFsp,
+            connectorId,
         );
-        const headers = FspiopHeaders.Values.Quotes.forResult(traceCorrelationId, payerFsp, connectorId);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
@@ -144,12 +144,12 @@ export class PerformPostQuotesHandler
 
     private static resolveCorrelationId(
         correlationId: string | null,
-        ...businessIds: Array<string | null | undefined>
+        ...transactionIdentifiers: Array<string | null | undefined>
     ): string {
-        const businessId = PerformPostQuotesHandler.firstNonBlank(...businessIds);
+        const transactionIdentifier = PerformPostQuotesHandler.firstNonBlank(...transactionIdentifiers);
 
-        if (businessId != null) {
-            return businessId;
+        if (transactionIdentifier != null) {
+            return transactionIdentifier;
         }
 
         const traceCorrelationId = PerformPostQuotesHandler.firstNonBlank(correlationId);
@@ -174,9 +174,5 @@ export class PerformPostQuotesHandler
         }
 
         return null;
-    }
-
-    private static resolveTraceCorrelationId(correlationId: string | null, fallback: string): string {
-        return PerformPostQuotesHandler.firstNonBlank(correlationId, fallback) ?? fallback;
     }
 }

@@ -87,12 +87,12 @@ export class PerformPatchTransfersHandler
 
     private static resolveCorrelationId(
         correlationId: string | null,
-        ...businessIds: Array<string | null | undefined>
+        ...transactionIdentifiers: Array<string | null | undefined>
     ): string {
-        const businessId = PerformPatchTransfersHandler.firstNonBlank(...businessIds);
+        const transactionIdentifier = PerformPatchTransfersHandler.firstNonBlank(...transactionIdentifiers);
 
-        if (businessId != null) {
-            return businessId;
+        if (transactionIdentifier != null) {
+            return transactionIdentifier;
         }
 
         const traceCorrelationId = PerformPatchTransfersHandler.firstNonBlank(correlationId);
