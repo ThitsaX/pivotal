@@ -36,6 +36,24 @@ export class RolePermissionRepository {
         return rows.map((row) => row.keyName);
     }
 
+    async countByRoleId(roleId: string, target: DbTarget = DbTarget.Read): Promise<number> {
+        return this.getRepository(target).count({where: {roleId}});
+    }
+
+    async replaceForRole(roleId: string, permissionIds: string[]): Promise<void> {
+        await this.writeRepository.manager.transaction(async (em) => {
+            await em.delete(RolePermission, {roleId});
+            if (permissionIds.length > 0) {
+                const rows = permissionIds.map((permissionId) => {
+                    const rp = new RolePermission(roleId, permissionId);
+                    rp.grantedAt = new Date();
+                    return rp;
+                });
+                await em.insert(RolePermission, rows);
+            }
+        });
+    }
+
     async count(target: DbTarget = DbTarget.Read): Promise<number> {
         return this.getRepository(target).count();
     }

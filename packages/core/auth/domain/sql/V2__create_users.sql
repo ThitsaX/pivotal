@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
     `failed_login_attempts` INT NOT NULL DEFAULT 0,
     `locked_until` DATETIME NULL,
+    `tokens_invalidated_at` DATETIME NULL,
     `last_login_at` DATETIME NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
