@@ -5,9 +5,21 @@ import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {
     ChangePasswordHandler,
+    CreateMenuHandler,
+    CreateRoleHandler,
+    CreateUserHandler,
+    DeactivateUserHandler,
+    DeleteMenuHandler,
+    DeleteRoleHandler,
     LoginHandler,
     LogoutHandler,
     RefreshTokensHandler,
+    ReplaceMenuPermissionsHandler,
+    ReplaceRolePermissionsHandler,
+    ResetUserPasswordHandler,
+    UpdateMenuHandler,
+    UpdateRoleHandler,
+    UpdateUserHandler,
 } from './command';
 import {Menu, MenuPermission, Permission, RefreshToken, Role, RolePermission, User} from './model';
 import {
@@ -26,6 +38,7 @@ import {
     AUTH_DOMAIN_REQUIRED_SETTINGS,
     AuthDomainSettings,
     PasswordService,
+    TempPasswordService,
     TokenService,
 } from './service';
 
@@ -51,6 +64,7 @@ const Repositories = [
 
 const Services = [
     PasswordService,
+    TempPasswordService,
     TokenService,
 ];
 
@@ -64,6 +78,18 @@ const CommandHandlers = [
     RefreshTokensHandler,
     LogoutHandler,
     ChangePasswordHandler,
+    CreateUserHandler,
+    UpdateUserHandler,
+    ResetUserPasswordHandler,
+    DeactivateUserHandler,
+    CreateRoleHandler,
+    UpdateRoleHandler,
+    DeleteRoleHandler,
+    ReplaceRolePermissionsHandler,
+    CreateMenuHandler,
+    UpdateMenuHandler,
+    DeleteMenuHandler,
+    ReplaceMenuPermissionsHandler,
 ];
 
 @Module({})

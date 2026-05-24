@@ -5,6 +5,11 @@ import {Repository} from 'typeorm';
 import {Role} from '../model';
 import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from './pivotal-connection-name';
 
+export interface RoleUpdate {
+    name?:        string;
+    description?: string | null;
+}
+
 @Injectable()
 export class RoleRepository {
 
@@ -29,7 +34,15 @@ export class RoleRepository {
     }
 
     async findAll(target: DbTarget = DbTarget.Read): Promise<Role[]> {
-        return this.getRepository(target).find();
+        return this.getRepository(target).find({order: {createdAt: 'ASC'}});
+    }
+
+    async update(id: string, partial: RoleUpdate): Promise<void> {
+        await this.writeRepository.update({id}, partial);
+    }
+
+    async delete(id: string): Promise<void> {
+        await this.writeRepository.delete({id});
     }
 
     async count(target: DbTarget = DbTarget.Read): Promise<number> {

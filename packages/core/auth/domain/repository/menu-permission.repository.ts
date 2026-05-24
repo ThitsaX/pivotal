@@ -24,6 +24,32 @@ export class MenuPermissionRepository {
         return this.getRepository(target).find({where: {menuId}});
     }
 
+    async findPermissionKeysByMenuId(menuId: string, target: DbTarget = DbTarget.Read): Promise<string[]> {
+
+        const rows = await this.getRepository(target)
+                               .createQueryBuilder('mp')
+                               .innerJoin('permissions', 'p', 'p.id = mp.permission_id')
+                               .select('p.key_name', 'keyName')
+                               .where('mp.menu_id = :menuId', {menuId})
+                               .getRawMany<{keyName: string}>();
+
+        return rows.map((row) => row.keyName);
+    }
+
+    async countByMenuId(menuId: string, target: DbTarget = DbTarget.Read): Promise<number> {
+        return this.getRepository(target).count({where: {menuId}});
+    }
+
+    async replaceForMenu(menuId: string, permissionIds: string[]): Promise<void> {
+        await this.writeRepository.manager.transaction(async (em) => {
+            await em.delete(MenuPermission, {menuId});
+            if (permissionIds.length > 0) {
+                const rows = permissionIds.map((permissionId) => new MenuPermission(menuId, permissionId));
+                await em.insert(MenuPermission, rows);
+            }
+        });
+    }
+
     async count(target: DbTarget = DbTarget.Read): Promise<number> {
         return this.getRepository(target).count();
     }

@@ -66,6 +66,10 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, description: 'Update the JWS signing keys for a participant.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         description: 'Query the audited transactions list.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         description: 'View a single audited transaction by transfer ID.'},
+    {keyName: PermissionKey.ADMIN_USERS_MANAGE,              description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
+    {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              description: 'Manage portal roles and their granted permissions.'},
+    {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          description: 'Browse the read-only permission catalogue.'},
+    {keyName: PermissionKey.ADMIN_MENUS_MANAGE,              description: 'Manage sidebar menus and the permissions that reveal them.'},
 ];
 
 const ROLE_GRANTS: Record<string, string[]> = {
@@ -76,6 +80,21 @@ const ROLE_GRANTS: Record<string, string[]> = {
     ],
 };
 
+export const SEEDED_MENU_KEYS: readonly string[] = [
+    'hub-add-currency',
+    'hub-list-participants',
+    'hub-add-signing-keys',
+    'participant-onboarding',
+    'participant-add-new-currency',
+    'participant-register-endpoint',
+    'participant-add-signing-keys',
+    'transactions',
+    'admin-users',
+    'admin-roles',
+    'admin-permissions',
+    'admin-menus',
+];
+
 const MENU_SEEDS: MenuSeed[] = [
     {menuKey: 'hub-add-currency',              groupLabel: 'Hub',         label: 'Add Currency',         route: '/views/hub-add-currency',              sortOrder: 10, permissionKey: PermissionKey.HUB_CURRENCY_ADD},
     {menuKey: 'hub-list-participants',         groupLabel: 'Hub',         label: 'List Participants',    route: '/views/hub-list-participants',         sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_LIST},
@@ -85,6 +104,10 @@ const MENU_SEEDS: MenuSeed[] = [
     {menuKey: 'participant-register-endpoint', groupLabel: 'Participant', label: 'Register Endpoint',    route: '/views/participant-register-endpoint', sortOrder: 30, permissionKey: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER},
     {menuKey: 'participant-add-signing-keys',  groupLabel: 'Participant', label: 'Update Signing Keys', route: '/views/participant-add-signing-keys',  sortOrder: 40, permissionKey: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE},
     {menuKey: 'transactions',                  groupLabel: 'Audit',       label: 'Find Transactions',    route: '/views/transactions',                  sortOrder: 10, permissionKey: PermissionKey.AUDIT_TRANSACTIONS_LIST},
+    {menuKey: 'admin-users',                   groupLabel: 'Admin',       label: 'Users',                route: '/views/admin-users',                   sortOrder: 10, permissionKey: PermissionKey.ADMIN_USERS_MANAGE},
+    {menuKey: 'admin-roles',                   groupLabel: 'Admin',       label: 'Roles',                route: '/views/admin-roles',                   sortOrder: 20, permissionKey: PermissionKey.ADMIN_ROLES_MANAGE},
+    {menuKey: 'admin-permissions',             groupLabel: 'Admin',       label: 'Permissions',          route: '/views/admin-permissions',             sortOrder: 30, permissionKey: PermissionKey.ADMIN_PERMISSIONS_LIST},
+    {menuKey: 'admin-menus',                   groupLabel: 'Admin',       label: 'Menus',                route: '/views/admin-menus',                   sortOrder: 40, permissionKey: PermissionKey.ADMIN_MENUS_MANAGE},
 ];
 
 @Injectable()
