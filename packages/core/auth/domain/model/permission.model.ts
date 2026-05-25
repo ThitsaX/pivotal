@@ -1,5 +1,6 @@
 import {Snowflake} from '@shared/snowflake';
 import {BeforeInsert, Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {PermissionScope} from './role-scope';
 
 @Entity({name: 'permissions'})
 @Index('permissions_01_uk_key_name', ['keyName'], {unique: true})
@@ -16,11 +17,15 @@ export class Permission {
     @Column({type: 'varchar', length: 512, name: 'description', nullable: true})
     public description: string | null;
 
+    @Column({type: 'varchar', length: 8, name: 'scope'})
+    public scope: PermissionScope;
+
     @Column({type: 'datetime', name: 'created_at'})
     public createdAt!: Date;
 
     constructor(
         keyName: string,
+        scope: PermissionScope,
         description: string | null = null,
         id?: string,
     ) {
@@ -28,6 +33,7 @@ export class Permission {
             this.id = id;
         }
         this.keyName = keyName;
+        this.scope = scope;
         this.description = description;
     }
 

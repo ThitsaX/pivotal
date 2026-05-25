@@ -6,7 +6,11 @@ export type ViewKey =
     | 'participant-add-signing-keys'
     | 'participant-add-new-currency'
     | 'participant-register-endpoint'
-    | 'transactions';
+    | 'transactions'
+    | 'admin-users'
+    | 'admin-roles'
+    | 'admin-permissions'
+    | 'admin-menus';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';

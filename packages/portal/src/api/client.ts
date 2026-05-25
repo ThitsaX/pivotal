@@ -163,12 +163,35 @@ async function request<T>(
     return parsed as T;
 }
 
-export const apiClient = {
-    get: <T>(path: string): Promise<T> => request<T>('GET', path, undefined, {}),
-    post: <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body, {}),
-    put: <T>(path: string, body?: unknown): Promise<T> => request<T>('PUT', path, body, {}),
-    delete: <T>(path: string): Promise<T> => request<T>('DELETE', path, undefined, {}),
+function get<T>(path: string): Promise<T> {
+    return request<T>('GET', path, undefined, {});
+}
 
-    postWithoutAuthRetry: <T>(path: string, body?: unknown): Promise<T> =>
-        request<T>('POST', path, body, {skipAuthRetry: true}),
+function post<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>('POST', path, body, {});
+}
+
+function patch<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>('PATCH', path, body, {});
+}
+
+function put<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>('PUT', path, body, {});
+}
+
+function del<T>(path: string): Promise<T> {
+    return request<T>('DELETE', path, undefined, {});
+}
+
+function postWithoutAuthRetry<T>(path: string, body?: unknown): Promise<T> {
+    return request<T>('POST', path, body, {skipAuthRetry: true});
+}
+
+export const apiClient = {
+    get,
+    post,
+    patch,
+    put,
+    delete: del,
+    postWithoutAuthRetry,
 };

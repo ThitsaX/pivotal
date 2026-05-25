@@ -3,6 +3,7 @@ export * from './command';
 export * from './decorator';
 export * from './error';
 export * from './model';
+export * from './preset';
 export * from './repository';
 export * from './seed';
 export * from './service';
