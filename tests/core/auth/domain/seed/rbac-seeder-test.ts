@@ -149,12 +149,25 @@ describe('RbacSeeder', () => {
         }
     });
 
-    it('seeds both system roles', async () => {
+    it('seeds both system roles with the right scopes', async () => {
 
         await makeSeeder(state).seed();
 
         assert.ok(state.roles.has(ADMIN_ROLE_CODE));
         assert.ok(state.roles.has(DFSP_USER_ROLE_CODE));
+        assert.equal(state.roles.get(ADMIN_ROLE_CODE)!.scope, 'HUB');
+        assert.equal(state.roles.get(DFSP_USER_ROLE_CODE)!.scope, 'DFSP');
+    });
+
+    it('tags audit permissions BOTH and hub/admin/participant permissions HUB', async () => {
+
+        await makeSeeder(state).seed();
+
+        assert.equal(state.permissions.get('audit.transactions.list')!.scope, 'BOTH');
+        assert.equal(state.permissions.get('audit.transactions.view')!.scope, 'BOTH');
+        assert.equal(state.permissions.get('admin.users.manage')!.scope, 'HUB');
+        assert.equal(state.permissions.get('hub.currency.add')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.list')!.scope, 'HUB');
     });
 
     it('grants ADMIN all 13 permissions and DFSP_USER exactly the 2 audit permissions', async () => {

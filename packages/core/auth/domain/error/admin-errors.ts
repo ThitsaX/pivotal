@@ -26,6 +26,8 @@ export class AdminErrorCode {
 
     static readonly ROLE_CANNOT_REMOVE_ADMIN_KEY = 'ADMIN_ROLE_CANNOT_REMOVE_ADMIN_KEY';
 
+    static readonly ROLE_PERMISSION_SCOPE_MISMATCH = 'ADMIN_ROLE_PERMISSION_SCOPE_MISMATCH';
+
     static readonly PERMISSION_NOT_FOUND        = 'ADMIN_PERMISSION_NOT_FOUND';
 
     static readonly MENU_NOT_FOUND              = 'ADMIN_MENU_NOT_FOUND';
@@ -39,8 +41,8 @@ export class AdminErrorCode {
 
 export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.USER_EMAIL_TAKEN]:               'A user with that email already exists.',
-    [AdminErrorCode.USER_DFSP_REQUIRES_FSP_ID]:      'A non-ADMIN role requires fspId.',
-    [AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID]:      'The ADMIN role does not accept fspId.',
+    [AdminErrorCode.USER_DFSP_REQUIRES_FSP_ID]:      'A DFSP-scoped role requires fspId.',
+    [AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID]:      'A HUB-scoped role does not accept fspId.',
     [AdminErrorCode.USER_SELF_LOCK]:                 'You cannot change your own role or active status, or delete your own account.',
     [AdminErrorCode.USER_LAST_ADMIN]:                'This change would leave no active users able to manage other users.',
     [AdminErrorCode.USER_NOT_FOUND]:                 'User not found.',
@@ -51,6 +53,7 @@ export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.ROLE_IS_SYSTEM]:                 'System roles cannot be deleted.',
     [AdminErrorCode.ROLE_IN_USE]:                    'This role is assigned to one or more users and cannot be deleted.',
     [AdminErrorCode.ROLE_CANNOT_REMOVE_ADMIN_KEY]:   'System roles must retain their admin.* permissions.',
+    [AdminErrorCode.ROLE_PERMISSION_SCOPE_MISMATCH]: 'One or more permissions cannot be assigned to a role with that scope.',
     [AdminErrorCode.PERMISSION_NOT_FOUND]:           'One or more of the requested permission keys does not exist.',
     [AdminErrorCode.MENU_NOT_FOUND]:                 'Menu not found.',
     [AdminErrorCode.MENU_KEY_TAKEN]:                 'A menu with that menuKey already exists.',

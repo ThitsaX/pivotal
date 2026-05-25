@@ -5,5 +5,6 @@ export * from './permission-key';
 export * from './refresh-token.model';
 export * from './role.model';
 export * from './role-code';
+export * from './role-scope';
 export * from './role-permission.model';
 export * from './user.model';

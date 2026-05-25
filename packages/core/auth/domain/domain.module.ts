@@ -14,7 +14,6 @@ import {
     LoginHandler,
     LogoutHandler,
     RefreshTokensHandler,
-    ReplaceMenuPermissionsHandler,
     ReplaceRolePermissionsHandler,
     ResetUserPasswordHandler,
     UpdateMenuHandler,
@@ -89,7 +88,6 @@ const CommandHandlers = [
     CreateMenuHandler,
     UpdateMenuHandler,
     DeleteMenuHandler,
-    ReplaceMenuPermissionsHandler,
 ];
 
 @Module({})

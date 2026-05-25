@@ -41,6 +41,12 @@ export class ReplaceRolePermissionsHandler
             throw new BadRequestException(adminError(AdminErrorCode.PERMISSION_NOT_FOUND));
         }
 
+        const mismatched = resolved.filter((p) => p.scope !== 'BOTH' && p.scope !== role.scope);
+
+        if (mismatched.length > 0) {
+            throw new BadRequestException(adminError(AdminErrorCode.ROLE_PERMISSION_SCOPE_MISMATCH));
+        }
+
         if (role.isSystem) {
             const currentKeys = await this.rolePermissionRepository.findPermissionKeysByRoleId(role.id, DbTarget.Write);
             const currentAdminKeys = currentKeys.filter((k) => k.startsWith(ADMIN_KEY_PREFIX));

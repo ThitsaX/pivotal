@@ -18,7 +18,7 @@ export class PermissionsAdminController {
         const permissions = await this.permissionRepository.findAll();
 
         return new PermissionListResponseDto(
-            permissions.map((p) => new PermissionResponseDto(p.id, p.keyName, p.description)),
+            permissions.map((p) => new PermissionResponseDto(p.id, p.keyName, p.description, p.scope)),
         );
     }
 }

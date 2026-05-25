@@ -1,4 +1,4 @@
-import {Role} from '../model';
+import {Role, RoleScope} from '../model';
 
 export class CreateRoleCommand {
 
@@ -12,6 +12,7 @@ export namespace CreateRoleCommand {
         constructor(
             public readonly code:         string,
             public readonly name:         string,
+            public readonly scope:        RoleScope,
             public readonly description:  string | null,
         ) {
         }

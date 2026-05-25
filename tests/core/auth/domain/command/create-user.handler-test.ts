@@ -13,8 +13,8 @@ interface State {
 }
 
 function freshState(): State {
-    const adminRole = new Role(ADMIN_ROLE_CODE, 'System Administrator', null, true, 'role-admin');
-    const dfspRole = new Role(DFSP_USER_ROLE_CODE, 'DFSP Operator', null, true, 'role-dfsp');
+    const adminRole = new Role(ADMIN_ROLE_CODE, 'System Administrator', 'HUB', null, true, 'role-admin');
+    const dfspRole = new Role(DFSP_USER_ROLE_CODE, 'DFSP Operator', 'DFSP', null, true, 'role-dfsp');
     return {
         rolesById:    new Map([[adminRole.id, adminRole], [dfspRole.id, dfspRole]]),
         usersByEmail: new Map(),

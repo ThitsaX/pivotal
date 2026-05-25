@@ -17,7 +17,7 @@ function freshCalls(): Calls {
 }
 
 function adminRole(): Role {
-    return new Role(ADMIN_ROLE_CODE, 'Admin', null, true, 'role-admin');
+    return new Role(ADMIN_ROLE_CODE, 'Admin', 'HUB', null, true, 'role-admin');
 }
 
 function makeUserRepo(user: User | null, calls: Calls): UserRepository {

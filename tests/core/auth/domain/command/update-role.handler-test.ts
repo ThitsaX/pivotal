@@ -36,7 +36,7 @@ describe('UpdateRoleHandler', () => {
     it('updates name and description', async () => {
 
         const state = freshState();
-        state.rolesById.set('role-1', new Role('OPS', 'Old', 'Old desc', false, 'role-1'));
+        state.rolesById.set('role-1', new Role('OPS', 'Old', 'HUB', 'Old desc', false, 'role-1'));
 
         await makeHandler(state).execute(new UpdateRoleCommand(
             new UpdateRoleCommand.Input('role-1', 'New name', 'New desc'),
@@ -48,7 +48,7 @@ describe('UpdateRoleHandler', () => {
     it('skips the DB update when nothing changes', async () => {
 
         const state = freshState();
-        state.rolesById.set('role-1', new Role('OPS', 'Old', 'Old desc', false, 'role-1'));
+        state.rolesById.set('role-1', new Role('OPS', 'Old', 'HUB', 'Old desc', false, 'role-1'));
 
         await makeHandler(state).execute(new UpdateRoleCommand(
             new UpdateRoleCommand.Input('role-1', undefined, undefined),

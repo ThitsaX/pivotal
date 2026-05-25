@@ -40,16 +40,6 @@ export class MenuPermissionRepository {
         return this.getRepository(target).count({where: {menuId}});
     }
 
-    async replaceForMenu(menuId: string, permissionIds: string[]): Promise<void> {
-        await this.writeRepository.manager.transaction(async (em) => {
-            await em.delete(MenuPermission, {menuId});
-            if (permissionIds.length > 0) {
-                const rows = permissionIds.map((permissionId) => new MenuPermission(menuId, permissionId));
-                await em.insert(MenuPermission, rows);
-            }
-        });
-    }
-
     async count(target: DbTarget = DbTarget.Read): Promise<number> {
         return this.getRepository(target).count();
     }

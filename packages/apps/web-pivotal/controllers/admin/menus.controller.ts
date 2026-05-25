@@ -11,7 +11,6 @@ import {
     Param,
     Patch,
     Post,
-    Put,
 } from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
 import {
@@ -23,13 +22,11 @@ import {
     MenuPermissionRepository,
     MenuRepository,
     PermissionKey,
-    ReplaceMenuPermissionsCommand,
     RequiresPermission,
     UpdateMenuCommand,
 } from '@core/auth/domain';
 import {
     MenuCreateDto,
-    MenuPermissionsDto,
     MenuPermissionsResponseDto,
     MenuResponseDto,
     MenuUpdateDto,
@@ -148,25 +145,6 @@ export class MenusAdminController {
 
         const keys = await this.menuPermissionRepository.findPermissionKeysByMenuId(menu.id);
         return new MenuPermissionsResponseDto(keys.sort());
-    }
-
-    @Put(':id/permissions')
-    @RequiresPermission(PermissionKey.ADMIN_MENUS_MANAGE)
-    async replacePermissions(
-        @Param('id') id: string,
-        @Body() dto: MenuPermissionsDto,
-    ): Promise<MenuPermissionsResponseDto> {
-
-        const output = await this.commandBus.execute<
-            ReplaceMenuPermissionsCommand,
-            ReplaceMenuPermissionsCommand.Output
-        >(
-            new ReplaceMenuPermissionsCommand(
-                new ReplaceMenuPermissionsCommand.Input(id, dto.permissionKeys),
-            ),
-        );
-
-        return new MenuPermissionsResponseDto(output.permissionKeys);
     }
 
     private async toMenuResponse(menu: Menu): Promise<MenuResponseDto> {
