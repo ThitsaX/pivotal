@@ -24,8 +24,8 @@ function freshState(): State {
     return {
         users: new Map(),
         roles: new Map([
-            ['role-admin', new Role(ADMIN_ROLE_CODE, 'Admin', null, true, 'role-admin')],
-            ['role-dfsp',  new Role(DFSP_USER_ROLE_CODE, 'DFSP',  null, true, 'role-dfsp')],
+            ['role-admin', new Role(ADMIN_ROLE_CODE, 'Admin', 'HUB', null, true, 'role-admin')],
+            ['role-dfsp',  new Role(DFSP_USER_ROLE_CODE, 'DFSP',  'DFSP', null, true, 'role-dfsp')],
         ]),
         permissionsByRole: new Map([
             ['role-admin', [PermissionKey.ADMIN_USERS_MANAGE]],

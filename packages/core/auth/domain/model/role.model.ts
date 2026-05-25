@@ -1,5 +1,6 @@
 import {Snowflake} from '@shared/snowflake';
 import {BeforeInsert, Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {ROLE_SCOPES, RoleScope} from './role-scope';
 
 @Entity({name: 'roles'})
 @Index('roles_01_uk_code', ['code'], {unique: true})
@@ -19,6 +20,9 @@ export class Role {
     @Column({type: 'varchar', length: 512, name: 'description', nullable: true})
     public description: string | null;
 
+    @Column({type: 'enum', enum: ROLE_SCOPES, name: 'scope'})
+    public scope: RoleScope;
+
     @Column({type: 'boolean', name: 'is_system', default: false})
     public isSystem: boolean;
 
@@ -31,6 +35,7 @@ export class Role {
     constructor(
         code: string,
         name: string,
+        scope: RoleScope,
         description: string | null = null,
         isSystem: boolean = false,
         id?: string,
@@ -40,6 +45,7 @@ export class Role {
         }
         this.code = code;
         this.name = name;
+        this.scope = scope;
         this.description = description;
         this.isSystem = isSystem;
     }

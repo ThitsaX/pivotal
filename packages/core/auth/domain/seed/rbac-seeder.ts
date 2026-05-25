@@ -7,8 +7,10 @@ import {
     MenuPermission,
     Permission,
     PermissionKey,
+    PermissionScope,
     Role,
     RolePermission,
+    RoleScope,
 } from '../model';
 import {
     MenuPermissionRepository,
@@ -34,11 +36,13 @@ export interface RbacSeedResult {
 interface RoleSeed {
     code:        string;
     name:        string;
+    scope:       RoleScope;
     description: string;
 }
 
 interface PermissionSeed {
     keyName:     string;
+    scope:       PermissionScope;
     description: string;
 }
 
@@ -52,24 +56,24 @@ interface MenuSeed {
 }
 
 const ROLE_SEEDS: RoleSeed[] = [
-    {code: ADMIN_ROLE_CODE,     name: 'System Administrator', description: 'Full access to all hub operations.'},
-    {code: DFSP_USER_ROLE_CODE, name: 'DFSP Operator',        description: 'Operator scoped to a single FSP by fsp_id.'},
+    {code: ADMIN_ROLE_CODE,     name: 'System Administrator', scope: 'HUB',  description: 'Full access to all hub operations.'},
+    {code: DFSP_USER_ROLE_CODE, name: 'DFSP Operator',        scope: 'DFSP', description: 'Operator scoped to a single FSP by fsp_id.'},
 ];
 
 const PERMISSION_SEEDS: PermissionSeed[] = [
-    {keyName: PermissionKey.HUB_CURRENCY_ADD,                description: 'Provision hub settlement accounts for a new currency.'},
-    {keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE,         description: 'Update the hub-side JWS signing key pair.'},
-    {keyName: PermissionKey.PARTICIPANT_LIST,                description: 'View the list of registered participants.'},
-    {keyName: PermissionKey.PARTICIPANT_ONBOARD,             description: 'Onboard a new FSP into the hub.'},
-    {keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD,        description: 'Enable an additional currency for an existing participant.'},
-    {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   description: 'Register or replace a participant\'s callback endpoint.'},
-    {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, description: 'Update the JWS signing keys for a participant.'},
-    {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         description: 'Query the audited transactions list.'},
-    {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         description: 'View a single audited transaction by transfer ID.'},
-    {keyName: PermissionKey.ADMIN_USERS_MANAGE,              description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
-    {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              description: 'Manage portal roles and their granted permissions.'},
-    {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          description: 'Browse the read-only permission catalogue.'},
-    {keyName: PermissionKey.ADMIN_MENUS_MANAGE,              description: 'Manage sidebar menus and the permissions that reveal them.'},
+    {keyName: PermissionKey.HUB_CURRENCY_ADD,                scope: 'HUB',  description: 'Provision hub settlement accounts for a new currency.'},
+    {keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE,         scope: 'HUB',  description: 'Update the hub-side JWS signing key pair.'},
+    {keyName: PermissionKey.PARTICIPANT_LIST,                scope: 'HUB',  description: 'View the list of registered participants.'},
+    {keyName: PermissionKey.PARTICIPANT_ONBOARD,             scope: 'HUB',  description: 'Onboard a new FSP into the hub.'},
+    {keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD,        scope: 'HUB',  description: 'Enable an additional currency for an existing participant.'},
+    {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   scope: 'HUB',  description: 'Register or replace a participant\'s callback endpoint.'},
+    {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'Update the JWS signing keys for a participant.'},
+    {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         scope: 'BOTH', description: 'Query the audited transactions list.'},
+    {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         scope: 'BOTH', description: 'View a single audited transaction by transfer ID.'},
+    {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
+    {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              scope: 'HUB',  description: 'Manage portal roles and their granted permissions.'},
+    {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          scope: 'HUB',  description: 'Browse the read-only permission catalogue.'},
+    {keyName: PermissionKey.ADMIN_MENUS_MANAGE,              scope: 'HUB',  description: 'Manage sidebar menus and the permissions that reveal them.'},
 ];
 
 const ROLE_GRANTS: Record<string, string[]> = {
@@ -148,7 +152,7 @@ export class RbacSeeder {
         }
 
         for (const seed of ROLE_SEEDS) {
-            await this.roleRepository.save(new Role(seed.code, seed.name, seed.description, true));
+            await this.roleRepository.save(new Role(seed.code, seed.name, seed.scope, seed.description, true));
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${ROLE_SEEDS.length} role(s): ${ROLE_SEEDS.map((r) => r.code).join(', ')}.`);
@@ -163,7 +167,7 @@ export class RbacSeeder {
         }
 
         for (const seed of PERMISSION_SEEDS) {
-            await this.permissionRepository.save(new Permission(seed.keyName, seed.description));
+            await this.permissionRepository.save(new Permission(seed.keyName, seed.scope, seed.description));
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${PERMISSION_SEEDS.length} permission(s).`);

@@ -1,3 +1,5 @@
+import {RoleScope} from '@core/auth/domain';
+
 export class RoleResponseDto {
 
     constructor(
@@ -5,6 +7,7 @@ export class RoleResponseDto {
         public readonly code:            string,
         public readonly name:            string,
         public readonly description:     string | null,
+        public readonly scope:           RoleScope,
         public readonly isSystem:        boolean,
         public readonly userCount:       number,
         public readonly permissionCount: number,

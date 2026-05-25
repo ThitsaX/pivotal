@@ -1,4 +1,5 @@
-import {IsNotEmpty, IsOptional, IsString, MaxLength} from 'class-validator';
+import {IsIn, IsNotEmpty, IsOptional, IsString, MaxLength} from 'class-validator';
+import {ROLE_SCOPES, RoleScope} from '@core/auth/domain';
 
 export class RoleCreateDto {
 
@@ -11,6 +12,9 @@ export class RoleCreateDto {
     @IsNotEmpty()
     @MaxLength(128)
     name!: string;
+
+    @IsIn(ROLE_SCOPES as unknown as string[])
+    scope!: RoleScope;
 
     @IsOptional()
     @IsString()

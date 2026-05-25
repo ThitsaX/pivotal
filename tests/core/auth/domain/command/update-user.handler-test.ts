@@ -21,8 +21,8 @@ interface State {
 }
 
 function freshState(): State {
-    const adminRole = new Role(ADMIN_ROLE_CODE, 'Admin', null, true, 'role-admin');
-    const dfspRole = new Role(DFSP_USER_ROLE_CODE, 'DFSP', null, true, 'role-dfsp');
+    const adminRole = new Role(ADMIN_ROLE_CODE, 'Admin', 'HUB', null, true, 'role-admin');
+    const dfspRole = new Role(DFSP_USER_ROLE_CODE, 'DFSP', 'DFSP', null, true, 'role-dfsp');
 
     return {
         users:                 new Map(),

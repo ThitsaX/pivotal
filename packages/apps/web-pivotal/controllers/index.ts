@@ -12,5 +12,6 @@ export * from './hub/list-central-ledger-participants.controller';
 export * from './audit/transactions.controller';
 export * from './admin/menus.controller';
 export * from './admin/permissions.controller';
+export * from './admin/role-presets.controller';
 export * from './admin/roles.controller';
 export * from './admin/users.controller';

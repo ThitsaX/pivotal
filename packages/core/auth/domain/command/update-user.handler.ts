@@ -2,7 +2,7 @@ import {BadRequestException, ConflictException, Inject, NotFoundException} from 
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
-import {ADMIN_ROLE_CODE, PermissionKey} from '../model';
+import {PermissionKey} from '../model';
 import {RolePermissionRepository, RoleRepository, UserRepository, UserUpdate} from '../repository';
 import {RefreshTokenRepository} from '../repository/refresh-token.repository';
 import {UpdateUserCommand} from './update-user.command';
@@ -50,11 +50,11 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, Upd
 
         const effectiveFspId = fspId === undefined ? target.fspId : (fspId != null && fspId.trim().length > 0 ? fspId.trim() : null);
 
-        if (newRole.code === ADMIN_ROLE_CODE && effectiveFspId != null) {
+        if (newRole.scope === 'HUB' && effectiveFspId != null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID));
         }
 
-        if (newRole.code !== ADMIN_ROLE_CODE && effectiveFspId == null) {
+        if (newRole.scope === 'DFSP' && effectiveFspId == null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_DFSP_REQUIRES_FSP_ID));
         }
 

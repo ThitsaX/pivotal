@@ -85,7 +85,7 @@ export class RolesAdminController {
 
         const output = await this.commandBus.execute<CreateRoleCommand, CreateRoleCommand.Output>(
             new CreateRoleCommand(
-                new CreateRoleCommand.Input(dto.code, dto.name, dto.description ?? null),
+                new CreateRoleCommand.Input(dto.code, dto.name, dto.scope, dto.description ?? null),
             ),
         );
 
@@ -165,6 +165,7 @@ export class RolesAdminController {
             role.code,
             role.name,
             role.description,
+            role.scope,
             role.isSystem,
             userCount,
             permissionCount,

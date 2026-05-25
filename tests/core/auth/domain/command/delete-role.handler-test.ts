@@ -40,7 +40,7 @@ describe('DeleteRoleHandler', () => {
     it('hard-deletes a non-system role with no users', async () => {
 
         const state = freshState();
-        state.rolesById.set('role-1', new Role('OPS', 'Ops', null, false, 'role-1'));
+        state.rolesById.set('role-1', new Role('OPS', 'Ops', 'HUB', null, false, 'role-1'));
 
         await makeHandler(state).execute(new DeleteRoleCommand(new DeleteRoleCommand.Input('role-1')));
 
@@ -60,7 +60,7 @@ describe('DeleteRoleHandler', () => {
     it('rejects 409 ROLE_IS_SYSTEM for a system role', async () => {
 
         const state = freshState();
-        state.rolesById.set('role-admin', new Role('ADMIN', 'Admin', null, true, 'role-admin'));
+        state.rolesById.set('role-admin', new Role('ADMIN', 'Admin', 'HUB', null, true, 'role-admin'));
 
         await assert.rejects(
             makeHandler(state).execute(new DeleteRoleCommand(new DeleteRoleCommand.Input('role-admin'))),
@@ -73,7 +73,7 @@ describe('DeleteRoleHandler', () => {
     it('rejects 409 ROLE_IN_USE when users still hold the role', async () => {
 
         const state = freshState();
-        state.rolesById.set('role-1', new Role('OPS', 'Ops', null, false, 'role-1'));
+        state.rolesById.set('role-1', new Role('OPS', 'Ops', 'HUB', null, false, 'role-1'));
         state.userCountByRole.set('role-1', 3);
 
         await assert.rejects(

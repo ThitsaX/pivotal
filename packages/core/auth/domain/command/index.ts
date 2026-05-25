@@ -28,5 +28,3 @@ export * from './update-menu.command';
 export * from './update-menu.handler';
 export * from './delete-menu.command';
 export * from './delete-menu.handler';
-export * from './replace-menu-permissions.command';
-export * from './replace-menu-permissions.handler';

@@ -32,26 +32,37 @@ function makeHandler(state: State): CreateRoleHandler {
 
 describe('CreateRoleHandler', () => {
 
-    it('creates a non-system role with the given fields', async () => {
+    it('creates a non-system HUB role with the given fields', async () => {
 
         const state = freshState();
         const output = await makeHandler(state).execute(new CreateRoleCommand(
-            new CreateRoleCommand.Input('AUDITOR', 'Auditor', 'Read-only review'),
+            new CreateRoleCommand.Input('AUDITOR', 'Auditor', 'HUB', 'Read-only review'),
         ));
 
         assert.equal(state.saved.length, 1);
         assert.equal(state.saved[0].code, 'AUDITOR');
         assert.equal(state.saved[0].name, 'Auditor');
+        assert.equal(state.saved[0].scope, 'HUB');
         assert.equal(state.saved[0].description, 'Read-only review');
         assert.equal(state.saved[0].isSystem, false);
         assert.equal(output.role.id, 'role-1');
+    });
+
+    it('persists DFSP scope when chosen', async () => {
+
+        const state = freshState();
+        const output = await makeHandler(state).execute(new CreateRoleCommand(
+            new CreateRoleCommand.Input('DFSP_AUDIT', 'DFSP Audit', 'DFSP', null),
+        ));
+
+        assert.equal(output.role.scope, 'DFSP');
     });
 
     it('accepts a null description', async () => {
 
         const state = freshState();
         const output = await makeHandler(state).execute(new CreateRoleCommand(
-            new CreateRoleCommand.Input('OPS', 'Operator', null),
+            new CreateRoleCommand.Input('OPS', 'Operator', 'HUB', null),
         ));
 
         assert.equal(output.role.description, null);
@@ -60,11 +71,11 @@ describe('CreateRoleHandler', () => {
     it('rejects 409 ROLE_CODE_TAKEN when the code already exists', async () => {
 
         const state = freshState();
-        state.rolesByCode.set('AUDITOR', new Role('AUDITOR', 'Existing', null, false, 'role-existing'));
+        state.rolesByCode.set('AUDITOR', new Role('AUDITOR', 'Existing', 'HUB', null, false, 'role-existing'));
 
         await assert.rejects(
             makeHandler(state).execute(new CreateRoleCommand(
-                new CreateRoleCommand.Input('AUDITOR', 'New', null),
+                new CreateRoleCommand.Input('AUDITOR', 'New', 'HUB', null),
             )),
             (error: unknown) => error instanceof ConflictException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_TAKEN',

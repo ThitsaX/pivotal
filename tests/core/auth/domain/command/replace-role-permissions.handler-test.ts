@@ -9,7 +9,7 @@ import {
 } from '../../../../../packages/core/auth/domain';
 import {ReplaceRolePermissionsCommand, ReplaceRolePermissionsHandler}
     from '../../../../../packages/core/auth/domain/command';
-import {ADMIN_ROLE_CODE, Permission, PermissionKey, Role} from '../../../../../packages/core/auth/domain/model';
+import {ADMIN_ROLE_CODE, Permission, PermissionKey, PermissionScope, Role, RoleScope} from '../../../../../packages/core/auth/domain/model';
 
 interface State {
     rolesById:           Map<string, Role>;
@@ -18,6 +18,17 @@ interface State {
     replaceCalls:        Array<{roleId: string; permissionIds: string[]}>;
     invalidateForRoleCalls: string[];
 }
+
+// Inline scope map so tests don't need to import the seed catalogue.
+const PERMISSION_SCOPES: Record<string, PermissionScope> = {
+    [PermissionKey.ADMIN_USERS_MANAGE]:        'HUB',
+    [PermissionKey.ADMIN_ROLES_MANAGE]:        'HUB',
+    [PermissionKey.ADMIN_MENUS_MANAGE]:        'HUB',
+    [PermissionKey.ADMIN_PERMISSIONS_LIST]:    'HUB',
+    [PermissionKey.AUDIT_TRANSACTIONS_LIST]:   'BOTH',
+    [PermissionKey.AUDIT_TRANSACTIONS_VIEW]:   'BOTH',
+    [PermissionKey.PARTICIPANT_LIST]:          'HUB',
+};
 
 function freshState(): State {
     const state: State = {
@@ -28,33 +39,27 @@ function freshState(): State {
         invalidateForRoleCalls: [],
     };
 
-    // Seed a few permissions
-    const allKeys = [
-        PermissionKey.ADMIN_USERS_MANAGE,
-        PermissionKey.ADMIN_ROLES_MANAGE,
-        PermissionKey.ADMIN_MENUS_MANAGE,
-        PermissionKey.ADMIN_PERMISSIONS_LIST,
-        PermissionKey.AUDIT_TRANSACTIONS_LIST,
-        PermissionKey.AUDIT_TRANSACTIONS_VIEW,
-        PermissionKey.PARTICIPANT_LIST,
-    ];
+    const allKeys = Object.keys(PERMISSION_SCOPES);
     for (const [i, key] of allKeys.entries()) {
-        const p = new Permission(key, `${key} desc`, `perm-${i + 1}`);
+        const p = new Permission(key, PERMISSION_SCOPES[key], `${key} desc`, `perm-${i + 1}`);
         state.permissionsByKey.set(key, p);
     }
+
+    // Synthesise a DFSP-only permission so we can exercise the HUB×DFSP mismatch branch.
+    state.permissionsByKey.set('dfsp.only.action', new Permission('dfsp.only.action', 'DFSP', 'DFSP-only test perm', 'perm-dfsp-only'));
 
     return state;
 }
 
-function addSystemRole(state: State, id: string, code: string, currentKeys: string[]): Role {
-    const r = new Role(code, code, null, true, id);
+function addSystemRole(state: State, id: string, code: string, scope: RoleScope, currentKeys: string[]): Role {
+    const r = new Role(code, code, scope, null, true, id);
     state.rolesById.set(id, r);
     state.currentKeysByRoleId.set(id, currentKeys);
     return r;
 }
 
-function addUserRole(state: State, id: string, code: string, currentKeys: string[]): Role {
-    const r = new Role(code, code, null, false, id);
+function addUserRole(state: State, id: string, code: string, scope: RoleScope, currentKeys: string[]): Role {
+    const r = new Role(code, code, scope, null, false, id);
     state.rolesById.set(id, r);
     state.currentKeysByRoleId.set(id, currentKeys);
     return r;
@@ -98,7 +103,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('atomically replaces the permission set and invalidates tokens for everyone in the role', async () => {
 
         const state = freshState();
-        addUserRole(state, 'role-ops', 'OPS', [PermissionKey.PARTICIPANT_LIST]);
+        addUserRole(state, 'role-ops', 'OPS', 'HUB',[PermissionKey.PARTICIPANT_LIST]);
 
         const output = await makeHandler(state).execute(new ReplaceRolePermissionsCommand(
             new ReplaceRolePermissionsCommand.Input('role-ops', [
@@ -120,7 +125,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('deduplicates incoming permission keys', async () => {
 
         const state = freshState();
-        addUserRole(state, 'role-ops', 'OPS', []);
+        addUserRole(state, 'role-ops', 'OPS', 'HUB',[]);
 
         await makeHandler(state).execute(new ReplaceRolePermissionsCommand(
             new ReplaceRolePermissionsCommand.Input('role-ops', [
@@ -148,7 +153,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('rejects 400 PERMISSION_NOT_FOUND when an incoming key does not exist', async () => {
 
         const state = freshState();
-        addUserRole(state, 'role-ops', 'OPS', []);
+        addUserRole(state, 'role-ops', 'OPS', 'HUB',[]);
 
         await assert.rejects(
             makeHandler(state).execute(new ReplaceRolePermissionsCommand(
@@ -163,7 +168,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('rejects 409 ROLE_CANNOT_REMOVE_ADMIN_KEY when a system role would lose an admin.* key', async () => {
 
         const state = freshState();
-        addSystemRole(state, 'role-admin', ADMIN_ROLE_CODE, [
+        addSystemRole(state, 'role-admin', ADMIN_ROLE_CODE, 'HUB',[
             PermissionKey.ADMIN_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
@@ -187,7 +192,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('allows system role edits that keep all admin.* keys and add/remove non-admin keys', async () => {
 
         const state = freshState();
-        addSystemRole(state, 'role-admin', ADMIN_ROLE_CODE, [
+        addSystemRole(state, 'role-admin', ADMIN_ROLE_CODE, 'HUB',[
             PermissionKey.ADMIN_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
@@ -208,7 +213,7 @@ describe('ReplaceRolePermissionsHandler', () => {
     it('non-system roles can drop admin.* keys freely', async () => {
 
         const state = freshState();
-        addUserRole(state, 'role-custom', 'CUSTOM', [PermissionKey.ADMIN_USERS_MANAGE]);
+        addUserRole(state, 'role-custom', 'CUSTOM', 'HUB', [PermissionKey.ADMIN_USERS_MANAGE]);
 
         await makeHandler(state).execute(new ReplaceRolePermissionsCommand(
             new ReplaceRolePermissionsCommand.Input('role-custom', [PermissionKey.PARTICIPANT_LIST]),
@@ -216,5 +221,50 @@ describe('ReplaceRolePermissionsHandler', () => {
 
         assert.equal(state.replaceCalls.length, 1);
         assert.deepEqual(state.invalidateForRoleCalls, ['role-custom']);
+    });
+
+    it('rejects 400 ROLE_PERMISSION_SCOPE_MISMATCH when a HUB role is given a DFSP-only perm', async () => {
+
+        const state = freshState();
+        addUserRole(state, 'role-hub', 'HUB_ROLE', 'HUB', []);
+
+        await assert.rejects(
+            makeHandler(state).execute(new ReplaceRolePermissionsCommand(
+                new ReplaceRolePermissionsCommand.Input('role-hub', ['dfsp.only.action']),
+            )),
+            (error: unknown) => error instanceof BadRequestException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_PERMISSION_SCOPE_MISMATCH',
+        );
+        assert.equal(state.replaceCalls.length, 0);
+        assert.equal(state.invalidateForRoleCalls.length, 0);
+    });
+
+    it('rejects 400 ROLE_PERMISSION_SCOPE_MISMATCH when a DFSP role is given a HUB-only perm', async () => {
+
+        const state = freshState();
+        addUserRole(state, 'role-dfsp', 'DFSP_ROLE', 'DFSP', []);
+
+        await assert.rejects(
+            makeHandler(state).execute(new ReplaceRolePermissionsCommand(
+                new ReplaceRolePermissionsCommand.Input('role-dfsp', [PermissionKey.PARTICIPANT_LIST]),
+            )),
+            (error: unknown) => error instanceof BadRequestException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_PERMISSION_SCOPE_MISMATCH',
+        );
+    });
+
+    it('allows BOTH-scoped perms to be assigned to either HUB or DFSP roles', async () => {
+
+        const state = freshState();
+        addUserRole(state, 'role-dfsp', 'DFSP_ROLE', 'DFSP', []);
+
+        await makeHandler(state).execute(new ReplaceRolePermissionsCommand(
+            new ReplaceRolePermissionsCommand.Input('role-dfsp', [
+                PermissionKey.AUDIT_TRANSACTIONS_LIST,
+                PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+            ]),
+        ));
+
+        assert.equal(state.replaceCalls.length, 1);
     });
 });

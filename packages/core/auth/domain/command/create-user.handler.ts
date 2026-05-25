@@ -2,7 +2,7 @@ import {BadRequestException, ConflictException, Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
-import {ADMIN_ROLE_CODE, User} from '../model';
+import {User} from '../model';
 import {RoleRepository, UserRepository} from '../repository';
 import {PasswordService, TempPasswordService} from '../service';
 import {CreateUserCommand} from './create-user.command';
@@ -34,11 +34,11 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand, Cre
 
         const normalizedFspId = fspId != null && fspId.trim().length > 0 ? fspId.trim() : null;
 
-        if (role.code === ADMIN_ROLE_CODE && normalizedFspId != null) {
+        if (role.scope === 'HUB' && normalizedFspId != null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID));
         }
 
-        if (role.code !== ADMIN_ROLE_CODE && normalizedFspId == null) {
+        if (role.scope === 'DFSP' && normalizedFspId == null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_DFSP_REQUIRES_FSP_ID));
         }
 
