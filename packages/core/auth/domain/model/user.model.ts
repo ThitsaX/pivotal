@@ -36,6 +36,9 @@ export class User {
     @Column({type: 'datetime', name: 'locked_until', nullable: true})
     public lockedUntil: Date | null;
 
+    @Column({type: 'datetime', name: 'tokens_invalidated_at', nullable: true})
+    public tokensInvalidatedAt: Date | null;
+
     @Column({type: 'datetime', name: 'last_login_at', nullable: true})
     public lastLoginAt: Date | null;
 
@@ -64,6 +67,7 @@ export class User {
         this.isActive = true;
         this.failedLoginAttempts = 0;
         this.lockedUntil = null;
+        this.tokensInvalidatedAt = null;
         this.lastLoginAt = null;
     }
 

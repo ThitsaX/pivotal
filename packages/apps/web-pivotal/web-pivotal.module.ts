@@ -13,9 +13,14 @@ import {
     HealthController,
     ListCentralLedgerParticipantsController,
     MeController,
+    MenusAdminController,
     OnboardFspController,
+    PermissionsAdminController,
+    RolePresetsAdminController,
+    RolesAdminController,
     TransactionsAuditController,
     UpsertEndpointController,
+    UsersAdminController,
 } from './controllers';
 import {JwtAuthGuard, PermissionsGuard} from './guards';
 import {WebPivotalSettings} from './required.settings';
@@ -65,6 +70,11 @@ export class WebPivotalModule {
                 UpsertEndpointController,
                 GenerateSigningKeyController,
                 TransactionsAuditController,
+                UsersAdminController,
+                RolesAdminController,
+                RolePresetsAdminController,
+                PermissionsAdminController,
+                MenusAdminController,
             ],
             providers: [
                 JwtAuthGuard,

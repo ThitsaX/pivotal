@@ -1,6 +1,13 @@
 import {CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException} from '@nestjs/common';
 import {Reflector} from '@nestjs/core';
-import {AccessTokenClaims, IS_PUBLIC_KEY, TokenService} from '@core/auth/domain';
+import {
+    AccessTokenClaims,
+    authError,
+    AuthErrorCode,
+    IS_PUBLIC_KEY,
+    TokenService,
+    UserRepository,
+} from '@core/auth/domain';
 import type {Request} from 'express';
 
 declare module 'express' {
@@ -17,6 +24,8 @@ export class JwtAuthGuard implements CanActivate {
     constructor(
         @Inject(TokenService)
         private readonly tokenService: TokenService,
+        @Inject(UserRepository)
+        private readonly userRepository: UserRepository,
         @Inject(Reflector)
         private readonly reflector: Reflector,
     ) {
@@ -45,6 +54,17 @@ export class JwtAuthGuard implements CanActivate {
 
         if (claims == null) {
             throw new UnauthorizedException({code: 'AUTH_INVALID_TOKEN', message: 'Invalid or expired access token.'});
+        }
+
+        const user = await this.userRepository.findById(claims.sub);
+
+        if (user == null || !user.isActive) {
+            throw new UnauthorizedException(authError(AuthErrorCode.USER_INACTIVE));
+        }
+
+        if (user.tokensInvalidatedAt != null
+            && Math.floor(user.tokensInvalidatedAt.getTime() / 1000) >= claims.iat) {
+            throw new UnauthorizedException(authError(AuthErrorCode.TOKEN_REVOKED));
         }
 
         request.authUser = claims;
