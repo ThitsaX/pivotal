@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` BIGINT NOT NULL,
+    `email` VARCHAR(255) NOT NULL,
+    `password_hash` VARCHAR(255) NOT NULL,
+    `fsp_id` VARCHAR(64) NULL,
+    `role_id` BIGINT NOT NULL,
+    `must_change_password` BOOLEAN NOT NULL DEFAULT TRUE,
+    `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+    `failed_login_attempts` INT NOT NULL DEFAULT 0,
+    `locked_until` DATETIME NULL,
+    `tokens_invalidated_at` DATETIME NULL,
+    `last_login_at` DATETIME NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `users_01_uk_email` (`email`),
+    KEY `users_02_idx_role_id` (`role_id`),
+    KEY `users_03_idx_fsp_id` (`fsp_id`),
+    CONSTRAINT `users_01_fk_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

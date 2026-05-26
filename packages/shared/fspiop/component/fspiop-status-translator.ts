@@ -1,6 +1,6 @@
-import {HttpStatus} from '@nestjs/common';
-import {FspiopErrorType} from '../exception/fspiop-error-type';
-import {FspiopException} from '../exception/fspiop-exception';
+import { HttpStatus } from '@nestjs/common';
+import { FspiopErrorType } from '../exception/fspiop-error-type';
+import { FspiopException } from '../exception/fspiop-exception';
 
 /**
  * Translates a FspiopException into an appropriate HTTP status code.
@@ -27,79 +27,80 @@ export class FspiopStatusTranslator {
 
     private static readonly STATUS_MAP: Readonly<Record<string, HttpStatus>> = {
         // ── 1xxx  Communication ───────────────────────────────────────────────
-        [FspiopErrorType.COMMUNICATION_ERROR.code]:             HttpStatus.BAD_GATEWAY,
+        [FspiopErrorType.COMMUNICATION_ERROR.code]: HttpStatus.BAD_GATEWAY,
         [FspiopErrorType.DESTINATION_COMMUNICATION_ERROR.code]: HttpStatus.BAD_GATEWAY,
 
         // ── 2xxx  Server ──────────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_SERVER_ERROR.code]:            HttpStatus.INTERNAL_SERVER_ERROR,
-        [FspiopErrorType.INTERNAL_SERVER_ERROR.code]:           HttpStatus.INTERNAL_SERVER_ERROR,
-        [FspiopErrorType.NOT_IMPLEMENTED.code]:                 HttpStatus.NOT_IMPLEMENTED,
-        [FspiopErrorType.SERVICE_CURRENTLY_UNAVAILABLE.code]:   HttpStatus.SERVICE_UNAVAILABLE,
-        [FspiopErrorType.SERVER_TIMED_OUT.code]:                HttpStatus.GATEWAY_TIMEOUT,
-        [FspiopErrorType.SERVER_BUSY.code]:                     HttpStatus.SERVICE_UNAVAILABLE,
+        [FspiopErrorType.GENERIC_SERVER_ERROR.code]: HttpStatus.INTERNAL_SERVER_ERROR,
+        [FspiopErrorType.INTERNAL_SERVER_ERROR.code]: HttpStatus.INTERNAL_SERVER_ERROR,
+        [FspiopErrorType.NOT_IMPLEMENTED.code]: HttpStatus.NOT_IMPLEMENTED,
+        [FspiopErrorType.SERVICE_CURRENTLY_UNAVAILABLE.code]: HttpStatus.SERVICE_UNAVAILABLE,
+        [FspiopErrorType.SERVER_TIMED_OUT.code]: HttpStatus.GATEWAY_TIMEOUT,
+        [FspiopErrorType.SERVER_BUSY.code]: HttpStatus.SERVICE_UNAVAILABLE,
 
         // ── 30xx  Generic client ──────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_CLIENT_ERROR.code]:            HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.UNACCEPTABLE_VERSION_REQUESTED.code]:  HttpStatus.NOT_ACCEPTABLE,
-        [FspiopErrorType.UNKNOWN_URI.code]:                     HttpStatus.NOT_FOUND,
-        [FspiopErrorType.ADD_PARTY_INFORMATION_ERROR.code]:     HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.GENERIC_CLIENT_ERROR.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.UNACCEPTABLE_VERSION_REQUESTED.code]: HttpStatus.NOT_ACCEPTABLE,
+        [FspiopErrorType.UNKNOWN_URI.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.ADD_PARTY_INFORMATION_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
 
         // ── 31xx  Validation ──────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_VALIDATION_ERROR.code]:        HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.MALFORMED_SYNTAX.code]:                HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.MISSING_MANDATORY_ELEMENT.code]:       HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.TOO_MANY_ELEMENTS.code]:               HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.TOO_LARGE_PAYLOAD.code]:               HttpStatus.PAYLOAD_TOO_LARGE,
-        [FspiopErrorType.INVALID_SIGNATURE.code]:               HttpStatus.UNAUTHORIZED,
-        [FspiopErrorType.MODIFIED_REQUEST.code]:                HttpStatus.BAD_REQUEST,
-        [FspiopErrorType.MISSING_EXTENSION_PARAMETER.code]:     HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.GENERIC_VALIDATION_ERROR.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.MALFORMED_SYNTAX.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.MISSING_MANDATORY_ELEMENT.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.TOO_MANY_ELEMENTS.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.TOO_LARGE_PAYLOAD.code]: HttpStatus.PAYLOAD_TOO_LARGE,
+        [FspiopErrorType.INVALID_SIGNATURE.code]: HttpStatus.UNAUTHORIZED,
+        [FspiopErrorType.MODIFIED_REQUEST.code]: HttpStatus.BAD_REQUEST,
+        [FspiopErrorType.MISSING_EXTENSION_PARAMETER.code]: HttpStatus.BAD_REQUEST,
 
         // ── 32xx  ID not found ────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_ID_NOT_FOUND.code]:            HttpStatus.NOT_FOUND,
-        [FspiopErrorType.DESTINATION_FSP_ERROR.code]:           HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_FSP_ID_NOT_FOUND.code]:          HttpStatus.NOT_FOUND,
-        [FspiopErrorType.PAYEE_FSP_ID_NOT_FOUND.code]:          HttpStatus.NOT_FOUND,
-        [FspiopErrorType.PARTY_NOT_FOUND.code]:                 HttpStatus.NOT_FOUND,
-        [FspiopErrorType.QUOTE_ID_NOT_FOUND.code]:              HttpStatus.NOT_FOUND,
-        [FspiopErrorType.TRANSACTION_REQUEST_ID_NOT_FOUND.code]:HttpStatus.NOT_FOUND,
-        [FspiopErrorType.TRANSACTION_ID_NOT_FOUND.code]:        HttpStatus.NOT_FOUND,
-        [FspiopErrorType.TRANSFER_ID_NOT_FOUND.code]:           HttpStatus.NOT_FOUND,
-        [FspiopErrorType.BULK_QUOTE_ID_NOT_FOUND.code]:         HttpStatus.NOT_FOUND,
-        [FspiopErrorType.BULK_TRANSFER_ID_NOT_FOUND.code]:      HttpStatus.NOT_FOUND,
+        [FspiopErrorType.GENERIC_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.DESTINATION_FSP_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_FSP_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.PAYEE_FSP_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.QUOTE_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.TRANSACTION_REQUEST_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.TRANSACTION_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.TRANSFER_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.BULK_QUOTE_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
+        [FspiopErrorType.BULK_TRANSFER_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
 
         // ── 33xx  Expired ─────────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_EXPIRED_ERROR.code]:           HttpStatus.REQUEST_TIMEOUT,
-        [FspiopErrorType.TRANSACTION_REQUEST_EXPIRED.code]:     HttpStatus.REQUEST_TIMEOUT,
-        [FspiopErrorType.QUOTE_EXPIRED.code]:                   HttpStatus.REQUEST_TIMEOUT,
-        [FspiopErrorType.TRANSFER_EXPIRED.code]:                HttpStatus.REQUEST_TIMEOUT,
+        [FspiopErrorType.GENERIC_EXPIRED_ERROR.code]: HttpStatus.REQUEST_TIMEOUT,
+        [FspiopErrorType.TRANSACTION_REQUEST_EXPIRED.code]: HttpStatus.REQUEST_TIMEOUT,
+        [FspiopErrorType.QUOTE_EXPIRED.code]: HttpStatus.REQUEST_TIMEOUT,
+        [FspiopErrorType.TRANSFER_EXPIRED.code]: HttpStatus.REQUEST_TIMEOUT,
 
         // ── 4xxx  Payer ───────────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_PAYER_ERROR.code]:                     HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_FSP_INSUFFICIENT_LIQUIDITY.code]:        HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.GENERIC_PAYER_REJECTION.code]:                 HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_REJECTED_TRANSACTION_REQUEST.code]:      HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE.code]:  HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_UNSUPPORTED_CURRENCY.code]:              HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_LIMIT_ERROR.code]:                       HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYER_PERMISSION_ERROR.code]:                  HttpStatus.FORBIDDEN,
-        [FspiopErrorType.GENERIC_PAYER_BLOCKED_ERROR.code]:             HttpStatus.FORBIDDEN,
+        [FspiopErrorType.GENERIC_PAYER_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_FSP_INSUFFICIENT_LIQUIDITY.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.GENERIC_PAYER_REJECTION.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_REJECTED_TRANSACTION_REQUEST.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_UNSUPPORTED_CURRENCY.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_LIMIT_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYER_PERMISSION_ERROR.code]: HttpStatus.FORBIDDEN,
+        [FspiopErrorType.GENERIC_PAYER_BLOCKED_ERROR.code]: HttpStatus.FORBIDDEN,
+        [FspiopErrorType.ROUNDING_VALUE_ERROR.code]: HttpStatus.NOT_ACCEPTABLE,
+        [FspiopErrorType.PARTY_NOT_FOUND.code]: HttpStatus.EXPECTATION_FAILED,
 
         // ── 5xxx  Payee ───────────────────────────────────────────────────────
-        [FspiopErrorType.GENERIC_PAYEE_ERROR.code]:                     HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_FSP_INSUFFICIENT_LIQUIDITY.code]:        HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.GENERIC_PAYEE_REJECTION.code]:                 HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_REJECTED_QUOTE.code]:                    HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_FSP_UNSUPPORTED_TRANSACTION_TYPE.code]:  HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_FSP_REJECTED_QUOTE.code]:                HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_REJECTED_TRANSACTION.code]:              HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_FSP_REJECTED_TRANSACTION.code]:          HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_UNSUPPORTED_CURRENCY.code]:              HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_LIMIT_ERROR.code]:                       HttpStatus.UNPROCESSABLE_ENTITY,
-        [FspiopErrorType.PAYEE_PERMISSION_ERROR.code]:                  HttpStatus.FORBIDDEN,
-        [FspiopErrorType.GENERIC_PAYEE_BLOCKED_ERROR.code]:             HttpStatus.FORBIDDEN,
+        [FspiopErrorType.GENERIC_PAYEE_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_FSP_INSUFFICIENT_LIQUIDITY.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.GENERIC_PAYEE_REJECTION.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_REJECTED_QUOTE.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_FSP_UNSUPPORTED_TRANSACTION_TYPE.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_FSP_REJECTED_QUOTE.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_REJECTED_TRANSACTION.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_FSP_REJECTED_TRANSACTION.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_UNSUPPORTED_CURRENCY.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_LIMIT_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
+        [FspiopErrorType.PAYEE_PERMISSION_ERROR.code]: HttpStatus.FORBIDDEN,
+        [FspiopErrorType.GENERIC_PAYEE_BLOCKED_ERROR.code]: HttpStatus.FORBIDDEN,
     };
 
-    private constructor() {}
+    private constructor() { }
 
     /**
      * Returns the HTTP status code that best represents the given FspiopException.

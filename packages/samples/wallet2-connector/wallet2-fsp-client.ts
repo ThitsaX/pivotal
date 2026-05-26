@@ -1,5 +1,6 @@
 import {Logger} from '@nestjs/common';
 import {ConnectorSettings, FspClient} from '@core/connector/domain';
+import {FspClientException} from '@core/connector/domain/exception/fsp-client-exception';
 import {CatalystException, CatalystFeeEngine, FeeSplitRole} from '@shared/catalyst';
 import {
     AmountType,
@@ -17,7 +18,6 @@ import {
 } from '@shared/fspiop';
 
 export class Wallet2FspClient extends FspClient {
-
     private readonly logger = new Logger(Wallet2FspClient.name);
 
     constructor(
@@ -78,6 +78,11 @@ export class Wallet2FspClient extends FspClient {
 
             return new FspClient.PostQuotesOutput(amount, amount, fees);
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`postQuotes failed for scenario=${scenarioName}`, stack ?? message);
+
             if (error instanceof CatalystException) {
                 throw new FspiopException(FspiopErrors.INTERNAL_SERVER_ERROR, error.message);
             }
@@ -112,8 +117,18 @@ export class Wallet2FspClient extends FspClient {
     async patchTransfers(input: FspClient.PatchTransfersInput): Promise<void> {
         const {transferId, response} = input;
         const fulfilment = response.transferState;
+        const minute = new Date().getMinutes();
 
-        this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}`);
+        this.logger.log(`patchTransfers: transferId=${transferId}, transferState=${fulfilment}, minute=${minute}`);
+
+        //if (minute % 2 === 1)
+        {
+            const description = `Simulated wallet2 PATCH failure for transfer ${transferId} because minute ${minute} is odd.`;
+
+            this.logger.warn(description);
+
+            throw new FspClientException(description);
+        }
     }
 
 }

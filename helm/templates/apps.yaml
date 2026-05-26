@@ -1,0 +1,318 @@
+{{- if .Values.webInbound.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-inbound
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-inbound
+spec:
+  replicas: {{ .Values.webInbound.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web-inbound
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web-inbound
+    spec:
+      containers:
+        - name: web-inbound
+          image: "{{ .Values.webInbound.image.repository }}:{{ .Values.webInbound.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.webInbound.service.port }}
+              protocol: TCP
+          env:
+            {{- include "pivotal-stack.envVars" .Values.webInbound.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-inbound
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-inbound
+spec:
+  type: {{ .Values.webInbound.service.type }}
+  selector:
+    {{- include "pivotal-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web-inbound
+  ports:
+    - name: http
+      port: {{ .Values.webInbound.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- if .Values.webOutbound.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-outbound
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-outbound
+spec:
+  replicas: {{ .Values.webOutbound.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web-outbound
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web-outbound
+    spec:
+      containers:
+        - name: web-outbound
+          image: "{{ .Values.webOutbound.image.repository }}:{{ .Values.webOutbound.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.webOutbound.service.port }}
+              protocol: TCP
+          env:
+            {{- include "pivotal-stack.envVars" .Values.webOutbound.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-outbound
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-outbound
+spec:
+  type: {{ .Values.webOutbound.service.type }}
+  selector:
+    {{- include "pivotal-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web-outbound
+  ports:
+    - name: http
+      port: {{ .Values.webOutbound.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- if .Values.appAuditor.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-auditor
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app-auditor
+spec:
+  replicas: {{ .Values.appAuditor.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app-auditor
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app-auditor
+    spec:
+      containers:
+        - name: app-auditor
+          image: "{{ .Values.appAuditor.image.repository }}:{{ .Values.appAuditor.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "pivotal-stack.envVars" .Values.appAuditor.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+{{- end }}
+{{- if .Values.webPivotal.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-pivotal
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-pivotal
+spec:
+  replicas: {{ .Values.webPivotal.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web-pivotal
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web-pivotal
+    spec:
+      containers:
+        - name: web-pivotal
+          image: "{{ .Values.webPivotal.image.repository }}:{{ .Values.webPivotal.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.webPivotal.service.port }}
+              protocol: TCP
+          env:
+            {{- include "pivotal-stack.envVars" .Values.webPivotal.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-pivotal
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-pivotal
+spec:
+  type: {{ .Values.webPivotal.service.type }}
+  selector:
+    {{- include "pivotal-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web-pivotal
+  ports:
+    - name: http
+      port: {{ .Values.webPivotal.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- if .Values.portal.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  replicas: {{ .Values.portal.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: portal
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: portal
+    spec:
+      containers:
+        - name: portal
+          image: "{{ .Values.portal.image.repository }}:{{ .Values.portal.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  type: {{ .Values.portal.service.type }}
+  selector:
+    {{- include "pivotal-stack.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+  ports:
+    - name: http
+      port: {{ .Values.portal.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- if .Values.wallet1Connector.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallet1-connector
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wallet1-connector
+spec:
+  replicas: {{ .Values.wallet1Connector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: wallet1-connector
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: wallet1-connector
+    spec:
+      containers:
+        - name: wallet1-connector
+          image: "{{ .Values.wallet1Connector.image.repository }}:{{ .Values.wallet1Connector.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "pivotal-stack.envVars" .Values.wallet1Connector.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+{{- end }}
+{{- if .Values.wallet2Connector.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallet2-connector
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wallet2-connector
+spec:
+  replicas: {{ .Values.wallet2Connector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: wallet2-connector
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: wallet2-connector
+    spec:
+      containers:
+        - name: wallet2-connector
+          image: "{{ .Values.wallet2Connector.image.repository }}:{{ .Values.wallet2Connector.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "pivotal-stack.envVars" .Values.wallet2Connector.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+{{- end }}
+{{- if .Values.wallet3Connector.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallet3-connector
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wallet3-connector
+spec:
+  replicas: {{ .Values.wallet3Connector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: wallet3-connector
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: wallet3-connector
+    spec:
+      containers:
+        - name: wallet3-connector
+          image: "{{ .Values.wallet3Connector.image.repository }}:{{ .Values.wallet3Connector.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "pivotal-stack.envVars" .Values.wallet3Connector.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+{{- end }}

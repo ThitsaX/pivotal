@@ -1,24 +1,20 @@
-import {Inject} from '@nestjs/common';
+import {Inject, Logger} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {AuditInboundQuotesCommand} from '@core/audit/domain';
-import {InboundQuotesAuditPublisher} from '@core/audit/producer';
+import {TransactionMessage} from '@core/audit/common';
+import {AuditTransactionPublisher} from '@core/audit/producer';
 import {
-    ErrorInformationObject,
-    ErrorInformationResponse,
     FspiopAxios,
+    FspiopErrors,
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
 import {PerformPostQuotesCommand} from './perform-post-quotes.command';
-import {ConnectorSettings, FspConnector} from '../component';
+import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
 @CommandHandler(PerformPostQuotesCommand)
 export class PerformPostQuotesHandler
     implements ICommandHandler<PerformPostQuotesCommand, PerformPostQuotesCommand.Output> {
-
-    private static readonly RAIL = 'fspiop';
-    private static readonly SNOWFLAKE = Snowflake.get();
+    private readonly logger = new Logger(PerformPostQuotesHandler.name);
 
     constructor(
         @Inject(FspConnector)
@@ -27,18 +23,41 @@ export class PerformPostQuotesHandler
         private readonly connectorSettings: ConnectorSettings,
         @Inject(FspiopAxios)
         private readonly fspiopAxios: FspiopAxios,
-        @Inject(InboundQuotesAuditPublisher)
-        private readonly auditPublisher: InboundQuotesAuditPublisher,
+        @Inject(AuditTransactionPublisher)
+        private readonly auditPublisher: AuditTransactionPublisher,
     ) {
     }
 
     async execute(command: PerformPostQuotesCommand): Promise<PerformPostQuotesCommand.Output> {
-        const {payerFsp, payeeFsp, request} = command.input;
+        const {correlationId, payerFsp, payeeFsp, request} = command.input;
         const {quotesUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
-        const headers = FspiopHeaders.Values.Quotes.forResult(payerFsp, connectorId);
         const createdAt = new Date();
-        const id = PerformPostQuotesHandler.nextAuditId();
+        const auditCorrelationId = PerformPostQuotesHandler.resolveCorrelationId(
+            correlationId,
+            request.transactionId,
+            request.transactionRequestId,
+            request.quoteId,
+        );
+        const headers = FspiopHeaders.Values.Quotes.forResult(
+            correlationId?.trim() || auditCorrelationId,
+            payerFsp,
+            connectorId,
+        );
+
+        await this.auditPublisher.publish(
+            TransactionMessage.request(
+                TransactionMessage.InvocationPhase.Quotes,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: auditCorrelationId,
+                    payerFsp,
+                    payeeFsp,
+                    request,
+                    occurredAt: createdAt,
+                },
+            ),
+        );
 
         try {
             const response = await this.fspConnector.postQuotes(request);
@@ -51,24 +70,28 @@ export class PerformPostQuotesHandler
             );
 
             await this.auditPublisher.publish(
-                new AuditInboundQuotesCommand.Input(
-                    id,
-                    PerformPostQuotesHandler.RAIL,
-                    payerFsp,
-                    payeeFsp,
-                    request.quoteId,
-                    request,
-                    response,
-                    null,
-                    null,
-                    createdAt,
-                    new Date(),
+                TransactionMessage.response(
+                    TransactionMessage.InvocationPhase.Quotes,
+                    TransactionMessage.InvocationGateway.Connector,
+                    {
+                        correlationId: auditCorrelationId,
+                        payerFsp,
+                        payeeFsp,
+                        request,
+                        response,
+                        occurredAt: new Date(),
+                    },
                 ),
             );
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`postQuotes callback flow failed for quoteId=${request.quoteId}`, stack ?? message);
             let callbackError = error;
-            let callbackAuditError = PerformPostQuotesHandler.toAuditError(error);
-            let callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
+            let callbackAuditError = AuditErrorConverter.toAuditError(error);
+            let callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+            let callbackFspError = AuditErrorConverter.toFspError(error);
 
             try {
                 await this.fspiopAxios.putQuotesError(
@@ -78,28 +101,38 @@ export class PerformPostQuotesHandler
                     callbackErrorResponse,
                 );
             } catch (putError) {
+                const putMessage = putError instanceof Error ? putError.message : String(putError);
+                const putStack = putError instanceof Error ? putError.stack : undefined;
+
+                this.logger.error(`putQuotesError failed for quoteId=${request.quoteId}`, putStack ?? putMessage);
                 callbackError = putError;
-                callbackAuditError = PerformPostQuotesHandler.toAuditError(putError);
-                callbackErrorResponse = PerformPostQuotesHandler.toErrorResponse(callbackAuditError);
+                callbackAuditError = AuditErrorConverter.toAuditError(putError);
+                callbackErrorResponse = AuditErrorConverter.toErrorResponse(callbackAuditError);
+                callbackFspError = callbackFspError ?? AuditErrorConverter.toFspError(putError);
             }
 
             try {
                 await this.auditPublisher.publish(
-                    new AuditInboundQuotesCommand.Input(
-                        id,
-                        PerformPostQuotesHandler.RAIL,
-                        payerFsp,
-                        payeeFsp,
-                        request.quoteId,
-                        request,
-                        null,
-                        callbackAuditError,
-                        null,
-                        createdAt,
-                        new Date(),
+                    TransactionMessage.error(
+                        TransactionMessage.InvocationPhase.Quotes,
+                        TransactionMessage.InvocationGateway.Connector,
+                        {
+                            correlationId: auditCorrelationId,
+                            payerFsp,
+                            payeeFsp,
+                            request,
+                            error: callbackFspError == null
+                                ? callbackAuditError
+                                : {audit: callbackAuditError, fspError: callbackFspError},
+                            occurredAt: new Date(),
+                        },
                     ),
                 );
-            } catch {
+            } catch (publishError) {
+                const publishMessage = publishError instanceof Error ? publishError.message : String(publishError);
+                const publishStack = publishError instanceof Error ? publishError.stack : undefined;
+
+                this.logger.error(`audit publish failed for quoteId=${request.quoteId}`, publishStack ?? publishMessage);
                 // Preserve the callback error as the command failure.
             }
 
@@ -109,19 +142,37 @@ export class PerformPostQuotesHandler
         return new PerformPostQuotesCommand.Output();
     }
 
-    private static toAuditError(error: unknown): ErrorInformationObject {
-        try {
-            FspiopException.rethrow(error);
-        } catch (normalizedError) {
-            return (normalizedError as FspiopException).toErrorObject();
+    private static resolveCorrelationId(
+        correlationId: string | null,
+        ...transactionIdentifiers: Array<string | null | undefined>
+    ): string {
+        const transactionIdentifier = PerformPostQuotesHandler.firstNonBlank(...transactionIdentifiers);
+
+        if (transactionIdentifier != null) {
+            return transactionIdentifier;
         }
+
+        const traceCorrelationId = PerformPostQuotesHandler.firstNonBlank(correlationId);
+
+        if (traceCorrelationId == null) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'traceparent correlationId or transaction identifier is required',
+            );
+        }
+
+        return traceCorrelationId;
     }
 
-    private static toErrorResponse(error: ErrorInformationObject): ErrorInformationResponse {
-        return {errorInformation: error.errorInformation};
-    }
+    private static firstNonBlank(...values: Array<string | null | undefined>): string | null {
+        for (const value of values) {
+            const normalized = value?.trim();
 
-    private static nextAuditId(): string {
-        return PerformPostQuotesHandler.SNOWFLAKE.nextId().toString();
+            if (normalized != null && normalized.length > 0) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 }

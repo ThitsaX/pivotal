@@ -1,5 +1,6 @@
 import {NatsClientService} from '@shared/nats';
 import {TransfersIDPatchResponse} from '@shared/fspiop';
+import {resolveFspiopStream} from '../consumer/listener/fspiop-stream.resolver';
 
 export class ConnectorPatchTransfersPublisher {
 
@@ -11,7 +12,11 @@ export class ConnectorPatchTransfersPublisher {
 
     async publish(message: ConnectorPatchTransfersPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(ConnectorPatchTransfersPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
+        const subject = ConnectorPatchTransfersPublisher.subjectFor(message.payeeFsp);
+        const jsm = await js.jetstreamManager();
+
+        await resolveFspiopStream(jsm, subject);
+        await js.publish(subject, this.nats.codec.encode(message));
     }
 }
 
@@ -19,6 +24,7 @@ export namespace ConnectorPatchTransfersPublisher {
 
     export class Message {
         constructor(
+            public readonly correlationId: string | null,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly transferId: string,

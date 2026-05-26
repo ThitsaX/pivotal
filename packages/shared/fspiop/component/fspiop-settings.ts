@@ -1,5 +1,3 @@
-import {Injectable} from '@nestjs/common';
-
 /**
  * FSPIOP runtime settings.
  *
@@ -20,7 +18,7 @@ import {Injectable} from '@nestjs/common';
  *   ),
  * }
  */
-@Injectable()
+
 export class FspiopSettings {
     constructor(
         public readonly switchId: string,

@@ -46,6 +46,10 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
         } catch (error) {
             const maybeNatsError = error as {code?: string};
             if (maybeNatsError.code !== '404') {
+                this.logger.error(
+                    `Failed to inspect consumer for stream='${stream}' durable='${durable}'.`,
+                    error instanceof Error ? error.stack : String(error),
+                );
                 throw error;
             }
         }
@@ -81,6 +85,7 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
                 await this.commandBus.execute(
                     new PerformGetPartiesCommand(
                         new PerformGetPartiesCommand.Input(
+                            message.correlationId,
                             message.payerFsp,
                             message.payeeFsp,
                             message.partyIdType,

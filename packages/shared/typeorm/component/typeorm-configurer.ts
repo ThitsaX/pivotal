@@ -5,13 +5,16 @@ export class TypeOrmConfigurer {
 
     static toTypeOrmOptions(settings: TypeOrmSettings): TypeOrmModuleOptions {
         return {
-            type: 'postgres',
+            type: 'mysql',
             host: settings.host,
             port: settings.port,
             username: settings.username,
             password: settings.password,
             database: settings.database,
-            schema: settings.schema,
+            charset: 'utf8mb4',
+            timezone: 'Z',
+            supportBigNumbers: true,
+            bigNumberStrings: true,
             synchronize: false,
             autoLoadEntities: true,
         };
@@ -22,4 +25,3 @@ export enum DbTarget {
     Read = 'read',
     Write = 'write',
 }
-

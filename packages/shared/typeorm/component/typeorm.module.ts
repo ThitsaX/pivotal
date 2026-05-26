@@ -7,6 +7,7 @@ import {DbTarget, TypeOrmConfigurer} from './typeorm-configurer';
 export class TypeOrmModule {
 
     static forRootAsync(asyncOptions: TypeOrmModule.AsyncOptions): DynamicModule {
+
         const typeOrmModuleOptions: Record<string, unknown> = {
             imports: asyncOptions.imports ?? [],
             inject: asyncOptions.inject ?? [],
@@ -40,7 +41,7 @@ export class TypeOrmModule {
 
 export namespace TypeOrmModule {
 
-    export interface RequiredDependencies {
+    export interface RequiredSettings {
         writeTypeOrmSettings(): TypeOrmSettings;
         readTypeOrmSettings(): TypeOrmSettings;
     }
@@ -49,7 +50,7 @@ export namespace TypeOrmModule {
         connectionName: string;
         target: DbTarget;
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

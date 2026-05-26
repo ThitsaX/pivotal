@@ -1,8 +1,6 @@
-import {Injectable} from '@nestjs/common';
 import {PublicKey} from '../public-key';
 import {PublicKeyStore} from '../public-key-store';
 
-@Injectable()
 export class EnvBasedPublicKeyStore extends PublicKeyStore {
 
     private static readonly FSP_IDS_ENV_NAME = 'FSPIOP_FSP_IDS';

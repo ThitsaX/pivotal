@@ -1,5 +1,6 @@
 import {DynamicModule, Module} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
+import {AuditProducerModule} from '@core/audit/producer';
 import {ConnectorPublisherModule} from '@core/connector/publisher';
 import {FspiopPubSubModule} from '@shared/fspiop';
 import {
@@ -48,6 +49,11 @@ export class InboundDomainModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                AuditProducerModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [...CommandHandlers],
@@ -58,14 +64,15 @@ export class InboundDomainModule {
 
 export namespace InboundDomainModule {
 
-    export interface RequiredDependencies
-        extends FspiopPubSubModule.RequiredDependencies,
-                ConnectorPublisherModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends FspiopPubSubModule.RequiredSettings,
+                ConnectorPublisherModule.RequiredSettings,
+                AuditProducerModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

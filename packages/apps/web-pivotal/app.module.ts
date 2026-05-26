@@ -1,6 +1,6 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
-import {WebPivotalDependencies} from './required.dependencies';
+import {WebPivotalSettings} from './required.settings';
 import {WebPivotalModule} from './web-pivotal.module';
 
 @Module({
@@ -12,8 +12,8 @@ import {WebPivotalModule} from './web-pivotal.module';
         WebPivotalModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: (configService: ConfigService): WebPivotalModule.RequiredDependencies => {
-                return new WebPivotalDependencies(configService);
+            useFactory: (configService: ConfigService): WebPivotalModule.RequiredSettings => {
+                return new WebPivotalSettings(configService);
             },
         }),
     ],

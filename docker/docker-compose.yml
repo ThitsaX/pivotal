@@ -1,31 +1,94 @@
-name: pivotal-web
+name: pivotal-stack
+
+x-common-fspiop-env: &common_fspiop_env
+  FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://web-inbound:3201}
+  FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://web-inbound:3201}
+  FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://web-inbound:3201}
+  FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
+  FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
+  FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
+  FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}
+  FSPIOP_VERIFY_JWS: ${FSPIOP_VERIFY_JWS:-false}
+  FSPIOP_MUTUAL_TLS: ${FSPIOP_MUTUAL_TLS:-false}
+  FSPIOP_SOCKET_TIMEOUT_MS: ${FSPIOP_SOCKET_TIMEOUT_MS:-30000}
+  FSPIOP_CONNECTION_TIMEOUT_MS: ${FSPIOP_CONNECTION_TIMEOUT_MS:-5000}
+  FSPIOP_TLS_VERIFY_SERVER_CERT: ${FSPIOP_TLS_VERIFY_SERVER_CERT:-false}
+  FSPIOP_TLS_VERIFY_DOMAIN: ${FSPIOP_TLS_VERIFY_DOMAIN:-false}
+  FSPIOP_JWS_PRIVATE_KEY: ${FSPIOP_JWS_PRIVATE_KEY:-}
+  FSPIOP_JWS_PUBLIC_KEY: ${FSPIOP_JWS_PUBLIC_KEY:-}
+  FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
+  FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
+  FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+
+x-common-db-env: &common_db_env
+  DB_WRITE_HOST: ${DB_WRITE_HOST:-mysql}
+  DB_WRITE_PORT: ${DB_WRITE_PORT:-3306}
+  DB_WRITE_USERNAME: ${DB_WRITE_USERNAME:-root}
+  DB_WRITE_PASSWORD: ${DB_WRITE_PASSWORD:-mysql}
+  DB_WRITE_NAME: ${DB_WRITE_NAME:-pivotal}
+  DB_READ_HOST: ${DB_READ_HOST:-mysql}
+  DB_READ_PORT: ${DB_READ_PORT:-3306}
+  DB_READ_USERNAME: ${DB_READ_USERNAME:-root}
+  DB_READ_PASSWORD: ${DB_READ_PASSWORD:-mysql}
+  DB_READ_NAME: ${DB_READ_NAME:-pivotal}
 
 services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_WRITE_NAME:-pivotal}
+      MYSQL_ROOT_PASSWORD: ${DB_WRITE_PASSWORD:-mysql}
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p${DB_WRITE_PASSWORD:-mysql} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.11-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "${NATS_HOST_PORT:-4222}:4222"
+      - "${NATS_MONITOR_HOST_PORT:-8222}:8222"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
   web-outbound:
     image: pivotal-web-outbound:local
     build:
       context: ..
       dockerfile: docker/web-outbound.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      web-inbound:
+        condition: service_started
+      nats:
+        condition: service_started
+      redis:
+        condition: service_started
     environment:
       WEB_OUTBOUND_PORT: ${WEB_OUTBOUND_PORT:-3200}
-      NATS_URL: ${NATS_URL:-nats://localhost:4222}
-      FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://localhost:4002}
-      FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://localhost:3002}
-      FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://localhost:3000}
-      FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
-      FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}
-      FSPIOP_VERIFY_JWS: ${FSPIOP_VERIFY_JWS:-false}
-      FSPIOP_MUTUAL_TLS: ${FSPIOP_MUTUAL_TLS:-false}
-      FSPIOP_SOCKET_TIMEOUT_MS: ${FSPIOP_SOCKET_TIMEOUT_MS:-30000}
-      FSPIOP_CONNECTION_TIMEOUT_MS: ${FSPIOP_CONNECTION_TIMEOUT_MS:-5000}
-      FSPIOP_TLS_VERIFY_SERVER_CERT: ${FSPIOP_TLS_VERIFY_SERVER_CERT:-false}
-      FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
-      FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
-      FSPIOP_JWS_PRIVATE_KEY: ${FSPIOP_JWS_PRIVATE_KEY:-}
-      FSPIOP_JWS_PUBLIC_KEY: ${FSPIOP_JWS_PUBLIC_KEY:-}
-      FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
-      FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
-      FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+      PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: ${PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS:-5}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_CACHE_ITEM_TIMEOUT_MS: ${REDIS_CACHE_ITEM_TIMEOUT_MS:-900000}
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
+      <<: [*common_db_env, *common_fspiop_env]
     ports:
       - "${WEB_OUTBOUND_HOST_PORT:-3200}:${WEB_OUTBOUND_PORT:-3200}"
     restart: unless-stopped
@@ -35,24 +98,133 @@ services:
     build:
       context: ..
       dockerfile: docker/web-inbound.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nats:
+        condition: service_started
     environment:
       WEB_INBOUND_PORT: ${WEB_INBOUND_PORT:-3201}
-      NATS_URL: ${NATS_URL:-nats://localhost:4222}
-      FSPIOP_PARTIES_URL: ${FSPIOP_PARTIES_URL:-http://localhost:4002}
-      FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://localhost:3002}
-      FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://localhost:3000}
-      FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
-      FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
-      FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
-      FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}
-      FSPIOP_VERIFY_JWS: ${FSPIOP_VERIFY_JWS:-false}
-      FSPIOP_MUTUAL_TLS: ${FSPIOP_MUTUAL_TLS:-false}
-      FSPIOP_TLS_VERIFY_SERVER_CERT: ${FSPIOP_TLS_VERIFY_SERVER_CERT:-false}
-      FSPIOP_JWS_PRIVATE_KEY: ${FSPIOP_JWS_PRIVATE_KEY:-}
-      FSPIOP_JWS_PUBLIC_KEY: ${FSPIOP_JWS_PUBLIC_KEY:-}
-      FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
-      FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
-      FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
+      <<: [*common_db_env, *common_fspiop_env]
     ports:
       - "${WEB_INBOUND_HOST_PORT:-3201}:${WEB_INBOUND_PORT:-3201}"
     restart: unless-stopped
+
+  app-auditor:
+    image: pivotal-app-auditor:local
+    build:
+      context: ..
+      dockerfile: docker/app-auditor.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      PIVOTAL_AUDIT_STREAM_NAME: ${PIVOTAL_AUDIT_STREAM_NAME:-PIVOTAL_AUDIT}
+      <<: *common_db_env
+    restart: unless-stopped
+
+  web-pivotal:
+    image: pivotal-web-pivotal:local
+    build:
+      context: ..
+      dockerfile: docker/web-pivotal.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      WEB_PIVOTAL_PORT: ${WEB_PIVOTAL_PORT:-3202}
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
+      CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
+      CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
+      <<: *common_db_env
+    ports:
+      - "${WEB_PIVOTAL_HOST_PORT:-3202}:${WEB_PIVOTAL_PORT:-3202}"
+    restart: unless-stopped
+
+  portal:
+    image: pivotal-portal:local
+    build:
+      context: ..
+      dockerfile: docker/portal.Dockerfile
+      args:
+        VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-http://localhost:3202}
+    depends_on:
+      web-pivotal:
+        condition: service_started
+    ports:
+      - "${PORTAL_HOST_PORT:-4173}:80"
+    restart: unless-stopped
+
+  wallet1-connector:
+    image: pivotal-wallet1-connector:local
+    build:
+      context: ..
+      dockerfile: docker/wallet1-connector.Dockerfile
+    depends_on:
+      nats:
+        condition: service_started
+      web-inbound:
+        condition: service_started
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      PIVOTAL_FSPIOP_STREAM_NAME: ${PIVOTAL_FSPIOP_STREAM_NAME:-PIVOTAL_FSPIOP}
+      CONNECTOR_ID: ${WALLET1_CONNECTOR_ID:-wallet1}
+      CONNECTOR_SUPPORTED_CURRENCIES: ${WALLET1_CONNECTOR_SUPPORTED_CURRENCIES:-USD,LRD}
+      CONNECTOR_ILP_SECRET: ${WALLET1_CONNECTOR_ILP_SECRET:-wallet1-ilp-secret}
+      CATALYST_URL: ${CATALYST_URL:-http://host.docker.internal:4000}
+      CATALYST_ENGINE_MODE: ${CATALYST_ENGINE_MODE:-STRICT}
+      <<: *common_fspiop_env
+    restart: unless-stopped
+
+  wallet2-connector:
+    image: pivotal-wallet2-connector:local
+    build:
+      context: ..
+      dockerfile: docker/wallet2-connector.Dockerfile
+    depends_on:
+      nats:
+        condition: service_started
+      web-inbound:
+        condition: service_started
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      PIVOTAL_FSPIOP_STREAM_NAME: ${PIVOTAL_FSPIOP_STREAM_NAME:-PIVOTAL_FSPIOP}
+      CONNECTOR_ID: ${WALLET2_CONNECTOR_ID:-wallet2}
+      CONNECTOR_SUPPORTED_CURRENCIES: ${WALLET2_CONNECTOR_SUPPORTED_CURRENCIES:-USD,LRD}
+      CONNECTOR_ILP_SECRET: ${WALLET2_CONNECTOR_ILP_SECRET:-wallet2-ilp-secret}
+      CATALYST_URL: ${CATALYST_URL:-http://host.docker.internal:4000}
+      CATALYST_ENGINE_MODE: ${CATALYST_ENGINE_MODE:-STRICT}
+      <<: *common_fspiop_env
+    restart: unless-stopped
+
+  wallet3-connector:
+    image: pivotal-wallet3-connector:local
+    build:
+      context: ..
+      dockerfile: docker/wallet3-connector.Dockerfile
+    depends_on:
+      nats:
+        condition: service_started
+      web-inbound:
+        condition: service_started
+    environment:
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      PIVOTAL_FSPIOP_STREAM_NAME: ${PIVOTAL_FSPIOP_STREAM_NAME:-PIVOTAL_FSPIOP}
+      CONNECTOR_ID: ${WALLET3_CONNECTOR_ID:-wallet3}
+      CONNECTOR_SUPPORTED_CURRENCIES: ${WALLET3_CONNECTOR_SUPPORTED_CURRENCIES:-USD,LRD}
+      CONNECTOR_ILP_SECRET: ${WALLET3_CONNECTOR_ILP_SECRET:-wallet3-ilp-secret}
+      CATALYST_URL: ${CATALYST_URL:-http://host.docker.internal:4000}
+      CATALYST_ENGINE_MODE: ${CATALYST_ENGINE_MODE:-STRICT}
+      <<: *common_fspiop_env
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:

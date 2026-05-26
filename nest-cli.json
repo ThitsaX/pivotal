@@ -50,24 +50,6 @@
         "tsConfigPath": "packages/core/outbound/domain/tsconfig.app.json"
       }
     },
-    "core-legacy-domain": {
-      "type": "library",
-      "root": "packages/core/legacy/domain",
-      "entryFile": "index",
-      "sourceRoot": "packages/core/legacy/domain",
-      "compilerOptions": {
-        "tsConfigPath": "packages/core/legacy/domain/tsconfig.app.json"
-      }
-    },
-    "core-outbound-publisher": {
-      "type": "library",
-      "root": "packages/core/outbound/publisher",
-      "entryFile": "index",
-      "sourceRoot": "packages/core/outbound/publisher",
-      "compilerOptions": {
-        "tsConfigPath": "packages/core/outbound/publisher/tsconfig.app.json"
-      }
-    },
     "core-audit-domain": {
       "type": "library",
       "root": "packages/core/audit/domain",
@@ -75,6 +57,15 @@
       "sourceRoot": "packages/core/audit/domain",
       "compilerOptions": {
         "tsConfigPath": "packages/core/audit/domain/tsconfig.app.json"
+      }
+    },
+    "core-auth-domain": {
+      "type": "library",
+      "root": "packages/core/auth/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/auth/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/auth/domain/tsconfig.app.json"
       }
     },
     "core-audit-consumer": {
@@ -102,15 +93,6 @@
       "sourceRoot": "packages/apps/web-outbound",
       "compilerOptions": {
         "tsConfigPath": "packages/apps/web-outbound/tsconfig.app.json"
-      }
-    },
-    "apps-web-legacy": {
-      "type": "application",
-      "root": "packages/apps/web-legacy",
-      "entryFile": "apps/web-legacy/main",
-      "sourceRoot": "packages/apps/web-legacy",
-      "compilerOptions": {
-        "tsConfigPath": "packages/apps/web-legacy/tsconfig.app.json"
       }
     },
     "apps-web-inbound": {
@@ -194,13 +176,22 @@
         "tsConfigPath": "packages/shared/catalyst/tsconfig.app.json"
       }
     },
-    "shared-pg-migration": {
+    "shared-central-ledger": {
       "type": "library",
-      "root": "packages/shared/pg-migration",
+      "root": "packages/shared/central-ledger",
       "entryFile": "index",
-      "sourceRoot": "packages/shared/pg-migration",
+      "sourceRoot": "packages/shared/central-ledger",
       "compilerOptions": {
-        "tsConfigPath": "packages/shared/pg-migration/tsconfig.app.json"
+        "tsConfigPath": "packages/shared/central-ledger/tsconfig.app.json"
+      }
+    },
+    "shared-dbmigration": {
+      "type": "library",
+      "root": "packages/shared/dbmigration",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/dbmigration",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/dbmigration/tsconfig.app.json"
       }
     },
     "shared-snowflake": {
@@ -237,6 +228,15 @@
       "sourceRoot": "packages/shared/security",
       "compilerOptions": {
         "tsConfigPath": "packages/shared/security/tsconfig.app.json"
+      }
+    },
+    "shared-foundation": {
+      "type": "library",
+      "root": "packages/shared/foundation",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/foundation",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/foundation/tsconfig.app.json"
       }
     },
     "shared-ulid": {

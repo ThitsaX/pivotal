@@ -1,14 +1,16 @@
 export type ViewKey =
+    | 'hub-add-currency'
+    | 'hub-list-participants'
+    | 'hub-add-signing-keys'
     | 'participant-onboarding'
+    | 'participant-add-signing-keys'
     | 'participant-add-new-currency'
-    | 'inbound-parties'
-    | 'inbound-quotes'
-    | 'inbound-transfers'
-    | 'outbound-parties'
-    | 'outbound-quotes'
-    | 'outbound-transfers';
-
-export type ViewGroup = 'Participant' | 'Inbound' | 'Outbound';
+    | 'participant-register-endpoint'
+    | 'transactions'
+    | 'admin-users'
+    | 'admin-roles'
+    | 'admin-permissions'
+    | 'admin-menus';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';
@@ -34,9 +36,7 @@ export interface ColumnDefinition {
 
 export interface ViewDefinition {
     key: ViewKey;
-    group: ViewGroup;
     title: string;
-    menuLabel: string;
     subtitle: string;
     endpoint: string;
     criteriaFields: FilterField[];
