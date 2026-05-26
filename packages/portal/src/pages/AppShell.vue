@@ -7,8 +7,11 @@ import SidebarMenuIcon from '../components/SidebarMenuIcon.vue';
 import thitsaworksLogo from '../assets/thitsaworks_logo.jpg';
 import {DESKTOP_BREAKPOINT} from '../modules/audit/helpers';
 import type {ViewKey} from '../modules/audit/types';
-import {VIEW_BY_KEY} from '../modules/audit/view-definitions';
 import {menuStore, type MenuGroup, type MenuItem} from '../stores/menu.store';
+import MenusAdminPage from './admin/MenusPage.vue';
+import PermissionsAdminPage from './admin/PermissionsPage.vue';
+import RolesAdminPage from './admin/RolesPage.vue';
+import UsersAdminPage from './admin/UsersPage.vue';
 import TransactionsPage from './audit/TransactionsPage.vue';
 import DashboardPage from './DashboardPage.vue';
 import HubAddCurrencyPage from './hub/HubAddCurrencyPage.vue';
@@ -40,12 +43,16 @@ const pageComponentByKey: Record<ViewKey, Component> = {
     'participant-add-new-currency': ParticipantAddNewCurrencyPage,
     'participant-register-endpoint': ParticipantRegisterEndpointPage,
     transactions: TransactionsPage,
+    'admin-users': UsersAdminPage,
+    'admin-roles': RolesAdminPage,
+    'admin-permissions': PermissionsAdminPage,
+    'admin-menus': MenusAdminPage,
 };
 
 const warnedMenuKeys = new Set<string>();
 
 const isKnownViewKey = (key: string): key is ViewKey => {
-    return Object.prototype.hasOwnProperty.call(VIEW_BY_KEY, key);
+    return Object.prototype.hasOwnProperty.call(pageComponentByKey, key);
 };
 
 const visibleGroups = computed((): MenuGroup[] => {
