@@ -10,6 +10,22 @@ const variant = computed((): string => {
         return 'dashboard';
     }
 
+    if (props.item === 'admin-users') {
+        return 'admin-users';
+    }
+
+    if (props.item === 'admin-roles') {
+        return 'admin-roles';
+    }
+
+    if (props.item === 'admin-permissions') {
+        return 'admin-permissions';
+    }
+
+    if (props.item === 'admin-menus') {
+        return 'admin-menus';
+    }
+
     if (props.item.includes('onboarding')) {
         return 'onboarding';
     }
@@ -126,6 +142,53 @@ const variant = computed((): string => {
     >
         <rect x="4" y="3.5" width="12" height="13" rx="2" stroke="currentColor" stroke-width="1.7" />
         <path d="M7 7h6M7 10h6M7 13h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+
+    <svg
+        v-else-if="variant === 'admin-users'"
+        class="h-4 w-4 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+    >
+        <circle cx="8" cy="7.5" r="2.5" stroke="currentColor" stroke-width="1.7" />
+        <path d="M3 16c.6-2.4 2.5-3.8 5-3.8s4.4 1.4 5 3.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        <circle cx="14.5" cy="8" r="2" stroke="currentColor" stroke-width="1.5" />
+        <path d="M13 13.4c.4-.9 1.3-1.4 2.4-1.4 1.4 0 2.5.8 2.8 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+    </svg>
+
+    <svg
+        v-else-if="variant === 'admin-roles'"
+        class="h-4 w-4 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+    >
+        <path d="M10 3.2 4.2 5.2v4.2c0 3.4 2.4 6.4 5.8 7.4 3.4-1 5.8-4 5.8-7.4V5.2L10 3.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+        <path d="m7.6 10.2 1.8 1.8 3.2-3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+
+    <svg
+        v-else-if="variant === 'admin-permissions'"
+        class="h-4 w-4 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+    >
+        <circle cx="7.5" cy="9" r="3" stroke="currentColor" stroke-width="1.7" />
+        <path d="m9.7 7.2 7 7m-2.5-.5 1.5 1.5m-3-3 1.4 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+
+    <svg
+        v-else-if="variant === 'admin-menus'"
+        class="h-4 w-4 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+    >
+        <rect x="3" y="4" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
+        <rect x="3" y="8.5" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
+        <rect x="3" y="13" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
     </svg>
 
     <svg

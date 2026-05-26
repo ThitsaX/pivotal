@@ -47,6 +47,7 @@ export class ChangePasswordHandler
 
         // Security-paranoid: revoke all existing sessions on password change.
         await this.refreshTokenRepository.revokeAllForUser(user.id);
+        await this.userRepository.invalidateTokens(user.id);
 
         return new ChangePasswordCommand.Output(true);
     }

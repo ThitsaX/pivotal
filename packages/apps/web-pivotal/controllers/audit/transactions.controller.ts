@@ -2,7 +2,6 @@ import {BadRequestException, Controller, Get, Inject, Param, Query} from '@nestj
 import {QueryBus} from '@nestjs/cqrs';
 import {
     AccessTokenClaims,
-    DFSP_USER_ROLE_CODE,
     PermissionKey,
     RequiresPermission,
 } from '@core/auth/domain';
@@ -128,15 +127,8 @@ export class TransactionsAuditController {
         payeeFsp: string | undefined,
     ): FindTransactionsQuery.AccessScope | undefined {
 
-        if (claims == null || claims.role !== DFSP_USER_ROLE_CODE) {
+        if (claims == null || claims.fspId == null) {
             return undefined;
-        }
-
-        if (claims.fspId == null) {
-            throw new BadRequestException({
-                code: 'AUTH_FSP_SCOPE_MISSING',
-                message: 'DFSP user has no fspId associated with the session.',
-            });
         }
 
         const scopedFspId = claims.fspId;
@@ -162,15 +154,8 @@ export class TransactionsAuditController {
         claims: AccessTokenClaims | undefined,
     ): GetTransactionQuery.AccessScope | undefined {
 
-        if (claims == null || claims.role !== DFSP_USER_ROLE_CODE) {
+        if (claims == null || claims.fspId == null) {
             return undefined;
-        }
-
-        if (claims.fspId == null) {
-            throw new BadRequestException({
-                code: 'AUTH_FSP_SCOPE_MISSING',
-                message: 'DFSP user has no fspId associated with the session.',
-            });
         }
 
         return new GetTransactionQuery.AccessScope(claims.fspId);
