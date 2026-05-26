@@ -1,7 +1,7 @@
-import {Inject, Logger} from '@nestjs/common';
-import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {TransactionMessage} from '@core/audit/common';
-import {AuditTransactionPublisher} from '@core/audit/producer';
+import { Inject, Logger } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { TransactionMessage } from '@core/audit/common';
+import { AuditTransactionPublisher } from '@core/audit/producer';
 import {
     FspiopAxios,
     FspiopAxiosError,
@@ -16,11 +16,11 @@ import {
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
-import {TransferRequest} from '../cache';
-import {RedisClient} from '../component';
-import {SendMoneyResponse} from '../dto';
-import {PutAcceptQuoteCommand} from './put-accept-quote.command';
-import {SendMoneyResponseMapper} from './send-money-response.mapper';
+import { TransferRequest } from '../cache';
+import { RedisClient } from '../component';
+import { SendMoneyResponse } from '../dto';
+import { PutAcceptQuoteCommand } from './put-accept-quote.command';
+import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptQuoteCommand)
 export class PutAcceptQuoteHandler
@@ -113,12 +113,12 @@ export class PutAcceptQuoteHandler
     }
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
-        const {transferId, acceptQuote} = command.input;
+        const { transferId, acceptQuote } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
-        const {transfersUrl} = this.fspiopAxios.settings;
+        const { transfersUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
@@ -185,10 +185,7 @@ export class PutAcceptQuoteHandler
 
             return new PutAcceptQuoteCommand.Output(response, callback);
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const stack = error instanceof Error ? error.stack : undefined;
-
-            this.logger.error(`putAcceptQuote failed for transferId=${transferId}`, stack ?? message);
+            this.logger.error(`Put SendMoney acceptQuote Error Response for transferId=${transferId} : ${JSON.stringify(error)}`);
             const fspiopException = PutAcceptQuoteHandler.toFspiopException(error, transferId);
 
             try {

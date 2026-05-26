@@ -57,6 +57,7 @@ export class FspiopErrorType {
     static readonly PAYEE_UNSUPPORTED_CURRENCY = new FspiopErrorType('5106', 'Payee unsupported currency');
     static readonly PAYEE_LIMIT_ERROR = new FspiopErrorType('5200', 'Payee limit error');
     static readonly PAYEE_PERMISSION_ERROR = new FspiopErrorType('5300', 'Payee permission error');
+    static readonly ROUNDING_VALUE_ERROR = new FspiopErrorType('5241', "Amount is invalid. Please enter the format specified by the service provider.");
     static readonly GENERIC_PAYEE_BLOCKED_ERROR = new FspiopErrorType('5400', 'Generic Payee blocked error');
 
     readonly code: string;

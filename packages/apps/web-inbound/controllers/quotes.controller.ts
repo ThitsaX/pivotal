@@ -39,6 +39,9 @@ export class QuotesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesPostRequest): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Post Quote Request for TransferId ${request.transactionId} : ${JSON.stringify(request)}`,
+            );
             const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(sourceHeader);
             const payeeFsp = QuotesController.headerValue(destinationHeader);
@@ -59,6 +62,9 @@ export class QuotesController {
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Put Quote Request Error for QuoteId ${quoteId} : ${JSON.stringify(request)}`,
+            );
             const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
@@ -86,6 +92,9 @@ export class QuotesController {
         @Body() request: QuotesIDPutResponse,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Put Quote Request for TransferId ${quoteId} : ${JSON.stringify(request)}`,
+            );
             const correlationId = QuotesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = QuotesController.headerValue(destinationHeader);
             const payeeFsp = QuotesController.headerValue(sourceHeader);
