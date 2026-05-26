@@ -126,7 +126,9 @@ export class FspConnector {
         response.expiration = expiration;
         response.ilpPacket = prepare.base64PreparePacket;
         response.condition = prepare.base64Condition;
-        response.extensionList = postQuotesOutput.fees;
+        response.extensionList = (postQuotesOutput.fees?.extension?.length ?? 0) > 0
+            ? postQuotesOutput.fees
+            : undefined;
 
         return response;
     }
@@ -159,13 +161,13 @@ export class FspConnector {
         return response;
     }
 
-    async patchTransfers(patchresponse: FspConnector.PatchTransfersInput): Promise<void> {
+    async patchTransfers(response: FspConnector.PatchTransfersInput): Promise<void> {
         await this.fspClient.patchTransfers(
             new FspClient.PatchTransfersInput(
-                patchresponse.payerFsp,
-                patchresponse.payeeFsp,
-                patchresponse.transferId,
-                patchresponse.response,
+                response.payerFsp,
+                response.payeeFsp,
+                response.transferId,
+                response.response,
             ),
         );
     }

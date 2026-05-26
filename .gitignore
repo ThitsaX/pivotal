@@ -66,6 +66,7 @@ hs_err_pid*
 **/.cache/*
 **/node_modules/*
 **/dist/*
+**/nats-data/*
 
 *.factorypath
 .qodo

@@ -2,6 +2,7 @@ import {Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {ConnectorGetPartiesPublisher} from '@core/connector/publisher';
 import {HandleGetPartiesCommand} from './handle-get-parties.command';
+import {resolveGatewayCorrelationId} from '../gateway-audit';
 
 @CommandHandler(HandleGetPartiesCommand)
 export class HandleGetPartiesHandler
@@ -14,9 +15,11 @@ export class HandleGetPartiesHandler
     }
 
     async execute(command: HandleGetPartiesCommand): Promise<HandleGetPartiesCommand.Output> {
-        const {payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
+        const {correlationId, payerFsp, payeeFsp, partyIdType, partyId, subId} = command.input;
+        const connectorCorrelationId = resolveGatewayCorrelationId(correlationId);
+
         await this.publisher.publish(
-            new ConnectorGetPartiesPublisher.Message(payerFsp, payeeFsp, partyIdType, partyId, subId),
+            new ConnectorGetPartiesPublisher.Message(connectorCorrelationId, payerFsp, payeeFsp, partyIdType, partyId, subId),
         );
         return new HandleGetPartiesCommand.Output();
     }

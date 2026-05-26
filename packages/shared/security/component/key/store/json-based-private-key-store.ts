@@ -1,8 +1,6 @@
-import {Injectable} from '@nestjs/common';
 import {PrivateKey} from '../private-key';
 import {PrivateKeyStore} from '../private-key-store';
 
-@Injectable()
 export class JsonBasedPrivateKeyStore extends PrivateKeyStore {
 
     private static readonly ENV_JSON_PRIVATE_KEYS = 'JSON_PRIVATE_KEYS';

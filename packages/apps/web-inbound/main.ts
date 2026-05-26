@@ -5,8 +5,8 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspiopExceptionFilter, FspInboundGuard} from '@shared/fspiop';
-import {WebInboundDependencies} from './required.dependencies';
+import {FspInboundGuard, FspiopExceptionFilter} from '@shared/fspiop';
+import {WebInboundSettings} from './required.settings';
 import {WebInboundAppModule} from './app.module';
 
 const ROOT_ENV_LOCATION = '.env';
@@ -42,19 +42,19 @@ const findRepoRoot = (): string => {
 };
 
 const resolveHttpsOptions = (
-    deps: WebInboundDependencies,
+    settings: WebInboundSettings,
     useMutualTls: boolean,
 ): Record<string, unknown> | undefined => {
     if (!useMutualTls) {
         return undefined;
     }
 
-    const ca = deps.caStore().get();
+    const ca = settings.caStore().get();
     if (ca == null || ca.toBuffer().length === 0) {
         throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CA.');
     }
 
-    const clientCert = deps.clientCertStore().get();
+    const clientCert = settings.clientCertStore().get();
     if (clientCert == null) {
         throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CLIENT_CERT and FSPIOP_MTLS_CLIENT_KEY.');
     }
@@ -85,7 +85,7 @@ const bootstrap = async (): Promise<void> => {
     }
 
     const port = Number(process.env['WEB_INBOUND_PORT'] ?? DEFAULT_HTTP_PORT);
-    const deps = new WebInboundDependencies();
+    const deps = new WebInboundSettings();
     const settings = deps.fspiopSettings();
     const httpsOptions = resolveHttpsOptions(deps, settings.useMutualTls);
     const nestOptions = httpsOptions == null ? {} : {httpsOptions: httpsOptions as any};
@@ -94,8 +94,9 @@ const bootstrap = async (): Promise<void> => {
     app.enableShutdownHooks();
     app.use(json({type: ['application/json', 'application/*+json']}));
     app.useGlobalFilters(new FspiopExceptionFilter());
+
     if (settings.useJws) {
-        app.useGlobalGuards(new FspInboundGuard(deps.publicKeyStore(), settings));
+        app.useGlobalGuards(app.get(FspInboundGuard));
         Logger.log('FspInboundGuard is enabled.', 'Bootstrap');
     }
 

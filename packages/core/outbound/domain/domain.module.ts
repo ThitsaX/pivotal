@@ -1,14 +1,14 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
-import {
-    FspiopAxiosModule,
-    FspiopPubSubModule,
-    FspiopSettings,
-} from '@shared/fspiop';
-import {DoLookupHandler, DoQuotingHandler, DoTransferHandler} from './command';
+import {AuditProducerModule} from '@core/audit/producer';
+import {FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor,} from '@shared/fspiop';
+import {PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler} from './command';
+import {OutboundSettings, RedisClient} from './component';
+import * as https from "node:https";
+import {CaStore, ClientCertStore, PrivateKeyStore} from "@shared/security";
 
-const REQUIRED_DEPENDENCIES = Symbol('OutboundDomainRequiredDependencies');
-const CommandHandlers = [DoLookupHandler, DoQuotingHandler, DoTransferHandler];
+const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
+const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
 
 @Module({})
 export class OutboundDomainModule {
@@ -18,36 +18,84 @@ export class OutboundDomainModule {
             module: OutboundDomainModule,
             imports: [
                 CqrsModule,
-                FspiopAxiosModule.forRootAsync({
-                    imports: asyncOptions.imports ?? [],
-                    inject: asyncOptions.inject ?? [],
-                    useFactory: asyncOptions.useFactory,
-                }),
                 FspiopPubSubModule.forRootAsync({
-                    imports: asyncOptions.imports ?? [],
-                    inject: asyncOptions.inject ?? [],
-                    useFactory: asyncOptions.useFactory,
-                }),
+                                                    imports: asyncOptions.imports ?? [],
+                                                    inject: asyncOptions.inject ?? [],
+                                                    useFactory: asyncOptions.useFactory,
+                                                }),
+                AuditProducerModule.forRootAsync({
+                                                     imports: asyncOptions.imports ?? [],
+                                                     inject: asyncOptions.inject ?? [],
+                                                     useFactory: asyncOptions.useFactory,
+                                                 }),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [
                 {
-                    provide: REQUIRED_DEPENDENCIES,
+                    provide: REQUIRED_SETTINGS,
                     useFactory: asyncOptions.useFactory,
                     inject: asyncOptions.inject ?? [],
                 },
-                ...OutboundDomainModule.createProviders(),
+                ...OutboundDomainModule.createProviders(asyncOptions),
             ],
-            exports: [CqrsModule],
+            exports: [CqrsModule, RedisClient],
         };
     }
 
-    private static createProviders(): Provider[] {
+    private static createProviders(asyncOptions: OutboundDomainModule.AsyncOptions): Provider[] {
         return [
             {
+                provide: OutboundSettings,
+                useFactory: (settings: OutboundDomainModule.RequiredSettings): OutboundSettings => settings.outboundSettings(),
+                inject: [REQUIRED_SETTINGS],
+            },
+            {
                 provide: FspiopSettings,
-                useFactory: (deps: OutboundDomainModule.RequiredDependencies) => deps.fspiopSettings(),
-                inject: [REQUIRED_DEPENDENCIES],
+                useFactory: (outboundSettings: OutboundSettings): FspiopSettings => outboundSettings.fspiopSettings,
+                inject: [OutboundSettings],
+            },
+            {
+                provide: RedisClient,
+                useFactory: (outboundSettings: OutboundSettings): RedisClient => {
+                    return new RedisClient(outboundSettings.redisUrl, outboundSettings.redisCacheItemTimeoutMs);
+                },
+                inject: [OutboundSettings],
+            },
+            ...(asyncOptions.providers ?? []),
+            {
+                provide: FspiopAxios,
+                useFactory: (
+                    outboundSettings: OutboundSettings,
+                    privateKeyStore: PrivateKeyStore,
+                    caStore: CaStore,
+                    clientCertStore: ClientCertStore,
+                ): FspiopAxios => {
+
+                    const fspiopSettings = outboundSettings.fspiopSettings;
+                    const params = outboundSettings.fspiopAxiosParams;
+
+                    const interceptors =
+                        fspiopSettings.useJws ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+                            : [];
+
+                    const httpsAgent =
+                        fspiopSettings.useMutualTls ?
+                            new https.Agent(
+                                {
+                                    ca: caStore.get()?.toBuffer(),
+                                    cert: clientCertStore.get()?.certBuffer(),
+                                    key: clientCertStore.get()?.keyBuffer(),
+                                    rejectUnauthorized: params.verifyServerCertificate,
+                                    timeout: params.connectionTimeoutMs,
+                                    ...(params.verifyDomain === false
+                                        ? {checkServerIdentity: () => undefined}
+                                        : {}),
+                                })
+                            : undefined;
+
+                    return new FspiopAxios(fspiopSettings, params, interceptors, {}, httpsAgent);
+                },
+                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore],
             },
             ...CommandHandlers,
         ];
@@ -56,14 +104,17 @@ export class OutboundDomainModule {
 
 export namespace OutboundDomainModule {
 
-    export interface RequiredDependencies
-        extends FspiopAxiosModule.RequiredDependencies,
-                FspiopPubSubModule.RequiredDependencies {
+    export interface RequiredSettings
+        extends FspiopPubSubModule.RequiredSettings,
+            AuditProducerModule.RequiredSettings {
+
+        outboundSettings(): OutboundSettings;
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        providers?: Provider[];
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

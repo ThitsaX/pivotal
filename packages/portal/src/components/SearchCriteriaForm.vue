@@ -3,7 +3,7 @@ import CustomDropdown from './CustomDropdown.vue';
 import TimeRangeSelector from './TimeRangeSelector.vue';
 import type {CriteriaSection} from '../modules/audit/types';
 
-defineProps<{
+const props = withDefaults(defineProps<{
     sections: CriteriaSection[];
     criteria: Record<string, string>;
     selectedTimeZone: string;
@@ -11,7 +11,10 @@ defineProps<{
     loading: boolean;
     lastLoadedAt: string | null;
     formatLastLoadedAt: (value: string) => string;
-}>();
+    embedded?: boolean;
+}>(), {
+    embedded: false,
+});
 
 const emit = defineEmits<{
     (event: 'toggle'): void;
@@ -19,12 +22,40 @@ const emit = defineEmits<{
     (event: 'reset'): void;
     (event: 'refresh'): void;
 }>();
+
+const getSectionClass = (sectionKey: string): string => {
+    if (sectionKey === 'status' || sectionKey === 'participant') {
+        return 'xl:col-span-3';
+    }
+
+    if (sectionKey === 'transaction' || sectionKey === 'parties' || sectionKey === 'transactionPeriod') {
+        return 'xl:col-span-6';
+    }
+
+    return '';
+};
+
+const getFieldGridClass = (sectionKey: string): string => {
+    if (sectionKey === 'participant' || sectionKey === 'status') {
+        return 'grid gap-3 sm:grid-cols-2';
+    }
+
+    if (sectionKey === 'transaction') {
+        return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-4';
+    }
+
+    if (sectionKey === 'parties') {
+        return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
+    }
+
+    return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-4';
+};
 </script>
 
 <template>
-    <section class="pt-5">
+    <section :class="props.embedded ? 'pt-0' : 'pt-5'">
         <article class="overflow-visible border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
-            <div class="flex items-center justify-between border-b border-accent/15 bg-[#f8fbff] px-4 py-3">
+            <div class="flex flex-col gap-3 border-b border-accent/15 bg-[#f8fbff] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h3 class="font-display text-sm font-semibold uppercase tracking-[0.08em] text-accent">
                         Search Criteria
@@ -33,11 +64,11 @@ const emit = defineEmits<{
                         Refine the query and run search against audit data.
                     </p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                     <button
                         v-if="!visible"
                         type="button"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex min-w-[9rem] items-center justify-center gap-1.5 rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 sm:min-w-0"
                         :disabled="loading"
                         @click="emit('refresh')"
                     >
@@ -51,7 +82,7 @@ const emit = defineEmits<{
                     <button
                         type="button"
                         :class="[
-                            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition',
+                            'inline-flex min-w-[9rem] items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition sm:min-w-0',
                             visible
                                 ? 'border border-accent/25 bg-white text-accent hover:border-accent'
                                 : 'animate-pulseGlow border border-accent bg-accent text-white shadow-soft',
@@ -94,92 +125,97 @@ const emit = defineEmits<{
                 leave-to-class="max-h-0 -translate-y-1 opacity-0"
             >
                 <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="emit('submit')">
-                    <section
-                        v-for="section in sections"
-                        :key="section.key"
-                        class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5"
-                    >
-                        <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
-                            {{ section.title }}
-                        </h3>
+                    <div class="grid gap-4 xl:grid-cols-6">
+                        <section
+                            v-for="section in sections"
+                            :key="section.key"
+                            :class="[
+                                'space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5',
+                                getSectionClass(section.key),
+                            ]"
+                        >
+                            <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                                {{ section.title }}
+                            </h3>
 
-                        <div v-if="section.key === 'transactionPeriod'" class="grid gap-4 xl:grid-cols-2">
-                            <TimeRangeSelector
-                                label="Created At"
-                                :selected-time-zone="selectedTimeZone"
-                                :mode="criteria.createdAtMode"
-                                :start-value="criteria.createdAtStart"
-                                :end-value="criteria.createdAtEnd"
-                                @update:mode="criteria.createdAtMode = $event"
-                                @update:start-value="criteria.createdAtStart = $event"
-                                @update:end-value="criteria.createdAtEnd = $event"
-                            />
-                            <TimeRangeSelector
-                                label="Completed At"
-                                :selected-time-zone="selectedTimeZone"
-                                :mode="criteria.completedAtMode"
-                                :start-value="criteria.completedAtStart"
-                                :end-value="criteria.completedAtEnd"
-                                @update:mode="criteria.completedAtMode = $event"
-                                @update:start-value="criteria.completedAtStart = $event"
-                                @update:end-value="criteria.completedAtEnd = $event"
-                            />
-                        </div>
+                            <div v-if="section.key === 'transactionPeriod'" class="grid gap-4 xl:grid-cols-2">
+                                <TimeRangeSelector
+                                    label="Transaction Start"
+                                    :selected-time-zone="selectedTimeZone"
+                                    :mode="criteria.transactionStartAtMode"
+                                    :start-value="criteria.transactionStartAtStart"
+                                    :end-value="criteria.transactionStartAtEnd"
+                                    @update:mode="criteria.transactionStartAtMode = $event"
+                                    @update:start-value="criteria.transactionStartAtStart = $event"
+                                    @update:end-value="criteria.transactionStartAtEnd = $event"
+                                />
+                                <TimeRangeSelector
+                                    label="Transaction Completed"
+                                    :selected-time-zone="selectedTimeZone"
+                                    :mode="criteria.transactionCompletedAtMode"
+                                    :start-value="criteria.transactionCompletedAtStart"
+                                    :end-value="criteria.transactionCompletedAtEnd"
+                                    @update:mode="criteria.transactionCompletedAtMode = $event"
+                                    @update:start-value="criteria.transactionCompletedAtStart = $event"
+                                    @update:end-value="criteria.transactionCompletedAtEnd = $event"
+                                />
+                            </div>
 
-                        <div v-else class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <label
-                                v-for="field in section.fields"
-                                :key="field.key"
-                                class="block"
-                            >
-                                <div class="relative">
-                                    <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                        {{ field.label }}
-                                    </span>
+                            <div v-else :class="getFieldGridClass(section.key)">
+                                <div
+                                    v-for="field in section.fields"
+                                    :key="field.key"
+                                    class="block"
+                                >
+                                    <div class="relative">
+                                        <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                            {{ field.label }}
+                                        </span>
 
-                                    <input
-                                        v-if="field.type === 'text'"
-                                        v-model="criteria[field.key]"
-                                        type="text"
-                                        class="field-input !pb-1.5 !pt-5 text-xs"
-                                        :placeholder="field.placeholder ?? field.label"
-                                    />
+                                        <input
+                                            v-if="field.type === 'text'"
+                                            v-model="criteria[field.key]"
+                                            type="text"
+                                            class="field-input !pb-1.5 !pt-5 text-xs"
+                                            :placeholder="field.placeholder ?? field.label"
+                                        />
 
-                                    <input
-                                        v-else-if="field.type === 'datetime'"
-                                        v-model="criteria[field.key]"
-                                        type="datetime-local"
-                                        class="field-input !pb-1.5 !pt-5 text-xs"
-                                    />
+                                        <input
+                                            v-else-if="field.type === 'datetime'"
+                                            v-model="criteria[field.key]"
+                                            type="datetime-local"
+                                            class="field-input !pb-1.5 !pt-5 text-xs"
+                                        />
 
-                                    <CustomDropdown
-                                        v-else
-                                        v-model="criteria[field.key]"
-                                        :options="field.options ?? []"
-                                        :placeholder="field.label"
-                                        button-class="!pb-1.5 !pt-5 text-xs"
-                                    />
+                                        <CustomDropdown
+                                            v-else
+                                            v-model="criteria[field.key]"
+                                            :options="field.options ?? []"
+                                            :placeholder="field.label"
+                                            button-class="!pb-1.5 !pt-5 text-xs"
+                                        />
+                                    </div>
                                 </div>
-                            </label>
-                        </div>
-                    </section>
+                            </div>
+                        </section>
+                    </div>
 
                     <div class="flex flex-wrap items-center gap-2.5 border-t border-slate-200 pt-2.5">
                         <button
                             type="submit"
-                            class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8]"
+                            class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
                             :disabled="loading"
                         >
                             <span
                                 class="inline-block h-2.5 w-2.5 rounded-full bg-accentWarm"
                                 :class="loading ? 'animate-pulseGlow' : ''"
                             />
-                            {{ loading ? 'Searching...' : 'Search Audit Data' }}
+                            {{ loading ? 'Searching...' : 'Find Transactions' }}
                         </button>
 
                         <button
                             type="button"
-                            class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+                            class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
                             @click="emit('reset')"
                         >
                             Reset

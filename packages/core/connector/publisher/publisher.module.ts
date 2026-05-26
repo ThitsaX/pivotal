@@ -58,12 +58,12 @@ export class ConnectorPublisherModule {
 
 export namespace ConnectorPublisherModule {
 
-    export interface RequiredDependencies extends NatsClientServiceModule.RequiredDependencies {
+    export interface RequiredSettings extends NatsClientServiceModule.RequiredSettings {
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

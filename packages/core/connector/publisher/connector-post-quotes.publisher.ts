@@ -1,5 +1,6 @@
 import {NatsClientService} from '@shared/nats';
 import {QuotesPostRequest} from '@shared/fspiop';
+import {resolveFspiopStream} from '../consumer/listener/fspiop-stream.resolver';
 
 export class ConnectorPostQuotesPublisher {
 
@@ -11,7 +12,11 @@ export class ConnectorPostQuotesPublisher {
 
     async publish(message: ConnectorPostQuotesPublisher.Message): Promise<void> {
         const js = this.nats.nc.jetstream();
-        await js.publish(ConnectorPostQuotesPublisher.subjectFor(message.payeeFsp), this.nats.codec.encode(message));
+        const subject = ConnectorPostQuotesPublisher.subjectFor(message.payeeFsp);
+        const jsm = await js.jetstreamManager();
+
+        await resolveFspiopStream(jsm, subject);
+        await js.publish(subject, this.nats.codec.encode(message));
     }
 }
 
@@ -19,6 +24,7 @@ export namespace ConnectorPostQuotesPublisher {
 
     export class Message {
         constructor(
+            public readonly correlationId: string | null,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly request: QuotesPostRequest,

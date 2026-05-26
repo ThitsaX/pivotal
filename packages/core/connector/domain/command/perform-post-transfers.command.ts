@@ -7,7 +7,8 @@ export class PerformPostTransfersCommand {
 
 export namespace PerformPostTransfersCommand {
     export class Input {
-        constructor(public readonly payerFsp: string,
+        constructor(public readonly correlationId: string | null,
+                    public readonly payerFsp: string,
                     public readonly payeeFsp: string,
                     public readonly request: TransfersPostRequest) {
         }

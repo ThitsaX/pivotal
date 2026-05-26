@@ -8,6 +8,7 @@ export class HandlePutTransfersErrorCommand {
 export namespace HandlePutTransfersErrorCommand {
     export class Input {
         constructor(
+            public readonly correlationId: string | null,
             public readonly payerFsp: string,
             public readonly payeeFsp: string,
             public readonly transferId: string,

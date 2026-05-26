@@ -1,0 +1,12 @@
+# Common VCS directories
+.git/
+.gitignore
+
+# Common IDE files
+.idea/
+.vscode/
+
+# Local env and temp files
+*.swp
+*.tmp
+.DS_Store

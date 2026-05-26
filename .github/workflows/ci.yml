@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'develop/main'
+  pull_request:
+    branches:
+      - 'develop/main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build backend services
+        run: |
+          npm run build:apps-web-outbound
+          npm run build:apps-web-inbound
+          npm run build:apps-app-auditor
+          npm run build:apps-web-pivotal
+
+      - name: Install portal dependencies
+        run: npm ci --prefix packages/portal
+
+      - name: Build portal
+        run: npm run build:portal

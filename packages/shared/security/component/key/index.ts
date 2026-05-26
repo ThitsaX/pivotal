@@ -1,3 +1,4 @@
+export * from './access-key-store';
 export * from './private-key';
 export * from './rsa-key-pair';
 export * from './private-key-store';

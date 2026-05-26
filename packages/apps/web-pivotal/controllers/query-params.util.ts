@@ -130,6 +130,22 @@ export class QueryParamsUtil {
         return parsed;
     }
 
+    static toOptionalInteger(value: string | undefined, parameterName: string): number | undefined {
+        const normalized = QueryParamsUtil.toOptionalString(value);
+
+        if (normalized == null) {
+            return undefined;
+        }
+
+        const parsed = Number(normalized);
+
+        if (!Number.isInteger(parsed)) {
+            throw new BadRequestException(`${parameterName} must be an integer.`);
+        }
+
+        return parsed;
+    }
+
     static toDateRange<T>(
         startValue: string | undefined,
         endValue: string | undefined,

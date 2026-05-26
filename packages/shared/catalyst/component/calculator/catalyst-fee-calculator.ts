@@ -1,3 +1,4 @@
+import {Logger} from '@nestjs/common';
 import {Currency, Money} from '@shared/fspiop';
 import {
     CalculateFeeByFeePolicyIdInput,
@@ -9,6 +10,8 @@ import {CatalystAxios} from '../catalyst-axios';
 import {FeeCalculator} from '../fee-calculator';
 
 export class CatalystFeeCalculator extends FeeCalculator {
+
+    private readonly logger = new Logger(CatalystFeeCalculator.name);
 
     constructor(
         private readonly catalystAxios: CatalystAxios,
@@ -39,6 +42,10 @@ export class CatalystFeeCalculator extends FeeCalculator {
 
             return response.feeCalculationResultData ?? new FeeCalculationResult();
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`calculateByScenario failed for scenario=${scenario}`, stack ?? message);
             CatalystFeeCalculator.rethrowAsCatalystException(error);
             throw error;
         }
@@ -54,6 +61,10 @@ export class CatalystFeeCalculator extends FeeCalculator {
 
             return response.feeCalculationResultData ?? new FeeCalculationResult();
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const stack = error instanceof Error ? error.stack : undefined;
+
+            this.logger.error(`calculateByFeePolicyId failed for feePolicyId=${policyId.toString()}`, stack ?? message);
             CatalystFeeCalculator.rethrowAsCatalystException(error);
             throw error;
         }

@@ -1,7 +1,7 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {NatsClientService} from './nats-client.service';
 
-const REQUIRED_DEPENDENCIES = Symbol('NatsClientServiceRequiredDependencies');
+const REQUIRED_SETTINGS = Symbol('NatsClientServiceRequiredSettings');
 
 @Module({})
 export class NatsClientServiceModule {
@@ -12,7 +12,7 @@ export class NatsClientServiceModule {
             imports: asyncOptions.imports ?? [],
             providers: [
                 {
-                    provide: REQUIRED_DEPENDENCIES,
+                    provide: REQUIRED_SETTINGS,
                     useFactory: asyncOptions.useFactory,
                     inject: asyncOptions.inject ?? [],
                 },
@@ -26,24 +26,24 @@ export class NatsClientServiceModule {
         return [
             {
                 provide: NatsClientService,
-                useFactory: (deps: NatsClientServiceModule.RequiredDependencies): NatsClientService => {
-                    return new NatsClientService(deps.natsUrl());
+                useFactory: (settings: NatsClientServiceModule.RequiredSettings): NatsClientService => {
+                    return new NatsClientService(settings.natsUrl());
                 },
-                inject: [REQUIRED_DEPENDENCIES],
-            },
+                inject: [REQUIRED_SETTINGS],
+            }
         ];
     }
 }
 
 export namespace NatsClientServiceModule {
 
-    export interface RequiredDependencies {
+    export interface RequiredSettings {
         natsUrl(): string;
     }
 
     export type AsyncOptions = {
         imports?: any[];
-        useFactory: (...args: any[]) => RequiredDependencies | Promise<RequiredDependencies>;
+        useFactory: (...args: any[]) => RequiredSettings | Promise<RequiredSettings>;
         inject?: any[];
     };
 }

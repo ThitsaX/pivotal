@@ -1,7 +1,7 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
 import {AuditConsumerModule} from '@core/audit/consumer';
-import {AuditConsumerDependencies} from './required.dependencies';
+import {AuditConsumerSettings} from './required.settings';
 
 @Module({
     imports: [
@@ -12,8 +12,8 @@ import {AuditConsumerDependencies} from './required.dependencies';
         AuditConsumerModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: (configService: ConfigService): AuditConsumerModule.RequiredDependencies => {
-                return new AuditConsumerDependencies(configService);
+            useFactory: (configService: ConfigService): AuditConsumerModule.RequiredSettings => {
+                return new AuditConsumerSettings(configService);
             },
         }),
     ],

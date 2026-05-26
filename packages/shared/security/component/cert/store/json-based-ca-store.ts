@@ -1,9 +1,7 @@
 import {Ca} from '../ca';
-import {Injectable} from '@nestjs/common';
 import {CaCert} from '../ca-cert';
 import {CaStore} from '../ca-store';
 
-@Injectable()
 export class JsonBasedCaStore extends CaStore {
 
     private static readonly ENV_JSON_CA_CERTS = 'JSON_CA_CERTS';
