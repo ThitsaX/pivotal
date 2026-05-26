@@ -59,7 +59,6 @@ export class FspiopStatusTranslator {
         [FspiopErrorType.DESTINATION_FSP_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
         [FspiopErrorType.PAYER_FSP_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
         [FspiopErrorType.PAYEE_FSP_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
-        [FspiopErrorType.PARTY_NOT_FOUND.code]: HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.QUOTE_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
         [FspiopErrorType.TRANSACTION_REQUEST_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
         [FspiopErrorType.TRANSACTION_ID_NOT_FOUND.code]: HttpStatus.NOT_FOUND,
@@ -83,6 +82,8 @@ export class FspiopStatusTranslator {
         [FspiopErrorType.PAYER_LIMIT_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
         [FspiopErrorType.PAYER_PERMISSION_ERROR.code]: HttpStatus.FORBIDDEN,
         [FspiopErrorType.GENERIC_PAYER_BLOCKED_ERROR.code]: HttpStatus.FORBIDDEN,
+        [FspiopErrorType.ROUNDING_VALUE_ERROR.code]: HttpStatus.NOT_ACCEPTABLE,
+        [FspiopErrorType.PARTY_NOT_FOUND.code]: HttpStatus.EXPECTATION_FAILED,
 
         // ── 5xxx  Payee ───────────────────────────────────────────────────────
         [FspiopErrorType.GENERIC_PAYEE_ERROR.code]: HttpStatus.UNPROCESSABLE_ENTITY,
