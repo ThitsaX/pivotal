@@ -186,7 +186,7 @@ const bootstrap = async (): Promise<void> => {
 
     app.enableCors({
         origin:      corsAllowedOrigins,
-        methods:     ['GET', 'POST', 'PUT', 'OPTIONS'],
+        methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         credentials: true,
     });
     app.use(json({type: ['application/json', 'application/*+json']}));

@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS `permissions` (
     `id` BIGINT NOT NULL,
     `key_name` VARCHAR(128) NOT NULL,
     `description` VARCHAR(512) NULL,
+    `scope` VARCHAR(8) NOT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `permissions_01_uk_key_name` (`key_name`)
