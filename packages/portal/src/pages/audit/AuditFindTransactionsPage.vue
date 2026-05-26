@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue';
+import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
+import {
+    useRoute,
+    useRouter,
+    type LocationQuery,
+    type LocationQueryRaw,
+    type LocationQueryValue,
+} from 'vue-router';
 import {apiClient} from '../../api/client';
 import PageSizeDialog from '../../components/PageSizeDialog.vue';
 import PaginationInfoBar from '../../components/PaginationInfoBar.vue';
@@ -28,7 +35,38 @@ const emit = defineEmits<{
     (event: 'update:selectedTimeZone', value: string): void;
 }>();
 
+const route = useRoute();
+const router = useRouter();
+
 const MAX_SEARCH_RESULT_ROWS = 500_000;
+const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_ORDER_DIRECTION = 'DESC';
+const TIME_RANGE_MODE_KEYS = [
+    {
+        mode: 'transactionStartAtMode',
+        start: 'transactionStartAtStart',
+        end: 'transactionStartAtEnd',
+    },
+    {
+        mode: 'transactionCompletedAtMode',
+        start: 'transactionCompletedAtStart',
+        end: 'transactionCompletedAtEnd',
+    },
+] as const;
+
+const createInitialCriteria = (): Record<string, string> => {
+    const criteria = Object.fromEntries(
+        props.viewDefinition.criteriaFields.map((field): [string, string] => [field.key, '']),
+    );
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        criteria[field.mode] = '';
+    }
+
+    return criteria;
+};
+
+const defaultOrderColumn = (): string => props.viewDefinition.orderColumns[0]?.value ?? 'transactionStartAt';
 
 const loading = ref(false);
 const requestError = ref<string | null>(null);
@@ -47,13 +85,11 @@ const copiedCellKey = ref<string | null>(null);
 const lastSubmittedCriteria = ref<Record<string, string>>({});
 
 const state = reactive<ViewState>({
-    criteria: Object.fromEntries(
-        props.viewDefinition.criteriaFields.map((field): [string, string] => [field.key, '']),
-    ),
+    criteria: createInitialCriteria(),
     page: 0,
-    size: 20,
-    orderColumn: props.viewDefinition.orderColumns[0]?.value ?? 'transactionStartAt',
-    orderDirection: 'DESC',
+    size: DEFAULT_PAGE_SIZE,
+    orderColumn: defaultOrderColumn(),
+    orderDirection: DEFAULT_ORDER_DIRECTION,
 });
 
 const criteriaSections = computed(() => {
@@ -90,19 +126,6 @@ const canGoPreviousPage = computed((): boolean => {
 const canGoNextPage = computed((): boolean => {
     return !loading.value && state.page + 1 < totalPages.value;
 });
-
-const TIME_RANGE_MODE_KEYS = [
-    {
-        mode: 'transactionStartAtMode',
-        start: 'transactionStartAtStart',
-        end: 'transactionStartAtEnd',
-    },
-    {
-        mode: 'transactionCompletedAtMode',
-        start: 'transactionCompletedAtStart',
-        end: 'transactionCompletedAtEnd',
-    },
-] as const;
 
 const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
@@ -247,6 +270,216 @@ const snapshotCriteriaForQuery = (): Record<string, string> => {
     return snapshot;
 };
 
+const firstQueryValue = (value: LocationQueryValue | LocationQueryValue[] | undefined): string => {
+    const candidate = Array.isArray(value) ? value[0] : value;
+
+    return candidate ?? '';
+};
+
+const queryHasValue = (query: LocationQuery, key: string): boolean => {
+    return firstQueryValue(query[key]).trim().length > 0;
+};
+
+const hasSearchRouteQuery = (query: LocationQuery): boolean => {
+    if (
+        queryHasValue(query, 'page')
+        || queryHasValue(query, 'size')
+        || queryHasValue(query, 'orderColumn')
+        || queryHasValue(query, 'orderDirection')
+    ) {
+        return true;
+    }
+
+    for (const field of props.viewDefinition.criteriaFields) {
+        if (queryHasValue(query, field.key)) {
+            return true;
+        }
+    }
+
+    return TIME_RANGE_MODE_KEYS.some((field): boolean => queryHasValue(query, field.mode));
+};
+
+const parseNonNegativeInteger = (value: string, fallback: number): number => {
+    const parsed = Number.parseInt(value, 10);
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return fallback;
+    }
+
+    return parsed;
+};
+
+const parsePositiveInteger = (value: string, fallback: number): number => {
+    const parsed = Number.parseInt(value, 10);
+
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return fallback;
+    }
+
+    return parsed;
+};
+
+const parseOrderColumn = (value: string): string => {
+    return props.viewDefinition.orderColumns.some((column: SelectOption): boolean => column.value === value)
+        ? value
+        : defaultOrderColumn();
+};
+
+const parseOrderDirection = (value: string): 'ASC' | 'DESC' => {
+    return value === 'ASC' ? 'ASC' : 'DESC';
+};
+
+const resetCriteriaState = (): void => {
+    for (const field of props.viewDefinition.criteriaFields) {
+        state.criteria[field.key] = '';
+    }
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        state.criteria[field.mode] = '';
+    }
+};
+
+const resetSearchState = (): void => {
+    resetCriteriaState();
+    state.page = 0;
+    state.size = DEFAULT_PAGE_SIZE;
+    state.orderColumn = defaultOrderColumn();
+    state.orderDirection = DEFAULT_ORDER_DIRECTION;
+    requestError.value = null;
+    results.value = null;
+    lastRequestedUrl.value = '';
+    lastLoadedAt.value = null;
+    lastSubmittedCriteria.value = {};
+    isSearchFormVisible.value = true;
+};
+
+const applyRouteQueryToState = (query: LocationQuery): void => {
+    resetCriteriaState();
+
+    for (const field of props.viewDefinition.criteriaFields) {
+        state.criteria[field.key] = firstQueryValue(query[field.key]).trim();
+    }
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        state.criteria[field.mode] = firstQueryValue(query[field.mode]).trim();
+    }
+
+    state.page = parseNonNegativeInteger(firstQueryValue(query.page), 0);
+    state.size = parsePositiveInteger(firstQueryValue(query.size), DEFAULT_PAGE_SIZE);
+    state.orderColumn = parseOrderColumn(firstQueryValue(query.orderColumn));
+    state.orderDirection = parseOrderDirection(firstQueryValue(query.orderDirection));
+};
+
+const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | number): void => {
+    const normalized = String(value).trim();
+
+    if (normalized.length > 0) {
+        query[key] = normalized;
+    }
+};
+
+const buildSearchRouteQuery = (): LocationQueryRaw => {
+    const query: LocationQueryRaw = {};
+
+    for (const field of props.viewDefinition.criteriaFields) {
+        appendQueryValue(query, field.key, state.criteria[field.key] ?? '');
+    }
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        appendQueryValue(query, field.mode, state.criteria[field.mode] ?? '');
+    }
+
+    appendQueryValue(query, 'page', state.page);
+    appendQueryValue(query, 'size', state.size);
+    appendQueryValue(query, 'orderColumn', state.orderColumn);
+    appendQueryValue(query, 'orderDirection', state.orderDirection);
+
+    return query;
+};
+
+const normalizeQueryForComparison = (query: LocationQuery | LocationQueryRaw): string => {
+    const entries: Array<[string, string]> = [];
+
+    for (const [key, value] of Object.entries(query)) {
+        const values = Array.isArray(value) ? value : [value];
+
+        for (const item of values) {
+            if (item == null) {
+                continue;
+            }
+
+            const normalized = String(item).trim();
+
+            if (normalized.length > 0) {
+                entries.push([key, normalized]);
+            }
+        }
+    }
+
+    return JSON.stringify(entries.sort(([leftKey, leftValue], [rightKey, rightValue]): number => {
+        if (leftKey === rightKey) {
+            return leftValue.localeCompare(rightValue);
+        }
+
+        return leftKey.localeCompare(rightKey);
+    }));
+};
+
+const isSameQuery = (left: LocationQuery, right: LocationQueryRaw): boolean => {
+    return normalizeQueryForComparison(left) === normalizeQueryForComparison(right);
+};
+
+const navigateToSearchRoute = (mode: 'push' | 'replace' = 'push'): void => {
+    const query = buildSearchRouteQuery();
+
+    if (isSameQuery(route.query, query)) {
+        lastSubmittedCriteria.value = snapshotCriteriaForQuery();
+        void runSearch();
+        return;
+    }
+
+    const navigation = {path: route.path, query};
+
+    if (mode === 'replace') {
+        void router.replace(navigation);
+        return;
+    }
+
+    void router.push(navigation);
+};
+
+const navigateToEmptySearchRoute = (): void => {
+    const query: LocationQueryRaw = {};
+
+    if (isSameQuery(route.query, query)) {
+        return;
+    }
+
+    void router.push({path: route.path, query});
+};
+
+const isCurrentTransactionsRoute = (): boolean => {
+    const viewPath = `/views/${props.viewDefinition.key}`;
+
+    return route.path === viewPath || route.path.startsWith(`${viewPath}/`);
+};
+
+const applySearchRouteQuery = (query: LocationQuery): void => {
+    if (!isCurrentTransactionsRoute()) {
+        return;
+    }
+
+    if (!hasSearchRouteQuery(query)) {
+        resetSearchState();
+        return;
+    }
+
+    applyRouteQueryToState(query);
+    lastSubmittedCriteria.value = snapshotCriteriaForQuery();
+    isSearchFormVisible.value = false;
+    void runSearch();
+};
+
 onMounted((): void => {
     window.addEventListener('keydown', handleKeyDown);
 });
@@ -260,15 +493,13 @@ const toggleSearchForm = (): void => {
 };
 
 const refreshResults = (): void => {
-    lastSubmittedCriteria.value = snapshotCriteriaForQuery();
-    void runSearch();
+    navigateToSearchRoute('replace');
 };
 
 const submitSearch = (): void => {
-    lastSubmittedCriteria.value = snapshotCriteriaForQuery();
     state.page = 0;
     isSearchFormVisible.value = false;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const openPageSizeDialog = (): void => {
@@ -283,25 +514,12 @@ const applyPageSize = (size: number): void => {
     state.size = size;
     state.page = 0;
     isPageSizeDialogOpen.value = false;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const resetFilters = (): void => {
-    for (const field of props.viewDefinition.criteriaFields) {
-        state.criteria[field.key] = '';
-    }
-
-    state.criteria.transactionStartAtMode = '';
-    state.criteria.transactionCompletedAtMode = '';
-
-    state.page = 0;
-    state.size = 20;
-    state.orderColumn = props.viewDefinition.orderColumns[0]?.value ?? 'transactionStartAt';
-    state.orderDirection = 'DESC';
-
-    requestError.value = null;
-    results.value = null;
-    lastSubmittedCriteria.value = snapshotCriteriaForQuery();
+    resetSearchState();
+    navigateToEmptySearchRoute();
 };
 
 const toIsoString = (value: string): string | undefined => {
@@ -381,6 +599,14 @@ const runSearch = async (): Promise<void> => {
         loading.value = false;
     }
 };
+
+watch(
+    () => [route.path, route.query] as const,
+    ([, query]): void => {
+        applySearchRouteQuery(query);
+    },
+    {immediate: true},
+);
 
 const formatValue = (value: unknown): string => {
     if (value == null) {
@@ -933,7 +1159,8 @@ const sortByColumn = (columnKey: string): void => {
         state.orderDirection = 'ASC';
     }
 
-    void runSearch();
+    state.page = 0;
+    navigateToSearchRoute();
 };
 
 const goToPreviousPage = (): void => {
@@ -942,7 +1169,7 @@ const goToPreviousPage = (): void => {
     }
 
     state.page -= 1;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const goToNextPage = (): void => {
@@ -951,7 +1178,7 @@ const goToNextPage = (): void => {
     }
 
     state.page += 1;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const goToFirstPage = (): void => {
@@ -960,7 +1187,7 @@ const goToFirstPage = (): void => {
     }
 
     state.page = 0;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const goToLastPage = (): void => {
@@ -975,7 +1202,7 @@ const goToLastPage = (): void => {
     }
 
     state.page = lastPage;
-    void runSearch();
+    navigateToSearchRoute();
 };
 
 const jumpToPage = (pageNumber: number): void => {
@@ -990,7 +1217,7 @@ const jumpToPage = (pageNumber: number): void => {
     }
 
     state.page = normalizedPage;
-    void runSearch();
+    navigateToSearchRoute();
 };
 </script>
 
