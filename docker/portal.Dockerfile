@@ -13,5 +13,6 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 WORKDIR /usr/share/nginx/html
 COPY --from=builder /app/packages/portal/dist ./
 COPY docker/portal.nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/portal-runtime-config.sh /docker-entrypoint.d/40-portal-runtime-config.sh
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
