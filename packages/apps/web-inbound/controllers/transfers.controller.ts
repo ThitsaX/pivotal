@@ -39,6 +39,9 @@ export class TransfersController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: TransfersPostRequest): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Post Transfer Request for TransferId ${request.transferId} : ${JSON.stringify(request)}`,
+            );
             const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(sourceHeader);
             const payeeFsp = TransfersController.headerValue(destinationHeader);
@@ -59,6 +62,9 @@ export class TransfersController {
         @Body() response: TransfersIDPatchResponse,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Patch Transfer Request for TransferId ${transferId} : ${JSON.stringify(response)}`,
+            );
             const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(sourceHeader);
             const payeeFsp = TransfersController.headerValue(destinationHeader);
@@ -79,6 +85,9 @@ export class TransfersController {
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Put Transfer Error Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
+            );
             const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(destinationHeader);
             const payeeFsp = TransfersController.headerValue(sourceHeader);

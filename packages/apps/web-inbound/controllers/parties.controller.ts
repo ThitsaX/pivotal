@@ -48,7 +48,9 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
     ): void {
         this.dispatch(() => {
-
+            this.logger.log(
+                `Get Party Request for idValue ${id}`,
+            );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(sourceHeader);
             const payeeFsp = PartiesController.headerValue(destinationHeader);
@@ -71,6 +73,9 @@ export class PartiesController {
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Put Party Error Request for idValue ${id} : ${JSON.stringify(request)}`,
+            );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
@@ -102,6 +107,9 @@ export class PartiesController {
         @Body() request: PartiesTypeIDPutResponse,
     ): void {
         this.dispatch(() => {
+            this.logger.log(
+                `Put Party Request for idValue ${id} : ${JSON.stringify(request)}`,
+            );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
             const payeeFsp = PartiesController.headerValue(sourceHeader);
