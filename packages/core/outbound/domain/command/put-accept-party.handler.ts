@@ -1,7 +1,7 @@
-import {Inject, Logger} from '@nestjs/common';
-import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {TransactionMessage} from '@core/audit/common';
-import {AuditTransactionPublisher} from '@core/audit/producer';
+import { Inject, Logger } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { TransactionMessage } from '@core/audit/common';
+import { AuditTransactionPublisher } from '@core/audit/producer';
 import {
     Currency,
     ExtensionList,
@@ -23,11 +23,11 @@ import {
     TransactionInitiatorType,
     TransactionType,
 } from '@shared/fspiop';
-import {TransferRequest} from '../cache';
-import {RedisClient} from '../component';
-import {SendMoneyResponse} from '../dto';
-import {PutAcceptPartyCommand} from './put-accept-party.command';
-import {SendMoneyResponseMapper} from './send-money-response.mapper';
+import { TransferRequest } from '../cache';
+import { RedisClient } from '../component';
+import { SendMoneyResponse } from '../dto';
+import { PutAcceptPartyCommand } from './put-accept-party.command';
+import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptPartyCommand)
 export class PutAcceptPartyHandler
@@ -50,13 +50,13 @@ export class PutAcceptPartyHandler
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
-        const {transferId, acceptParty} = command.input;
+        const { transferId, acceptParty } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);
-        const {quoteId} = quoteRequest;
-        const {quotesUrl} = this.fspiopAxios.settings;
+        const { quoteId } = quoteRequest;
+        const { quotesUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
 
         await this.auditPublisher.publish(
@@ -125,10 +125,7 @@ export class PutAcceptPartyHandler
 
             return new PutAcceptPartyCommand.Output(response, callback);
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const stack = error instanceof Error ? error.stack : undefined;
-
-            this.logger.error(`putAcceptParty failed for transferId=${transferId}`, stack ?? message);
+            this.logger.error(`Put SendMoney acceptParty Error Response for transferId=${transferId} : ${JSON.stringify(error)}`);
             const fspiopException = PutAcceptPartyHandler.toFspiopException(error, transferId);
 
             try {
