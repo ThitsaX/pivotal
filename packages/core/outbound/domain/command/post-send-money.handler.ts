@@ -1,7 +1,7 @@
-import {Inject, Logger} from '@nestjs/common';
-import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
-import {TransactionMessage} from '@core/audit/common';
-import {AuditTransactionPublisher} from '@core/audit/producer';
+import { Inject, Logger } from '@nestjs/common';
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { TransactionMessage } from '@core/audit/common';
+import { AuditTransactionPublisher } from '@core/audit/producer';
 import {
     ExtensionList,
     FspiopAxios,
@@ -18,11 +18,11 @@ import {
     PartyIdInfo,
     PartyPersonalInfo,
 } from '@shared/fspiop';
-import {RedisClient} from '../component';
-import {TransferRequest} from '../cache';
-import {FspParty, SendMoneyRequest} from '../dto';
-import {PostSendMoneyCommand} from './post-send-money.command';
-import {SendMoneyResponseMapper} from './send-money-response.mapper';
+import { RedisClient } from '../component';
+import { TransferRequest } from '../cache';
+import { FspParty, SendMoneyRequest } from '../dto';
+import { PostSendMoneyCommand } from './post-send-money.command';
+import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PostSendMoneyCommand)
 export class PostSendMoneyHandler
@@ -49,8 +49,8 @@ export class PostSendMoneyHandler
 
     private static toFspParty(callback: PartiesTypeIDPutResponse): FspParty {
         const fspParty = new FspParty();
-        const {party} = callback;
-        const {partyIdInfo} = party;
+        const { party } = callback;
+        const { partyIdInfo } = party;
         const complexName = party.personalInfo?.complexName;
 
         fspParty.idType = partyIdInfo.partyIdType;
@@ -166,14 +166,14 @@ export class PostSendMoneyHandler
 
     async execute(command: PostSendMoneyCommand): Promise<PostSendMoneyCommand.Output> {
 
-        const {correlationId, source, request} = command.input;
+        const { correlationId, source, request } = command.input;
         const transferId = correlationId;
         const destination = request.to.fspId;
         const type = request.to.idType;
         const id = request.to.idValue;
         const subId = PostSendMoneyHandler.toSubId(request.to.idSubValue);
         const payerSubId = PostSendMoneyHandler.toSubId(request.from.idSubValue);
-        const {partiesUrl, switchId} = this.fspiopAxios.settings;
+        const { partiesUrl, switchId } = this.fspiopAxios.settings;
         const createdAt = new Date();
 
         const headers = FspiopHeaders.Values.Parties.forRequest(correlationId, source, destination);
@@ -261,12 +261,8 @@ export class PostSendMoneyHandler
                 callback,
             );
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const stack = error instanceof Error ? error.stack : undefined;
-
-            this.logger.error(`postSendMoney failed for correlationId=${correlationId}`, stack ?? message);
+            this.logger.error(`Post SendMoney Error Response for FromIdValue ${request.from.idValue} toIdValue ${request.to.idValue} : ${JSON.stringify(error)}`);
             const fspiopException = PostSendMoneyHandler.toFspiopException(error);
-
             try {
                 await this.auditPublisher.publish(
                     TransactionMessage.error(

@@ -7,6 +7,7 @@ import { FspiopException } from '../exception/fspiop-exception';
 export class FspiopErrorTranslator {
 
     private static readonly TRANSACTION_ID_KEY = 'transaction_id';
+    private static readonly MESSAGE_KEY = 'message';
 
     private constructor() {
     }
@@ -19,6 +20,7 @@ export class FspiopErrorTranslator {
         const extensionList = FspiopErrorTranslator.withTransactionId(
             normalized.extensionList,
             transactionId,
+            normalized.errorDefinition.description
         );
 
         if (extensionList === normalized.extensionList) {
@@ -39,10 +41,18 @@ export class FspiopErrorTranslator {
     private static withTransactionId(
         extensionList: ExtensionList | undefined,
         transactionId: string | undefined,
+        message: string | undefined,
     ): ExtensionList | undefined {
         const normalizedTransactionId = transactionId?.trim();
+        const normalizedMessage = message?.trim();
 
         if (normalizedTransactionId == null || normalizedTransactionId.length === 0) {
+            return extensionList;
+        }
+        if (
+            (normalizedTransactionId == null || normalizedTransactionId.length === 0) &&
+            (normalizedMessage == null || normalizedMessage.length === 0)
+        ) {
             return extensionList;
         }
 
@@ -54,24 +64,35 @@ export class FspiopErrorTranslator {
             return extension;
         });
 
-        let updated = false;
+        const upsertExtension = (targetKey: string, targetValue: string): void => {
+            const existing = extensions.find((extension) => {
+                const key = extension.key?.trim().toLowerCase() ?? '';
+                return key === targetKey;
+            });
 
-        for (const extension of extensions) {
-            const key = extension.key?.trim().toLowerCase() ?? '';
-
-            if (key !== FspiopErrorTranslator.TRANSACTION_ID_KEY) {
-                continue;
+            if (existing != null) {
+                existing.value = targetValue;
+                return;
             }
 
-            extension.value = normalizedTransactionId;
-            updated = true;
+            const extension = new Extension();
+            extension.key = targetKey;
+            extension.value = targetValue;
+            extensions.push(extension);
+        };
+
+        if (normalizedTransactionId != null && normalizedTransactionId.length > 0) {
+            upsertExtension(
+                FspiopErrorTranslator.TRANSACTION_ID_KEY,
+                normalizedTransactionId,
+            );
         }
 
-        if (!updated) {
-            const transactionIdExtension = new Extension();
-            transactionIdExtension.key = FspiopErrorTranslator.TRANSACTION_ID_KEY;
-            transactionIdExtension.value = normalizedTransactionId;
-            extensions.push(transactionIdExtension);
+        if (normalizedMessage != null && normalizedMessage.length > 0) {
+            upsertExtension(
+                FspiopErrorTranslator.MESSAGE_KEY,
+                normalizedMessage,
+            );
         }
 
         mergedExtensionList.extension = extensions;
