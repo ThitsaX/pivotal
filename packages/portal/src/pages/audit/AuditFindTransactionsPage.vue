@@ -737,6 +737,188 @@ const getStatusDisplay = (record: Record<string, unknown>): {
     };
 };
 
+interface PatchErrorChip {
+    label: string;
+    tone: 'neutral' | 'warn' | 'danger';
+}
+
+interface PatchErrorContextRow {
+    label: string;
+    value: string;
+}
+
+interface PatchErrorDisplay {
+    visible: boolean;
+    headline: string;
+    chips: PatchErrorChip[];
+    message: string | null;
+    responseBody: string | null;
+    contextRows: PatchErrorContextRow[];
+    occurredAtAbsolute: string | null;
+    occurredAtRelative: string | null;
+    extraJson: string | null;
+    raw: string;
+}
+
+const KNOWN_PATCH_ERROR_FIELDS = new Set([
+    'source',
+    'operation',
+    'httpStatus',
+    'code',
+    'message',
+    'responseBody',
+    'context',
+    'occurredAt',
+]);
+
+const CONTEXT_LABELS: Record<string, string> = {
+    transferId:  'Transfer ID',
+    payeeMobile: 'Payee mobile',
+    amount:      'Amount',
+    currency:    'Currency',
+    externalId:  'External ID',
+};
+
+const toDisplayString = (value: unknown): string => {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+};
+
+const httpStatusTone = (status: number): PatchErrorChip['tone'] => {
+    if (status >= 500) return 'danger';
+    if (status >= 400) return 'warn';
+    return 'neutral';
+};
+
+const toRelativeTime = (iso: string): string | null => {
+    const at = Date.parse(iso);
+    if (Number.isNaN(at)) return null;
+
+    const diffMs = Date.now() - at;
+    const absSec = Math.round(Math.abs(diffMs) / 1000);
+    const suffix = diffMs >= 0 ? 'ago' : 'from now';
+
+    if (absSec < 60) return `${absSec}s ${suffix}`;
+    if (absSec < 3600) return `${Math.round(absSec / 60)}m ${suffix}`;
+    if (absSec < 86_400) return `${Math.round(absSec / 3600)}h ${suffix}`;
+    return `${Math.round(absSec / 86_400)}d ${suffix}`;
+};
+
+const getPatchErrorDisplay = (record: Record<string, unknown>): PatchErrorDisplay => {
+    const value = record.patchError;
+    const raw = typeof value === 'string' ? value.trim() : '';
+    const empty: PatchErrorDisplay = {
+        visible: false,
+        headline: '',
+        chips: [],
+        message: null,
+        responseBody: null,
+        contextRows: [],
+        occurredAtAbsolute: null,
+        occurredAtRelative: null,
+        extraJson: null,
+        raw: '',
+    };
+
+    if (raw.length === 0) return empty;
+
+    let parsed: Record<string, unknown> | null = null;
+
+    if (raw.startsWith('{')) {
+        try {
+            const candidate: unknown = JSON.parse(raw);
+            if (candidate != null && typeof candidate === 'object' && !Array.isArray(candidate)) {
+                parsed = candidate as Record<string, unknown>;
+            }
+        } catch {
+            parsed = null;
+        }
+    }
+
+    if (parsed == null) {
+        return {
+            ...empty,
+            visible: true,
+            headline: 'Payee backend reported an error',
+            raw,
+        };
+    }
+
+    const source     = typeof parsed.source === 'string' ? parsed.source : null;
+    const operation  = typeof parsed.operation === 'string' ? parsed.operation : null;
+    const httpStatus = typeof parsed.httpStatus === 'number' ? parsed.httpStatus : null;
+    const code       = typeof parsed.code === 'string' ? parsed.code : null;
+    const message    = typeof parsed.message === 'string' && parsed.message.trim().length > 0
+        ? parsed.message.trim()
+        : null;
+    const occurredAt = typeof parsed.occurredAt === 'string' ? parsed.occurredAt : null;
+
+    const headline = operation != null && source != null
+        ? `${operation} failed on ${source}`
+        : operation != null
+            ? `${operation} failed`
+            : source != null
+                ? `${source} reported an error`
+                : 'Payee backend reported an error';
+
+    const chips: PatchErrorChip[] = [];
+    if (source != null)     chips.push({label: source, tone: 'neutral'});
+    if (operation != null)  chips.push({label: operation, tone: 'neutral'});
+    if (httpStatus != null) chips.push({label: `HTTP ${httpStatus}`, tone: httpStatusTone(httpStatus)});
+    if (code != null)       chips.push({label: code, tone: 'warn'});
+
+    let responseBody: string | null = null;
+    if (parsed.responseBody !== undefined && parsed.responseBody !== null) {
+        if (typeof parsed.responseBody === 'string') {
+            responseBody = parsed.responseBody;
+        } else {
+            try {
+                responseBody = JSON.stringify(parsed.responseBody, null, 2);
+            } catch {
+                responseBody = String(parsed.responseBody);
+            }
+        }
+    }
+
+    const contextRows: PatchErrorContextRow[] = [];
+    const ctx = parsed.context;
+    if (ctx != null && typeof ctx === 'object' && !Array.isArray(ctx)) {
+        for (const [k, v] of Object.entries(ctx as Record<string, unknown>)) {
+            const displayValue = toDisplayString(v);
+            if (displayValue.length === 0) continue;
+            contextRows.push({label: CONTEXT_LABELS[k] ?? k, value: displayValue});
+        }
+    }
+
+    const extraEntries: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+        if (!KNOWN_PATCH_ERROR_FIELDS.has(k)) extraEntries[k] = v;
+    }
+    const extraJson = Object.keys(extraEntries).length > 0
+        ? JSON.stringify(extraEntries, null, 2)
+        : null;
+
+    return {
+        visible: true,
+        headline,
+        chips,
+        message,
+        responseBody,
+        contextRows,
+        occurredAtAbsolute: occurredAt,
+        occurredAtRelative: occurredAt != null ? toRelativeTime(occurredAt) : null,
+        extraJson,
+        raw,
+    };
+};
+
 const getFlowDisplay = (record: Record<string, unknown>): {
     stages: Array<{label: string; className: string}>;
     transferState: string | null;
@@ -1716,6 +1898,123 @@ const jumpToPage = (pageNumber: number): void => {
                                 </span>
                             </div>
                         </div>
+
+                        <section
+                            v-if="getPatchErrorDisplay(selectedTransaction.record).visible"
+                            class="space-y-3 rounded-xl border border-red-200 bg-red-50/60 px-3.5 py-3"
+                        >
+                            <header class="flex items-start gap-2.5">
+                                <span
+                                    class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700"
+                                    aria-hidden="true"
+                                >
+                                    <svg
+                                        class="h-3.5 w-3.5"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2.25"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M12 9v4" />
+                                        <path d="M12 17h.01" />
+                                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                                    </svg>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700">
+                                        Dispute Reason
+                                    </p>
+                                    <p class="mt-0.5 text-[13px] font-semibold text-ink">
+                                        {{ getPatchErrorDisplay(selectedTransaction.record).headline }}
+                                    </p>
+                                </div>
+                            </header>
+
+                            <div
+                                v-if="getPatchErrorDisplay(selectedTransaction.record).chips.length > 0"
+                                class="flex flex-wrap gap-1.5"
+                            >
+                                <span
+                                    v-for="chip in getPatchErrorDisplay(selectedTransaction.record).chips"
+                                    :key="chip.label"
+                                    :class="[
+                                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]',
+                                        chip.tone === 'danger' ? 'border-red-300 bg-red-100 text-red-800' : '',
+                                        chip.tone === 'warn'   ? 'border-amber-300 bg-amber-100 text-amber-800' : '',
+                                        chip.tone === 'neutral'? 'border-slate-300 bg-white text-slate-700' : '',
+                                    ]"
+                                >
+                                    {{ chip.label }}
+                                </span>
+                            </div>
+
+                            <div v-if="getPatchErrorDisplay(selectedTransaction.record).message">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                                    Backend message
+                                </p>
+                                <p class="mt-1 text-[13px] leading-5 text-ink">
+                                    {{ getPatchErrorDisplay(selectedTransaction.record).message }}
+                                </p>
+                            </div>
+
+                            <div v-if="getPatchErrorDisplay(selectedTransaction.record).contextRows.length > 0">
+                                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                                    Context
+                                </p>
+                                <dl class="mt-1 grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2">
+                                    <div
+                                        v-for="row in getPatchErrorDisplay(selectedTransaction.record).contextRows"
+                                        :key="row.label"
+                                        class="flex items-baseline gap-2"
+                                    >
+                                        <dt class="shrink-0 text-slate-500">{{ row.label }}</dt>
+                                        <dd class="min-w-0 break-all font-mono text-ink">{{ row.value }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+
+                            <details
+                                v-if="getPatchErrorDisplay(selectedTransaction.record).responseBody"
+                                class="group rounded-md border border-slate-200 bg-white/70"
+                            >
+                                <summary class="cursor-pointer select-none px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600 group-open:border-b group-open:border-slate-200">
+                                    Backend response body
+                                </summary>
+                                <pre class="overflow-x-auto whitespace-pre-wrap break-all px-2.5 py-2 text-[12px] font-mono leading-5 text-ink">{{ getPatchErrorDisplay(selectedTransaction.record).responseBody }}</pre>
+                            </details>
+
+                            <details
+                                v-if="getPatchErrorDisplay(selectedTransaction.record).extraJson"
+                                class="group rounded-md border border-slate-200 bg-white/70"
+                            >
+                                <summary class="cursor-pointer select-none px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600 group-open:border-b group-open:border-slate-200">
+                                    Additional fields
+                                </summary>
+                                <pre class="overflow-x-auto whitespace-pre-wrap break-all px-2.5 py-2 text-[12px] font-mono leading-5 text-ink">{{ getPatchErrorDisplay(selectedTransaction.record).extraJson }}</pre>
+                            </details>
+
+                            <p
+                                v-if="getPatchErrorDisplay(selectedTransaction.record).occurredAtAbsolute"
+                                class="text-[11px] text-slate-500"
+                            >
+                                Reported
+                                <span v-if="getPatchErrorDisplay(selectedTransaction.record).occurredAtRelative">
+                                    {{ getPatchErrorDisplay(selectedTransaction.record).occurredAtRelative }}
+                                </span>
+                                <span class="font-mono">
+                                    ({{ getPatchErrorDisplay(selectedTransaction.record).occurredAtAbsolute }})
+                                </span>
+                            </p>
+
+                            <pre
+                                v-if="getPatchErrorDisplay(selectedTransaction.record).chips.length === 0
+                                    && !getPatchErrorDisplay(selectedTransaction.record).message
+                                    && !getPatchErrorDisplay(selectedTransaction.record).responseBody"
+                                class="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2.5 py-2 text-[12px] font-mono leading-5 text-ink"
+                            >{{ getPatchErrorDisplay(selectedTransaction.record).raw }}</pre>
+                        </section>
 
                         <div class="grid gap-2.5 xl:grid-cols-4">
                             <section class="space-y-1.5 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
