@@ -25,7 +25,7 @@ import {
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
 import { RedisClient } from '../component';
-import { SendMoneyResponse } from '../dto';
+import { normalizeFspiopAmount, SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
@@ -50,8 +50,9 @@ export class PutAcceptPartyHandler
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
-        const { transferId, acceptParty } = command.input;
+        const { transferId, acceptParty, amount } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+        transferRequest.amount = normalizeFspiopAmount(amount);
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);

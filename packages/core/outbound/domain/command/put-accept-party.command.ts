@@ -12,6 +12,7 @@ export namespace PutAcceptPartyCommand {
         constructor(
             public readonly transferId: string,
             public readonly acceptParty: boolean,
+            public readonly amount: string,
         ) {
         }
     }
