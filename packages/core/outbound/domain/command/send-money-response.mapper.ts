@@ -1,6 +1,6 @@
-import {Extension, ExtensionList, TransferState} from '@shared/fspiop';
-import {TransferRequest} from '../cache';
-import {SendMoneyResponse, StateEnum} from '../dto';
+import { Extension, ExtensionList, TransferState } from '@shared/fspiop';
+import { TransferRequest } from '../cache';
+import { SendMoneyResponse, StateEnum } from '../dto';
 
 export class SendMoneyResponseMapper {
     private static readonly DIRECTION = 'OUTGOIND';
@@ -59,6 +59,9 @@ export class SendMoneyResponseMapper {
         response.note = transferRequest.note;
         response.amount = transferRequest.amount;
         response.payeeFspFeeAmount = payeeFspFeeAmount;
+        response.payeeFee = extensionList?.find(ext => ext.key === 'payeeFee')?.value ?? "0";
+        response.payerFee = extensionList?.find(ext => ext.key === 'payerFee')?.value ?? "0";
+        response.schemeFee = extensionList?.find(ext => ext.key === 'schemeFee')?.value ?? "0";
         response.currency = transferRequest.currency;
         response.currentState = currentState;
         response.initiatedTimestamp = transferRequest.initiatedTimestamp;
