@@ -25,7 +25,7 @@ import {
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
 import { RedisClient } from '../component';
-import { normalizeFspiopAmount, SendMoneyResponse } from '../dto';
+import { SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
@@ -52,7 +52,8 @@ export class PutAcceptPartyHandler
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
         const { transferId, acceptParty, amount } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
-        transferRequest.amount = normalizeFspiopAmount(amount);
+        // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
+        transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);

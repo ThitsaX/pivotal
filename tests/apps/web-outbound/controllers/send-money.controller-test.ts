@@ -21,20 +21,20 @@ function messages(errors: ValidationError[]): string[] {
 
 describe('PutSendMoneyRequest', () => {
 
-    it('requires amount when acceptParty is provided', async () => {
+    it('requires amount when acceptParty is true', async () => {
         const {errors} = await validateRequest({acceptParty: true});
 
         assert.ok(messages(errors).includes('amount is required when acceptParty is provided'));
     });
 
-    it('rejects blank amount when acceptParty is provided', async () => {
+    it('rejects blank amount when acceptParty is true', async () => {
         const {request, errors} = await validateRequest({acceptParty: true, amount: '   '});
 
         assert.equal(request.amount, '');
         assert.ok(messages(errors).includes('amount is required when acceptParty is provided'));
     });
 
-    it('rejects malformed amount when acceptParty is provided', async () => {
+    it('rejects malformed amount when acceptParty is true', async () => {
         const {errors} = await validateRequest({acceptParty: true, amount: 'abc'});
 
         assert.ok(messages(errors).includes('amount must be a valid FSPIOP Amount'));
@@ -45,6 +45,19 @@ describe('PutSendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
         assert.equal(request.amount, '12.34');
+    });
+
+    it('strips trailing fractional zeros so 44.40 is accepted as 44.4', async () => {
+        const {request, errors} = await validateRequest({acceptParty: true, amount: '44.40'});
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.amount, '44.4');
+    });
+
+    it('does not require amount when acceptParty is false (rejection)', async () => {
+        const {errors} = await validateRequest({acceptParty: false});
+
+        assert.deepEqual(errors, []);
     });
 
     it('does not require amount when only acceptQuote is provided', async () => {
