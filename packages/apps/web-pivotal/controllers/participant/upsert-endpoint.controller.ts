@@ -1,12 +1,17 @@
 import {Body, Controller, Inject, Put} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {IsNotEmpty, IsString} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {UpsertEndpointCommand} from '@core/participant/domain';
 
 export class UpsertEndpointRequest {
 
+    @IsString()
+    @IsNotEmpty()
     name!: string;
 
+    @IsString()
+    @IsNotEmpty()
     endpoint!: string;
 }
 

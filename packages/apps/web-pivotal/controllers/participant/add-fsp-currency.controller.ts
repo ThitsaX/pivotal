@@ -1,13 +1,17 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {IsEnum, IsNotEmpty, IsString} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {AddFspCurrencyCommand} from '@core/participant/domain';
-import {FspiopCurrency} from '@shared/fspiop';
+import {Currency, FspiopCurrency} from '@shared/fspiop';
 
 export class AddFspCurrencyRequest {
 
+    @IsString()
+    @IsNotEmpty()
     name!: string;
 
+    @IsEnum(Currency)
     currency!: FspiopCurrency;
 }
 
