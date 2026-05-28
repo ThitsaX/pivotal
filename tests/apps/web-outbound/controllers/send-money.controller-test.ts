@@ -24,14 +24,14 @@ describe('PutSendMoneyRequest', () => {
     it('requires amount when acceptParty is true', async () => {
         const {errors} = await validateRequest({acceptParty: true});
 
-        assert.ok(messages(errors).includes('amount is required when acceptParty is provided'));
+        assert.ok(messages(errors).includes('amount is required'));
     });
 
     it('rejects blank amount when acceptParty is true', async () => {
         const {request, errors} = await validateRequest({acceptParty: true, amount: '   '});
 
         assert.equal(request.amount, '');
-        assert.ok(messages(errors).includes('amount is required when acceptParty is provided'));
+        assert.ok(messages(errors).includes('amount is required'));
     });
 
     it('rejects malformed amount when acceptParty is true', async () => {
