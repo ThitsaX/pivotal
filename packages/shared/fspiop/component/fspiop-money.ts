@@ -17,6 +17,9 @@ export class FspiopMoney {
 
     static readonly UINT64_MAX = BigInt('18446744073709551615');
 
+    // FSPIOP 2.0 `Amount` type — no leading zeros, last fractional digit must be non-zero.
+    static readonly AMOUNT_PATTERN = /^([0]|([1-9][0-9]{0,17}))([.][0-9]{0,3}[1-9])?$/;
+
     static deserialize(amount: bigint, scale: number): string {
         FspiopMoney.validateScale(scale);
 

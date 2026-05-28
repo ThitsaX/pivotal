@@ -2,15 +2,55 @@ import { Body, Controller, Headers, Inject, Logger, Param, Post, Put } from '@ne
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
-import { FspiopErrors, FspiopException, FspiopHeaders, } from '@shared/fspiop';
+import { FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
-import { IsOptional, IsBoolean } from 'class-validator';
+import {
+    IsOptional,
+    IsBoolean,
+    Validate,
+    ValidateIf,
+    ValidationArguments,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
 
-class PutSendMoneyRequest {
+@ValidatorConstraint({name: 'acceptPartyAmount', async: false})
+class AcceptPartyAmountConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (typeof value !== 'string') {
+            return false;
+        }
+
+        const amount = FspiopMoney.normalizeAmount(value);
+
+        return amount.length > 0 && FspiopMoney.AMOUNT_PATTERN.test(amount);
+    }
+
+    defaultMessage(args: ValidationArguments): string {
+        const value = args.value;
+
+        if (value == null || (typeof value === 'string' && FspiopMoney.normalizeAmount(value).length === 0)) {
+            return 'amount is required when acceptParty is provided';
+        }
+
+        if (typeof value !== 'string') {
+            return 'amount must be a string';
+        }
+
+        return 'amount must be a valid FSPIOP Amount';
+    }
+}
+
+export class PutSendMoneyRequest {
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
     @IsBoolean()
     acceptParty?: boolean;
+
+    @ValidateIf((request: PutSendMoneyRequest) => request.acceptParty === true)
+    @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
+    @Validate(AcceptPartyAmountConstraint)
+    amount?: string;
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
@@ -81,7 +121,7 @@ export class SendMoneyController {
             );
             const output: PutAcceptPartyCommand.Output = await this.commandBus.execute(
                 new PutAcceptPartyCommand(
-                    new PutAcceptPartyCommand.Input(transferId, request.acceptParty),
+                    new PutAcceptPartyCommand.Input(transferId, request.acceptParty, request.amount ?? ''),
                 ),
             );
             this.logger.log(
