@@ -1,7 +1,7 @@
-import {Type} from 'class-transformer';
-import {IsArray, IsDefined, IsEnum, IsOptional, IsString, ValidateNested} from 'class-validator';
-import {AmountType, Currency, Extension, TransactionScenario} from '@shared/fspiop';
-import {FspParty} from './fsp-party';
+import { Type } from 'class-transformer';
+import { IsArray, IsDefined, IsEnum, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { AmountType, Currency, Extension, TransactionScenario } from '@shared/fspiop';
+import { FspParty } from './fsp-party';
 
 export enum StateEnum {
     WaitingForPartyAcceptance = 'WAITING_FOR_PARTY_ACCEPTANCE',
@@ -50,6 +50,18 @@ export class SendMoneyResponse {
     payeeFspFeeAmount?: string;
 
     @IsOptional()
+    @IsString()
+    payeeFee?: string;
+
+    @IsOptional()
+    @IsString()
+    payerFee?: string;
+
+    @IsOptional()
+    @IsString()
+    schemeFee?: string;
+
+    @IsOptional()
     @IsEnum(Currency)
     currency?: Currency;
 
@@ -67,12 +79,12 @@ export class SendMoneyResponse {
 
     @IsOptional()
     @IsArray()
-    @IsString({each: true})
+    @IsString({ each: true })
     supportedCurrencies?: Array<string>;
 
     @IsOptional()
     @IsArray()
-    @ValidateNested({each: true})
+    @ValidateNested({ each: true })
     @Type(() => Extension)
     extensionList?: Array<Extension>;
 }
