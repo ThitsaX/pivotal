@@ -1,8 +1,8 @@
 import { Body, Controller, Headers, Inject, Logger, Param, Post, Put } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
-import { FSPIOP_AMOUNT_PATTERN, normalizeFspiopAmount, PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
-import { FspiopErrors, FspiopException, FspiopHeaders, } from '@shared/fspiop';
+import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
+import { FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import {
     IsOptional,
@@ -21,15 +21,15 @@ class AcceptPartyAmountConstraint implements ValidatorConstraintInterface {
             return false;
         }
 
-        const amount = normalizeFspiopAmount(value);
+        const amount = FspiopMoney.normalizeAmount(value);
 
-        return amount.length > 0 && FSPIOP_AMOUNT_PATTERN.test(amount);
+        return amount.length > 0 && FspiopMoney.AMOUNT_PATTERN.test(amount);
     }
 
     defaultMessage(args: ValidationArguments): string {
         const value = args.value;
 
-        if (value == null || (typeof value === 'string' && normalizeFspiopAmount(value).length === 0)) {
+        if (value == null || (typeof value === 'string' && FspiopMoney.normalizeAmount(value).length === 0)) {
             return 'amount is required when acceptParty is provided';
         }
 
@@ -47,8 +47,8 @@ export class PutSendMoneyRequest {
     @IsBoolean()
     acceptParty?: boolean;
 
-    @ValidateIf((request: PutSendMoneyRequest) => request.acceptParty != null)
-    @Transform(({ value }) => typeof value === 'string' ? normalizeFspiopAmount(value) : value)
+    @ValidateIf((request: PutSendMoneyRequest) => request.acceptParty === true)
+    @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
     @Validate(AcceptPartyAmountConstraint)
     amount?: string;
 
