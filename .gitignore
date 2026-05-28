@@ -68,5 +68,10 @@ hs_err_pid*
 **/dist/*
 **/nats-data/*
 
+# Stray compiled TS output under packages/ — TS is the source of truth.
+# Exception: packages/portal/public/config.js is a runtime config served by index.html.
+packages/**/*.js
+!packages/portal/public/*.js
+
 *.factorypath
 .qodo
