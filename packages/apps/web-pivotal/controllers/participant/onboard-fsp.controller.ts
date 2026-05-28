@@ -1,21 +1,35 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {ArrayNotEmpty, IsArray, IsEnum, IsNotEmpty, IsString} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {OnboardFspCommand} from '@core/participant/domain';
-import {FspiopCurrency} from '@shared/fspiop';
+import {Currency, FspiopCurrency} from '@shared/fspiop';
 
 export class OnboardFspRequest {
 
+    @IsString()
+    @IsNotEmpty()
     name!: string;
 
+    @IsArray()
+    @ArrayNotEmpty()
+    @IsEnum(Currency, {each: true})
     currencies!: FspiopCurrency[];
 
+    @IsString()
+    @IsNotEmpty()
     endpoint!: string;
 
+    @IsString()
+    @IsNotEmpty()
     jwsPublicKey!: string;
 
+    @IsString()
+    @IsNotEmpty()
     jwsPrivateKey!: string;
 
+    @IsString()
+    @IsNotEmpty()
     accessPublicKey!: string;
 }
 

@@ -1,11 +1,13 @@
 import {Body, Controller, Inject, Post} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
+import {IsEnum} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {AddHubCurrencyCommand} from '@core/participant/domain';
-import {FspiopCurrency} from '@shared/fspiop';
+import {Currency, FspiopCurrency} from '@shared/fspiop';
 
 export class AddHubCurrencyRequest {
 
+    @IsEnum(Currency)
     currency!: FspiopCurrency;
 }
 

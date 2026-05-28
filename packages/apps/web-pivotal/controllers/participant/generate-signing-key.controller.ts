@@ -1,10 +1,14 @@
 import {Body, Controller, Post} from '@nestjs/common';
+import {Type} from 'class-transformer';
+import {IsInt} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {PivotalException} from '@shared/foundation';
 import {RsaKeyPair} from '@shared/security/component/key/rsa-key-pair';
 
 export class GenerateSigningKeyRequest {
 
+    @Type(() => Number)
+    @IsInt()
     size!: number;
 }
 

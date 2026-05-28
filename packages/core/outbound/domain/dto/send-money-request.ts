@@ -1,6 +1,6 @@
-import {Type} from 'class-transformer';
+import {Transform, Type} from 'class-transformer';
 import {IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested} from 'class-validator';
-import {AmountType, Currency, TransactionScenario} from '@shared/fspiop';
+import {AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario} from '@shared/fspiop';
 import {FspParty} from './fsp-party';
 
 export class SendMoneyRequest {
@@ -26,8 +26,8 @@ export class SendMoneyRequest {
     @IsEnum(Currency)
     currency!: Currency;
 
-    @IsDefined()
-    @IsString()
+    @Transform(({value}) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
+    @IsFspiopAmount()
     amount!: string;
 
     @IsDefined()
