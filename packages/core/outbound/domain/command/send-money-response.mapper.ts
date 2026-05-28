@@ -1,9 +1,9 @@
-import {Extension, ExtensionList, TransferState} from '@shared/fspiop';
-import {TransferRequest} from '../cache';
-import {SendMoneyResponse, StateEnum} from '../dto';
+import { Extension, ExtensionList, TransferState } from '@shared/fspiop';
+import { TransferRequest } from '../cache';
+import { SendMoneyResponse, StateEnum } from '../dto';
 
 export class SendMoneyResponseMapper {
-    private static readonly DIRECTION = 'OUTGOIND';
+    private static readonly DIRECTION = 'OUTGOING';
 
     static toWaitingForPartyAcceptance(transferRequest: TransferRequest): SendMoneyResponse {
         return SendMoneyResponseMapper.toResponse(
@@ -49,7 +49,11 @@ export class SendMoneyResponseMapper {
         payeeFspFeeAmount?: string,
         extensionList?: Array<Extension>,
     ): SendMoneyResponse {
+
+        const feeByKey = SendMoneyResponseMapper.indexExtensions(extensionList);
+
         const response = new SendMoneyResponse();
+        
         response.transferId = transferRequest.transferId;
         response.homeTransactionId = transferRequest.homeTransactionId;
         response.from = transferRequest.from;
@@ -59,6 +63,9 @@ export class SendMoneyResponseMapper {
         response.note = transferRequest.note;
         response.amount = transferRequest.amount;
         response.payeeFspFeeAmount = payeeFspFeeAmount;
+        response.payeeFee = feeByKey.get('payeefee') ?? "0";
+        response.payerFee = feeByKey.get('payerfee') ?? "0";
+        response.schemeFee = feeByKey.get('schemefee') ?? "0";
         response.currency = transferRequest.currency;
         response.currentState = currentState;
         response.initiatedTimestamp = transferRequest.initiatedTimestamp;
@@ -71,5 +78,21 @@ export class SendMoneyResponseMapper {
 
     private static toExtensionArray(extensionList: ExtensionList | undefined): Array<Extension> | undefined {
         return extensionList?.extension;
+    }
+
+    private static indexExtensions(
+        extensionList: Array<Extension> | undefined,
+    ): Map<string, string> {
+        const map = new Map<string, string>();
+
+        for (const ext of extensionList ?? []) {
+            const key = ext.key?.trim().toLowerCase();
+            const value = ext.value?.trim();
+            if (key && value) {
+                map.set(key, value);
+            }
+        }
+
+        return map;
     }
 }
