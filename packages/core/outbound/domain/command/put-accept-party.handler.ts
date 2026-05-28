@@ -50,8 +50,10 @@ export class PutAcceptPartyHandler
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
-        const { transferId, acceptParty } = command.input;
+        const { transferId, acceptParty, amount } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+        // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
+        transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);
