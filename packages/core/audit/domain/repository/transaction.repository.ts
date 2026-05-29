@@ -47,6 +47,29 @@ export class TransactionRepository {
         'transaction.transactionCompletedAt',
     ];
 
+    private static readonly REPORT_SELECT = [
+        'transaction.id',
+        'transaction.correlationId',
+        'transaction.payerFsp',
+        'transaction.payeeFsp',
+        'transaction.payerIdType',
+        'transaction.payerId',
+        'transaction.payerSubId',
+        'transaction.payeeIdType',
+        'transaction.payeeId',
+        'transaction.payeeSubId',
+        'transaction.quotingCurrency',
+        'transaction.quotingAmount',
+        'transaction.transferState',
+        'transaction.possibleDispute',
+        'transaction.partiesError',
+        'transaction.quotesError',
+        'transaction.transfersError',
+        'transaction.patchError',
+        'transaction.transactionStartedAt',
+        'transaction.transactionCompletedAt',
+    ];
+
     constructor(
         @InjectRepository(Transaction, PIVOTAL_DB_WRITE_CONNECTION_NAME)
         private readonly writeRepository: Repository<Transaction>,
@@ -531,6 +554,58 @@ export class TransactionRepository {
         return {count: Math.min(matched, maxLimit), capped: matched > maxLimit};
     }
 
+    async countForReport(
+        criteria: FindTransactionsQuery.Criteria,
+        maxLimit: number,
+        accessScope?: FindTransactionsQuery.AccessScope,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<{count: number; capped: boolean}> {
+        return this.count(criteria, maxLimit, accessScope, target);
+    }
+
+    async findForReport(
+        criteria: FindTransactionsQuery.Criteria,
+        order: FindTransactionsQuery.Order,
+        cursorToken: string | undefined,
+        limit: number,
+        accessScope?: FindTransactionsQuery.AccessScope,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<TransactionRepository.ReportPage> {
+        const meta = TransactionRepository.sortMeta(order.column);
+        const effectiveDir: 'ASC' | 'DESC' =
+            order.direction === FindTransactionsQuery.Order.Direction.Asc ? 'ASC' : 'DESC';
+        const decoded = cursorToken == null ? undefined : TransactionRepository.decodeCursor(cursorToken);
+        const fetchLimit = Math.max(1, Math.trunc(limit)) + 1;
+        let rows: Transaction[];
+
+        if (accessScope !== undefined) {
+            const [payerLeg, payeeLeg] = await Promise.all([
+                this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payerFsp',
+                    fspId: accessScope.fspId,
+                }),
+                this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payeeFsp',
+                    fspId: accessScope.fspId,
+                }),
+            ]);
+            rows = TransactionRepository.mergeLegs(payerLeg, payeeLeg, meta, effectiveDir, fetchLimit);
+        } else {
+            rows = await this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, undefined);
+        }
+
+        const hasMore = rows.length >= fetchLimit;
+        const page = hasMore ? rows.slice(0, fetchLimit - 1) : rows;
+        const nextCursor = hasMore && page.length > 0
+            ? TransactionRepository.encodeCursor(page[page.length - 1], meta)
+            : undefined;
+
+        return {
+            records: page.map((record) => TransactionRepository.toReportRecord(record)),
+            nextCursor,
+        };
+    }
+
     /**
      * Runs ONE index-seekable keyset query and returns up to `fetchLimit` (= size + 1) rows.
      *
@@ -558,6 +633,38 @@ export class TransactionRepository {
         const queryBuilder = this.getRepository(target)
                                  .createQueryBuilder('transaction')
                                  .select(TransactionRepository.LIST_SELECT);
+
+        this.applyCriteria(queryBuilder, criteria);
+
+        if (leg !== undefined) {
+            queryBuilder.andWhere(`${leg.property} = :accessScopeFspId`, {accessScopeFspId: leg.fspId});
+        }
+
+        if (decoded !== undefined) {
+            const keyset = TransactionRepository.keysetWhere(meta, effectiveDir, decoded);
+            queryBuilder.andWhere(keyset.sql, keyset.params);
+        }
+
+        queryBuilder
+            .orderBy(meta.property, effectiveDir)
+            .addOrderBy('transaction.id', effectiveDir)
+            .limit(fetchLimit);
+
+        return queryBuilder.getMany();
+    }
+
+    private async fetchReportLeg(
+        criteria: FindTransactionsQuery.Criteria,
+        meta: TransactionRepository.SortMeta,
+        effectiveDir: 'ASC' | 'DESC',
+        decoded: TransactionRepository.DecodedCursor | undefined,
+        fetchLimit: number,
+        target: DbTarget,
+        leg: {property: string; fspId: string} | undefined,
+    ): Promise<Transaction[]> {
+        const queryBuilder = this.getRepository(target)
+                                 .createQueryBuilder('transaction')
+                                 .select(TransactionRepository.REPORT_SELECT);
 
         this.applyCriteria(queryBuilder, criteria);
 
@@ -1027,9 +1134,48 @@ export class TransactionRepository {
             updatedAt: record.updatedAt,
         };
     }
+
+    private static toReportRecord(record: Transaction): Record<string, unknown> {
+        return {
+            transferId:      record.correlationId,
+            payerFsp:        record.payerFsp,
+            payeeFsp:        record.payeeFsp,
+            payerIdType:     record.payerIdType,
+            payerId:         record.payerId,
+            payerSubId:      record.payerSubId,
+            payeeIdType:     record.payeeIdType,
+            payeeId:         record.payeeId,
+            payeeSubId:      record.payeeSubId,
+            quotingCurrency: record.quotingCurrency,
+            quotingAmount:   record.quotingAmount,
+            transferState:   record.transferState,
+            dispute:         record.possibleDispute,
+            partiesError:    TransactionRepository.toRawJson(record.partiesError),
+            quotesError:     TransactionRepository.toRawJson(record.quotesError),
+            transfersError:  TransactionRepository.toRawJson(record.transfersError),
+            patchError:      TransactionRepository.toRawJson(record.patchError),
+        };
+    }
+
+    private static toRawJson(value: unknown): string | null {
+        if (value == null) {
+            return null;
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        return JSON.stringify(value, TransactionRepository.JSON_REPLACER);
+    }
 }
 
 export namespace TransactionRepository {
+
+    export type ReportPage = {
+        records: Record<string, unknown>[];
+        nextCursor?: string;
+    };
 
     export type SortMeta = {
         property: string;
