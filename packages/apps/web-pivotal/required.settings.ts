@@ -1,4 +1,5 @@
 import {ConfigService} from '@nestjs/config';
+import {ReportDownloadSettings} from '@core/audit/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm';
 import type {WebPivotalModule} from './web-pivotal.module';
@@ -105,6 +106,27 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         return raw.split(',').map((origin) => origin.trim()).filter((origin) => origin.length > 0);
     }
 
+    reportDownloadSettings(): ReportDownloadSettings {
+        return new ReportDownloadSettings(
+            this.readOptionalBoolean('REPORT_DOWNLOAD_WORKER_ENABLED') ?? false,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_POLL_INTERVAL_MS') ?? 5000,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_PAGE_SIZE') ?? 50000,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_MAX_ROWS_PER_FILE') ?? 500000,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_MAX_ZIP_FILES') ?? 20,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_MAX_CONCURRENT') ?? 3,
+            this.readOptionalPositiveInteger('REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS') ?? 20 * 60 * 1000,
+            this.readOptionalBoolean('REPORT_S3_ENABLED') ?? false,
+            this.readOptionalValue('REPORT_S3_BUCKET') ?? '',
+            this.readOptionalValue('REPORT_S3_REGION') ?? 'us-east-1',
+            this.readOptionalValue('REPORT_S3_ACCESS_KEY_ID') ?? '',
+            this.readOptionalValue('REPORT_S3_SECRET_ACCESS_KEY') ?? '',
+            this.readOptionalValue('REPORT_S3_ENDPOINT') ?? '',
+            this.readOptionalBoolean('REPORT_S3_FORCE_PATH_STYLE') ?? true,
+            this.readOptionalValue('REPORT_S3_PREFIX') ?? 'reports/',
+            this.readOptionalPositiveInteger('REPORT_S3_PRESIGNED_URL_TTL_SECONDS') ?? 900,
+        );
+    }
+
     private readRequiredValue(name: string): string {
         const value = this.configService.get<string>(name);
 
@@ -155,5 +177,25 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     private readOptionalPositiveInteger(name: string): number | undefined {
         return this.readPositiveInteger(name);
+    }
+
+    private readOptionalBoolean(name: string): boolean | undefined {
+        const value = this.readOptionalValue(name);
+
+        if (value == null) {
+            return undefined;
+        }
+
+        const normalized = value.toLowerCase();
+
+        if (['true', '1', 'yes'].includes(normalized)) {
+            return true;
+        }
+
+        if (['false', '0', 'no'].includes(normalized)) {
+            return false;
+        }
+
+        throw new Error(`Invalid environment variable ${name}: expected true/false.`);
     }
 }

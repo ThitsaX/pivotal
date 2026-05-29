@@ -411,6 +411,39 @@ export class TransactionRepository {
         );
     }
 
+    async countForReport(
+        criteria: FindTransactionsQuery.Criteria,
+        accessScope?: FindTransactionsQuery.AccessScope,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<number> {
+        const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
+
+        this.applyCriteria(queryBuilder, criteria);
+        this.applyAccessScope(queryBuilder, accessScope);
+
+        return queryBuilder.getCount();
+    }
+
+    async findForReport(
+        criteria: FindTransactionsQuery.Criteria,
+        order: FindTransactionsQuery.Order,
+        offset: number,
+        limit: number,
+        accessScope?: FindTransactionsQuery.AccessScope,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<Record<string, unknown>[]> {
+        const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
+
+        this.applyCriteria(queryBuilder, criteria);
+        this.applyAccessScope(queryBuilder, accessScope);
+        this.applyOrdering(queryBuilder, order);
+        queryBuilder.skip(offset).take(limit);
+
+        const records = await queryBuilder.getMany();
+
+        return records.map((record) => TransactionRepository.toReportRecord(record));
+    }
+
     private applyAccessScope(
         queryBuilder: SelectQueryBuilder<Transaction>,
         accessScope: FindTransactionsQuery.AccessScope | undefined,
@@ -678,6 +711,62 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+        };
+    }
+
+    private static toReportRecord(record: Transaction): Record<string, unknown> {
+        return {
+            id: record.id,
+            transferId: record.correlationId,
+            payerFsp: record.payerFsp,
+            payeeFsp: record.payeeFsp,
+            payerIdType: record.payerIdType,
+            payerId: record.payerId,
+            payerSubId: record.payerSubId,
+            payeeIdType: record.payeeIdType,
+            payeeId: record.payeeId,
+            payeeSubId: record.payeeSubId,
+            transactionInitiatorType: record.transactionInitiatorType,
+            quotingCurrency: record.quotingCurrency,
+            quotingAmount: record.quotingAmount,
+            transferCurrency: record.transferCurrency,
+            transferAmount: record.transferAmount,
+            transactionType: record.transactionType,
+            subScenario: record.subScenario,
+            transferState: record.transferState,
+            error: record.error,
+            dispute: record.possibleDispute,
+            flow: record.flow,
+            partiesRequestedAt: record.partiesRequestedAt,
+            partiesRespondedAt: record.partiesRespondedAt,
+            outboundPartiesRequestedAt: record.outboundPartiesRequestedAt,
+            outboundPartiesRespondedAt: record.outboundPartiesRespondedAt,
+            inboundPartiesRequestedAt: record.inboundPartiesRequestedAt,
+            inboundPartiesRespondedAt: record.inboundPartiesRespondedAt,
+            connectorPartiesRequestedAt: record.connectorPartiesRequestedAt,
+            connectorPartiesRespondedAt: record.connectorPartiesRespondedAt,
+            quotesRequestedAt: record.quotesRequestedAt,
+            quotesRespondedAt: record.quotesRespondedAt,
+            outboundQuotesRequestedAt: record.outboundQuotesRequestedAt,
+            outboundQuotesRespondedAt: record.outboundQuotesRespondedAt,
+            inboundQuotesRequestedAt: record.inboundQuotesRequestedAt,
+            inboundQuotesRespondedAt: record.inboundQuotesRespondedAt,
+            connectorQuotesRequestedAt: record.connectorQuotesRequestedAt,
+            connectorQuotesRespondedAt: record.connectorQuotesRespondedAt,
+            transfersRequestedAt: record.transfersRequestedAt,
+            transfersRespondedAt: record.transfersRespondedAt,
+            outboundTransfersRequestedAt: record.outboundTransfersRequestedAt,
+            outboundTransfersRespondedAt: record.outboundTransfersRespondedAt,
+            inboundTransfersRequestedAt: record.inboundTransfersRequestedAt,
+            inboundTransfersRespondedAt: record.inboundTransfersRespondedAt,
+            connectorTransfersRequestedAt: record.connectorTransfersRequestedAt,
+            connectorTransfersRespondedAt: record.connectorTransfersRespondedAt,
+            patchRequestedAt: record.patchRequestedAt,
+            patchRespondedAt: record.patchRespondedAt,
+            transactionStartedAt: record.transactionStartedAt,
+            transactionCompletedAt: record.transactionCompletedAt,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
         };
