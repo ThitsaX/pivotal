@@ -28,7 +28,7 @@ export class HandlePutPartiesHandler
             subId ?? undefined,
         );
 
-        this.publisher.publishSuccess(subject, response);
+        await this.publisher.publishSuccess(subject, response);
 
         return new HandlePutPartiesCommand.Output();
     }

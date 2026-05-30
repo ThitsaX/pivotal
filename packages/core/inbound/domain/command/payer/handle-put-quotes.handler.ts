@@ -47,7 +47,7 @@ export class HandlePutQuotesHandler
             quoteId,
         );
 
-        this.publisher.publishSuccess(subject, response);
+        await this.publisher.publishSuccess(subject, response);
 
         return new HandlePutQuotesCommand.Output();
     }

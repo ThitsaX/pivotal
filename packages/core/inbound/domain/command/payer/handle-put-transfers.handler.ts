@@ -48,7 +48,7 @@ export class HandlePutTransfersHandler
             transferId,
         );
 
-        this.publisher.publishSuccess(subject, response);
+        await this.publisher.publishSuccess(subject, response);
 
         return new HandlePutTransfersCommand.Output();
     }
