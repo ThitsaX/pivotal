@@ -48,7 +48,7 @@ export class HandlePutQuotesErrorHandler
             quoteId,
         );
 
-        this.publisher.publishError(subject, error);
+        await this.publisher.publishError(subject, error);
 
         return new HandlePutQuotesErrorCommand.Output();
     }
