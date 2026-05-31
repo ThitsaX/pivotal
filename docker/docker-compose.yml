@@ -70,8 +70,8 @@ services:
     profiles: ["reports"]
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${REPORT_S3_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${REPORT_S3_SECRET_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "${MINIO_API_HOST_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
@@ -90,10 +90,10 @@ services:
       - -c
       - |
         until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done
-        mc mb --ignore-existing "local/${REPORT_S3_BUCKET:-pivotal-reports}"
+        mc mb --ignore-existing "local/${MINIO_REPORT_BUCKET:-pivotal-reports}"
     environment:
-      MINIO_ROOT_USER: ${REPORT_S3_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${REPORT_S3_SECRET_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
 
   web-outbound:
     image: pivotal-web-outbound:local
@@ -182,7 +182,7 @@ services:
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
-      REPORT_DOWNLOAD_WORKER_ENABLED: ${REPORT_DOWNLOAD_WORKER_ENABLED:-false}
+      REPORT_DOWNLOAD_WORKER_ENABLED: ${REPORT_DOWNLOAD_WORKER_ENABLED:-true}
       REPORT_DOWNLOAD_POLL_INTERVAL_MS: ${REPORT_DOWNLOAD_POLL_INTERVAL_MS:-5000}
       REPORT_DOWNLOAD_PAGE_SIZE: ${REPORT_DOWNLOAD_PAGE_SIZE:-50000}
       REPORT_DOWNLOAD_MAX_ROWS_PER_FILE: ${REPORT_DOWNLOAD_MAX_ROWS_PER_FILE:-500000}
@@ -190,12 +190,12 @@ services:
       REPORT_DOWNLOAD_MAX_CONCURRENT: ${REPORT_DOWNLOAD_MAX_CONCURRENT:-3}
       REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS: ${REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS:-1200000}
       REPORT_S3_ENABLED: ${REPORT_S3_ENABLED:-false}
-      REPORT_S3_BUCKET: ${REPORT_S3_BUCKET:-pivotal-reports}
+      REPORT_S3_BUCKET: ${REPORT_S3_BUCKET:-your-aws-s3-bucket-name}
       REPORT_S3_REGION: ${REPORT_S3_REGION:-us-east-1}
-      REPORT_S3_ACCESS_KEY_ID: ${REPORT_S3_ACCESS_KEY_ID:-minioadmin}
-      REPORT_S3_SECRET_ACCESS_KEY: ${REPORT_S3_SECRET_ACCESS_KEY:-minioadmin}
-      REPORT_S3_ENDPOINT: ${REPORT_S3_ENDPOINT:-http://minio:9000}
-      REPORT_S3_FORCE_PATH_STYLE: ${REPORT_S3_FORCE_PATH_STYLE:-true}
+      REPORT_S3_ACCESS_KEY_ID: ${REPORT_S3_ACCESS_KEY_ID:-your-aws-access-key-id}
+      REPORT_S3_SECRET_ACCESS_KEY: ${REPORT_S3_SECRET_ACCESS_KEY:-your-aws-secret-access-key}
+      REPORT_S3_ENDPOINT: ${REPORT_S3_ENDPOINT:-}
+      REPORT_S3_FORCE_PATH_STYLE: ${REPORT_S3_FORCE_PATH_STYLE:-false}
       REPORT_S3_PREFIX: ${REPORT_S3_PREFIX:-reports/}
       REPORT_S3_PRESIGNED_URL_TTL_SECONDS: ${REPORT_S3_PRESIGNED_URL_TTL_SECONDS:-900}
       <<: *common_db_env
