@@ -108,7 +108,7 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     reportDownloadSettings(): ReportDownloadSettings {
         return new ReportDownloadSettings(
-            this.readOptionalBoolean('REPORT_DOWNLOAD_WORKER_ENABLED') ?? false,
+            this.readOptionalBoolean('REPORT_DOWNLOAD_WORKER_ENABLED') ?? true,
             this.readOptionalPositiveInteger('REPORT_DOWNLOAD_POLL_INTERVAL_MS') ?? 5000,
             this.readOptionalPositiveInteger('REPORT_DOWNLOAD_PAGE_SIZE') ?? 50000,
             this.readOptionalPositiveInteger('REPORT_DOWNLOAD_MAX_ROWS_PER_FILE') ?? 500000,
@@ -121,7 +121,7 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
             this.readOptionalValue('REPORT_S3_ACCESS_KEY_ID') ?? '',
             this.readOptionalValue('REPORT_S3_SECRET_ACCESS_KEY') ?? '',
             this.readOptionalValue('REPORT_S3_ENDPOINT') ?? '',
-            this.readOptionalBoolean('REPORT_S3_FORCE_PATH_STYLE') ?? true,
+            this.readOptionalBoolean('REPORT_S3_FORCE_PATH_STYLE') ?? false,
             this.readOptionalValue('REPORT_S3_PREFIX') ?? 'reports/',
             this.readOptionalPositiveInteger('REPORT_S3_PRESIGNED_URL_TTL_SECONDS') ?? 900,
         );
