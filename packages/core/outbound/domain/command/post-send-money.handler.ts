@@ -55,7 +55,7 @@ export class PostSendMoneyHandler
 
         fspParty.idType = partyIdInfo.partyIdType;
         fspParty.idValue = partyIdInfo.partyIdentifier;
-        fspParty.idSubValue = partyIdInfo.partySubIdOrType ?? '';
+        fspParty.idSubValue = PostSendMoneyHandler.toSubId(partyIdInfo.partySubIdOrType);
         fspParty.displayName = party.name;
         fspParty.firstName = complexName?.firstName;
         fspParty.middleName = complexName?.middleName;
