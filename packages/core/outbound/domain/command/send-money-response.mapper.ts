@@ -60,6 +60,7 @@ export class SendMoneyResponseMapper {
         response.to = transferRequest.to;
         response.amountType = transferRequest.amountType;
         response.transactionType = transferRequest.transactionType;
+        response.subScenario = transferRequest.subScenario;
         response.note = transferRequest.note;
         response.amount = transferRequest.amount;
         response.payeeFspFeeAmount = payeeFspFeeAmount;
