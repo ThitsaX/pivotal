@@ -17,7 +17,7 @@ export class FspParty {
 
     @IsOptional()
     @IsString()
-    idSubValue!: string;
+    idSubValue?: string;
 
     @IsOptional()
     @IsString()
