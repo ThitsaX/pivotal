@@ -39,6 +39,10 @@ export class SendMoneyResponse {
 
     @IsOptional()
     @IsString()
+    subScenario?: string;
+
+    @IsOptional()
+    @IsString()
     note?: string;
 
     @IsDefined()
