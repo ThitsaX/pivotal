@@ -127,6 +127,67 @@ describe('CreateTransactionReportHandler', () => {
         assert.match(sheet, /wallet2/);
     });
 
+    it('includes raw request and response JSON in CSV reports for disputed transactions', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                '1',
+                    transferId:        'transfer-disputed',
+                    dispute:           true,
+                    partiesRequest:    JSON.stringify({partyId: '2769200001'}),
+                    partiesResponse:   JSON.stringify({fspId: 'wallet2'}),
+                    quotesRequest:     JSON.stringify({amount: {amount: '12.34', currency: 'USD'}}),
+                    quotesResponse:    JSON.stringify({transferAmount: {amount: '12.34', currency: 'USD'}}),
+                    transfersRequest:  JSON.stringify({transferId: 'transfer-disputed'}),
+                    transfersResponse: JSON.stringify({transferState: 'COMMITTED'}),
+                    patchRequest:      JSON.stringify({transferState: 'COMMITTED'}),
+                    patchError:        JSON.stringify({errorCode: '2001'}),
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const csv = report.bytes.toString('utf8');
+
+        assert.equal(report.extension, 'csv');
+        assert.match(csv, /partiesRequest/);
+        assert.match(csv, /transfersResponse/);
+        assert.match(csv, /"\{""partyId"":""2769200001""\}"/);
+        assert.match(csv, /"\{""transferState"":""COMMITTED""\}"/);
+        assert.match(csv, /"\{""errorCode"":""2001""\}"/);
+    });
+
+    it('keeps raw request and response CSV columns empty for non-disputed transactions', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                '1',
+                    transferId:        'transfer-normal',
+                    dispute:           false,
+                    partiesRequest:    null,
+                    partiesResponse:   null,
+                    quotesRequest:     null,
+                    quotesResponse:    null,
+                    transfersRequest:  null,
+                    transfersResponse: null,
+                    patchRequest:      null,
+                    patchError:        null,
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [header, row] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = header.split(',');
+        const values = row.split(',');
+
+        for (const column of ['partiesRequest', 'quotesRequest', 'transfersRequest', 'patchRequest', 'patchError']) {
+            assert.equal(values[headers.indexOf(column)], '');
+        }
+    });
+
     it('splits large XLSX transaction reports into a ZIP of XLSX parts', async () => {
         const generator = new TransactionReportGenerator(
             reportTransactionRepository([

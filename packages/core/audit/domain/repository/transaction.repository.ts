@@ -717,6 +717,8 @@ export class TransactionRepository {
     }
 
     private static toReportRecord(record: Transaction): Record<string, unknown> {
+        const disputedPayload = (value: unknown) => record.possibleDispute ? TransactionRepository.toRawJson(value) : null;
+
         return {
             id: record.id,
             transferId: record.correlationId,
@@ -741,6 +743,9 @@ export class TransactionRepository {
             flow: record.flow,
             partiesRequestedAt: record.partiesRequestedAt,
             partiesRespondedAt: record.partiesRespondedAt,
+            partiesRequest: disputedPayload(record.partiesRequest),
+            partiesResponse: disputedPayload(record.partiesResponse),
+            partiesError: disputedPayload(record.partiesError),
             outboundPartiesRequestedAt: record.outboundPartiesRequestedAt,
             outboundPartiesRespondedAt: record.outboundPartiesRespondedAt,
             inboundPartiesRequestedAt: record.inboundPartiesRequestedAt,
@@ -749,6 +754,9 @@ export class TransactionRepository {
             connectorPartiesRespondedAt: record.connectorPartiesRespondedAt,
             quotesRequestedAt: record.quotesRequestedAt,
             quotesRespondedAt: record.quotesRespondedAt,
+            quotesRequest: disputedPayload(record.quotesRequest),
+            quotesResponse: disputedPayload(record.quotesResponse),
+            quotesError: disputedPayload(record.quotesError),
             outboundQuotesRequestedAt: record.outboundQuotesRequestedAt,
             outboundQuotesRespondedAt: record.outboundQuotesRespondedAt,
             inboundQuotesRequestedAt: record.inboundQuotesRequestedAt,
@@ -757,6 +765,9 @@ export class TransactionRepository {
             connectorQuotesRespondedAt: record.connectorQuotesRespondedAt,
             transfersRequestedAt: record.transfersRequestedAt,
             transfersRespondedAt: record.transfersRespondedAt,
+            transfersRequest: disputedPayload(record.transfersRequest),
+            transfersResponse: disputedPayload(record.transfersResponse),
+            transfersError: disputedPayload(record.transfersError),
             outboundTransfersRequestedAt: record.outboundTransfersRequestedAt,
             outboundTransfersRespondedAt: record.outboundTransfersRespondedAt,
             inboundTransfersRequestedAt: record.inboundTransfersRequestedAt,
@@ -765,11 +776,25 @@ export class TransactionRepository {
             connectorTransfersRespondedAt: record.connectorTransfersRespondedAt,
             patchRequestedAt: record.patchRequestedAt,
             patchRespondedAt: record.patchRespondedAt,
+            patchRequest: disputedPayload(record.patchRequest),
+            patchError: disputedPayload(record.patchError),
             transactionStartedAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
         };
+    }
+
+    private static toRawJson(value: unknown): string | null {
+        if (value == null) {
+            return null;
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        return JSON.stringify(value, TransactionRepository.JSON_REPLACER);
     }
 }
 
