@@ -14,6 +14,7 @@ import PrettyJsonViewer from '../../components/PrettyJsonViewer.vue';
 import SearchCriteriaForm from '../../components/SearchCriteriaForm.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
 import TimeZoneSelector from '../../components/TimeZoneSelector.vue';
+import { useReportDownloadState } from '../../composables/useDownloadReportState';
 import {
     getCriteriaSections,
     PAGE_SIZE_OPTIONS,
@@ -71,6 +72,8 @@ const requestError = ref<string | null>(null);
 const requestErrorEyebrow = ref('Search Failed');
 const requestErrorTitle = ref('Audit search could not be completed');
 const results = ref<QueryResponse | null>(null);
+const reportFileType = ref<'xlsx' | 'csv'>('xlsx');
+const reportRequesting = ref(false);
 const pageInfo = ref<PageInfo>({hasNext: false, hasPrev: false});
 const totalCount = ref<CountResponse | null>(null);
 const countLoading = ref(false);
@@ -94,6 +97,21 @@ const state = reactive<ViewState>({
     orderColumn: defaultOrderColumn(),
     orderDirection: DEFAULT_ORDER_DIRECTION,
 });
+const {
+    downloadStatus,
+    isDownloading,
+    readyFile,
+    failedMessage,
+    startPolling,
+    consumeDownload,
+    clearDownloadState,
+} = useReportDownloadState('TransactionDetailReport');
+
+const statusLabel: Record<string, string> = {
+    PENDING: 'Queuing report...',
+    RUNNING: 'Generating report...',
+    READY: 'Report ready',
+};
 
 // Keyset navigation — ephemeral component state (NOT route-synced), so a hard reload
 // returns the first page of the same search rather than a stale cursor offset.
@@ -555,6 +573,44 @@ const buildCriteriaParams = (criteria: Record<string, string>): URLSearchParams 
     }
 
     return params;
+};
+
+const downloadTransactionDetailReport = async (): Promise<void> => {
+    const criteria = Object.keys(lastSubmittedCriteria.value).length > 0
+        ? lastSubmittedCriteria.value
+        : snapshotCriteriaForQuery();
+    const params = buildCriteriaParams(criteria);
+
+    params.set('fileType', reportFileType.value);
+    params.set('orderColumn', state.orderColumn);
+    params.set('orderDirection', state.orderDirection);
+
+    reportRequesting.value = true;
+
+    try {
+        const response = await apiClient.post<{
+            requestId?: string;
+            reqId?: string;
+            reportRequestId?: string;
+        }>(`/audit/transactions/reports?${params.toString()}`);
+
+        const requestId = response.requestId ?? response.reqId ?? response.reportRequestId;
+        if (typeof requestId === 'string' && requestId.length > 0) {
+            startPolling(requestId, reportFileType.value);
+            return;
+        }
+
+        requestErrorEyebrow.value = 'Download Failed';
+        requestErrorTitle.value = 'Report request could not be created';
+        requestError.value = 'Report request did not return a requestId.';
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        requestErrorEyebrow.value = 'Download Failed';
+        requestErrorTitle.value = 'Report request could not be created';
+        requestError.value = message;
+    } finally {
+        reportRequesting.value = false;
+    }
 };
 
 // Fires the list + count requests for a brand-new search. The count runs in parallel and is
@@ -1474,7 +1530,7 @@ const goToLastPage = (): void => {
                     @refresh="refreshResults"
                 />
 
-                <section v-if="requestError || loading || results">
+                <section v-if="requestError || loading || results || isDownloading || readyFile || (downloadStatus === 'FAILED' && failedMessage)">
         <article class="overflow-hidden border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
             <div class="border-b border-accent/15 bg-[#f8fbff] px-4 py-3">
                 <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -1491,11 +1547,91 @@ const goToLastPage = (): void => {
                                 {{ selectedTimeZone }}
                             </span>
                         </span>
+                        <label class="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-white px-3 py-1 font-semibold text-accent">
+                            <span>Format</span>
+                            <select
+                                v-model="reportFileType"
+                                class="bg-transparent text-xs font-bold uppercase outline-none"
+                                :disabled="reportRequesting || isDownloading"
+                            >
+                                <option value="xlsx">
+                                    XLSX
+                                </option>
+                                <option value="csv">
+                                    CSV
+                                </option>
+                            </select>
+                        </label>
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-full border border-[#d97706] bg-[#d97706] px-3 py-1 font-semibold text-white transition hover:bg-[#b45309] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+                            :disabled="reportRequesting || isDownloading || loading"
+                            @click="downloadTransactionDetailReport"
+                        >
+                            {{ reportRequesting || isDownloading ? 'Downloading...' : 'Download' }}
+                        </button>
                     </template>
                 </div>
             </div>
 
             <div class="space-y-4 p-4">
+                <div
+                    v-if="isDownloading"
+                    class="flex items-start gap-3 border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-700"
+                >
+                    <span class="mt-0.5 h-3 w-3 shrink-0 animate-pulse rounded-full bg-sky-500" />
+                    <div>
+                        <p class="font-semibold">
+                            {{ statusLabel[downloadStatus] ?? 'Processing report...' }}
+                        </p>
+                        <p class="mt-0.5 text-xs text-sky-600">
+                            You can leave this page. Your transaction report will be available here once it is ready.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="readyFile"
+                    class="flex flex-wrap items-center justify-between gap-3 border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700"
+                >
+                    <div class="min-w-0">
+                        <p class="font-semibold">
+                            Report ready
+                        </p>
+                        <p class="truncate text-xs text-emerald-600" :title="readyFile.fileName">
+                            {{ readyFile.fileName }} - Link expires in 24 hours
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-soft transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                        @click="consumeDownload"
+                    >
+                        Click to Download
+                    </button>
+                </div>
+
+                <div
+                    v-if="downloadStatus === 'FAILED' && failedMessage"
+                    class="flex flex-wrap items-center justify-between gap-3 border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700"
+                >
+                    <div class="min-w-0">
+                        <p class="font-semibold">
+                            Report generation failed
+                        </p>
+                        <p class="text-xs text-red-600">
+                            {{ failedMessage }}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-soft transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+                        @click="clearDownloadState"
+                    >
+                        OK
+                    </button>
+                </div>
+
                 <article v-if="loading" class="space-y-3 border border-slate-200 bg-[#f7faff] p-4">
                     <div class="h-4 w-48 animate-pulse bg-slate-200" />
                     <div class="h-24 animate-pulse bg-slate-100" />
