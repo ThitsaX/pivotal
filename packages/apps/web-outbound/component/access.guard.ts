@@ -1,9 +1,9 @@
-import {CanActivate, ExecutionContext} from '@nestjs/common';
-import {FspiopErrors, FspiopException, FspiopHeaders} from '@shared/fspiop';
-import {Jwt} from '@shared/security/component/jwt';
-import {Request} from 'express';
-import {AccessKeyStore} from '@shared/security';
-import {JwtPolicy} from './jwt-policy';
+import { CanActivate, ExecutionContext } from '@nestjs/common';
+import { FspiopErrors, FspiopException, FspiopHeaders } from '@shared/fspiop';
+import { Jwt } from '@shared/security/component/jwt';
+import { Request } from 'express';
+import { AccessKeyStore } from '@shared/security';
+import { JwtPolicy } from './jwt-policy';
 
 export class AccessGuard implements CanActivate {
 
@@ -13,15 +13,6 @@ export class AccessGuard implements CanActivate {
         private readonly accessKeyStore: AccessKeyStore,
         private readonly policy: JwtPolicy,
     ) {
-    }
-
-    private static resolveBody(request: Request): string {
-        if (request.body != null && Object.keys(request.body as object).length > 0) {
-            return JSON.stringify(request.body);
-        }
-
-        const date = request.headers[FspiopHeaders.Names.DATE];
-        return JSON.stringify({date: date != null ? String(date) : ''});
     }
 
     canActivate(context: ExecutionContext): boolean {
@@ -77,9 +68,7 @@ export class AccessGuard implements CanActivate {
             );
         }
 
-        const body = AccessGuard.resolveBody(request);
-        const bodyEncoded = Jwt.encode(body);
-        const token = new Jwt.Token(tokenParts[0], bodyEncoded, tokenParts[2]);
+        const token = new Jwt.Token(tokenParts[0], tokenParts[1], tokenParts[2]);
 
         if (!Jwt.verify(publicKey, token)) {
             throw new FspiopException(
@@ -88,6 +77,70 @@ export class AccessGuard implements CanActivate {
             );
         }
 
+        const requestPayload = AccessGuard.resolvePayload(request);
+        const tokenPayload = AccessGuard.decodeTokenPayload(tokenParts[1]);
+
+        if (
+            AccessGuard.toCanonicalJson(requestPayload)
+            !== AccessGuard.toCanonicalJson(tokenPayload)
+        ) {
+            throw new FspiopException(
+                FspiopErrors.INVALID_SIGNATURE,
+                'Authorization payload does not match request body.',
+            );
+        }
+
         return true;
+    }
+
+    private static isJsonObject(value: unknown): value is Record<string, unknown> {
+        return typeof value === 'object' && value != null && !Array.isArray(value);
+    }
+
+
+    private static resolvePayload(request: Request): Record<string, unknown> {
+        if (AccessGuard.isJsonObject(request.body) && Object.keys(request.body).length > 0) {
+            return request.body;
+        }
+
+        const date = request.headers[FspiopHeaders.Names.DATE];
+
+        return {
+            date: date != null ? String(date) : '',
+        };
+    }
+
+    private static decodeTokenPayload(encodedPayload: string): Record<string, unknown> {
+        try {
+            const decoded = Jwt.decode(encodedPayload);
+            const payload = JSON.parse(decoded) as unknown;
+
+            if (!AccessGuard.isJsonObject(payload)) {
+                throw new Error('JWT payload must be a JSON object.');
+            }
+
+            return payload;
+        } catch {
+            throw new FspiopException(
+                FspiopErrors.MALFORMED_SYNTAX,
+                'Header authorization payload must be a valid JSON object.',
+            );
+        }
+    }
+
+    private static toCanonicalJson(value: unknown): string {
+        if (Array.isArray(value)) {
+            return `[${value.map((item) => AccessGuard.toCanonicalJson(item)).join(',')}]`;
+        }
+
+        if (AccessGuard.isJsonObject(value)) {
+            const entries = Object.entries(value)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, item]) => `${JSON.stringify(key)}:${AccessGuard.toCanonicalJson(item)}`);
+
+            return `{${entries.join(',')}}`;
+        }
+
+        return JSON.stringify(value);
     }
 }
