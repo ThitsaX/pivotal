@@ -2,6 +2,7 @@ import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param,
 import { CommandBus, ICommand } from '@nestjs/cqrs';
 import { HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand, } from '@core/inbound/domain';
 import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest, } from '@shared/fspiop';
+import { MdcContext } from '@shared/foundation';
 
 @Controller('transfers')
 export class TransfersController {
@@ -38,6 +39,7 @@ export class TransfersController {
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: TransfersPostRequest): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: request.transferId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Post Transfer Request for TransferId ${request.transferId} : ${JSON.stringify(request)}`,
@@ -49,6 +51,7 @@ export class TransfersController {
             return new HandlePostTransfersCommand(
                 new HandlePostTransfersCommand.Input(correlationId, payerFsp, payeeFsp, request),
             );
+            });
         });
     }
 
@@ -61,6 +64,7 @@ export class TransfersController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() response: TransfersIDPatchResponse,
     ): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Patch Transfer Request for TransferId ${transferId} : ${JSON.stringify(response)}`,
@@ -72,6 +76,7 @@ export class TransfersController {
             return new HandlePatchTransfersCommand(
                 new HandlePatchTransfersCommand.Input(correlationId, payerFsp, payeeFsp, transferId, response),
             );
+            });
         });
     }
 
@@ -84,6 +89,7 @@ export class TransfersController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Put Transfer Error Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
@@ -102,6 +108,7 @@ export class TransfersController {
                     error,
                 ),
             );
+            });
         });
     }
 
@@ -114,6 +121,7 @@ export class TransfersController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: TransfersIDPutResponse,
     ): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, () => {
         this.dispatch(() => {
             const correlationId = TransfersController.optionalHeaderValue(traceparentHeader);
             const payerFsp = TransfersController.headerValue(destinationHeader);
@@ -128,6 +136,7 @@ export class TransfersController {
                     request,
                 ),
             );
+            });
         });
     }
 

@@ -3,6 +3,7 @@ import {CommandBus} from '@nestjs/cqrs';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
 import {FspiopException} from '@shared/fspiop';
 import {NatsClientService} from '@shared/nats';
+import {MdcContext} from '@shared/foundation';
 import {ConnectorSettings, PerformPatchTransfersCommand} from '../../domain';
 import {ConnectorPatchTransfersPublisher} from '../../publisher';
 import {resolveFspiopStream} from './fspiop-stream.resolver';
@@ -79,30 +80,31 @@ export class ConnectorPatchTransfersListener implements OnModuleInit {
 
     private async consume(messages: ConsumerMessages): Promise<void> {
         for await (const msg of messages) {
-            try {
-                const message = this.nats.codec.decode(msg.data) as ConnectorPatchTransfersPublisher.Message;
-
-                await this.commandBus.execute(
-                    new PerformPatchTransfersCommand(
-                        new PerformPatchTransfersCommand.Input(
-                            message.correlationId,
-                            message.payerFsp,
-                            message.payeeFsp,
-                            message.transferId,
-                            message.response,
+            const message = this.nats.codec.decode(msg.data) as ConnectorPatchTransfersPublisher.Message;
+            await MdcContext.run({[MdcContext.TRANSFER_ID]: message.transferId}, async () => {
+                try {
+                    await this.commandBus.execute(
+                        new PerformPatchTransfersCommand(
+                            new PerformPatchTransfersCommand.Input(
+                                message.correlationId,
+                                message.payerFsp,
+                                message.payeeFsp,
+                                message.transferId,
+                                message.response,
+                            ),
                         ),
-                    ),
-                );
+                    );
 
-                msg.ack();
-            } catch (error) {
-                if (error instanceof FspiopException) {
                     msg.ack();
-                } else {
-                    this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
-                    msg.nak();
+                } catch (error) {
+                    if (error instanceof FspiopException) {
+                        msg.ack();
+                    } else {
+                        this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
+                        msg.nak();
+                    }
                 }
-            }
+            });
         }
     }
 }

@@ -3,6 +3,7 @@ import {CommandBus} from '@nestjs/cqrs';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
 import {FspiopException} from '@shared/fspiop';
 import {NatsClientService} from '@shared/nats';
+import {MdcContext} from '@shared/foundation';
 import {ConnectorSettings, PerformGetPartiesCommand} from '../../domain';
 import {ConnectorGetPartiesPublisher} from '../../publisher';
 import {resolveFspiopStream} from './fspiop-stream.resolver';
@@ -79,31 +80,33 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
 
     private async consume(messages: ConsumerMessages): Promise<void> {
         for await (const msg of messages) {
-            try {
-                const message = this.nats.codec.decode(msg.data) as ConnectorGetPartiesPublisher.Message;
-
-                await this.commandBus.execute(
-                    new PerformGetPartiesCommand(
-                        new PerformGetPartiesCommand.Input(
-                            message.correlationId,
-                            message.payerFsp,
-                            message.payeeFsp,
-                            message.partyIdType,
-                            message.partyId,
-                            message.subId,
+            const message = this.nats.codec.decode(msg.data) as ConnectorGetPartiesPublisher.Message;
+            const idValue = message.subId ? `${message.partyId} ${message.subId}` : message.partyId;
+            await MdcContext.run({[MdcContext.ID_VALUE]: idValue}, async () => {
+                try {
+                    await this.commandBus.execute(
+                        new PerformGetPartiesCommand(
+                            new PerformGetPartiesCommand.Input(
+                                message.correlationId,
+                                message.payerFsp,
+                                message.payeeFsp,
+                                message.partyIdType,
+                                message.partyId,
+                                message.subId,
+                            ),
                         ),
-                    ),
-                );
+                    );
 
-                msg.ack();
-            } catch (error) {
-                if (error instanceof FspiopException) {
                     msg.ack();
-                } else {
-                    this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
-                    msg.nak();
+                } catch (error) {
+                    if (error instanceof FspiopException) {
+                        msg.ack();
+                    } else {
+                        this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
+                        msg.nak();
+                    }
                 }
-            }
+            });
         }
     }
 }
