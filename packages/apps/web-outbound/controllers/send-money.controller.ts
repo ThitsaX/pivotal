@@ -3,6 +3,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
 import { FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
+import { MdcContext } from '@shared/foundation';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsOptional, ValidateIf } from 'class-validator';
 
@@ -70,7 +71,9 @@ export class SendMoneyController {
             new PostSendMoneyCommand(input),
         );
 
-        this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
+        MdcContext.run({[MdcContext.TRANSFER_ID]: output.response.transferId}, () => {
+            this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
+        });
 
         return output.response;
     }
@@ -80,6 +83,7 @@ export class SendMoneyController {
         @Param('transferId') transferId: string,
         @Body() request: PutSendMoneyRequest,
     ): Promise<SendMoneyResponse> {
+        return MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, async () => {
         if (request.acceptParty != null) {
             this.logger.log(
                 `Put SendMoney Accept Party Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
@@ -121,5 +125,6 @@ export class SendMoneyController {
                 ],
             },
         );
+        });
     }
 }
