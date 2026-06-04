@@ -1,10 +1,10 @@
-import {ConfigService} from '@nestjs/config';
-import {OutboundSettings} from '@core/outbound/domain';
-import {CentralLedgerAxiosParams} from '@shared/central-ledger';
-import {TypeOrmSettings} from '@shared/typeorm/component/typeorm-settings';
-import {FspiopAxiosParams, FspiopSettings,} from '@shared/fspiop';
-import type {WebOutboundModule} from './web-outbound.module';
-import {JwtPolicy} from './component';
+import { ConfigService } from '@nestjs/config';
+import { OutboundSettings } from '@core/outbound/domain';
+import { CentralLedgerAxiosParams } from '@shared/central-ledger';
+import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
+import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
+import type { WebOutboundModule } from './web-outbound.module';
+import { JwtPolicy } from './component';
 
 export class WebOutboundSettings
     implements WebOutboundModule.RequiredSettings {
@@ -43,6 +43,10 @@ export class WebOutboundSettings
         const connectionTimeoutMs = this.readPositiveInteger('FSPIOP_CONNECTION_TIMEOUT_MS');
         const verifyServerCertificate = this.readRequiredBoolean('FSPIOP_TLS_VERIFY_SERVER_CERT');
         const verifyDomain = this.readRequiredBoolean('FSPIOP_TLS_VERIFY_DOMAIN');
+        const prefixOracleAxiosParams = {
+            socketTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_SOCKET_TIMEOUT_MS'),
+            connectionTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_CONNECTION_TIMEOUT_MS'),
+        };
 
         const fspiopAxiosParams: FspiopAxiosParams = {
             socketTimeoutMs,
@@ -61,7 +65,10 @@ export class WebOutboundSettings
                 this.readRequiredString('FSPIOP_TRANSFERS_URL'),
                 this.readRequiredBoolean('FSPIOP_USE_JWS'),
                 this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS')
-            ), fspiopAxiosParams
+            ),
+            fspiopAxiosParams,
+            this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
+            prefixOracleAxiosParams,
         );
     }
 

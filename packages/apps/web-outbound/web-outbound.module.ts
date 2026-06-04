@@ -1,12 +1,12 @@
-import {DynamicModule, Module, Provider} from '@nestjs/common';
-import {OutboundDomainModule} from '@core/outbound/domain';
-import {ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore,} from '@core/participant/domain';
-import {AccessGuard, JwtPolicy} from './component';
-import {SendMoneyController} from './controllers';
-import {WebOutboundSettings} from './required.settings';
-import {AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore} from '@shared/security';
-import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
-import {FspiopMtlsCaStore, FspiopMtlsClientCertStore} from "@shared/fspiop";
+import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { OutboundDomainModule } from '@core/outbound/domain';
+import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
+import { AccessGuard, JwtPolicy } from './component';
+import { DfspListController, SendMoneyController } from './controllers';
+import { WebOutboundSettings } from './required.settings';
+import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
+import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
+import { FspiopMtlsCaStore, FspiopMtlsClientCertStore } from "@shared/fspiop";
 
 const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 
@@ -15,8 +15,8 @@ export class WebOutboundModule {
 
     static forRoot(): DynamicModule {
         return WebOutboundModule.forRootAsync({
-                                                  useFactory: (): WebOutboundModule.RequiredSettings => new WebOutboundSettings(),
-                                              });
+            useFactory: (): WebOutboundModule.RequiredSettings => new WebOutboundSettings(),
+        });
     }
 
     static forRootAsync(asyncOptions: WebOutboundModule.AsyncOptions): DynamicModule {
@@ -45,7 +45,7 @@ export class WebOutboundModule {
                 outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [SendMoneyController],
+            controllers: [SendMoneyController, DfspListController],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],
