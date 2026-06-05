@@ -10,7 +10,7 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
     errors:  ValidationError[];
 }> {
     const request = plainToInstance(PutSendMoneyRequest, body);
-    const errors = await validate(request);
+    const errors = await validate(request, {whitelist: true});
 
     return {request, errors};
 }
@@ -45,6 +45,19 @@ describe('PutSendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
         assert.equal(request.amount, '12.34');
+    });
+
+    it('keeps extensionList when acceptParty is true', async () => {
+        const extensionList = {
+            extension: [
+                {key: 'payerFee', value: '1.23'},
+                {key: 'payerFeeCurrency', value: 'USD'},
+            ],
+        };
+        const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});
+
+        assert.deepEqual(errors, []);
+        assert.deepEqual(request.extensionList, extensionList);
     });
 
     it('strips trailing fractional zeros so 44.40 is accepted as 44.4', async () => {
