@@ -1,9 +1,11 @@
 import { CanActivate, ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { FspiopErrors, FspiopException, FspiopHeaders } from '@shared/fspiop';
 import { Jwt } from '@shared/security/component/jwt';
 import { Request } from 'express';
 import { AccessKeyStore } from '@shared/security';
 import { JwtPolicy } from './jwt-policy';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 export class AccessGuard implements CanActivate {
 
@@ -12,10 +14,20 @@ export class AccessGuard implements CanActivate {
     constructor(
         private readonly accessKeyStore: AccessKeyStore,
         private readonly policy: JwtPolicy,
+        private readonly reflector: Reflector,
     ) {
     }
 
     canActivate(context: ExecutionContext): boolean {
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+
+        if (isPublic) {
+            return true;
+        }
+
         if (!this.policy.enabled) {
             return true;
         }
