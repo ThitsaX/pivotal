@@ -8,6 +8,7 @@ import {FspParty} from '../../../../../packages/core/outbound/domain/dto';
 import {
     AmountType,
     Currency,
+    ExtensionList,
     Money,
     Party,
     PartyIdInfo,
@@ -70,7 +71,14 @@ describe('PutAcceptPartyHandler', () => {
     it('uses the confirmed acceptParty amount when posting the quote request', async () => {
         const cachedRequest = transferRequest();
         let postedQuoteAmount: string | undefined;
+        let postedQuoteExtensionList: ExtensionList | undefined;
         let savedRequest: TransferRequest | undefined;
+        const extensionList: ExtensionList = {
+            extension: [
+                {key: 'payerFee', value: '1.23'},
+                {key: 'payerFeeCurrency', value: 'USD'},
+            ],
+        };
 
         const callback = new QuotesIDPutResponse();
         callback.transferAmount = money('44.44');
@@ -80,8 +88,13 @@ describe('PutAcceptPartyHandler', () => {
         const handler = new PutAcceptPartyHandler(
             {
                 settings: {quotesUrl: 'http://quotes'},
-                async postQuotes(_url: string, _headers: unknown, body: {amount?: Money}): Promise<void> {
+                async postQuotes(
+                    _url: string,
+                    _headers: unknown,
+                    body: {amount?: Money; extensionList?: ExtensionList},
+                ): Promise<void> {
                     postedQuoteAmount = body.amount?.amount;
+                    postedQuoteExtensionList = body.extensionList;
                 },
             } as never,
             {
@@ -109,10 +122,11 @@ describe('PutAcceptPartyHandler', () => {
         );
 
         const output = await handler.execute(
-            new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, ' 44.44 ')),
+            new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, ' 44.44 ', extensionList)),
         );
 
         assert.equal(postedQuoteAmount, '44.44');
+        assert.deepEqual(postedQuoteExtensionList, extensionList);
         assert.equal(savedRequest?.amount, '44.44');
         assert.equal(output.response.amount, '44.44');
     });
