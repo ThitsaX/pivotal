@@ -70,6 +70,7 @@ export class WebOutboundSettings
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
             this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
+            this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0
         );
     }
 
@@ -136,6 +137,20 @@ export class WebOutboundSettings
 
         if (!Number.isInteger(parsed) || parsed <= 0) {
             throw new Error(`Invalid environment variable ${name}: expected a positive integer.`);
+        }
+
+        return parsed;
+    }
+
+    private readNonNegativeInteger(name: string): number | undefined {
+        const value = this.configService.get<string>(name);
+        if (value == null || value.trim().length === 0) {
+            return undefined;
+        }
+
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+            throw new Error(`Invalid environment variable ${name}: expected a non-negative integer.`);
         }
 
         return parsed;

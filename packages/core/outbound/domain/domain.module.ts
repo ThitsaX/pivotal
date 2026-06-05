@@ -4,7 +4,7 @@ import { AuditProducerModule } from '@core/audit/producer';
 import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
-import { OutboundSettings, PrefixOracleClient, RedisClient } from './component';
+import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
@@ -64,6 +64,12 @@ export class OutboundDomainModule {
                 useFactory: (outboundSettings: OutboundSettings): RedisClient => {
                     return new RedisClient(outboundSettings.redisUrl, outboundSettings.redisCacheItemTimeoutMs);
                 },
+                inject: [OutboundSettings],
+            },
+            {
+                provide: AmountDecimalValidator,
+                useFactory: (outboundSettings: OutboundSettings): AmountDecimalValidator =>
+                    new AmountDecimalValidator(outboundSettings.amountDecimalPlaces),
                 inject: [OutboundSettings],
             },
             {
