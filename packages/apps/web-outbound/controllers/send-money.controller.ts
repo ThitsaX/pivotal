@@ -2,8 +2,8 @@ import { Body, Controller, Headers, Inject, Logger, Param, Post, Put } from '@ne
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
-import { FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { MdcContext } from '@shared/foundation';
+import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsOptional, ValidateIf } from 'class-validator';
 
@@ -17,6 +17,9 @@ export class PutSendMoneyRequest {
     @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
     @IsFspiopAmount()
     amount?: string;
+
+    @IsOptional()
+    extensionList?: ExtensionList;
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
@@ -90,7 +93,12 @@ export class SendMoneyController {
             );
             const output: PutAcceptPartyCommand.Output = await this.commandBus.execute(
                 new PutAcceptPartyCommand(
-                    new PutAcceptPartyCommand.Input(transferId, request.acceptParty, request.amount ?? ''),
+                    new PutAcceptPartyCommand.Input(
+                        transferId,
+                        request.acceptParty,
+                        request.amount ?? '',
+                        request.extensionList,
+                    ),
                 ),
             );
             this.logger.log(
