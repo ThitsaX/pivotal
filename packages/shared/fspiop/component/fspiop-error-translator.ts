@@ -6,9 +6,6 @@ import { FspiopException } from '../exception/fspiop-exception';
 
 export class FspiopErrorTranslator {
 
-    private static readonly TRANSACTION_ID_KEY = 'transaction_id';
-    private static readonly MESSAGE_KEY = 'message';
-
     private constructor() {
     }
 
@@ -81,16 +78,16 @@ export class FspiopErrorTranslator {
             extensions.push(extension);
         };
 
-        if (normalizedTransactionId != null && normalizedTransactionId.length > 0) {
-            upsertExtension(
-                FspiopErrorTranslator.TRANSACTION_ID_KEY,
-                normalizedTransactionId,
-            );
-        }
+        // if (normalizedTransactionId != null && normalizedTransactionId.length > 0) {
+        //     upsertExtension(
+        //         FspiopErrorTranslator.TRANSACTION_ID_KEY,
+        //         normalizedTransactionId,
+        //     );
+        // }
 
         if (normalizedMessage != null && normalizedMessage.length > 0) {
             upsertExtension(
-                FspiopErrorTranslator.MESSAGE_KEY,
+                "",
                 normalizedMessage,
             );
         }
