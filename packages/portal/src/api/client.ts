@@ -1,25 +1,11 @@
-type PivotalRuntimeConfig = {
-    WEB_PIVOTAL_API_BASE_URL?: string;
-    VITE_WEB_PIVOTAL_API_BASE_URL?: string;
-};
-
-declare global {
-    interface Window {
-        __PIVOTAL_CONFIG__?: PivotalRuntimeConfig;
-    }
-}
+import {getPivotalRuntimeConfig, optionalEnv} from '../configs/pivotal-runtime-config';
 
 const DEFAULT_API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3202`;
-
-function optionalEnv(value: string | undefined): string | undefined {
-    const normalized = value?.trim();
-
-    return normalized != null && normalized.length > 0 ? normalized : undefined;
-}
+const runtimeConfig = getPivotalRuntimeConfig();
 
 export const API_BASE_URL = (
-    optionalEnv(window.__PIVOTAL_CONFIG__?.WEB_PIVOTAL_API_BASE_URL)
-    ?? optionalEnv(window.__PIVOTAL_CONFIG__?.VITE_WEB_PIVOTAL_API_BASE_URL)
+    optionalEnv(runtimeConfig.WEB_PIVOTAL_API_BASE_URL)
+    ?? optionalEnv(runtimeConfig.VITE_WEB_PIVOTAL_API_BASE_URL)
     ?? optionalEnv(import.meta.env.VITE_WEB_PIVOTAL_API_BASE_URL as string | undefined)
     ?? optionalEnv(import.meta.env.VITE_AUDIT_API_BASE_URL as string | undefined)
     ?? DEFAULT_API_BASE_URL

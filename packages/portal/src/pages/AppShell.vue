@@ -80,8 +80,21 @@ const visibleGroups = computed((): MenuGroup[] => {
             groups.push({label: group.label, menus: visibleMenus});
         }
     }
-
     return groups;
+});
+
+const visibleMenuKeys = computed((): Set<ViewKey> => {
+    const keys = new Set<ViewKey>();
+
+    for (const group of visibleGroups.value) {
+        for (const menu of group.menus) {
+            if (isKnownViewKey(menu.key)) {
+                keys.add(menu.key);
+            }
+        }
+    }
+
+    return keys;
 });
 
 const isMenuEmpty = computed((): boolean => {
@@ -106,10 +119,20 @@ const activeViewKey = computed((): ViewKey | null => {
 
 const isDashboardActive = computed((): boolean => activeViewKey.value === null);
 
+const isActiveViewAllowed = computed((): boolean => {
+    const key = activeViewKey.value;
+
+    if (key == null) {
+        return true;
+    }
+
+    return visibleMenuKeys.value.has(key);
+});
+
 const activePageComponent = computed((): Component | null => {
     const key = activeViewKey.value;
 
-    if (key === null) {
+    if (key === null || !isActiveViewAllowed.value) {
         return null;
     }
 
@@ -185,6 +208,16 @@ watch(visibleGroups, async (): Promise<void> => {
     await nextTick();
     updateSidebarScrollIndicator();
 });
+
+watch(
+    [activeViewKey, isActiveViewAllowed],
+    ([key, allowed]): void => {
+        if (key != null && !allowed) {
+            void router.replace('/');
+        }
+    },
+    {immediate: true},
+);
 
 const closeSidebarOnMobile = (): void => {
     if (window.innerWidth < DESKTOP_BREAKPOINT) {

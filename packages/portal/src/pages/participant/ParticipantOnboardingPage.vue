@@ -2,6 +2,7 @@
 import {computed, reactive, ref} from 'vue';
 import CurrencySelector from '../../components/CurrencySelector.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
+import {SIGNING_KEYS_UI_ENABLED} from '../../configs/pivotal-runtime-config';
 import {VIEW_BY_KEY} from '../../modules/audit/view-definitions';
 import {
     PARTICIPANT_CURRENCY_OPTIONS,
@@ -41,12 +42,15 @@ const responsePayload = ref<unknown>({
 const lastSubmittedAt = ref<string | null>(null);
 
 const requestPreview = computed(() => {
+    const jwsPublicKey = form.jwsPublicKey.trim();
+    const jwsPrivateKey = form.jwsPrivateKey.trim();
+
     return {
         name: form.name.trim(),
         currencies: selectedCurrencies.value,
         endpoint: form.endpoint.trim(),
-        jwsPublicKey: form.jwsPublicKey.trim(),
-        jwsPrivateKey: form.jwsPrivateKey.trim(),
+        ...(SIGNING_KEYS_UI_ENABLED && jwsPublicKey.length > 0 ? {jwsPublicKey} : {}),
+        ...(SIGNING_KEYS_UI_ENABLED && jwsPrivateKey.length > 0 ? {jwsPrivateKey} : {}),
         accessPublicKey: form.accessPublicKey.trim(),
     };
 });
@@ -54,8 +58,11 @@ const requestPreview = computed(() => {
 const canSubmit = computed((): boolean => {
     return form.name.trim().length > 0
         && form.endpoint.trim().length > 0
-        && form.jwsPublicKey.trim().length > 0
-        && form.jwsPrivateKey.trim().length > 0
+        && (!SIGNING_KEYS_UI_ENABLED
+            || (
+                form.jwsPublicKey.trim().length > 0
+                && form.jwsPrivateKey.trim().length > 0
+            ))
         && form.accessPublicKey.trim().length > 0
         && !keyGenerationLoading.value
         && !loading.value;
@@ -291,7 +298,10 @@ const submit = async (): Promise<void> => {
                     </div>
                 </section>
 
-                <section class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5">
+                <section
+                    v-if="SIGNING_KEYS_UI_ENABLED"
+                    class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5"
+                >
                     <div class="flex flex-col gap-3 border-b border-accent/15 pb-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
