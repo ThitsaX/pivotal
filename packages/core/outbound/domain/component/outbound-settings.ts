@@ -9,7 +9,8 @@ export class OutboundSettings {
         public readonly fspiopAxiosParams: FspiopAxiosParams,
         public readonly prefixOracleEndpoint: string,
         public readonly prefixOracleAxiosParams: AxiosClientBuilderParams,
-        public readonly prefixOracleCacheTtlMs: number
+        public readonly prefixOracleCacheTtlMs: number,
+        public readonly amountDecimalPlaces: number
     ) {
     }
 }
