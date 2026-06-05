@@ -1,14 +1,19 @@
-import {DynamicModule, Module, Provider} from '@nestjs/common';
-import {CqrsModule} from '@nestjs/cqrs';
-import {AuditProducerModule} from '@core/audit/producer';
-import {FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor,} from '@shared/fspiop';
-import {PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler} from './command';
-import {AmountDecimalValidator, OutboundSettings, RedisClient} from './component';
+import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+import { AuditProducerModule } from '@core/audit/producer';
+import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
+import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
+import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
+import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
 import * as https from "node:https";
-import {CaStore, ClientCertStore, PrivateKeyStore} from "@shared/security";
+import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
+const QueryHandlers = [
+    GetDfspListByUsecaseHandler,
+    GetDfspListHandler,
+];
 
 @Module({})
 export class OutboundDomainModule {
@@ -19,15 +24,15 @@ export class OutboundDomainModule {
             imports: [
                 CqrsModule,
                 FspiopPubSubModule.forRootAsync({
-                                                    imports: asyncOptions.imports ?? [],
-                                                    inject: asyncOptions.inject ?? [],
-                                                    useFactory: asyncOptions.useFactory,
-                                                }),
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 AuditProducerModule.forRootAsync({
-                                                     imports: asyncOptions.imports ?? [],
-                                                     inject: asyncOptions.inject ?? [],
-                                                     useFactory: asyncOptions.useFactory,
-                                                 }),
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [
@@ -67,6 +72,18 @@ export class OutboundDomainModule {
                     new AmountDecimalValidator(outboundSettings.amountDecimalPlaces),
                 inject: [OutboundSettings],
             },
+            {
+                provide: PrefixOracleClient,
+                useFactory: (outboundSettings: OutboundSettings, redisClient: RedisClient): PrefixOracleClient => {
+                    return new PrefixOracleClient(
+                        outboundSettings.prefixOracleEndpoint,
+                        outboundSettings.prefixOracleAxiosParams,
+                        redisClient,
+                        outboundSettings.prefixOracleCacheTtlMs,
+                    );
+                },
+                inject: [OutboundSettings, RedisClient],
+            },
             ...(asyncOptions.providers ?? []),
             {
                 provide: FspiopAxios,
@@ -94,7 +111,7 @@ export class OutboundDomainModule {
                                     rejectUnauthorized: params.verifyServerCertificate,
                                     timeout: params.connectionTimeoutMs,
                                     ...(params.verifyDomain === false
-                                        ? {checkServerIdentity: () => undefined}
+                                        ? { checkServerIdentity: () => undefined }
                                         : {}),
                                 })
                             : undefined;
@@ -103,7 +120,7 @@ export class OutboundDomainModule {
                 },
                 inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore],
             },
-            ...CommandHandlers,
+            ...CommandHandlers, ...QueryHandlers,
         ];
     }
 }
@@ -112,7 +129,7 @@ export namespace OutboundDomainModule {
 
     export interface RequiredSettings
         extends FspiopPubSubModule.RequiredSettings,
-            AuditProducerModule.RequiredSettings {
+        AuditProducerModule.RequiredSettings {
 
         outboundSettings(): OutboundSettings;
     }
