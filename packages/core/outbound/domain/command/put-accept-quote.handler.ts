@@ -37,6 +37,8 @@ export class PutAcceptQuoteHandler
         private readonly redisClient: RedisClient,
         @Inject(AuditTransactionPublisher)
         private readonly auditPublisher: AuditTransactionPublisher,
+        @Inject(AmountDecimalValidator)
+        private readonly amountDecimalValidator: AmountDecimalValidator,
     ) {
     }
 
@@ -120,7 +122,7 @@ export class PutAcceptQuoteHandler
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const { transfersUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
-        AmountDecimalValidator.validate(transfersPostRequest.amount);
+        this.amountDecimalValidator.validate(transfersPostRequest.amount);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(

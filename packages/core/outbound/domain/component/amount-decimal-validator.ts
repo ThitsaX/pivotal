@@ -1,37 +1,32 @@
-import { FspiopErrors, FspiopException, Money } from '@shared/fspiop';
+import { FspiopErrors, FspiopException, FspiopMoney, Money } from '@shared/fspiop';
 
 export class AmountDecimalValidator {
 
-   private static readonly ENV_SEND_MONEY_AMOUNT_DECIMAL_PLACES = 'DECIMAL_PLACES';
-   static validate(amount: string | Money | null | undefined): void {
-      const amountValue = typeof amount === 'string'
-         ? amount
-         : amount?.amount;
+    constructor(private readonly allowedDecimalPlaces: number) {
+    }
 
-      if (amountValue == null || amountValue.trim().length === 0) {
-         return;
-      }
+    validate(amount: string | Money | null | undefined): void {
+        const amountValue = typeof amount === 'string'
+            ? amount
+            : amount?.amount;
 
-      const allowedDecimalPlaces = AmountDecimalValidator.allowedDecimalPlaces();
-      const actualDecimalPlaces = AmountDecimalValidator.decimalPlaces(amountValue);
+        if (amountValue == null || amountValue.trim().length === 0) {
+            return;
+        }
 
-      if (actualDecimalPlaces > allowedDecimalPlaces) {
-         throw new FspiopException(
-            FspiopErrors.ROUNDING_VALUE_ERROR
-         );
-      }
-   }
+        // Normalize first so trailing zeros are not counted as decimals (e.g. 128.00 -> 128).
+        const normalized = FspiopMoney.normalizeAmount(amountValue);
 
-   private static allowedDecimalPlaces(): number {
-      const rawValue = process.env[AmountDecimalValidator.ENV_SEND_MONEY_AMOUNT_DECIMAL_PLACES] ?? '0';
-      const value = Number.parseInt(rawValue, 10);
+        if (AmountDecimalValidator.decimalPlaces(normalized) > this.allowedDecimalPlaces) {
+            throw new FspiopException(
+                FspiopErrors.ROUNDING_VALUE_ERROR,
+            );
+        }
+    }
 
-      return Number.isInteger(value) && value >= 0 ? value : 0;
-   }
+    private static decimalPlaces(amount: string): number {
+        const decimalIndex = amount.indexOf('.');
 
-   private static decimalPlaces(amount: string): number {
-      const decimalIndex = amount.indexOf('.');
-
-      return decimalIndex < 0 ? 0 : amount.length - decimalIndex - 1;
-   }
+        return decimalIndex < 0 ? 0 : amount.length - decimalIndex - 1;
+    }
 }
