@@ -7,30 +7,29 @@ import { GetDfspListByUsecaseQuery } from './get-dfsp-list-by-usecase.query';
 @QueryHandler(GetDfspListByUsecaseQuery)
 export class GetDfspListByUsecaseHandler {
 
-   private readonly logger = new Logger(GetDfspListByUsecaseHandler.name);
+    private readonly logger = new Logger(GetDfspListByUsecaseHandler.name);
 
-   constructor(
-      @Inject(PrefixOracleClient)
-      private readonly prefixOracleClient: PrefixOracleClient,
-   ) {
-   }
+    constructor(
+        @Inject(PrefixOracleClient)
+        private readonly prefixOracleClient: PrefixOracleClient,
+    ) {
+    }
 
-   async execute(query: GetDfspListByUsecaseQuery): Promise<GetDfspListByUsecaseQuery.Output> {
-      const usecase = query.usecase?.trim();
+    async execute(query: GetDfspListByUsecaseQuery): Promise<GetDfspListByUsecaseQuery.Output> {
+        const usecase = query.usecase?.trim();
 
-      if (!usecase) {
-         throw new FspiopException(
-            FspiopErrors.MISSING_MANDATORY_ELEMENT,
-            'usecase is required.',
-         );
-      }
+        if (!usecase) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'usecase is required.',
+            );
+        }
 
-      this.logger.log(`Get DFSP List with usecase: ${usecase}`);
+        this.logger.log(`Get DFSP List with usecase: ${usecase}`);
 
-      const dfspList = await this.prefixOracleClient.getDfspListByUsecase(usecase);
+        const dfspList = await this.prefixOracleClient.getDfspListByUsecase(usecase);
+        
 
-      this.logger.log(`Successfully retrieved DFSP List count: ${dfspList.length}`);
-
-      return dfspList;
-   }
+        return dfspList;
+    }
 }

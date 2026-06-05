@@ -6,21 +6,19 @@ import { GetDfspListQuery } from './get-dfsp-list.query';
 @QueryHandler(GetDfspListQuery)
 export class GetDfspListHandler {
 
-   private readonly logger = new Logger(GetDfspListHandler.name);
+    private readonly logger = new Logger(GetDfspListHandler.name);
 
-   constructor(
-      @Inject(PrefixOracleClient)
-      private readonly prefixOracleClient: PrefixOracleClient,
-   ) {
-   }
+    constructor(
+        @Inject(PrefixOracleClient)
+        private readonly prefixOracleClient: PrefixOracleClient,
+    ) {
+    }
 
-   async execute(): Promise<GetDfspListQuery.Output> {
-      this.logger.log('Get DFSP List');
+    async execute(): Promise<GetDfspListQuery.Output> {
+        this.logger.log('Get DFSP List');
 
-      const dfspList = await this.prefixOracleClient.getDfspList();
+        const dfspList = await this.prefixOracleClient.getDfspList();
 
-      this.logger.log(`Successfully retrieved DFSP List count: ${dfspList.length}`);
-
-      return dfspList;
-   }
+        return dfspList;
+    }
 }

@@ -4,5 +4,5 @@ export class GetDfspListQuery {
 }
 
 export namespace GetDfspListQuery {
-   export type Output = Dfsp[];
+    export type Output = Dfsp[];
 }
