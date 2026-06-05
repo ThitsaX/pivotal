@@ -69,6 +69,7 @@ export class WebOutboundSettings
             fspiopAxiosParams,
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
+            this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
         );
     }
 

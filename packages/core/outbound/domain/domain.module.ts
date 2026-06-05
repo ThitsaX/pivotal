@@ -68,13 +68,15 @@ export class OutboundDomainModule {
             },
             {
                 provide: PrefixOracleClient,
-                useFactory: (outboundSettings: OutboundSettings): PrefixOracleClient => {
+                useFactory: (outboundSettings: OutboundSettings, redisClient: RedisClient): PrefixOracleClient => {
                     return new PrefixOracleClient(
                         outboundSettings.prefixOracleEndpoint,
                         outboundSettings.prefixOracleAxiosParams,
+                        redisClient,
+                        outboundSettings.prefixOracleCacheTtlMs,
                     );
                 },
-                inject: [OutboundSettings],
+                inject: [OutboundSettings, RedisClient],
             },
             ...(asyncOptions.providers ?? []),
             {
