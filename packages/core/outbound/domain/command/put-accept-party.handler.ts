@@ -46,6 +46,8 @@ export class PutAcceptPartyHandler
         private readonly redisClient: RedisClient,
         @Inject(AuditTransactionPublisher)
         private readonly auditPublisher: AuditTransactionPublisher,
+        @Inject(AmountDecimalValidator)
+        private readonly amountDecimalValidator: AmountDecimalValidator,
     ) {
     }
 
@@ -54,7 +56,7 @@ export class PutAcceptPartyHandler
         const transferRequest = await this.getTransferRequest(transferId);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
-        AmountDecimalValidator.validate(transferRequest.amount);
+        this.amountDecimalValidator.validate(transferRequest.amount);
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest, extensionList);

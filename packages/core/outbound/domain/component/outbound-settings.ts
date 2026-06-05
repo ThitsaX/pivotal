@@ -5,7 +5,8 @@ export class OutboundSettings {
         public readonly redisUrl: string,
         public readonly redisCacheItemTimeoutMs: number,
         public readonly fspiopSettings: FspiopSettings,
-        public readonly fspiopAxiosParams: FspiopAxiosParams
+        public readonly fspiopAxiosParams: FspiopAxiosParams,
+        public readonly amountDecimalPlaces: number
     ) {
     }
 }

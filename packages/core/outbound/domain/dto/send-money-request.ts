@@ -2,7 +2,6 @@ import { Transform, Type } from 'class-transformer';
 import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
-import { AmountDecimalValidator } from './../component'
 
 export class SendMoneyRequest {
     @IsNotEmpty()
@@ -27,10 +26,7 @@ export class SendMoneyRequest {
     @IsEnum(Currency)
     currency!: Currency;
 
-    @Transform(({ value }) => {
-        AmountDecimalValidator.validate(value);
-        return typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value;
-    })
+    @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
     @IsFspiopAmount()
     amount!: string;
 
