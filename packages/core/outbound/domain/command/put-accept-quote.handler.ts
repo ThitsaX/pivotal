@@ -17,7 +17,7 @@ import {
     TransfersPostRequest,
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
-import { RedisClient } from '../component';
+import { AmountDecimalValidator, RedisClient } from '../component';
 import { SendMoneyResponse } from '../dto';
 import { PutAcceptQuoteCommand } from './put-accept-quote.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
@@ -37,6 +37,8 @@ export class PutAcceptQuoteHandler
         private readonly redisClient: RedisClient,
         @Inject(AuditTransactionPublisher)
         private readonly auditPublisher: AuditTransactionPublisher,
+        @Inject(AmountDecimalValidator)
+        private readonly amountDecimalValidator: AmountDecimalValidator,
     ) {
     }
 
@@ -120,6 +122,7 @@ export class PutAcceptQuoteHandler
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const { transfersUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
+        this.amountDecimalValidator.validate(transfersPostRequest.amount);
 
         await this.auditPublisher.publish(
             TransactionMessage.request(
