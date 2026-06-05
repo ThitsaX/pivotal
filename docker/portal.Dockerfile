@@ -6,7 +6,9 @@ RUN npm --prefix packages/portal ci
 COPY packages/portal ./packages/portal
 COPY packages/shared ./packages/shared
 ARG VITE_WEB_PIVOTAL_API_BASE_URL
+ARG VITE_SIGNING_KEYS_UI_ENABLED
 ENV VITE_WEB_PIVOTAL_API_BASE_URL=${VITE_WEB_PIVOTAL_API_BASE_URL}
+ENV VITE_SIGNING_KEYS_UI_ENABLED=${VITE_SIGNING_KEYS_UI_ENABLED}
 RUN npm --prefix packages/portal run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
