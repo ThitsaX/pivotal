@@ -59,6 +59,7 @@ export class FspiopErrorType {
     static readonly PAYEE_PERMISSION_ERROR = new FspiopErrorType('5300', 'Payee permission error');
     static readonly ROUNDING_VALUE_ERROR = new FspiopErrorType('5241', "Amount is invalid. Please enter the format specified by the service provider.");
     static readonly GENERIC_PAYEE_BLOCKED_ERROR = new FspiopErrorType('5400', 'Generic Payee blocked error');
+    static readonly INACTIVE_ACCOUNT = new FspiopErrorType('3242', 'Account is not active.');
 
     readonly code: string;
 
