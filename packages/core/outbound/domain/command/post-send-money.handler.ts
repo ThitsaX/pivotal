@@ -18,7 +18,7 @@ import {
     PartyIdInfo,
     PartyPersonalInfo,
 } from '@shared/fspiop';
-import { RedisClient } from '../component';
+import { AmountDecimalValidator, RedisClient } from '../component';
 import { TransferRequest } from '../cache';
 import { FspParty, SendMoneyRequest } from '../dto';
 import { PostSendMoneyCommand } from './post-send-money.command';
@@ -175,6 +175,7 @@ export class PostSendMoneyHandler
         const payerSubId = PostSendMoneyHandler.toSubId(request.from.idSubValue);
         const { partiesUrl, switchId } = this.fspiopAxios.settings;
         const createdAt = new Date();
+        AmountDecimalValidator.validate(request.amount);
 
         const headers = FspiopHeaders.Values.Parties.forRequest(correlationId, source, destination);
         try {
