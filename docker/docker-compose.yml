@@ -163,7 +163,11 @@ services:
       context: ..
       dockerfile: docker/portal.Dockerfile
       args:
-        VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-http://localhost:3202}
+        VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-https://pivotal-api.int.stg-hub.gimpss.com}
+        VITE_SIGNING_KEYS_UI_ENABLED: ${VITE_SIGNING_KEYS_UI_ENABLED:-false}
+    environment:
+      VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-https://pivotal-api.int.stg-hub.gimpss.com}
+      VITE_SIGNING_KEYS_UI_ENABLED: ${VITE_SIGNING_KEYS_UI_ENABLED:-false}
     depends_on:
       web-pivotal:
         condition: service_started

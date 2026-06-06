@@ -12,8 +12,8 @@ export namespace OnboardFspCommand {
             public readonly name: string,
             public readonly currencies: FspiopCurrency[],
             public readonly endpoint: string,
-            public readonly jwsPublicKey: string,
-            public readonly jwsPrivateKey: string,
+            public readonly jwsPublicKey: string | undefined,
+            public readonly jwsPrivateKey: string | undefined,
             public readonly accessPublicKey: string,
         ) {
         }
