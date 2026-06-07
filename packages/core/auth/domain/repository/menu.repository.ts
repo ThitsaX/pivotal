@@ -39,7 +39,10 @@ export class MenuRepository {
     }
 
     async findAllForAdmin(target: DbTarget = DbTarget.Read): Promise<Menu[]> {
-        return this.getRepository(target).find({order: {groupLabel: 'ASC', sortOrder: 'ASC'}});
+        return this.getRepository(target).find({
+            where: {isActive: true},
+            order: {groupLabel: 'ASC', sortOrder: 'ASC'},
+        });
     }
 
     async update(id: string, partial: MenuUpdate): Promise<void> {

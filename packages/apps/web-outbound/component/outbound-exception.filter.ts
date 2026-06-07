@@ -55,7 +55,7 @@ export class OutboundExceptionFilter implements ExceptionFilter {
         errorInformation.statusCode = exception.errorDefinition.errorType.code;
         errorInformation.message = exception.message;
         errorInformation.localeMessage = exception.message;
-        errorInformation.detailedDescription = OutboundExceptionFilter.toDetailedDescription(exception.extensionList);
+        errorInformation.detailedDescription = OutboundExceptionFilter.toDetailedDescription(exception.extensionList) ?? exception.message;
 
         return errorInformation;
     }

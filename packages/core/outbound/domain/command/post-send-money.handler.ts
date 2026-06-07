@@ -18,7 +18,7 @@ import {
     PartyIdInfo,
     PartyPersonalInfo,
 } from '@shared/fspiop';
-import { RedisClient } from '../component';
+import { AmountDecimalValidator, RedisClient } from '../component';
 import { TransferRequest } from '../cache';
 import { FspParty, SendMoneyRequest } from '../dto';
 import { PostSendMoneyCommand } from './post-send-money.command';
@@ -39,6 +39,8 @@ export class PostSendMoneyHandler
         private readonly redisClient: RedisClient,
         @Inject(AuditTransactionPublisher)
         private readonly auditPublisher: AuditTransactionPublisher,
+        @Inject(AmountDecimalValidator)
+        private readonly amountDecimalValidator: AmountDecimalValidator,
     ) {
     }
 
@@ -175,6 +177,7 @@ export class PostSendMoneyHandler
         const payerSubId = PostSendMoneyHandler.toSubId(request.from.idSubValue);
         const { partiesUrl, switchId } = this.fspiopAxios.settings;
         const createdAt = new Date();
+        this.amountDecimalValidator.validate(request.amount);
 
         const headers = FspiopHeaders.Values.Parties.forRequest(correlationId, source, destination);
         try {
