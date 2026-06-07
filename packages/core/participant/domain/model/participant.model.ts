@@ -10,19 +10,19 @@ export class Participant {
     @Column({type: 'varchar', length: 128, name: 'name'})
     public name: string;
 
-    @Column({type: 'text', name: 'jws_public_key'})
-    public jwsPublicKey: string;
+    @Column({type: 'text', name: 'jws_public_key', nullable: true})
+    public jwsPublicKey: string | null;
 
-    @Column({type: 'text', name: 'jws_private_key'})
-    public jwsPrivateKey: string;
+    @Column({type: 'text', name: 'jws_private_key', nullable: true})
+    public jwsPrivateKey: string | null;
 
     @Column({type: 'text', name: 'access_public_key'})
     public accessPublicKey: string;
 
     constructor(
         name: string,
-        jwsPublicKey: string,
-        jwsPrivateKey: string,
+        jwsPublicKey: string | null,
+        jwsPrivateKey: string | null,
         accessPublicKey: string,
         id?: string,
     ) {

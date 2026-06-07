@@ -1,5 +1,5 @@
-import {Logger} from '@nestjs/common';
-import {AxiosError, AxiosResponse, InternalAxiosRequestConfig} from 'axios';
+import { Logger } from '@nestjs/common';
+import { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 interface AxiosRequestConfigWithMetadata extends InternalAxiosRequestConfig {
     metadata?: {
@@ -10,6 +10,10 @@ interface AxiosRequestConfigWithMetadata extends InternalAxiosRequestConfig {
 export class HttpLoggerInterceptor {
 
     private readonly logger: Logger;
+    private static readonly LOG_REDACTED_FIELDS = new Set([
+        'logoBase64',
+    ]);
+
 
     constructor(context = HttpLoggerInterceptor.name) {
         this.logger = new Logger(context);
@@ -93,9 +97,21 @@ export class HttpLoggerInterceptor {
         }
 
         try {
-            return JSON.stringify(value);
+            return JSON.stringify(value, HttpLoggerInterceptor.redactLogValue);
         } catch {
             return String(value);
         }
+    }
+
+    private static redactLogValue(key: string, value: unknown): unknown {
+        if (HttpLoggerInterceptor.LOG_REDACTED_FIELDS.has(key)) {
+            if (typeof value === 'string') {
+                return `[redacted base64 length=${value.length}]`;
+            }
+
+            return '[redacted]';
+        }
+
+        return value;
     }
 }

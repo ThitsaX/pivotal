@@ -29,7 +29,11 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
         this.refreshIntervalMs = ParticipantSigningKeysCache.resolveRefreshIntervalMs();
     }
 
-    private static normalizePem(pem: string): string {
+    private static normalizePem(pem: string | null | undefined): string | undefined {
+        if (pem == null || pem.trim().length === 0) {
+            return undefined;
+        }
+
         return pem.replace(/\\n/g, '\n');
     }
 
@@ -118,9 +122,21 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
                     continue;
                 }
 
-                nextPublicKeysByFspId.set(fspId, ParticipantSigningKeysCache.normalizePem(participant.jwsPublicKey));
-                nextPrivateKeysByFspId.set(fspId, ParticipantSigningKeysCache.normalizePem(participant.jwsPrivateKey));
-                nextAccessPublicKeysByFspId.set(fspId, ParticipantSigningKeysCache.normalizePem(participant.accessPublicKey));
+                const publicKeyPem = ParticipantSigningKeysCache.normalizePem(participant.jwsPublicKey);
+                const privateKeyPem = ParticipantSigningKeysCache.normalizePem(participant.jwsPrivateKey);
+                const accessPublicKeyPem = ParticipantSigningKeysCache.normalizePem(participant.accessPublicKey);
+
+                if (publicKeyPem != null) {
+                    nextPublicKeysByFspId.set(fspId, publicKeyPem);
+                }
+
+                if (privateKeyPem != null) {
+                    nextPrivateKeysByFspId.set(fspId, privateKeyPem);
+                }
+
+                if (accessPublicKeyPem != null) {
+                    nextAccessPublicKeysByFspId.set(fspId, accessPublicKeyPem);
+                }
             }
 
             this.publicKeysByFspId = nextPublicKeysByFspId;

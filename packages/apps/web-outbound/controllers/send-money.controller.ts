@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Inject, Logger, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
@@ -58,6 +58,7 @@ export class SendMoneyController {
     }
 
     @Post()
+    @HttpCode(HttpStatus.OK)
     async post(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: SendMoneyRequest,
