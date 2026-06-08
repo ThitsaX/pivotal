@@ -115,9 +115,10 @@ export class PutAcceptQuoteHandler
     }
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
-        const { transferId, acceptQuote } = command.input;
+        const { transferId, acceptQuote, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
+        PutAcceptQuoteHandler.assertSourceCanActForPayer(requestSource, source);
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const { transfersUrl } = this.fspiopAxios.settings;
@@ -227,5 +228,18 @@ export class PutAcceptQuoteHandler
         }
 
         return transferRequest;
+    }
+
+    private static assertSourceCanActForPayer(requestSource: string | undefined, payerFsp: string): void {
+        const normalizedSource = requestSource?.trim();
+
+        if (normalizedSource == null || normalizedSource.length === 0 || normalizedSource === payerFsp) {
+            return;
+        }
+
+        throw new FspiopException(
+            FspiopErrors.PAYER_PERMISSION_ERROR,
+            `fspiop-source '${normalizedSource}' is not authorized to act for payer FSP '${payerFsp}'.`,
+        );
     }
 }
