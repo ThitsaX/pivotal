@@ -52,12 +52,13 @@ export class PutAcceptPartyHandler
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
-        const { transferId, acceptParty, amount, extensionList } = command.input;
+        const { transferId, acceptParty, amount, extensionList, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+        const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
+        PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         this.amountDecimalValidator.validate(transferRequest.amount);
-        const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest, extensionList);
         const { quoteId } = quoteRequest;
@@ -169,6 +170,19 @@ export class PutAcceptPartyHandler
         }
 
         return transferRequest;
+    }
+
+    private static assertSourceCanActForPayer(requestSource: string | undefined, payerFsp: string): void {
+        const normalizedSource = requestSource?.trim();
+
+        if (normalizedSource == null || normalizedSource.length === 0 || normalizedSource === payerFsp) {
+            return;
+        }
+
+        throw new FspiopException(
+            FspiopErrors.PAYER_PERMISSION_ERROR,
+            `fspiop-source '${normalizedSource}' is not authorized to act for payer FSP '${payerFsp}'.`,
+        );
     }
 
     private static getFspId(party: Party | undefined, label: string): string {
