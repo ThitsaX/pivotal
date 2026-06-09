@@ -7,7 +7,7 @@ import {Transform} from 'class-transformer';
 import {FspiopMoney, IsFspiopAmount} from '../../../../packages/shared/fspiop';
 
 class AmountHolder {
-    @Transform(({value}) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
+    @Transform(({value}) => typeof value === 'string' || typeof value === 'number' ? FspiopMoney.normalizeAmount(value) : value)
     @IsFspiopAmount()
     amount!: unknown;
 }
@@ -66,16 +66,17 @@ describe('IsFspiopAmount', () => {
         assert.ok(messages(errors).includes('amount is required'));
     });
 
-    it('reports "amount must be a string" when the value is a number', async () => {
-        const {errors} = await validateAmount(500);
+    it('accepts and normalizes a numeric amount', async () => {
+        const {instance, errors} = await validateAmount(500.5);
 
-        assert.ok(messages(errors).includes('amount must be a string'));
+        assert.deepEqual(errors, []);
+        assert.equal(instance.amount, '500.5');
     });
 
-    it('reports "amount must be a string" when the value is a boolean', async () => {
+    it('reports "amount must be a string or number" when the value is a boolean', async () => {
         const {errors} = await validateAmount(true);
 
-        assert.ok(messages(errors).includes('amount must be a string'));
+        assert.ok(messages(errors).includes('amount must be a string or number'));
     });
 
     it('reports the pattern error for the literal string "NULL"', async () => {
