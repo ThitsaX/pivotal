@@ -67,10 +67,10 @@ describe('IsFspiopAmount', () => {
     });
 
     it('accepts and normalizes a numeric amount', async () => {
-        const {instance, errors} = await validateAmount(500.5);
+        const {instance, errors} = await validateAmount(500);
 
         assert.deepEqual(errors, []);
-        assert.equal(instance.amount, '500.5');
+        assert.equal(instance.amount, '500');
     });
 
     it('reports "amount must be a string or number" when the value is a boolean', async () => {

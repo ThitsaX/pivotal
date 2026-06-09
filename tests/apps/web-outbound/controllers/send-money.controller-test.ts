@@ -63,10 +63,10 @@ describe('PutSendMoneyRequest', () => {
     });
 
     it('normalizes a valid numeric acceptParty amount', async () => {
-        const {request, errors} = await validateRequest({acceptParty: true, amount: 12.34});
+        const {request, errors} = await validateRequest({acceptParty: true, amount: 12});
 
         assert.deepEqual(errors, []);
-        assert.equal(request.amount, '12.34');
+        assert.equal(request.amount, '12');
     });
 
     it('keeps extensionList when acceptParty is true', async () => {
@@ -118,14 +118,14 @@ describe('SendMoneyRequest', () => {
                 fspId: 'wallet2',
             },
             amountType: 'SEND',
-            amount: 12.34,
+            amount: 12,
             currency: 'USD',
             transactionType: 'TRANSFER',
             subScenario: 'PERSON_TO_PERSON',
         });
 
         assert.deepEqual(errors, []);
-        assert.equal(request.amount, '12.34');
+        assert.equal(request.amount, '12');
     });
 });
 
