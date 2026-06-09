@@ -89,8 +89,9 @@ export class FspiopMoney {
         }
     }
 
-    static normalizeAmount(amount: string): string {
-        const trimmed = amount.trim();
+    static normalizeAmount(amount: string | number): string {
+        const amountText = typeof amount === 'number' ? amount.toString() : amount;
+        const trimmed = amountText.trim();
         const matches = trimmed.match(/^([+-])?(\d+)(?:\.(\d+))?$/);
 
         if (matches == null) {

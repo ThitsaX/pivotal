@@ -26,7 +26,7 @@ export class SendMoneyRequest {
     @IsEnum(Currency)
     currency!: Currency;
 
-    @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
+    @Transform(({ value }) => typeof value === 'string' || typeof value === 'number' ? FspiopMoney.normalizeAmount(value) : value)
     @IsFspiopAmount()
     amount!: string;
 

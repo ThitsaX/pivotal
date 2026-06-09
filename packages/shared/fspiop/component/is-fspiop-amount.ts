@@ -11,7 +11,7 @@ import {FspiopMoney} from './fspiop-money';
 export class FspiopAmountConstraint implements ValidatorConstraintInterface {
 
     validate(value: unknown): boolean {
-        if (typeof value !== 'string') {
+        if (typeof value !== 'string' && typeof value !== 'number') {
             return false;
         }
 
@@ -28,8 +28,8 @@ export class FspiopAmountConstraint implements ValidatorConstraintInterface {
             return `${property} is required`;
         }
 
-        if (typeof value !== 'string') {
-            return `${property} must be a string`;
+        if (typeof value !== 'string' && typeof value !== 'number') {
+            return `${property} must be a string or number`;
         }
 
         if (FspiopMoney.normalizeAmount(value).length === 0) {
