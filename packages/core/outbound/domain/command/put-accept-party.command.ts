@@ -14,6 +14,7 @@ export namespace PutAcceptPartyCommand {
             public readonly acceptParty: boolean,
             public readonly amount: string,
             public readonly extensionList?: ExtensionList,
+            public readonly requestSource?: string,
         ) {
         }
     }
