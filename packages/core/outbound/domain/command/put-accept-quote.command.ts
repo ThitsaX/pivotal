@@ -12,6 +12,7 @@ export namespace PutAcceptQuoteCommand {
         constructor(
             public readonly transferId: string,
             public readonly acceptQuote: boolean,
+            public readonly requestSource?: string,
         ) {
         }
     }
