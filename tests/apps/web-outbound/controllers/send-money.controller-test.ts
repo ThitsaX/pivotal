@@ -3,13 +3,28 @@ import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import {plainToInstance} from 'class-transformer';
 import {validate, ValidationError} from 'class-validator';
-import {PutSendMoneyRequest} from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
+import {
+    PutSendMoneyRequest,
+    SendMoneyController,
+} from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
+import {SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
 
 async function validateRequest(body: Record<string, unknown>): Promise<{
     request: PutSendMoneyRequest;
     errors:  ValidationError[];
 }> {
     const request = plainToInstance(PutSendMoneyRequest, body);
+    const errors = await validate(request, {whitelist: true});
+
+    return {request, errors};
+}
+
+async function validateSendMoneyRequest(body: Record<string, unknown>): Promise<{
+    request: SendMoneyRequest;
+    errors:  ValidationError[];
+}> {
+    const request = plainToInstance(SendMoneyRequest, body);
     const errors = await validate(request, {whitelist: true});
 
     return {request, errors};
@@ -47,6 +62,13 @@ describe('PutSendMoneyRequest', () => {
         assert.equal(request.amount, '12.34');
     });
 
+    it('normalizes a valid numeric acceptParty amount', async () => {
+        const {request, errors} = await validateRequest({acceptParty: true, amount: 12});
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.amount, '12');
+    });
+
     it('keeps extensionList when acceptParty is true', async () => {
         const extensionList = {
             extension: [
@@ -77,5 +99,68 @@ describe('PutSendMoneyRequest', () => {
         const {errors} = await validateRequest({acceptQuote: true});
 
         assert.deepEqual(errors, []);
+    });
+});
+
+describe('SendMoneyRequest', () => {
+
+    it('normalizes a valid numeric amount', async () => {
+        const {request, errors} = await validateSendMoneyRequest({
+            homeTransactionId: 'home-1',
+            from: {
+                idType: 'MSISDN',
+                idValue: '2769100001',
+                fspId: 'wallet1',
+            },
+            to: {
+                idType: 'MSISDN',
+                idValue: '2769200001',
+                fspId: 'wallet2',
+            },
+            amountType: 'SEND',
+            amount: 12,
+            currency: 'USD',
+            transactionType: 'TRANSFER',
+            subScenario: 'PERSON_TO_PERSON',
+        });
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.amount, '12');
+    });
+});
+
+describe('SendMoneyController', () => {
+
+    it('rejects POST sendmoney when fspiop-source differs from request payer FSP', async () => {
+        const controller = new SendMoneyController({
+            async execute(): Promise<never> {
+                throw new Error('command bus should not be called');
+            },
+        } as never);
+
+        const request = {
+            homeTransactionId: 'home-1',
+            from: {
+                idType: 'MSISDN',
+                idValue: '2769100001',
+                fspId: 'wallet1',
+            },
+            to: {
+                idType: 'MSISDN',
+                idValue: '2769200001',
+                fspId: 'wallet2',
+            },
+            amountType: 'SEND',
+            amount: '10',
+            currency: 'USD',
+            transactionType: 'TRANSFER',
+            subScenario: 'PERSON_TO_PERSON',
+        };
+
+        await assert.rejects(
+            () => controller.post('wallet2', request as never),
+            (error: unknown) => error instanceof FspiopException
+                && error.errorDefinition.errorType.code === FspiopErrors.PAYER_PERMISSION_ERROR.errorType.code,
+        );
     });
 });
