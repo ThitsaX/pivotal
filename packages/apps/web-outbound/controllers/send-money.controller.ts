@@ -14,7 +14,7 @@ export class PutSendMoneyRequest {
     acceptParty?: boolean;
 
     @ValidateIf((request: PutSendMoneyRequest) => request.acceptParty === true)
-    @Transform(({ value }) => typeof value === 'string' ? FspiopMoney.normalizeAmount(value) : value)
+    @Transform(({ value }) => typeof value === 'string' || typeof value === 'number' ? FspiopMoney.normalizeAmount(value) : value)
     @IsFspiopAmount()
     amount?: string;
 
@@ -38,14 +38,30 @@ export class SendMoneyController {
     ) {
     }
 
-    private static toSource(source: string | undefined, request: SendMoneyRequest): string {
+    private static toOptionalSource(source: string | undefined): string | undefined {
         const normalizedSource = source?.trim();
 
         if (normalizedSource != null && normalizedSource.length > 0) {
             return normalizedSource;
         }
 
+        return undefined;
+    }
+
+    private static toSource(source: string | undefined, request: SendMoneyRequest): string {
+        const normalizedSource = SendMoneyController.toOptionalSource(source);
         const payerFsp = request.from?.fspId?.trim();
+
+        if (normalizedSource != null && payerFsp != null && payerFsp.length > 0 && normalizedSource !== payerFsp) {
+            throw new FspiopException(
+                FspiopErrors.PAYER_PERMISSION_ERROR,
+                `fspiop-source '${normalizedSource}' is not authorized to act for payer FSP '${payerFsp}'.`,
+            );
+        }
+
+        if (normalizedSource != null) {
+            return normalizedSource;
+        }
 
         if (payerFsp == null || payerFsp.length === 0) {
             throw new FspiopException(
@@ -84,6 +100,7 @@ export class SendMoneyController {
 
     @Put(':transferId')
     async put(
+        @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string | undefined,
         @Param('transferId') transferId: string,
         @Body() request: PutSendMoneyRequest,
     ): Promise<SendMoneyResponse> {
@@ -99,6 +116,7 @@ export class SendMoneyController {
                         request.acceptParty,
                         request.amount ?? '',
                         request.extensionList,
+                        SendMoneyController.toOptionalSource(source),
                     ),
                 ),
             );
@@ -114,7 +132,11 @@ export class SendMoneyController {
             );
             const output: PutAcceptQuoteCommand.Output = await this.commandBus.execute(
                 new PutAcceptQuoteCommand(
-                    new PutAcceptQuoteCommand.Input(transferId, request.acceptQuote),
+                    new PutAcceptQuoteCommand.Input(
+                        transferId,
+                        request.acceptQuote,
+                        SendMoneyController.toOptionalSource(source),
+                    ),
                 ),
             );
             this.logger.log(
