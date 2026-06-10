@@ -3,6 +3,7 @@ import {CommandBus} from '@nestjs/cqrs';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
 import {FspiopException} from '@shared/fspiop';
 import {NatsClientService} from '@shared/nats';
+import {MdcContext} from '@shared/foundation';
 import {ConnectorSettings, PerformPostQuotesCommand} from '../../domain';
 import {ConnectorPostQuotesPublisher} from '../../publisher';
 import {resolveFspiopStream} from './fspiop-stream.resolver';
@@ -81,27 +82,29 @@ export class ConnectorPostQuotesListener implements OnModuleInit {
         for await (const msg of messages) {
             try {
                 const message = this.nats.codec.decode(msg.data) as ConnectorPostQuotesPublisher.Message;
+                await MdcContext.run({[MdcContext.TRANSFER_ID]: message.request.transactionId}, async () => {
 
-                await this.commandBus.execute(
-                    new PerformPostQuotesCommand(
-                        new PerformPostQuotesCommand.Input(
-                            message.correlationId,
-                            message.payerFsp,
-                            message.payeeFsp,
-                            message.request,
+                    await this.commandBus.execute(
+                        new PerformPostQuotesCommand(
+                            new PerformPostQuotesCommand.Input(
+                                message.correlationId,
+                                message.payerFsp,
+                                message.payeeFsp,
+                                message.request,
+                            ),
                         ),
-                    ),
-                );
+                    );
 
-                msg.ack();
-            } catch (error) {
-                if (error instanceof FspiopException) {
-                    msg.ack();
-                } else {
-                    this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
-                    msg.nak();
+                    msg.ack();});
+                } catch (error) {
+                    if (error instanceof FspiopException) {
+                        msg.ack();
+                    } else {
+                        this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
+                        msg.nak();
+                    }
                 }
             }
         }
     }
-}
+
