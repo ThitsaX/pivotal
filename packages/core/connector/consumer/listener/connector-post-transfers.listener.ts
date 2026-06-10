@@ -80,9 +80,9 @@ export class ConnectorPostTransfersListener implements OnModuleInit {
 
     private async consume(messages: ConsumerMessages): Promise<void> {
         for await (const msg of messages) {
-            const message = this.nats.codec.decode(msg.data) as ConnectorPostTransfersPublisher.Message;
-            await MdcContext.run({[MdcContext.TRANSFER_ID]: message.request.transferId}, async () => {
-                try {
+            try {
+                const message = this.nats.codec.decode(msg.data) as ConnectorPostTransfersPublisher.Message;
+                await MdcContext.run({[MdcContext.TRANSFER_ID]: message.request.transferId}, async () => {
                     await this.commandBus.execute(
                         new PerformPostTransfersCommand(
                             new PerformPostTransfersCommand.Input(
@@ -94,7 +94,7 @@ export class ConnectorPostTransfersListener implements OnModuleInit {
                         ),
                     );
 
-                    msg.ack();
+                    msg.ack();});
                 } catch (error) {
                     if (error instanceof FspiopException) {
                         msg.ack();
@@ -103,7 +103,6 @@ export class ConnectorPostTransfersListener implements OnModuleInit {
                         msg.nak();
                     }
                 }
-            });
+            }
         }
     }
-}

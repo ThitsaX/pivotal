@@ -80,10 +80,10 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
 
     private async consume(messages: ConsumerMessages): Promise<void> {
         for await (const msg of messages) {
-            const message = this.nats.codec.decode(msg.data) as ConnectorGetPartiesPublisher.Message;
-            const idValue = message.subId ? `${message.partyId} ${message.subId}` : message.partyId;
-            await MdcContext.run({[MdcContext.ID_VALUE]: idValue}, async () => {
-                try {
+            try {
+                const message = this.nats.codec.decode(msg.data) as ConnectorGetPartiesPublisher.Message;
+                const idValue = message.subId ? `${message.partyId} ${message.subId}` : message.partyId;
+                await MdcContext.run({[MdcContext.ID_VALUE]: idValue}, async () => {
                     await this.commandBus.execute(
                         new PerformGetPartiesCommand(
                             new PerformGetPartiesCommand.Input(
@@ -97,7 +97,7 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
                         ),
                     );
 
-                    msg.ack();
+                    msg.ack();});
                 } catch (error) {
                     if (error instanceof FspiopException) {
                         msg.ack();
@@ -106,7 +106,6 @@ export class ConnectorGetPartiesListener implements OnModuleInit {
                         msg.nak();
                     }
                 }
-            });
+            }
         }
     }
-}
