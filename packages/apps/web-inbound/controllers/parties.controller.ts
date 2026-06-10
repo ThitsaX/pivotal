@@ -24,6 +24,7 @@ import {
     PartiesTypeIDPutResponse,
     PartyIdType,
 } from '@shared/fspiop';
+import { MdcContext } from '@shared/foundation';
 
 @Controller('parties')
 export class PartiesController {
@@ -47,9 +48,11 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
     ): void {
+        const idValue = subId ? `${id} ${subId}` : id;
+        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
         this.dispatch(() => {
             this.logger.log(
-                `Get Party Request for idValue ${id}`,
+                    `Get Party Request for idValue ${idValue}`,
             );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(sourceHeader);
@@ -58,6 +61,7 @@ export class PartiesController {
             return new HandleGetPartiesCommand(
                 new HandleGetPartiesCommand.Input(correlationId, payerFsp, payeeFsp, type, id, subId ?? null),
             );
+            });
         });
     }
 
@@ -72,9 +76,11 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
+        const idValue = subId ? `${id} ${subId}` : id;
+        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
         this.dispatch(() => {
             this.logger.log(
-                `Put Party Error Request for idValue ${id} : ${JSON.stringify(request)}`,
+                    `Put Party Error Request for idValue ${idValue} : ${JSON.stringify(request)}`,
             );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
@@ -92,6 +98,7 @@ export class PartiesController {
                     error,
                 ),
             );
+            });
         });
     }
 
@@ -106,9 +113,11 @@ export class PartiesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
     ): void {
+        const idValue = subId ? `${id} ${subId}` : id;
+        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
         this.dispatch(() => {
             this.logger.log(
-                `Put Party Request for idValue ${id} : ${JSON.stringify(request)}`,
+                    `Put Party Request for idValue ${idValue} : ${JSON.stringify(request)}`,
             );
             const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
             const payerFsp = PartiesController.headerValue(destinationHeader);
@@ -125,6 +134,7 @@ export class PartiesController {
                     request,
                 ),
             );
+            });
         });
     }
 

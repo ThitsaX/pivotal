@@ -6,7 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config as loadDotEnv } from 'dotenv';
 import { json } from 'express';
-import { FspiopHeaders } from '@shared/fspiop';
+import { FspiopHeaders, PivotalLogger } from '@shared/fspiop';
 import { AccessGuard, OutboundExceptionFilter } from './component';
 import { WebOutboundAppModule } from './app.module';
 import { createOutboundValidationException } from './component/outbound-validation-error';
@@ -61,7 +61,9 @@ const bootstrap = async (): Promise<void> => {
 
     const port = Number(process.env['WEB_OUTBOUND_PORT'] ?? DEFAULT_HTTP_PORT);
 
-    const app = await NestFactory.create(WebOutboundAppModule);
+    const app = await NestFactory.create(WebOutboundAppModule, {
+        logger: new PivotalLogger(),
+    });
     app.enableShutdownHooks();
     app.use(json({ type: ['application/json', 'application/*+json'] }));
     app.useGlobalPipes(new ValidationPipe({

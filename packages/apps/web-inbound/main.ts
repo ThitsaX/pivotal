@@ -5,7 +5,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspInboundGuard, FspiopExceptionFilter} from '@shared/fspiop';
+import {FspInboundGuard, FspiopExceptionFilter, PivotalLogger} from '@shared/fspiop';
 import {WebInboundSettings} from './required.settings';
 import {WebInboundAppModule} from './app.module';
 
@@ -88,7 +88,10 @@ const bootstrap = async (): Promise<void> => {
     const deps = new WebInboundSettings();
     const settings = deps.fspiopSettings();
     const httpsOptions = resolveHttpsOptions(deps, settings.useMutualTls);
-    const nestOptions = httpsOptions == null ? {} : {httpsOptions: httpsOptions as any};
+    const nestOptions = {
+        logger: new PivotalLogger(),
+        ...(httpsOptions == null ? {} : {httpsOptions: httpsOptions as any}),
+    };
 
     const app = await NestFactory.create(WebInboundAppModule, nestOptions);
     app.enableShutdownHooks();

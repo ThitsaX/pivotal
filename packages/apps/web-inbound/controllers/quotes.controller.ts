@@ -2,6 +2,7 @@ import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param,
 import { CommandBus, ICommand } from '@nestjs/cqrs';
 import { HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCommand, } from '@core/inbound/domain';
 import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, QuotesIDPutResponse, QuotesPostRequest, } from '@shared/fspiop';
+import { MdcContext } from '@shared/foundation';
 
 @Controller('quotes')
 export class QuotesController {
@@ -38,6 +39,7 @@ export class QuotesController {
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesPostRequest): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: request.transactionId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Post Quote Request for TransferId ${request.transactionId} : ${JSON.stringify(request)}`,
@@ -49,6 +51,7 @@ export class QuotesController {
             return new HandlePostQuotesCommand(
                 new HandlePostQuotesCommand.Input(correlationId, payerFsp, payeeFsp, request),
             );
+            });
         });
     }
 
@@ -61,6 +64,7 @@ export class QuotesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
     ): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: quoteId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Put Quote Request Error for QuoteId ${quoteId} : ${JSON.stringify(request)}`,
@@ -79,6 +83,7 @@ export class QuotesController {
                     error,
                 ),
             );
+            });
         });
     }
 
@@ -91,6 +96,7 @@ export class QuotesController {
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
         @Body() request: QuotesIDPutResponse,
     ): void {
+        MdcContext.run({[MdcContext.TRANSFER_ID]: quoteId}, () => {
         this.dispatch(() => {
             this.logger.log(
                 `Put Quote Request for TransferId ${quoteId} : ${JSON.stringify(request)}`,
@@ -108,6 +114,7 @@ export class QuotesController {
                     request,
                 ),
             );
+            });
         });
     }
 
