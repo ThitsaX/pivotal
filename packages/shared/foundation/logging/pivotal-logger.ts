@@ -39,6 +39,7 @@ export class PivotalLogger extends ConsoleLogger {
         context?: string,
         logLevel?: string,
         writeStreamType?: 'stdout' | 'stderr',
+        errorStack?: unknown,
     ) {
         messages.forEach(message => {
             const output = this.formatMessage(
@@ -50,9 +51,12 @@ export class PivotalLogger extends ConsoleLogger {
                 '',
             );
             process[writeStreamType || 'stdout'].write(output);
+
+            if (errorStack != null) {
+                process[writeStreamType || 'stdout'].write(`${String(errorStack)}\n`);
+            }
         });
     }
-
     private formatTimestamp(date: Date): string {
         const Y = date.getUTCFullYear();
         const M = String(date.getUTCMonth() + 1).padStart(2, '0');
