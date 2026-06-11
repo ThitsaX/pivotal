@@ -68,6 +68,8 @@ export class SendMoneyResponseMapper {
         response.subScenario = transferRequest.subScenario;
         response.note = transferRequest.note;
         response.amount = transferRequest.amount;
+        response.payeeReceiveAmount = transferRequest.quotes?.payeeReceiveAmount?.amount;
+        response.transferAmount = transferRequest.quotes?.transferAmount?.amount;
         response.payeeFee = feeByKey.get('payeefee') ?? "0";
         response.payerFee = feeByKey.get('payerfee') ?? "0";
         response.schemeFee = feeByKey.get('schemefee') ?? "0";
