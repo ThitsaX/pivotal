@@ -51,6 +51,14 @@ export class SendMoneyResponse {
 
     @IsOptional()
     @IsString()
+    payeeReceiveAmount?: string;
+
+    @IsOptional()
+    @IsString()
+    transferAmount?: string;
+
+    @IsOptional()
+    @IsString()
     payeeFee?: string;
 
     @IsOptional()
