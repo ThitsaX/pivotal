@@ -341,6 +341,6 @@ export class PutAcceptPartyHandler
             return new FspiopException(errorDef, desc, extensionList);
         }
 
-        return FspiopErrorTranslator.toFspiopException(error, transferId);
+        return FspiopErrorTranslator.toFspiopException(error);
     }
 }
