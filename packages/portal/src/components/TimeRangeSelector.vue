@@ -2,7 +2,7 @@
 import {onMounted, ref, watch} from 'vue';
 import CustomDropdown from './CustomDropdown.vue';
 
-type RangeMode = 'today' | 'last24' | 'yesterdayToday' | 'custom';
+type RangeMode = 'today' | 'last24' | 'custom';
 
 const props = defineProps<{
     label: string;
@@ -21,10 +21,8 @@ const emit = defineEmits<{
 const padTwo = (value: number | string): string => String(value).padStart(2, '0');
 
 const RANGE_OPTIONS: Array<{label: string; value: string}> = [
-    {label: '(Any)', value: ''},
     {label: 'Today', value: 'today'},
-    {label: 'Last 24Hours', value: 'last24'},
-    {label: 'Yesterday & Today', value: 'yesterdayToday'},
+    {label: 'Last 24 Hours', value: 'last24'},
     {label: 'Custom Range', value: 'custom'},
 ];
 
@@ -247,13 +245,6 @@ const applyPreset = (mode: RangeMode): void => {
     } else if (mode === 'last24') {
         endIso = now.toISOString();
         startIso = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    } else if (mode === 'yesterdayToday') {
-        const today = formatPartsInZone(now, props.selectedTimeZone);
-        const yesterday = shiftDateByDays(today.year, today.month, today.day, -1);
-        const tomorrow = shiftDateByDays(today.year, today.month, today.day, 1);
-
-        startIso = zonedLocalToUtcIso(localMidnight(yesterday.year, yesterday.month, yesterday.day), props.selectedTimeZone);
-        endIso = zonedLocalToUtcIso(localMidnight(tomorrow.year, tomorrow.month, tomorrow.day), props.selectedTimeZone);
     }
 
     emit('update:startValue', startIso);
