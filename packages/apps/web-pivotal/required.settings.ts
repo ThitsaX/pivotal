@@ -17,6 +17,8 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     private static readonly DEFAULT_JWT_ISSUER                  = 'pivotal';
 
+    private static readonly DEFAULT_AUDIT_MAX_LIMIT            = 500_000;
+
     constructor(private readonly configService: ConfigService = new ConfigService()) {
     }
 
@@ -103,6 +105,14 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         }
 
         return raw.split(',').map((origin) => origin.trim()).filter((origin) => origin.length > 0);
+    }
+
+    /**
+     * `MAX_LIMIT` — the single system-wide cap on Find Transactions counts/results.
+     * Defaults to 500,000 when unset or invalid. Adjustable via the `.env`.
+     */
+    auditMaxLimit(): number {
+        return this.readPositiveInteger('MAX_LIMIT') ?? WebPivotalSettings.DEFAULT_AUDIT_MAX_LIMIT;
     }
 
     private readRequiredValue(name: string): string {
