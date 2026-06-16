@@ -108,11 +108,11 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     }
 
     /**
-     * `MAX_LIMIT` — the single system-wide cap on Find Transactions counts/results.
-     * Defaults to 500,000 when unset or invalid. Adjustable via the `.env`.
+     * `AUDIT_MAX_RESULT_ROWS` — cap on the rows the Find Transactions query scans, counts,
+     * and returns. Defaults to 500,000 when unset or invalid. Adjustable via the `.env`.
      */
     auditMaxLimit(): number {
-        return this.readPositiveInteger('MAX_LIMIT') ?? WebPivotalSettings.DEFAULT_AUDIT_MAX_LIMIT;
+        return this.readPositiveInteger('AUDIT_MAX_RESULT_ROWS') ?? WebPivotalSettings.DEFAULT_AUDIT_MAX_LIMIT;
     }
 
     private readRequiredValue(name: string): string {
