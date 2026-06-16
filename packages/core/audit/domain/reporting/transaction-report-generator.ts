@@ -9,6 +9,11 @@ import {TransactionReportParams} from './transaction-report-params';
 
 type ReportFileType = 'csv' | 'xlsx';
 
+type ReportColumn = {
+    header: string;
+    key: string;
+};
+
 @Injectable()
 export class TransactionReportGenerator {
 
@@ -16,70 +21,25 @@ export class TransactionReportGenerator {
     private static readonly XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     private static readonly XLSX_MAX_DATA_ROWS_PER_SHEET = 1_048_575;
 
-    private static readonly COLUMNS = [
-        'id',
-        'transferId',
-        'payerFsp',
-        'payeeFsp',
-        'payerIdType',
-        'payerId',
-        'payerSubId',
-        'payeeIdType',
-        'payeeId',
-        'payeeSubId',
-        'transactionInitiatorType',
-        'quotingCurrency',
-        'quotingAmount',
-        'transferCurrency',
-        'transferAmount',
-        'transactionType',
-        'subScenario',
-        'transferState',
-        'error',
-        'dispute',
-        'flow',
-        'partiesRequestedAt',
-        'partiesRespondedAt',
-        'partiesRequest',
-        'partiesResponse',
-        'partiesError',
-        'outboundPartiesRequestedAt',
-        'outboundPartiesRespondedAt',
-        'inboundPartiesRequestedAt',
-        'inboundPartiesRespondedAt',
-        'connectorPartiesRequestedAt',
-        'connectorPartiesRespondedAt',
-        'quotesRequestedAt',
-        'quotesRespondedAt',
-        'quotesRequest',
-        'quotesResponse',
-        'quotesError',
-        'outboundQuotesRequestedAt',
-        'outboundQuotesRespondedAt',
-        'inboundQuotesRequestedAt',
-        'inboundQuotesRespondedAt',
-        'connectorQuotesRequestedAt',
-        'connectorQuotesRespondedAt',
-        'transfersRequestedAt',
-        'transfersRespondedAt',
-        'transfersRequest',
-        'transfersResponse',
-        'transfersError',
-        'outboundTransfersRequestedAt',
-        'outboundTransfersRespondedAt',
-        'inboundTransfersRequestedAt',
-        'inboundTransfersRespondedAt',
-        'connectorTransfersRequestedAt',
-        'connectorTransfersRespondedAt',
-        'patchRequestedAt',
-        'patchRespondedAt',
-        'patchRequest',
-        'patchError',
-        'transactionStartedAt',
-        'transactionCompletedAt',
-        'createdAt',
-        'updatedAt',
-    ] as const;
+    private static readonly COLUMNS: readonly ReportColumn[] = [
+        {header: 'Transfer ID', key: 'transferId'},
+        {header: 'Payer FSP ID', key: 'payerFsp'},
+        {header: 'Payee FSP ID', key: 'payeeFsp'},
+        {header: 'Payer ID Type', key: 'payerIdType'},
+        {header: 'Payer ID', key: 'payerId'},
+        {header: 'Payer Sub ID', key: 'payerSubId'},
+        {header: 'Payee ID Type', key: 'payeeIdType'},
+        {header: 'Payee ID', key: 'payeeId'},
+        {header: 'Payee Sub ID', key: 'payeeSubId'},
+        {header: 'Currency', key: 'quotingCurrency'},
+        {header: 'Amount', key: 'quotingAmount'},
+        {header: 'Transfer State in Hub', key: 'transferState'},
+        {header: 'Disputed', key: 'dispute'},
+        {header: 'Account Lookup Error', key: 'partiesError'},
+        {header: 'Quote Call Error', key: 'quotesError'},
+        {header: 'Transfer Call Error', key: 'transfersError'},
+        {header: 'Patch Call Error', key: 'patchError'},
+    ];
 
     constructor(
         private readonly transactionRepository: TransactionRepository,
@@ -92,123 +52,151 @@ export class TransactionReportGenerator {
         const criteria = TransactionReportParams.toCriteria(params);
         const order = TransactionReportParams.toOrder(params);
         const accessScope = TransactionReportParams.toAccessScope(params);
-        const totalRows = await this.transactionRepository.countForReport(criteria, accessScope);
+        const fileType = TransactionReportGenerator.reportFileType(request.fileType);
+        const maxRowsPerFile = this.maxRowsPerGeneratedFile(fileType);
+        const maxRows = this.maxDownloadRows(fileType);
+        const {count: totalRows, capped} = await this.transactionRepository.countForReport(
+            criteria,
+            maxRows,
+            accessScope,
+        );
+
+        if (capped) {
+            throw new Error(`Report exceeds maximum downloadable rows (${maxRows}). Narrow the search filters.`);
+        }
 
         TransactionReportGenerator.LOGGER.log(
             `Generating transaction report requestId=${request.id} totalRows=${totalRows}`,
         );
 
-        const fileType = TransactionReportGenerator.reportFileType(request.fileType);
-        const maxRowsPerFile = this.maxRowsPerGeneratedFile(fileType);
-
-        if (totalRows <= maxRowsPerFile) {
-            return this.generateFile(fileType, criteria, order, accessScope, 0, totalRows);
+        if (fileType === 'xlsx') {
+            return this.generateXlsxZip(request, criteria, order, accessScope, totalRows, maxRowsPerFile);
         }
 
-        const fileCount = Math.ceil(totalRows / maxRowsPerFile);
+        return this.generateCsvReport(request, criteria, order, accessScope, totalRows, maxRowsPerFile);
+    }
 
-        if (fileCount > this.settings.maxZipFiles) {
-            throw new Error(
-                `Report has ${totalRows} rows and would create ${fileCount} files; maxZipFiles=${this.settings.maxZipFiles}.`,
-            );
+    private async generateCsvReport(
+        request: ReportDownloadRequest,
+        criteria: Parameters<TransactionRepository['findForReport']>[0],
+        order: Parameters<TransactionRepository['findForReport']>[1],
+        accessScope: Parameters<TransactionRepository['findForReport']>[4],
+        totalRows: number,
+        maxRowsPerFile: number,
+    ): Promise<ReportFile> {
+        if (totalRows <= maxRowsPerFile) {
+            const part = await this.generateCsvPart(criteria, order, accessScope, undefined, totalRows);
+
+            return new ReportFile(Buffer.from(part.content, 'utf8'), 'csv', 'text/csv');
         }
 
         const zip = new AdmZip();
+        let cursor: string | undefined;
+        let writtenRows = 0;
+        let partNumber = 1;
 
-        for (let partNumber = 1, offset = 0; offset < totalRows; partNumber++, offset += maxRowsPerFile) {
-            const rowsInPart = Math.min(maxRowsPerFile, totalRows - offset);
-            const file = await this.generateFile(fileType, criteria, order, accessScope, offset, rowsInPart);
+        while (writtenRows < totalRows) {
+            const rowsInPart = Math.min(maxRowsPerFile, totalRows - writtenRows);
+            const part = await this.generateCsvPart(criteria, order, accessScope, cursor, rowsInPart);
 
             zip.addFile(
-                `TransactionDetailReport-${request.id}-Part${partNumber}.${file.extension}`,
-                file.bytes,
+                `TransactionDetailReport-${request.id}-Part${partNumber}.csv`,
+                Buffer.from(part.content, 'utf8'),
             );
 
-            TransactionReportGenerator.LOGGER.log(
-                `Generated transaction report requestId=${request.id} part=${partNumber} rows=${rowsInPart}`,
-            );
+            writtenRows += part.rowCount;
+            cursor = part.nextCursor;
+            partNumber++;
+
+            if (part.rowCount === 0 || cursor == null) {
+                break;
+            }
         }
 
         return new ReportFile(zip.toBuffer(), 'zip', 'application/zip');
     }
 
-    private async generateFile(
-        fileType: ReportFileType,
+    private async generateXlsxZip(
+        request: ReportDownloadRequest,
         criteria: Parameters<TransactionRepository['findForReport']>[0],
         order: Parameters<TransactionRepository['findForReport']>[1],
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
-        offset: number,
-        rowCount: number,
+        totalRows: number,
+        maxRowsPerFile: number,
     ): Promise<ReportFile> {
-        if (fileType === 'xlsx') {
-            const xlsx = await this.generateXlsx(criteria, order, accessScope, offset, rowCount);
+        const zip = new AdmZip();
+        let cursor: string | undefined;
+        let writtenRows = 0;
+        let partNumber = 1;
 
-            return new ReportFile(xlsx, 'xlsx', TransactionReportGenerator.XLSX_CONTENT_TYPE);
-        }
+        do {
+            const rowsInPart = Math.min(maxRowsPerFile, Math.max(totalRows - writtenRows, 0));
+            const part = await this.generateXlsxPart(criteria, order, accessScope, cursor, rowsInPart);
 
-        const csv = await this.generateCsv(criteria, order, accessScope, offset, rowCount);
-
-        return new ReportFile(Buffer.from(csv, 'utf8'), 'csv', 'text/csv');
-    }
-
-    private async generateCsv(
-        criteria: Parameters<TransactionRepository['findForReport']>[0],
-        order: Parameters<TransactionRepository['findForReport']>[1],
-        accessScope: Parameters<TransactionRepository['findForReport']>[4],
-        offset: number,
-        rowCount: number,
-    ): Promise<string> {
-        const lines = [TransactionReportGenerator.COLUMNS.join(',')];
-
-        for (let currentOffset = offset; currentOffset < offset + rowCount; currentOffset += this.settings.pageSize) {
-            const limit = Math.min(this.settings.pageSize, offset + rowCount - currentOffset);
-            const rows = await this.transactionRepository.findForReport(
-                criteria,
-                order,
-                currentOffset,
-                limit,
-                accessScope,
+            zip.addFile(
+                `TransactionDetailReport-${request.id}-Part${partNumber}.xlsx`,
+                part.bytes,
             );
 
-            for (const row of rows) {
-                lines.push(TransactionReportGenerator.COLUMNS
-                    .map((column) => TransactionReportGenerator.csvValue(row[column]))
-                    .join(','));
-            }
-        }
+            TransactionReportGenerator.LOGGER.log(
+                `Generated transaction report requestId=${request.id} part=${partNumber} rows=${part.rowCount}`,
+            );
 
-        return `${lines.join('\n')}\n`;
+            writtenRows += part.rowCount;
+            cursor = part.nextCursor;
+            partNumber++;
+        } while (writtenRows < totalRows && cursor != null);
+
+        return new ReportFile(zip.toBuffer(), 'zip', 'application/zip');
     }
 
-    private async generateXlsx(
+    private async generateCsvPart(
         criteria: Parameters<TransactionRepository['findForReport']>[0],
         order: Parameters<TransactionRepository['findForReport']>[1],
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
-        offset: number,
+        cursor: string | undefined,
         rowCount: number,
-    ): Promise<Buffer> {
+    ): Promise<{content: string; rowCount: number; nextCursor?: string}> {
+        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
+        const lines = [TransactionReportGenerator.COLUMNS
+            .map((column) => TransactionReportGenerator.csvValue(column.header))
+            .join(',')];
+
+        for (const row of result.rows) {
+            lines.push(TransactionReportGenerator.COLUMNS
+                .map((column) => TransactionReportGenerator.csvValue(row[column.key]))
+                .join(','));
+        }
+
+        return {
+            content: `${lines.join('\n')}\n`,
+            rowCount: result.rows.length,
+            nextCursor: result.nextCursor,
+        };
+    }
+
+    private async generateXlsxPart(
+        criteria: Parameters<TransactionRepository['findForReport']>[0],
+        order: Parameters<TransactionRepository['findForReport']>[1],
+        accessScope: Parameters<TransactionRepository['findForReport']>[4],
+        cursor: string | undefined,
+        rowCount: number,
+    ): Promise<{bytes: Buffer; rowCount: number; nextCursor?: string}> {
+        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
         const sheetRows = [
-            TransactionReportGenerator.xlsxRow(1, TransactionReportGenerator.COLUMNS),
+            TransactionReportGenerator.xlsxRow(
+                1,
+                TransactionReportGenerator.COLUMNS.map((column) => column.header),
+            ),
         ];
         let sheetRowNumber = 2;
 
-        for (let currentOffset = offset; currentOffset < offset + rowCount; currentOffset += this.settings.pageSize) {
-            const limit = Math.min(this.settings.pageSize, offset + rowCount - currentOffset);
-            const rows = await this.transactionRepository.findForReport(
-                criteria,
-                order,
-                currentOffset,
-                limit,
-                accessScope,
-            );
-
-            for (const row of rows) {
-                sheetRows.push(TransactionReportGenerator.xlsxRow(
-                    sheetRowNumber,
-                    TransactionReportGenerator.COLUMNS.map((column) => row[column]),
-                ));
-                sheetRowNumber++;
-            }
+        for (const row of result.rows) {
+            sheetRows.push(TransactionReportGenerator.xlsxRow(
+                sheetRowNumber,
+                TransactionReportGenerator.COLUMNS.map((column) => row[column.key]),
+            ));
+            sheetRowNumber++;
         }
 
         const zip = new AdmZip();
@@ -220,7 +208,36 @@ export class TransactionReportGenerator {
         zip.addFile('xl/styles.xml', Buffer.from(TransactionReportGenerator.xlsxStyles(), 'utf8'));
         zip.addFile('xl/worksheets/sheet1.xml', Buffer.from(TransactionReportGenerator.xlsxSheet(sheetRows), 'utf8'));
 
-        return zip.toBuffer();
+        return {
+            bytes: zip.toBuffer(),
+            rowCount: result.rows.length,
+            nextCursor: result.nextCursor,
+        };
+    }
+
+    private async readRows(
+        criteria: Parameters<TransactionRepository['findForReport']>[0],
+        order: Parameters<TransactionRepository['findForReport']>[1],
+        accessScope: Parameters<TransactionRepository['findForReport']>[4],
+        initialCursor: string | undefined,
+        rowCount: number,
+    ): Promise<{rows: Record<string, unknown>[]; nextCursor?: string}> {
+        const rows: Record<string, unknown>[] = [];
+        let cursor = initialCursor;
+
+        while (rows.length < rowCount) {
+            const limit = Math.min(this.settings.pageSize, rowCount - rows.length);
+            const page = await this.transactionRepository.findForReport(criteria, order, cursor, limit, accessScope);
+
+            rows.push(...page.records);
+            cursor = page.nextCursor;
+
+            if (page.records.length === 0 || cursor == null) {
+                break;
+            }
+        }
+
+        return {rows, nextCursor: cursor};
     }
 
     private maxRowsPerGeneratedFile(fileType: ReportFileType): number {
@@ -234,8 +251,12 @@ export class TransactionReportGenerator {
         return this.settings.maxRowsPerFile;
     }
 
+    private maxDownloadRows(fileType: ReportFileType): number {
+        return this.maxRowsPerGeneratedFile(fileType) * this.settings.maxZipFiles;
+    }
+
     private static reportFileType(fileType: string): ReportFileType {
-        return fileType.trim().toLowerCase() === 'xlsx' ? 'xlsx' : 'csv';
+        return fileType.trim().toLowerCase() === 'csv' ? 'csv' : 'xlsx';
     }
 
     private static csvValue(value: unknown): string {
@@ -243,7 +264,7 @@ export class TransactionReportGenerator {
             return '';
         }
 
-        const normalized = value instanceof Date ? value.toISOString() : String(value);
+        const normalized = TransactionReportGenerator.safeTextValue(value);
         const escaped = normalized.replace(/"/g, '""');
 
         if (/[",\n\r]/.test(escaped)) {
@@ -272,9 +293,25 @@ export class TransactionReportGenerator {
             return `<c r="${reference}"><v>${value}</v></c>`;
         }
 
-        const normalized = value instanceof Date ? value.toISOString() : String(value);
+        return `<c r="${reference}" t="inlineStr"><is><t>${TransactionReportGenerator.xmlValue(
+            TransactionReportGenerator.safeTextValue(value),
+        )}</t></is></c>`;
+    }
 
-        return `<c r="${reference}" t="inlineStr"><is><t>${TransactionReportGenerator.xmlValue(normalized)}</t></is></c>`;
+    private static safeTextValue(value: unknown): string {
+        let normalized: string;
+
+        if (value instanceof Date) {
+            normalized = value.toISOString();
+        } else if (typeof value === 'string') {
+            normalized = value;
+        } else if (typeof value === 'number' || typeof value === 'boolean') {
+            normalized = String(value);
+        } else {
+            normalized = JSON.stringify(value);
+        }
+
+        return /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
     }
 
     private static xlsxColumnName(columnNumber: number): string {

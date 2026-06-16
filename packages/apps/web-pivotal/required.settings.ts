@@ -18,6 +18,8 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     private static readonly DEFAULT_JWT_ISSUER                  = 'pivotal';
 
+    private static readonly DEFAULT_AUDIT_MAX_LIMIT            = 500_000;
+
     constructor(private readonly configService: ConfigService = new ConfigService()) {
     }
 
@@ -104,6 +106,14 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         }
 
         return raw.split(',').map((origin) => origin.trim()).filter((origin) => origin.length > 0);
+    }
+
+    /**
+     * `AUDIT_MAX_RESULT_ROWS` — cap on the rows the Find Transactions query scans, counts,
+     * and returns. Defaults to 500,000 when unset or invalid. Adjustable via the `.env`.
+     */
+    auditMaxLimit(): number {
+        return this.readPositiveInteger('AUDIT_MAX_RESULT_ROWS') ?? WebPivotalSettings.DEFAULT_AUDIT_MAX_LIMIT;
     }
 
     reportDownloadSettings(): ReportDownloadSettings {

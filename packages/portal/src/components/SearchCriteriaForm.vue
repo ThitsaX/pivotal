@@ -149,16 +149,6 @@ const getFieldGridClass = (sectionKey: string): string => {
                                     @update:start-value="criteria.transactionStartAtStart = $event"
                                     @update:end-value="criteria.transactionStartAtEnd = $event"
                                 />
-                                <TimeRangeSelector
-                                    label="Transaction Completed"
-                                    :selected-time-zone="selectedTimeZone"
-                                    :mode="criteria.transactionCompletedAtMode"
-                                    :start-value="criteria.transactionCompletedAtStart"
-                                    :end-value="criteria.transactionCompletedAtEnd"
-                                    @update:mode="criteria.transactionCompletedAtMode = $event"
-                                    @update:start-value="criteria.transactionCompletedAtStart = $event"
-                                    @update:end-value="criteria.transactionCompletedAtEnd = $event"
-                                />
                             </div>
 
                             <div v-else :class="getFieldGridClass(section.key)">

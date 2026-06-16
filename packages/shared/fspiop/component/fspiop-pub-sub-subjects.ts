@@ -1,37 +1,43 @@
 import {PartyIdType} from '../dto/party-id-type';
 
 /**
- * Builds NATS subject strings for FSPIOP pub/sub messaging.
+ * Builds NATS JetStream subject strings for FSPIOP response correlation.
  *
- * Convention:
- *   forSuccess — subject for the success callback message.
- *                "<resource>:<payer>:<payee>:..."
+ * All subjects share the `pivotal.fspiop.response.` prefix so they route into a single
+ * JetStream stream (PIVOTAL_FSPIOP_RESPONSE). The prefix is deliberately *outside* the
+ * `fspiop.*` namespace used by connector teams for their command stream — it prevents
+ * a JetStream subject-overlap collision and means external connector implementations
+ * (pivotal-connector-nestjs, pivotal-connector-java, etc.) need zero awareness of this
+ * channel.
  *
- *   forError   — subject for the error callback message.
- *                "<resource>-error:<payer>:<payee>:..."
+ * The token following the prefix encodes the resource and outcome (`parties`,
+ * `parties-error`, `quotes`, `quotes-error`, `transfers`, `transfers-error`). The
+ * remainder uniquely identifies the in-flight request:
  *
- * Example (Parties lookup):
- *   publish on  → Parties.forSuccess('DFSP-A', 'DFSP-B', PartyIdType.Msisdn, '0612345678')
- *                 "parties:DFSP-A:DFSP-B:MSISDN:0612345678"
+ *   - Parties:   payer:payee:partyIdType:partyId[:subId]
+ *     (Parties callbacks are addressed by FSPIOP resource path, not by a transaction id,
+ *      so two concurrent waiters on the same tuple both receive the message — preserved
+ *      by giving each outbound replica its own JetStream consumer.)
  *
- *   subscribe on → Parties.forError('DFSP-A', 'DFSP-B', PartyIdType.Msisdn, '0612345678')
- *                  "parties-error:DFSP-A:DFSP-B:MSISDN:0612345678"
+ *   - Quotes / Transfers: payer:{quoteId|transferId}
+ *     (Already unique per request.)
+ *
+ * Example:
+ *   forSuccess('DFSP-A', 'DFSP-B', PartyIdType.Msisdn, '0612345678')
+ *     → "pivotal.fspiop.response.parties:DFSP-A:DFSP-B:MSISDN:0612345678"
  */
 export class FspiopPubSubSubjects {
 }
 
 export namespace FspiopPubSubSubjects {
 
+    const PREFIX = 'pivotal.fspiop.response.';
+
     export class Parties {
 
         private constructor() {
         }
 
-        /**
-         * Success callback subject for a party lookup.
-         * e.g. "parties:DFSP-A:DFSP-B:MSISDN:0612345678"
-         *      "parties:DFSP-A:DFSP-B:MSISDN:0612345678:passport123"  (with subId)
-         */
         static forSuccess(
             payer: string,
             payee: string,
@@ -39,15 +45,10 @@ export namespace FspiopPubSubSubjects {
             partyId: string,
             subId?: string,
         ): string {
-            const base = `parties:${payer}:${payee}:${partyIdType}:${partyId}`;
+            const base = `${PREFIX}parties:${payer}:${payee}:${partyIdType}:${partyId}`;
             return subId != null && subId.length > 0 ? `${base}:${subId}` : base;
         }
 
-        /**
-         * Error callback subject for a party lookup.
-         * e.g. "parties-error:DFSP-A:DFSP-B:MSISDN:0612345678"
-         *      "parties-error:DFSP-A:DFSP-B:MSISDN:0612345678:passport123"  (with subId)
-         */
         static forError(
             payer: string,
             payeeOrHub: string,
@@ -55,7 +56,7 @@ export namespace FspiopPubSubSubjects {
             partyId: string,
             subId?: string,
         ): string {
-            const base = `parties-error:${payer}:${payeeOrHub}:${partyIdType}:${partyId}`;
+            const base = `${PREFIX}parties-error:${payer}:${payeeOrHub}:${partyIdType}:${partyId}`;
             return subId != null && subId.length > 0 ? `${base}:${subId}` : base;
         }
     }
@@ -65,20 +66,12 @@ export namespace FspiopPubSubSubjects {
         private constructor() {
         }
 
-        /**
-         * Success callback subject for a quote.
-         * e.g. "quotes:DFSP-A:quote-uuid"
-         */
-            static forSuccess(payer: string, quoteId: string): string {
-            return `quotes:${payer}:${quoteId}`;
+        static forSuccess(payer: string, quoteId: string): string {
+            return `${PREFIX}quotes:${payer}:${quoteId}`;
         }
 
-        /**
-         * Error callback subject for a quote.
-         * e.g. "quotes-error:DFSP-A:quote-uuid"
-         */
         static forError(payer: string, quoteId: string): string {
-            return `quotes-error:${payer}:${quoteId}`;
+            return `${PREFIX}quotes-error:${payer}:${quoteId}`;
         }
     }
 
@@ -87,20 +80,12 @@ export namespace FspiopPubSubSubjects {
         private constructor() {
         }
 
-        /**
-         * Success callback subject for a transfer.
-         * e.g. "transfers:DFSP-A:transfer-uuid"
-         */
         static forSuccess(payer: string, transferId: string): string {
-            return `transfers:${payer}:${transferId}`;
+            return `${PREFIX}transfers:${payer}:${transferId}`;
         }
 
-        /**
-         * Error callback subject for a transfer.
-         * e.g. "transfers-error:DFSP-A:transfer-uuid"
-         */
         static forError(payer: string, transferId: string): string {
-            return `transfers-error:${payer}:${transferId}`;
+            return `${PREFIX}transfers-error:${payer}:${transferId}`;
         }
     }
 }

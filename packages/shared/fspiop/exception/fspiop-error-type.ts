@@ -33,6 +33,7 @@ export class FspiopErrorType {
     static readonly TRANSFER_ID_NOT_FOUND = new FspiopErrorType('3208', 'Transfer ID not found');
     static readonly BULK_QUOTE_ID_NOT_FOUND = new FspiopErrorType('3209', 'Bulk quote ID not found');
     static readonly BULK_TRANSFER_ID_NOT_FOUND = new FspiopErrorType('3210', 'Bulk transfer ID not found');
+    static readonly INACTIVE_ACCOUNT = new FspiopErrorType('3242', 'Account is not active.');
     static readonly GENERIC_EXPIRED_ERROR = new FspiopErrorType('3300', 'Generic expired error');
     static readonly TRANSACTION_REQUEST_EXPIRED = new FspiopErrorType('3301', 'Transaction request expired');
     static readonly QUOTE_EXPIRED = new FspiopErrorType('3302', 'Quote expired');
@@ -46,6 +47,7 @@ export class FspiopErrorType {
     static readonly PAYER_LIMIT_ERROR = new FspiopErrorType('4200', 'Payer limit error');
     static readonly PAYER_PERMISSION_ERROR = new FspiopErrorType('4300', 'Payer permission error');
     static readonly GENERIC_PAYER_BLOCKED_ERROR = new FspiopErrorType('4400', 'Generic Payer blocked error');
+
     static readonly GENERIC_PAYEE_ERROR = new FspiopErrorType('5000', 'Generic Payee error');
     static readonly PAYEE_FSP_INSUFFICIENT_LIQUIDITY = new FspiopErrorType('5001', 'Payee FSP insufficient liquidity');
     static readonly GENERIC_PAYEE_REJECTION = new FspiopErrorType('5100', 'Generic Payee rejection');
@@ -59,6 +61,7 @@ export class FspiopErrorType {
     static readonly PAYEE_PERMISSION_ERROR = new FspiopErrorType('5300', 'Payee permission error');
     static readonly ROUNDING_VALUE_ERROR = new FspiopErrorType('5241', "Amount is invalid. Please enter the format specified by the service provider.");
     static readonly GENERIC_PAYEE_BLOCKED_ERROR = new FspiopErrorType('5400', 'Generic Payee blocked error');
+
 
     readonly code: string;
 

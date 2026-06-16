@@ -24,7 +24,7 @@ import {
     TransactionType,
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
-import { RedisClient } from '../component';
+import { AmountDecimalValidator, RedisClient } from '../component';
 import { SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
@@ -46,17 +46,21 @@ export class PutAcceptPartyHandler
         private readonly redisClient: RedisClient,
         @Inject(AuditTransactionPublisher)
         private readonly auditPublisher: AuditTransactionPublisher,
+        @Inject(AmountDecimalValidator)
+        private readonly amountDecimalValidator: AmountDecimalValidator,
     ) {
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
-        const { transferId, acceptParty, amount } = command.input;
+        const { transferId, acceptParty, amount, extensionList, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+        const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
+        PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
-        const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
+        this.amountDecimalValidator.validate(transferRequest.amount);
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
-        const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest);
+        const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest, extensionList);
         const { quoteId } = quoteRequest;
         const { quotesUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
@@ -168,6 +172,19 @@ export class PutAcceptPartyHandler
         return transferRequest;
     }
 
+    private static assertSourceCanActForPayer(requestSource: string | undefined, payerFsp: string): void {
+        const normalizedSource = requestSource?.trim();
+
+        if (normalizedSource == null || normalizedSource.length === 0 || normalizedSource === payerFsp) {
+            return;
+        }
+
+        throw new FspiopException(
+            FspiopErrors.PAYER_PERMISSION_ERROR,
+            `fspiop-source '${normalizedSource}' is not authorized to act for payer FSP '${payerFsp}'.`,
+        );
+    }
+
     private static getFspId(party: Party | undefined, label: string): string {
         const fspId = party?.partyIdInfo?.fspId?.trim();
 
@@ -184,6 +201,7 @@ export class PutAcceptPartyHandler
     private static toQuotesPostRequest(
         transferId: string,
         transferRequest: TransferRequest,
+        extensionList: ExtensionList | undefined,
     ): QuotesPostRequest {
         const quoteRequest = new QuotesPostRequest();
         quoteRequest.quoteId = transferId;
@@ -195,6 +213,7 @@ export class PutAcceptPartyHandler
         quoteRequest.amount = PutAcceptPartyHandler.toMoney(transferRequest.currency, transferRequest.amount);
         quoteRequest.transactionType = PutAcceptPartyHandler.toTransactionType(transferRequest);
         quoteRequest.note = transferRequest.note;
+        quoteRequest.extensionList = extensionList;
 
         return quoteRequest;
     }
@@ -322,6 +341,6 @@ export class PutAcceptPartyHandler
             return new FspiopException(errorDef, desc, extensionList);
         }
 
-        return FspiopErrorTranslator.toFspiopException(error, transferId);
+        return FspiopErrorTranslator.toFspiopException(error);
     }
 }

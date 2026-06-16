@@ -23,6 +23,7 @@ import {
     UpsertEndpointController,
     UsersAdminController,
 } from './controllers';
+import {AUDIT_MAX_LIMIT} from './controllers/audit/audit.tokens';
 import {JwtAuthGuard, PermissionsGuard} from './guards';
 import {WebPivotalSettings} from './required.settings';
 
@@ -101,6 +102,11 @@ export class WebPivotalModule {
                 useFactory: asyncOptions.useFactory,
                 inject: asyncOptions.inject ?? [],
             },
+            {
+                provide: AUDIT_MAX_LIMIT,
+                useFactory: (settings: WebPivotalModule.RequiredSettings): number => settings.auditMaxLimit(),
+                inject: [REQUIRED_SETTINGS],
+            },
         ];
     }
 }
@@ -111,6 +117,7 @@ export namespace WebPivotalModule {
         extends AuditDomainModule.RequiredSettings,
             AuthDomainModule.RequiredSettings,
             ParticipantDomainModule.RequiredSettings {
+        auditMaxLimit(): number;
     }
 
     export type AsyncOptions = {

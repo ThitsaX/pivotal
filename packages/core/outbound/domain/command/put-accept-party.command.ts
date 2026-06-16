@@ -1,4 +1,4 @@
-import {QuotesIDPutResponse} from '@shared/fspiop';
+import {ExtensionList, QuotesIDPutResponse} from '@shared/fspiop';
 import {SendMoneyResponse} from '../dto';
 
 export class PutAcceptPartyCommand {
@@ -13,6 +13,8 @@ export namespace PutAcceptPartyCommand {
             public readonly transferId: string,
             public readonly acceptParty: boolean,
             public readonly amount: string,
+            public readonly extensionList?: ExtensionList,
+            public readonly requestSource?: string,
         ) {
         }
     }

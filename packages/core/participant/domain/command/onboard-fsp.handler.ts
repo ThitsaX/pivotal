@@ -10,6 +10,11 @@ import {OnboardFspCommand} from './onboard-fsp.command';
 export class OnboardFspHandler
     implements ICommandHandler<OnboardFspCommand, OnboardFspCommand.Output> {
 
+    private static normalizeOptionalKey(value: string | undefined): string | null {
+        const trimmed = value?.trim();
+        return trimmed == null || trimmed.length === 0 ? null : trimmed;
+    }
+
     constructor(
         @Inject(CentralLedgerFacade)
         private readonly centralLedgerFacade: CentralLedgerFacade,
@@ -26,8 +31,8 @@ export class OnboardFspHandler
         const existing = await this.repository.findByName(name, DbTarget.Write);
         const entity = new Participant(
             name,
-            jwsPublicKey,
-            jwsPrivateKey,
+            OnboardFspHandler.normalizeOptionalKey(jwsPublicKey),
+            OnboardFspHandler.normalizeOptionalKey(jwsPrivateKey),
             accessPublicKey,
             existing?.id,
         );

@@ -39,6 +39,10 @@ export class SendMoneyResponse {
 
     @IsOptional()
     @IsString()
+    subScenario?: string;
+
+    @IsOptional()
+    @IsString()
     note?: string;
 
     @IsDefined()
@@ -47,7 +51,11 @@ export class SendMoneyResponse {
 
     @IsOptional()
     @IsString()
-    payeeFspFeeAmount?: string;
+    payeeReceiveAmount?: string;
+
+    @IsOptional()
+    @IsString()
+    transferAmount?: string;
 
     @IsOptional()
     @IsString()

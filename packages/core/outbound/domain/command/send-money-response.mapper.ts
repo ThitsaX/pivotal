@@ -4,6 +4,11 @@ import { SendMoneyResponse, StateEnum } from '../dto';
 
 export class SendMoneyResponseMapper {
     private static readonly DIRECTION = 'OUTGOING';
+    private static readonly FEE_EXTENSION_KEYS = new Set([
+        'payeefee',
+        'payerfee',
+        'schemefee',
+    ]);
 
     static toWaitingForPartyAcceptance(transferRequest: TransferRequest): SendMoneyResponse {
         return SendMoneyResponseMapper.toResponse(
@@ -53,16 +58,18 @@ export class SendMoneyResponseMapper {
         const feeByKey = SendMoneyResponseMapper.indexExtensions(extensionList);
 
         const response = new SendMoneyResponse();
-        
+
         response.transferId = transferRequest.transferId;
         response.homeTransactionId = transferRequest.homeTransactionId;
         response.from = transferRequest.from;
         response.to = transferRequest.to;
         response.amountType = transferRequest.amountType;
         response.transactionType = transferRequest.transactionType;
+        response.subScenario = transferRequest.subScenario;
         response.note = transferRequest.note;
         response.amount = transferRequest.amount;
-        response.payeeFspFeeAmount = payeeFspFeeAmount;
+        response.payeeReceiveAmount = transferRequest.quotes?.payeeReceiveAmount?.amount;
+        response.transferAmount = transferRequest.quotes?.transferAmount?.amount;
         response.payeeFee = feeByKey.get('payeefee') ?? "0";
         response.payerFee = feeByKey.get('payerfee') ?? "0";
         response.schemeFee = feeByKey.get('schemefee') ?? "0";
@@ -71,7 +78,7 @@ export class SendMoneyResponseMapper {
         response.initiatedTimestamp = transferRequest.initiatedTimestamp;
         response.direction = SendMoneyResponseMapper.DIRECTION;
         response.supportedCurrencies = transferRequest.supportedCurrencies;
-        response.extensionList = extensionList;
+        response.extensionList = SendMoneyResponseMapper.removeFeeExtensions(extensionList);;
 
         return response;
     }
@@ -94,5 +101,13 @@ export class SendMoneyResponseMapper {
         }
 
         return map;
+    }
+    private static removeFeeExtensions(
+        extensionList: Array<Extension> | undefined,
+    ): Array<Extension> | undefined {
+        return extensionList?.filter((ext) => {
+            const key = ext.key?.trim().toLowerCase();
+            return !key || !SendMoneyResponseMapper.FEE_EXTENSION_KEYS.has(key);
+        });
     }
 }

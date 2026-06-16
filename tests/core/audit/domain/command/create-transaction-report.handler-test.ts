@@ -29,7 +29,11 @@ describe('CreateTransactionReportHandler', () => {
                 };
             },
         } as unknown as ReportDownloadRepository;
-        const handler = new CreateTransactionReportHandler(repository);
+        const handler = new CreateTransactionReportHandler(
+            repository,
+            reportTransactionRepository([]),
+            new ReportDownloadSettings(),
+        );
 
         const output = await handler.execute(new CreateTransactionReportCommand(
             new CreateTransactionReportCommand.Input(
@@ -70,7 +74,11 @@ describe('CreateTransactionReportHandler', () => {
                 };
             },
         } as unknown as ReportDownloadRepository;
-        const handler = new CreateTransactionReportHandler(repository);
+        const handler = new CreateTransactionReportHandler(
+            repository,
+            reportTransactionRepository([]),
+            new ReportDownloadSettings(),
+        );
 
         const output = await handler.execute(new CreateTransactionReportCommand(
             new CreateTransactionReportCommand.Input(
@@ -85,7 +93,11 @@ describe('CreateTransactionReportHandler', () => {
     });
 
     it('rejects unsupported file types', async () => {
-        const handler = new CreateTransactionReportHandler({} as ReportDownloadRepository);
+        const handler = new CreateTransactionReportHandler(
+            {} as ReportDownloadRepository,
+            reportTransactionRepository([]),
+            new ReportDownloadSettings(),
+        );
 
         await assert.rejects(
             handler.execute(new CreateTransactionReportCommand(
@@ -100,48 +112,56 @@ describe('CreateTransactionReportHandler', () => {
         );
     });
 
-    it('generates a single XLSX transaction report', async () => {
+    it('generates an XLSX transaction report zip', async () => {
         const generator = new TransactionReportGenerator(
             reportTransactionRepository([
                 {
-                    id:             '1',
-                    transferId:     'transfer-1',
-                    payerFsp:       'wallet1',
-                    payeeFsp:       'wallet2',
-                    transferAmount: '12.34',
-                    transferState:  'COMMITTED',
+                    id:              '1',
+                    transferId:      'transfer-1',
+                    payerFsp:        'wallet1',
+                    payeeFsp:        'wallet2',
+                    payerIdType:     'MSISDN',
+                    payerId:         '2769100001',
+                    payeeIdType:     'MSISDN',
+                    payeeId:         '2769200001',
+                    quotingCurrency: 'USD',
+                    quotingAmount:   '12.34',
+                    transferState:   'COMMITTED',
                 },
             ]),
             new ReportDownloadSettings(),
         );
 
         const report = await generator.generate(reportRequest('xlsx'), {});
-        const xlsx = new AdmZip(report.bytes);
+        const zip = new AdmZip(report.bytes);
+        const xlsxEntry = zip.getEntry('TransactionDetailReport-1001-Part1.xlsx');
+
+        assert.notEqual(xlsxEntry, null);
+
+        const xlsx = new AdmZip(xlsxEntry!.getData());
         const sheet = xlsx.readAsText('xl/worksheets/sheet1.xml');
 
-        assert.equal(report.extension, 'xlsx');
-        assert.equal(report.contentType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        assert.match(sheet, /transferId/);
+        assert.equal(report.extension, 'zip');
+        assert.equal(report.contentType, 'application/zip');
+        assert.match(sheet, /Transfer ID/);
         assert.match(sheet, /transfer-1/);
         assert.match(sheet, /wallet1/);
         assert.match(sheet, /wallet2/);
+        assert.match(sheet, /2769100001/);
+        assert.match(sheet, /2769200001/);
     });
 
-    it('includes raw request and response JSON in CSV reports for disputed transactions', async () => {
+    it('includes serialized error JSON in CSV reports', async () => {
         const generator = new TransactionReportGenerator(
             reportTransactionRepository([
                 {
-                    id:                '1',
-                    transferId:        'transfer-disputed',
-                    dispute:           true,
-                    partiesRequest:    JSON.stringify({partyId: '2769200001'}),
-                    partiesResponse:   JSON.stringify({fspId: 'wallet2'}),
-                    quotesRequest:     JSON.stringify({amount: {amount: '12.34', currency: 'USD'}}),
-                    quotesResponse:    JSON.stringify({transferAmount: {amount: '12.34', currency: 'USD'}}),
-                    transfersRequest:  JSON.stringify({transferId: 'transfer-disputed'}),
-                    transfersResponse: JSON.stringify({transferState: 'COMMITTED'}),
-                    patchRequest:      JSON.stringify({transferState: 'COMMITTED'}),
-                    patchError:        JSON.stringify({errorCode: '2001'}),
+                    id:             '1',
+                    transferId:     'transfer-disputed',
+                    dispute:        true,
+                    partiesError:   JSON.stringify({partyId: '2769200001'}),
+                    quotesError:    JSON.stringify({amount: {amount: '12.34', currency: 'USD'}}),
+                    transfersError: JSON.stringify({transferState: 'ABORTED'}),
+                    patchError:     JSON.stringify({errorCode: '2001'}),
                 },
             ]),
             new ReportDownloadSettings(),
@@ -151,28 +171,24 @@ describe('CreateTransactionReportHandler', () => {
         const csv = report.bytes.toString('utf8');
 
         assert.equal(report.extension, 'csv');
-        assert.match(csv, /partiesRequest/);
-        assert.match(csv, /transfersResponse/);
+        assert.match(csv, /Account Lookup Error/);
+        assert.match(csv, /Transfer Call Error/);
         assert.match(csv, /"\{""partyId"":""2769200001""\}"/);
-        assert.match(csv, /"\{""transferState"":""COMMITTED""\}"/);
+        assert.match(csv, /"\{""transferState"":""ABORTED""\}"/);
         assert.match(csv, /"\{""errorCode"":""2001""\}"/);
     });
 
-    it('keeps raw request and response CSV columns empty for non-disputed transactions', async () => {
+    it('keeps error CSV columns empty when no errors exist', async () => {
         const generator = new TransactionReportGenerator(
             reportTransactionRepository([
                 {
-                    id:                '1',
-                    transferId:        'transfer-normal',
-                    dispute:           false,
-                    partiesRequest:    null,
-                    partiesResponse:   null,
-                    quotesRequest:     null,
-                    quotesResponse:    null,
-                    transfersRequest:  null,
-                    transfersResponse: null,
-                    patchRequest:      null,
-                    patchError:        null,
+                    id:             '1',
+                    transferId:     'transfer-normal',
+                    dispute:        false,
+                    partiesError:   null,
+                    quotesError:    null,
+                    transfersError: null,
+                    patchError:     null,
                 },
             ]),
             new ReportDownloadSettings(),
@@ -183,7 +199,12 @@ describe('CreateTransactionReportHandler', () => {
         const headers = header.split(',');
         const values = row.split(',');
 
-        for (const column of ['partiesRequest', 'quotesRequest', 'transfersRequest', 'patchRequest', 'patchError']) {
+        for (const column of [
+            'Account Lookup Error',
+            'Quote Call Error',
+            'Transfer Call Error',
+            'Patch Call Error',
+        ]) {
             assert.equal(values[headers.indexOf(column)], '');
         }
     });
@@ -227,16 +248,26 @@ function reportRequest(fileType: string): ReportDownloadRequest {
 
 function reportTransactionRepository(rows: Record<string, unknown>[]): TransactionRepository {
     return {
-        async countForReport() {
-            return rows.length;
+        async countForReport(_criteria: FindTransactionsQuery.Criteria, maxLimit: number) {
+            return {
+                count:  Math.min(rows.length, maxLimit),
+                capped: rows.length > maxLimit,
+            };
         },
         async findForReport(
             _criteria: FindTransactionsQuery.Criteria,
             _order: FindTransactionsQuery.Order,
-            offset: number,
+            cursor: string | undefined,
             limit: number,
         ) {
-            return rows.slice(offset, offset + limit);
+            const offset = cursor == null ? 0 : Number(Buffer.from(cursor, 'base64').toString('utf8'));
+            const records = rows.slice(offset, offset + limit);
+            const nextOffset = offset + records.length;
+            const nextCursor = nextOffset < rows.length
+                ? Buffer.from(String(nextOffset), 'utf8').toString('base64')
+                : undefined;
+
+            return {records, nextCursor};
         },
     } as unknown as TransactionRepository;
 }

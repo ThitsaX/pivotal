@@ -19,7 +19,10 @@ import {
     PAGE_SIZE_OPTIONS,
 } from '../../modules/audit/helpers';
 import type {
+    CountResponse,
+    CursorDirection,
     DateTimeDisplayParts,
+    PageInfo,
     QueryResponse,
     SelectOption,
     ViewDefinition,
@@ -38,19 +41,14 @@ const emit = defineEmits<{
 const route = useRoute();
 const router = useRouter();
 
-const MAX_SEARCH_RESULT_ROWS = 500_000;
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_ORDER_DIRECTION = 'DESC';
+const DEFAULT_START_MODE = 'today';
 const TIME_RANGE_MODE_KEYS = [
     {
         mode: 'transactionStartAtMode',
         start: 'transactionStartAtStart',
         end: 'transactionStartAtEnd',
-    },
-    {
-        mode: 'transactionCompletedAtMode',
-        start: 'transactionCompletedAtStart',
-        end: 'transactionCompletedAtEnd',
     },
 ] as const;
 
@@ -60,7 +58,7 @@ const createInitialCriteria = (): Record<string, string> => {
     );
 
     for (const field of TIME_RANGE_MODE_KEYS) {
-        criteria[field.mode] = '';
+        criteria[field.mode] = DEFAULT_START_MODE;
     }
 
     return criteria;
@@ -73,6 +71,12 @@ const requestError = ref<string | null>(null);
 const requestErrorEyebrow = ref('Search Failed');
 const requestErrorTitle = ref('Audit search could not be completed');
 const results = ref<QueryResponse | null>(null);
+const pageInfo = ref<PageInfo>({hasNext: false, hasPrev: false});
+const totalCount = ref<CountResponse | null>(null);
+const countLoading = ref(false);
+const countSignature = ref<string | null>(null);
+const rowStart = ref(1);
+const rowStartKnown = ref(true);
 const lastRequestedUrl = ref<string>('');
 const lastLoadedAt = ref<string | null>(null);
 const isSearchFormVisible = ref(true);
@@ -86,10 +90,16 @@ const lastSubmittedCriteria = ref<Record<string, string>>({});
 
 const state = reactive<ViewState>({
     criteria: createInitialCriteria(),
-    page: 0,
     size: DEFAULT_PAGE_SIZE,
     orderColumn: defaultOrderColumn(),
     orderDirection: DEFAULT_ORDER_DIRECTION,
+});
+
+// Keyset navigation — ephemeral component state (NOT route-synced), so a hard reload
+// returns the first page of the same search rather than a stale cursor offset.
+const nav = reactive<{direction: CursorDirection; token: string}>({
+    direction: 'first',
+    token: '',
 });
 
 const criteriaSections = computed(() => {
@@ -100,12 +110,6 @@ const hasNoResults = computed((): boolean => {
     return results.value != null && results.value.records.length === 0;
 });
 
-const totalPages = computed((): number => {
-    const totalRecords = results.value?.totalRecords ?? 0;
-
-    return Math.max(1, Math.ceil(totalRecords / state.size));
-});
-
 const recordWindow = computed((): {start: number; end: number} => {
     const response = results.value;
 
@@ -113,18 +117,29 @@ const recordWindow = computed((): {start: number; end: number} => {
         return {start: 0, end: 0};
     }
 
-    const start = state.page * state.size + 1;
-    const end = Math.min(start + response.records.length - 1, response.totalRecords);
+    return {start: rowStart.value, end: rowStart.value + response.records.length - 1};
+});
 
-    return {start, end};
+const countDisplay = computed((): string => {
+    const count = totalCount.value;
+
+    if (count == null) {
+        return '…';
+    }
+
+    if (count.capped) {
+        return `~${count.limit.toLocaleString()}+`;
+    }
+
+    return count.count.toLocaleString();
 });
 
 const canGoPreviousPage = computed((): boolean => {
-    return !loading.value && state.page > 0;
+    return !loading.value && pageInfo.value.hasPrev;
 });
 
 const canGoNextPage = computed((): boolean => {
-    return !loading.value && state.page + 1 < totalPages.value;
+    return !loading.value && pageInfo.value.hasNext;
 });
 
 const handleKeyDown = (event: KeyboardEvent): void => {
@@ -227,17 +242,6 @@ const resolvePresetRange = (mode: string): {start: string; end: string} => {
         };
     }
 
-    if (mode === 'yesterdayToday') {
-        const today = formatPartsInZone(now);
-        const yesterday = shiftDateByDays(today.year, today.month, today.day, -1);
-        const tomorrow = shiftDateByDays(today.year, today.month, today.day, 1);
-
-        return {
-            start: zonedLocalToUtcIso(localMidnight(yesterday.year, yesterday.month, yesterday.day), props.selectedTimeZone),
-            end: zonedLocalToUtcIso(localMidnight(tomorrow.year, tomorrow.month, tomorrow.day), props.selectedTimeZone),
-        };
-    }
-
     return {
         start: '',
         end: '',
@@ -282,8 +286,7 @@ const queryHasValue = (query: LocationQuery, key: string): boolean => {
 
 const hasSearchRouteQuery = (query: LocationQuery): boolean => {
     if (
-        queryHasValue(query, 'page')
-        || queryHasValue(query, 'size')
+        queryHasValue(query, 'size')
         || queryHasValue(query, 'orderColumn')
         || queryHasValue(query, 'orderDirection')
     ) {
@@ -297,16 +300,6 @@ const hasSearchRouteQuery = (query: LocationQuery): boolean => {
     }
 
     return TIME_RANGE_MODE_KEYS.some((field): boolean => queryHasValue(query, field.mode));
-};
-
-const parseNonNegativeInteger = (value: string, fallback: number): number => {
-    const parsed = Number.parseInt(value, 10);
-
-    if (!Number.isFinite(parsed) || parsed < 0) {
-        return fallback;
-    }
-
-    return parsed;
 };
 
 const parsePositiveInteger = (value: string, fallback: number): number => {
@@ -335,18 +328,28 @@ const resetCriteriaState = (): void => {
     }
 
     for (const field of TIME_RANGE_MODE_KEYS) {
-        state.criteria[field.mode] = '';
+        state.criteria[field.mode] = DEFAULT_START_MODE;
     }
+};
+
+const resetPagination = (): void => {
+    nav.direction = 'first';
+    nav.token = '';
+    rowStart.value = 1;
+    rowStartKnown.value = true;
+    pageInfo.value = {hasNext: false, hasPrev: false};
 };
 
 const resetSearchState = (): void => {
     resetCriteriaState();
-    state.page = 0;
+    resetPagination();
     state.size = DEFAULT_PAGE_SIZE;
     state.orderColumn = defaultOrderColumn();
     state.orderDirection = DEFAULT_ORDER_DIRECTION;
     requestError.value = null;
     results.value = null;
+    totalCount.value = null;
+    countSignature.value = null;
     lastRequestedUrl.value = '';
     lastLoadedAt.value = null;
     lastSubmittedCriteria.value = {};
@@ -364,7 +367,6 @@ const applyRouteQueryToState = (query: LocationQuery): void => {
         state.criteria[field.mode] = firstQueryValue(query[field.mode]).trim();
     }
 
-    state.page = parseNonNegativeInteger(firstQueryValue(query.page), 0);
     state.size = parsePositiveInteger(firstQueryValue(query.size), DEFAULT_PAGE_SIZE);
     state.orderColumn = parseOrderColumn(firstQueryValue(query.orderColumn));
     state.orderDirection = parseOrderDirection(firstQueryValue(query.orderDirection));
@@ -389,7 +391,6 @@ const buildSearchRouteQuery = (): LocationQueryRaw => {
         appendQueryValue(query, field.mode, state.criteria[field.mode] ?? '');
     }
 
-    appendQueryValue(query, 'page', state.page);
     appendQueryValue(query, 'size', state.size);
     appendQueryValue(query, 'orderColumn', state.orderColumn);
     appendQueryValue(query, 'orderDirection', state.orderDirection);
@@ -434,7 +435,7 @@ const navigateToSearchRoute = (mode: 'push' | 'replace' = 'push'): void => {
 
     if (isSameQuery(route.query, query)) {
         lastSubmittedCriteria.value = snapshotCriteriaForQuery();
-        void runSearch();
+        executeNewSearch();
         return;
     }
 
@@ -477,7 +478,7 @@ const applySearchRouteQuery = (query: LocationQuery): void => {
     applyRouteQueryToState(query);
     lastSubmittedCriteria.value = snapshotCriteriaForQuery();
     isSearchFormVisible.value = false;
-    void runSearch();
+    executeNewSearch();
 };
 
 onMounted((): void => {
@@ -497,7 +498,6 @@ const refreshResults = (): void => {
 };
 
 const submitSearch = (): void => {
-    state.page = 0;
     isSearchFormVisible.value = false;
     navigateToSearchRoute();
 };
@@ -512,7 +512,6 @@ const closePageSizeDialog = (): void => {
 
 const applyPageSize = (size: number): void => {
     state.size = size;
-    state.page = 0;
     isPageSizeDialogOpen.value = false;
     navigateToSearchRoute();
 };
@@ -532,7 +531,7 @@ const toIsoString = (value: string): string | undefined => {
     return parsed.toISOString();
 };
 
-const buildQueryParams = (criteria: Record<string, string>): URLSearchParams => {
+const buildCriteriaParams = (criteria: Record<string, string>): URLSearchParams => {
     const params = new URLSearchParams();
 
     for (const field of props.viewDefinition.criteriaFields) {
@@ -555,17 +554,54 @@ const buildQueryParams = (criteria: Record<string, string>): URLSearchParams => 
         params.set(field.key, rawValue);
     }
 
-    params.set('page', String(state.page));
-    params.set('size', String(state.size));
-    params.set('orderColumn', state.orderColumn);
-    params.set('orderDirection', state.orderDirection);
-
     return params;
 };
 
+// Fires the list + count requests for a brand-new search. The count runs in parallel and is
+// cached per filter signature, so paging (First/Prev/Next/Last) and size/sort changes never
+// re-count.
+const executeNewSearch = (): void => {
+    resetPagination();
+
+    const signature = buildCriteriaParams(lastSubmittedCriteria.value).toString();
+
+    if (signature !== countSignature.value) {
+        countSignature.value = signature;
+        void runCount();
+    }
+
+    void runSearch();
+};
+
+const runCount = async (): Promise<void> => {
+    const params = buildCriteriaParams(lastSubmittedCriteria.value);
+    const requestPath = `${props.viewDefinition.endpoint}/count?${params.toString()}`;
+
+    countLoading.value = true;
+    totalCount.value = null;
+
+    try {
+        totalCount.value = await apiClient.get<CountResponse>(requestPath);
+    } catch {
+        totalCount.value = null;
+    } finally {
+        countLoading.value = false;
+    }
+};
+
 const runSearch = async (): Promise<void> => {
-    const params = buildQueryParams(lastSubmittedCriteria.value);
+    const params = buildCriteriaParams(lastSubmittedCriteria.value);
+    params.set('size', String(state.size));
+    params.set('orderColumn', state.orderColumn);
+    params.set('orderDirection', state.orderDirection);
+    params.set('direction', nav.direction);
+
+    if (nav.token) {
+        params.set('cursor', nav.token);
+    }
+
     const requestPath = `${props.viewDefinition.endpoint}?${params.toString()}`;
+    const requestedDirection = nav.direction;
 
     loading.value = true;
     requestError.value = null;
@@ -576,20 +612,23 @@ const runSearch = async (): Promise<void> => {
     try {
         const payload = await apiClient.get<QueryResponse>(requestPath);
 
-        if (payload.totalRecords > MAX_SEARCH_RESULT_ROWS) {
-            requestErrorEyebrow.value = 'Query Too Broad';
-            requestErrorTitle.value = 'Please optimize the search query';
-            requestError.value = `This search matched ${payload.totalRecords.toLocaleString()} rows. Please optimize the query before searching again because there are more than ${MAX_SEARCH_RESULT_ROWS.toLocaleString()} rows.`;
-            results.value = null;
-            return;
-        }
-
-        if (payload.pageRequest != null) {
-            state.page = payload.pageRequest.page;
-            state.size = payload.pageRequest.size;
-        }
-
         results.value = payload;
+        pageInfo.value = payload.pageInfo ?? {hasNext: false, hasPrev: false};
+
+        // "Showing X-Y" for the Last page needs the absolute offset, which is only known when
+        // the total count is exact (not capped at MAX_LIMIT).
+        if (requestedDirection === 'last') {
+            const count = totalCount.value;
+
+            if (count != null && !count.capped) {
+                rowStart.value = Math.max(1, count.count - payload.records.length + 1);
+                rowStartKnown.value = true;
+            } else {
+                rowStart.value = 1;
+                rowStartKnown.value = false;
+            }
+        }
+
         lastLoadedAt.value = new Date().toISOString();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1341,17 +1380,21 @@ const sortByColumn = (columnKey: string): void => {
         state.orderDirection = 'ASC';
     }
 
-    state.page = 0;
     navigateToSearchRoute();
 };
 
+// Keyset paging is ephemeral: it mutates `nav` + the running offset and re-runs the list
+// query directly (no route change, no re-count).
 const goToPreviousPage = (): void => {
     if (!canGoPreviousPage.value) {
         return;
     }
 
-    state.page -= 1;
-    navigateToSearchRoute();
+    nav.direction = 'prev';
+    nav.token = pageInfo.value.startCursor ?? '';
+    rowStart.value = Math.max(1, rowStart.value - state.size);
+    rowStartKnown.value = true;
+    void runSearch();
 };
 
 const goToNextPage = (): void => {
@@ -1359,47 +1402,33 @@ const goToNextPage = (): void => {
         return;
     }
 
-    state.page += 1;
-    navigateToSearchRoute();
+    nav.direction = 'next';
+    nav.token = pageInfo.value.endCursor ?? '';
+    rowStart.value += results.value?.records.length ?? 0;
+    rowStartKnown.value = true;
+    void runSearch();
 };
 
 const goToFirstPage = (): void => {
-    if (loading.value || state.page === 0) {
+    if (loading.value || !pageInfo.value.hasPrev) {
         return;
     }
 
-    state.page = 0;
-    navigateToSearchRoute();
+    nav.direction = 'first';
+    nav.token = '';
+    rowStart.value = 1;
+    rowStartKnown.value = true;
+    void runSearch();
 };
 
 const goToLastPage = (): void => {
-    if (loading.value) {
+    if (loading.value || !pageInfo.value.hasNext) {
         return;
     }
 
-    const lastPage = Math.max(0, totalPages.value - 1);
-
-    if (state.page === lastPage) {
-        return;
-    }
-
-    state.page = lastPage;
-    navigateToSearchRoute();
-};
-
-const jumpToPage = (pageNumber: number): void => {
-    if (loading.value || !Number.isFinite(pageNumber)) {
-        return;
-    }
-
-    const normalizedPage = Math.min(Math.max(1, Math.trunc(pageNumber)), totalPages.value) - 1;
-
-    if (normalizedPage === state.page) {
-        return;
-    }
-
-    state.page = normalizedPage;
-    navigateToSearchRoute();
+    nav.direction = 'last';
+    nav.token = '';
+    void runSearch();
 };
 </script>
 
@@ -1454,7 +1483,7 @@ const jumpToPage = (pageNumber: number): void => {
                     </h3>
                     <template v-if="results && !loading">
                         <span class="rounded-full bg-accentSoft px-3 py-1 font-semibold text-accent">
-                            Total: {{ results.totalRecords }}
+                            Total: <span v-if="countLoading" class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent align-middle" /><template v-else>{{ countDisplay }}</template>
                         </span>
                         <span class="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-white px-3 py-1 text-accent">
                             <span>Time Zone:</span>
@@ -1476,10 +1505,9 @@ const jumpToPage = (pageNumber: number): void => {
                 <template v-if="results && !loading">
                     <PaginationInfoBar
                         class="border border-slate-200 bg-[#fbfdff] px-3 py-3"
-                        :page="state.page"
-                        :total-pages="totalPages"
                         :record-start="recordWindow.start"
                         :record-end="recordWindow.end"
+                        :record-start-known="rowStartKnown"
                         :page-size="state.size"
                         :can-go-previous-page="canGoPreviousPage"
                         :can-go-next-page="canGoNextPage"
@@ -1488,7 +1516,6 @@ const jumpToPage = (pageNumber: number): void => {
                         @previous-page="goToPreviousPage"
                         @next-page="goToNextPage"
                         @last-page="goToLastPage"
-                        @jump-page="jumpToPage"
                     />
 
                     <article v-if="hasNoResults" class="border border-slate-200 bg-[#f7faff] p-8 text-center text-sm text-muted">
@@ -2012,10 +2039,9 @@ const jumpToPage = (pageNumber: number): void => {
                         </div>
                         <div class="border-t border-slate-200 px-3 py-3">
                             <PaginationInfoBar
-                                :page="state.page"
-                                :total-pages="totalPages"
                                 :record-start="recordWindow.start"
                                 :record-end="recordWindow.end"
+                                :record-start-known="rowStartKnown"
                                 :page-size="state.size"
                                 :can-go-previous-page="canGoPreviousPage"
                                 :can-go-next-page="canGoNextPage"
@@ -2024,7 +2050,6 @@ const jumpToPage = (pageNumber: number): void => {
                                 @previous-page="goToPreviousPage"
                                 @next-page="goToNextPage"
                                 @last-page="goToLastPage"
-                                @jump-page="jumpToPage"
                             />
                         </div>
                     </article>

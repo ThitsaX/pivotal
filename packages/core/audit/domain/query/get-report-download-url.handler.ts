@@ -2,7 +2,6 @@ import {Inject} from '@nestjs/common';
 import {IQueryHandler, QueryHandler} from '@nestjs/cqrs';
 import {ReportDownloadStatus} from '../model';
 import {ReportDownloadRepository} from '../repository';
-import {S3ReportStorage} from '../reporting';
 import {GetReportDownloadUrlQuery} from './get-report-download-url.query';
 
 @QueryHandler(GetReportDownloadUrlQuery)
@@ -12,7 +11,6 @@ export class GetReportDownloadUrlHandler
     constructor(
         @Inject(ReportDownloadRepository)
         private readonly repository: ReportDownloadRepository,
-        private readonly storage: S3ReportStorage,
     ) {
     }
 
@@ -26,7 +24,7 @@ export class GetReportDownloadUrlHandler
         let downloadUrl: string | null = null;
 
         if (request.status === ReportDownloadStatus.Ready && request.fileKey != null) {
-            downloadUrl = await this.storage.presignedDownloadUrl(request.fileKey);
+            downloadUrl = query.input.downloadUrl;
         }
 
         return new GetReportDownloadUrlQuery.Output(

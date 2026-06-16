@@ -16,6 +16,9 @@ export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';
 export type PayloadKey = 'request' | 'response' | 'error';
 
+/** Keyset navigation sent to the backend. */
+export type CursorDirection = 'first' | 'last' | 'next' | 'prev';
+
 export interface SelectOption {
     label: string;
     value: string;
@@ -47,19 +50,27 @@ export interface ViewDefinition {
 
 export interface ViewState {
     criteria: Record<string, string>;
-    page: number;
     size: number;
     orderColumn: string;
     orderDirection: OrderDirection;
 }
 
+export interface PageInfo {
+    hasNext: boolean;
+    hasPrev: boolean;
+    startCursor?: string;
+    endCursor?: string;
+}
+
 export interface QueryResponse {
     records: Record<string, unknown>[];
-    totalRecords: number;
-    pageRequest: {
-        page: number;
-        size: number;
-    };
+    pageInfo: PageInfo;
+}
+
+export interface CountResponse {
+    count: number;
+    capped: boolean;
+    limit: number;
 }
 
 export interface SelectedPayload {

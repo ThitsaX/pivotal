@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import {BadRequestException, Injectable} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
@@ -12,12 +12,63 @@ import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from 
 @Injectable()
 export class TransactionRepository {
 
-    private static readonly DEFAULT_PAGE = 0;
     private static readonly SNOWFLAKE = Snowflake.get();
     private static readonly DEFAULT_SIZE = 20;
+    private static readonly MAX_SIZE = 200;
     private static readonly JSON_REPLACER = (_key: string, value: unknown): unknown => {
         return typeof value === 'bigint' ? value.toString() : value;
     };
+
+    // Flat list columns only — never the JSON blobs (parties/quotes/transfers/patch),
+    // which are read solely by the single-row detail view.
+    private static readonly LIST_SELECT = [
+        'transaction.id',
+        'transaction.correlationId',
+        'transaction.payerFsp',
+        'transaction.payeeFsp',
+        'transaction.payerIdType',
+        'transaction.payerId',
+        'transaction.payerSubId',
+        'transaction.payeeIdType',
+        'transaction.payeeId',
+        'transaction.payeeSubId',
+        'transaction.transactionInitiatorType',
+        'transaction.quotingCurrency',
+        'transaction.quotingAmount',
+        'transaction.transferCurrency',
+        'transaction.transferAmount',
+        'transaction.transactionType',
+        'transaction.subScenario',
+        'transaction.transferState',
+        'transaction.error',
+        'transaction.possibleDispute',
+        'transaction.flow',
+        'transaction.transactionStartedAt',
+        'transaction.transactionCompletedAt',
+    ];
+
+    private static readonly REPORT_SELECT = [
+        'transaction.id',
+        'transaction.correlationId',
+        'transaction.payerFsp',
+        'transaction.payeeFsp',
+        'transaction.payerIdType',
+        'transaction.payerId',
+        'transaction.payerSubId',
+        'transaction.payeeIdType',
+        'transaction.payeeId',
+        'transaction.payeeSubId',
+        'transaction.quotingCurrency',
+        'transaction.quotingAmount',
+        'transaction.transferState',
+        'transaction.possibleDispute',
+        'transaction.partiesError',
+        'transaction.quotesError',
+        'transaction.transfersError',
+        'transaction.patchError',
+        'transaction.transactionStartedAt',
+        'transaction.transactionCompletedAt',
+    ];
 
     constructor(
         @InjectRepository(Transaction, PIVOTAL_DB_WRITE_CONNECTION_NAME)
@@ -389,73 +440,497 @@ export class TransactionRepository {
         return this.writeRepository.save(existing);
     }
 
+    /**
+     * Keyset (cursor) pagination. Replaces offset + getManyAndCount + select-*.
+     *
+     * - Sorts on `(sortColumn, id)`; the Snowflake `id` is the unique tiebreaker.
+     * - Fetches `size + 1` rows to derive `hasNext`/`hasPrev` with no `COUNT(*)`.
+     * - DFSP access scope `(payer OR payee = :fspId)` is run as two index-seekable legs
+     *   and merged in memory (UNION semantics) instead of an OR that defeats the index.
+     */
     async find(
         criteria: FindTransactionsQuery.Criteria,
-        pageRequest: FindTransactionsQuery.PageRequest,
+        cursor: FindTransactionsQuery.Cursor,
         order: FindTransactionsQuery.Order,
         accessScope?: FindTransactionsQuery.AccessScope,
         target: DbTarget = DbTarget.Read,
     ): Promise<FindTransactionsQuery.Output> {
-        const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
+        const meta = TransactionRepository.sortMeta(order.column);
+        const size = TransactionRepository.clampSize(cursor.size);
+        const position = cursor.position;
 
-        this.applyCriteria(queryBuilder, criteria);
-        this.applyAccessScope(queryBuilder, accessScope);
-        this.applyOrdering(queryBuilder, order);
-        const finalPageRequest = this.applyPagination(queryBuilder, pageRequest.page, pageRequest.size);
-        const [records, totalRecords] = await queryBuilder.getManyAndCount();
+        const reverse =
+            position === FindTransactionsQuery.Cursor.Position.Prev ||
+            position === FindTransactionsQuery.Cursor.Position.Last;
+        const baseDir: 'ASC' | 'DESC' =
+            order.direction === FindTransactionsQuery.Order.Direction.Asc ? 'ASC' : 'DESC';
+        const effectiveDir: 'ASC' | 'DESC' = reverse ? (baseDir === 'DESC' ? 'ASC' : 'DESC') : baseDir;
+
+        const usesToken =
+            position === FindTransactionsQuery.Cursor.Position.Next ||
+            position === FindTransactionsQuery.Cursor.Position.Prev;
+        const decoded =
+            usesToken && cursor.token != null ? TransactionRepository.decodeCursor(cursor.token) : undefined;
+
+        const fetchLimit = size + 1;
+        let rows: Transaction[];
+
+        if (accessScope !== undefined) {
+            const [payerLeg, payeeLeg] = await Promise.all([
+                this.fetchLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payerFsp',
+                    fspId: accessScope.fspId,
+                }),
+                this.fetchLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payeeFsp',
+                    fspId: accessScope.fspId,
+                }),
+            ]);
+            rows = TransactionRepository.mergeLegs(payerLeg, payeeLeg, meta, effectiveDir, fetchLimit);
+        } else {
+            rows = await this.fetchLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, undefined);
+        }
+
+        const hasMore = rows.length > size;
+        let page = hasMore ? rows.slice(0, size) : rows;
+
+        if (reverse) {
+            page = page.reverse();
+        }
 
         return new FindTransactionsQuery.Output(
-            records.map((record) => TransactionRepository.toRecord(record)),
-            totalRecords,
-            new FindTransactionsQuery.PageRequest(finalPageRequest.page, finalPageRequest.size),
+            page.map((record) => TransactionRepository.toRecord(record)),
+            TransactionRepository.buildPageInfo(position, hasMore, page, meta),
         );
+    }
+
+    /**
+     * Count matching rows, capped at `maxLimit`. Index-only probe (`LIMIT maxLimit + 1`):
+     * the `+1` is the over-limit signal, so the scan never reads past the cap. DFSP scope
+     * counts the UNION (dedup by id) of the payer ∪ payee legs.
+     */
+    async count(
+        criteria: FindTransactionsQuery.Criteria,
+        maxLimit: number,
+        accessScope?: FindTransactionsQuery.AccessScope,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<{count: number; capped: boolean}> {
+        const probeLimit = maxLimit + 1;
+
+        const buildProbe = (legProperty?: string): [string, unknown[]] => {
+            const queryBuilder = this.getRepository(target)
+                                     .createQueryBuilder('transaction')
+                                     .select('transaction.id', 'id');
+            this.applyCriteria(queryBuilder, criteria);
+
+            if (legProperty !== undefined && accessScope !== undefined) {
+                queryBuilder.andWhere(`${legProperty} = :accessScopeFspId`, {
+                    accessScopeFspId: accessScope.fspId,
+                });
+            }
+
+            queryBuilder.limit(probeLimit);
+
+            return queryBuilder.getQueryAndParameters();
+        };
+
+        let sql: string;
+        let params: unknown[];
+
+        if (accessScope !== undefined) {
+            const [payerSql, payerParams] = buildProbe('transaction.payerFsp');
+            const [payeeSql, payeeParams] = buildProbe('transaction.payeeFsp');
+            sql = `SELECT COUNT(*) AS c FROM ((${payerSql}) UNION (${payeeSql})) u`;
+            params = [...payerParams, ...payeeParams];
+        } else {
+            const [probeSql, probeParams] = buildProbe();
+            sql = `SELECT COUNT(*) AS c FROM (${probeSql}) t`;
+            params = probeParams;
+        }
+
+        const result = await this.getRepository(target).query(sql, params);
+        const matched = Number(result[0]?.c ?? 0);
+
+        return {count: Math.min(matched, maxLimit), capped: matched > maxLimit};
     }
 
     async countForReport(
         criteria: FindTransactionsQuery.Criteria,
+        maxLimit: number,
         accessScope?: FindTransactionsQuery.AccessScope,
         target: DbTarget = DbTarget.Read,
-    ): Promise<number> {
-        const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
-
-        this.applyCriteria(queryBuilder, criteria);
-        this.applyAccessScope(queryBuilder, accessScope);
-
-        return queryBuilder.getCount();
+    ): Promise<{count: number; capped: boolean}> {
+        return this.count(criteria, maxLimit, accessScope, target);
     }
 
     async findForReport(
         criteria: FindTransactionsQuery.Criteria,
         order: FindTransactionsQuery.Order,
-        offset: number,
+        cursorToken: string | undefined,
         limit: number,
         accessScope?: FindTransactionsQuery.AccessScope,
         target: DbTarget = DbTarget.Read,
-    ): Promise<Record<string, unknown>[]> {
-        const queryBuilder = this.getRepository(target).createQueryBuilder('transaction');
+    ): Promise<TransactionRepository.ReportPage> {
+        const meta = TransactionRepository.sortMeta(order.column);
+        const effectiveDir: 'ASC' | 'DESC' =
+            order.direction === FindTransactionsQuery.Order.Direction.Asc ? 'ASC' : 'DESC';
+        const decoded = cursorToken == null ? undefined : TransactionRepository.decodeCursor(cursorToken);
+        const fetchLimit = Math.max(1, Math.trunc(limit)) + 1;
+        let rows: Transaction[];
 
-        this.applyCriteria(queryBuilder, criteria);
-        this.applyAccessScope(queryBuilder, accessScope);
-        this.applyOrdering(queryBuilder, order);
-        queryBuilder.skip(offset).take(limit);
-
-        const records = await queryBuilder.getMany();
-
-        return records.map((record) => TransactionRepository.toReportRecord(record));
-    }
-
-    private applyAccessScope(
-        queryBuilder: SelectQueryBuilder<Transaction>,
-        accessScope: FindTransactionsQuery.AccessScope | undefined,
-    ): void {
-        if (accessScope === undefined) {
-            return;
+        if (accessScope !== undefined) {
+            const [payerLeg, payeeLeg] = await Promise.all([
+                this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payerFsp',
+                    fspId: accessScope.fspId,
+                }),
+                this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, {
+                    property: 'transaction.payeeFsp',
+                    fspId: accessScope.fspId,
+                }),
+            ]);
+            rows = TransactionRepository.mergeLegs(payerLeg, payeeLeg, meta, effectiveDir, fetchLimit);
+        } else {
+            rows = await this.fetchReportLeg(criteria, meta, effectiveDir, decoded, fetchLimit, target, undefined);
         }
 
-        queryBuilder.andWhere(
-            '(transaction.payerFsp = :accessScopeFspId OR transaction.payeeFsp = :accessScopeFspId)',
-            {accessScopeFspId: accessScope.fspId},
-        );
+        const hasMore = rows.length >= fetchLimit;
+        const page = hasMore ? rows.slice(0, fetchLimit - 1) : rows;
+        const nextCursor = hasMore && page.length > 0
+            ? TransactionRepository.encodeCursor(page[page.length - 1], meta)
+            : undefined;
+
+        return {
+            records: page.map((record) => TransactionRepository.toReportRecord(record)),
+            nextCursor,
+        };
+    }
+
+    /**
+     * Runs ONE index-seekable keyset query and returns up to `fetchLimit` (= size + 1) rows.
+     *
+     * This is the single building block for every page: it applies the search criteria, the
+     * keyset "beyond the cursor" predicate (when paging), the sort `(sortColumn, id)` and the
+     * `LIMIT` — selecting only the flat list columns (never the JSON blobs).
+     *
+     * `leg` scopes the query to one FSP column:
+     *   - `undefined`          → HUB / unscoped (single query over the whole table).
+     *   - `{payerFsp = :fsp}`  → the DFSP "payer leg".
+     *   - `{payeeFsp = :fsp}`  → the DFSP "payee leg".
+     * For a DFSP caller `find()` runs the payer leg and the payee leg separately (each hitting
+     * its own composite index) and hands both to {@link mergeLegs}, instead of a single
+     * `(payerFsp OR payeeFsp)` query that cannot use either index.
+     */
+    private async fetchLeg(
+        criteria: FindTransactionsQuery.Criteria,
+        meta: TransactionRepository.SortMeta,
+        effectiveDir: 'ASC' | 'DESC',
+        decoded: TransactionRepository.DecodedCursor | undefined,
+        fetchLimit: number,
+        target: DbTarget,
+        leg: {property: string; fspId: string} | undefined,
+    ): Promise<Transaction[]> {
+        const queryBuilder = this.getRepository(target)
+                                 .createQueryBuilder('transaction')
+                                 .select(TransactionRepository.LIST_SELECT);
+
+        this.applyCriteria(queryBuilder, criteria);
+
+        if (leg !== undefined) {
+            queryBuilder.andWhere(`${leg.property} = :accessScopeFspId`, {accessScopeFspId: leg.fspId});
+        }
+
+        if (decoded !== undefined) {
+            const keyset = TransactionRepository.keysetWhere(meta, effectiveDir, decoded);
+            queryBuilder.andWhere(keyset.sql, keyset.params);
+        }
+
+        queryBuilder
+            .orderBy(meta.property, effectiveDir)
+            .addOrderBy('transaction.id', effectiveDir)
+            .limit(fetchLimit);
+
+        return queryBuilder.getMany();
+    }
+
+    private async fetchReportLeg(
+        criteria: FindTransactionsQuery.Criteria,
+        meta: TransactionRepository.SortMeta,
+        effectiveDir: 'ASC' | 'DESC',
+        decoded: TransactionRepository.DecodedCursor | undefined,
+        fetchLimit: number,
+        target: DbTarget,
+        leg: {property: string; fspId: string} | undefined,
+    ): Promise<Transaction[]> {
+        const queryBuilder = this.getRepository(target)
+                                 .createQueryBuilder('transaction')
+                                 .select(TransactionRepository.REPORT_SELECT);
+
+        this.applyCriteria(queryBuilder, criteria);
+
+        if (leg !== undefined) {
+            queryBuilder.andWhere(`${leg.property} = :accessScopeFspId`, {accessScopeFspId: leg.fspId});
+        }
+
+        if (decoded !== undefined) {
+            const keyset = TransactionRepository.keysetWhere(meta, effectiveDir, decoded);
+            queryBuilder.andWhere(keyset.sql, keyset.params);
+        }
+
+        queryBuilder
+            .orderBy(meta.property, effectiveDir)
+            .addOrderBy('transaction.id', effectiveDir)
+            .limit(fetchLimit);
+
+        return queryBuilder.getMany();
+    }
+
+    private static sortMeta(column: FindTransactionsQuery.Order.Column): TransactionRepository.SortMeta {
+        switch (column) {
+            case FindTransactionsQuery.Order.Column.CorrelationId:
+                return {
+                    property: 'transaction.correlationId',
+                    entityField: 'correlationId',
+                    kind: 'string',
+                    nullable: false,
+                };
+            case FindTransactionsQuery.Order.Column.TransactionCompletedAt:
+                return {
+                    property: 'transaction.transactionCompletedAt',
+                    entityField: 'transactionCompletedAt',
+                    kind: 'datetime',
+                    nullable: true,
+                };
+            case FindTransactionsQuery.Order.Column.TransactionStartAt:
+            default:
+                return {
+                    property: 'transaction.transactionStartedAt',
+                    entityField: 'transactionStartedAt',
+                    kind: 'datetime',
+                    nullable: false,
+                };
+        }
+    }
+
+    private static clampSize(size: number): number {
+        if (!Number.isFinite(size) || size <= 0) {
+            return TransactionRepository.DEFAULT_SIZE;
+        }
+
+        return Math.min(Math.trunc(size), TransactionRepository.MAX_SIZE);
+    }
+
+    private static encodeCursor(record: Transaction, meta: TransactionRepository.SortMeta): string {
+        const raw = (record as unknown as Record<string, unknown>)[meta.entityField];
+
+        let value: string | null;
+
+        if (raw == null) {
+            value = null;
+        } else if (meta.kind === 'datetime') {
+            value = (raw instanceof Date ? raw : new Date(raw as string)).toISOString();
+        } else {
+            value = String(raw);
+        }
+
+        const payload = JSON.stringify({v: value, id: String(record.id)});
+
+        return Buffer.from(payload, 'utf8').toString('base64');
+    }
+
+    private static decodeCursor(token: string): TransactionRepository.DecodedCursor {
+        try {
+            const json = Buffer.from(token, 'base64').toString('utf8');
+            const parsed = JSON.parse(json) as {v?: unknown; id?: unknown};
+
+            if (parsed == null || parsed.id == null) {
+                throw new Error('missing id');
+            }
+
+            return {v: parsed.v == null ? null : String(parsed.v), id: String(parsed.id)};
+        } catch {
+            throw new BadRequestException({
+                code: 'AUDIT_INVALID_CURSOR',
+                message: 'The pagination cursor is invalid.',
+            });
+        }
+    }
+
+    /**
+     * Builds the "strictly beyond the cursor" predicate for one keyset page, honouring
+     * MySQL null ordering (ASC → nulls first, DESC → nulls last) for the nullable
+     * `transaction_completed_at` sort.
+     */
+    private static keysetWhere(
+        meta: TransactionRepository.SortMeta,
+        effectiveDir: 'ASC' | 'DESC',
+        cursor: TransactionRepository.DecodedCursor,
+    ): {sql: string; params: Record<string, unknown>} {
+        const col = meta.property;
+        const idCol = 'transaction.id';
+        const params: Record<string, unknown> = {keysetCid: cursor.id};
+        const cursorIsNull = cursor.v == null;
+
+        if (!cursorIsNull) {
+            params.keysetCv = meta.kind === 'datetime' ? new Date(cursor.v as string) : cursor.v;
+        }
+
+        if (effectiveDir === 'DESC') {
+            if (cursorIsNull) {
+                return {sql: `(${col} IS NULL AND ${idCol} < :keysetCid)`, params};
+            }
+
+            let core = `(${col} < :keysetCv OR (${col} = :keysetCv AND ${idCol} < :keysetCid))`;
+
+            if (meta.nullable) {
+                core = `(${core} OR ${col} IS NULL)`;
+            }
+
+            return {sql: core, params};
+        }
+
+        if (cursorIsNull) {
+            return {sql: `((${col} IS NOT NULL) OR (${col} IS NULL AND ${idCol} > :keysetCid))`, params};
+        }
+
+        return {
+            sql: `(${col} > :keysetCv OR (${col} = :keysetCv AND ${idCol} > :keysetCid))`,
+            params,
+        };
+    }
+
+    /**
+     * Merges the two DFSP legs (payer ∪ payee) into a single ordered page — the in-memory
+     * equivalent of a SQL `UNION`.
+     *
+     * Each leg arrives already sorted by `(sortColumn, id)` in `effectiveDir` and capped at
+     * `limit` rows. This:
+     *   1. de-duplicates by `id` (a transaction where payer == payee == the caller's FSP
+     *      appears in both legs — keep it once), then
+     *   2. re-sorts the combined set with the SAME ordering the DB used (so the merged page
+     *      matches what a single `UNION ... ORDER BY` would have produced), and
+     *   3. slices back to `limit` rows (= size + 1, preserving the `hasNext`/`hasPrev` probe).
+     */
+    private static mergeLegs(
+        payerLeg: Transaction[],
+        payeeLeg: Transaction[],
+        meta: TransactionRepository.SortMeta,
+        effectiveDir: 'ASC' | 'DESC',
+        limit: number,
+    ): Transaction[] {
+        const byId = new Map<string, Transaction>();
+
+        for (const record of payerLeg) {
+            byId.set(String(record.id), record);
+        }
+
+        for (const record of payeeLeg) {
+            const id = String(record.id);
+
+            if (!byId.has(id)) {
+                byId.set(id, record);
+            }
+        }
+
+        return Array.from(byId.values())
+                    .sort((left, right) => TransactionRepository.compareForMerge(left, right, meta, effectiveDir))
+                    .slice(0, limit);
+    }
+
+    private static compareForMerge(
+        left: Transaction,
+        right: Transaction,
+        meta: TransactionRepository.SortMeta,
+        direction: 'ASC' | 'DESC',
+    ): number {
+        const leftValue = (left as unknown as Record<string, unknown>)[meta.entityField];
+        const rightValue = (right as unknown as Record<string, unknown>)[meta.entityField];
+
+        const valueComparison = TransactionRepository.compareValues(leftValue, rightValue, meta.kind, direction);
+
+        if (valueComparison !== 0) {
+            return valueComparison;
+        }
+
+        return TransactionRepository.compareId(String(left.id), String(right.id), direction);
+    }
+
+    private static compareValues(
+        left: unknown,
+        right: unknown,
+        kind: 'datetime' | 'string',
+        direction: 'ASC' | 'DESC',
+    ): number {
+        if (left == null && right == null) {
+            return 0;
+        }
+
+        // MySQL: NULLs sort first ASC / last DESC.
+        if (left == null) {
+            return direction === 'DESC' ? 1 : -1;
+        }
+
+        if (right == null) {
+            return direction === 'DESC' ? -1 : 1;
+        }
+
+        let comparison: number;
+
+        if (kind === 'datetime') {
+            const leftTime = left instanceof Date ? left.getTime() : new Date(left as string).getTime();
+            const rightTime = right instanceof Date ? right.getTime() : new Date(right as string).getTime();
+            comparison = leftTime < rightTime ? -1 : leftTime > rightTime ? 1 : 0;
+        } else {
+            const leftString = String(left);
+            const rightString = String(right);
+            comparison = leftString < rightString ? -1 : leftString > rightString ? 1 : 0;
+        }
+
+        return direction === 'DESC' ? -comparison : comparison;
+    }
+
+    private static compareId(left: string, right: string, direction: 'ASC' | 'DESC'): number {
+        const leftId = BigInt(left);
+        const rightId = BigInt(right);
+        const comparison = leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+
+        return direction === 'DESC' ? -comparison : comparison;
+    }
+
+    private static buildPageInfo(
+        position: FindTransactionsQuery.Cursor.Position,
+        hasMore: boolean,
+        page: Transaction[],
+        meta: TransactionRepository.SortMeta,
+    ): FindTransactionsQuery.PageInfo {
+        let hasNext: boolean;
+        let hasPrev: boolean;
+
+        switch (position) {
+            case FindTransactionsQuery.Cursor.Position.Next:
+                hasNext = hasMore;
+                hasPrev = true;
+                break;
+            case FindTransactionsQuery.Cursor.Position.Prev:
+                hasNext = true;
+                hasPrev = hasMore;
+                break;
+            case FindTransactionsQuery.Cursor.Position.Last:
+                hasNext = false;
+                hasPrev = hasMore;
+                break;
+            case FindTransactionsQuery.Cursor.Position.First:
+            default:
+                hasNext = hasMore;
+                hasPrev = false;
+                break;
+        }
+
+        const startCursor = page.length > 0 ? TransactionRepository.encodeCursor(page[0], meta) : undefined;
+        const endCursor =
+            page.length > 0 ? TransactionRepository.encodeCursor(page[page.length - 1], meta) : undefined;
+
+        return new FindTransactionsQuery.PageInfo(hasNext, hasPrev, startCursor, endCursor);
     }
 
     private getRepository(target: DbTarget): Repository<Transaction> {
@@ -533,12 +1008,6 @@ export class TransactionRepository {
             criteria.transactionStartAt,
             'transactionStartAt',
         );
-        this.applyDateRange(
-            queryBuilder,
-            'transaction.transactionCompletedAt',
-            criteria.transactionCompletedAt,
-            'transactionCompletedAt',
-        );
 
         if (criteria.error !== undefined) {
             queryBuilder.andWhere('transaction.error = :error', {error: criteria.error});
@@ -567,56 +1036,6 @@ export class TransactionRepository {
             queryBuilder.andWhere(`${column} < :${parameterPrefix}EndExclusive`, {
                 [`${parameterPrefix}EndExclusive`]: range.endExclusive,
             });
-        }
-    }
-
-    private applyOrdering(
-        queryBuilder: SelectQueryBuilder<Transaction>,
-        order: FindTransactionsQuery.Order,
-    ): void {
-        queryBuilder.orderBy(TransactionRepository.toOrderColumn(order.column), order.direction);
-    }
-
-    private applyPagination(
-        queryBuilder: SelectQueryBuilder<Transaction>,
-        page: number,
-        size: number,
-    ): {page: number; size: number} {
-        const finalPage = page >= 0 ? page : TransactionRepository.DEFAULT_PAGE;
-        const finalSize = size > 0 ? size : TransactionRepository.DEFAULT_SIZE;
-
-        queryBuilder.skip(finalPage * finalSize).take(finalSize);
-
-        return {page: finalPage, size: finalSize};
-    }
-
-    private static toOrderColumn(column: FindTransactionsQuery.Order.Column): string {
-        switch (column) {
-            case FindTransactionsQuery.Order.Column.Id:
-                return 'transaction.id';
-            case FindTransactionsQuery.Order.Column.CorrelationId:
-                return 'transaction.correlationId';
-            case FindTransactionsQuery.Order.Column.PayerFsp:
-                return 'transaction.payerFsp';
-            case FindTransactionsQuery.Order.Column.PayeeFsp:
-                return 'transaction.payeeFsp';
-            case FindTransactionsQuery.Order.Column.PayerId:
-                return 'transaction.payerId';
-            case FindTransactionsQuery.Order.Column.PayeeId:
-                return 'transaction.payeeId';
-            case FindTransactionsQuery.Order.Column.TransferType:
-                return 'transaction.transactionType';
-            case FindTransactionsQuery.Order.Column.SubScenario:
-                return 'transaction.subScenario';
-            case FindTransactionsQuery.Order.Column.TransactionCompletedAt:
-                return 'transaction.transactionCompletedAt';
-            case FindTransactionsQuery.Order.Column.Error:
-                return 'transaction.error';
-            case FindTransactionsQuery.Order.Column.Dispute:
-                return 'transaction.possibleDispute';
-            case FindTransactionsQuery.Order.Column.TransactionStartAt:
-            default:
-                return 'transaction.transactionStartedAt';
         }
     }
 
@@ -717,71 +1136,24 @@ export class TransactionRepository {
     }
 
     private static toReportRecord(record: Transaction): Record<string, unknown> {
-        const disputedPayload = (value: unknown) => record.possibleDispute ? TransactionRepository.toRawJson(value) : null;
-
         return {
-            id: record.id,
-            transferId: record.correlationId,
-            payerFsp: record.payerFsp,
-            payeeFsp: record.payeeFsp,
-            payerIdType: record.payerIdType,
-            payerId: record.payerId,
-            payerSubId: record.payerSubId,
-            payeeIdType: record.payeeIdType,
-            payeeId: record.payeeId,
-            payeeSubId: record.payeeSubId,
-            transactionInitiatorType: record.transactionInitiatorType,
+            transferId:      record.correlationId,
+            payerFsp:        record.payerFsp,
+            payeeFsp:        record.payeeFsp,
+            payerIdType:     record.payerIdType,
+            payerId:         record.payerId,
+            payerSubId:      record.payerSubId,
+            payeeIdType:     record.payeeIdType,
+            payeeId:         record.payeeId,
+            payeeSubId:      record.payeeSubId,
             quotingCurrency: record.quotingCurrency,
-            quotingAmount: record.quotingAmount,
-            transferCurrency: record.transferCurrency,
-            transferAmount: record.transferAmount,
-            transactionType: record.transactionType,
-            subScenario: record.subScenario,
-            transferState: record.transferState,
-            error: record.error,
-            dispute: record.possibleDispute,
-            flow: record.flow,
-            partiesRequestedAt: record.partiesRequestedAt,
-            partiesRespondedAt: record.partiesRespondedAt,
-            partiesRequest: disputedPayload(record.partiesRequest),
-            partiesResponse: disputedPayload(record.partiesResponse),
-            partiesError: disputedPayload(record.partiesError),
-            outboundPartiesRequestedAt: record.outboundPartiesRequestedAt,
-            outboundPartiesRespondedAt: record.outboundPartiesRespondedAt,
-            inboundPartiesRequestedAt: record.inboundPartiesRequestedAt,
-            inboundPartiesRespondedAt: record.inboundPartiesRespondedAt,
-            connectorPartiesRequestedAt: record.connectorPartiesRequestedAt,
-            connectorPartiesRespondedAt: record.connectorPartiesRespondedAt,
-            quotesRequestedAt: record.quotesRequestedAt,
-            quotesRespondedAt: record.quotesRespondedAt,
-            quotesRequest: disputedPayload(record.quotesRequest),
-            quotesResponse: disputedPayload(record.quotesResponse),
-            quotesError: disputedPayload(record.quotesError),
-            outboundQuotesRequestedAt: record.outboundQuotesRequestedAt,
-            outboundQuotesRespondedAt: record.outboundQuotesRespondedAt,
-            inboundQuotesRequestedAt: record.inboundQuotesRequestedAt,
-            inboundQuotesRespondedAt: record.inboundQuotesRespondedAt,
-            connectorQuotesRequestedAt: record.connectorQuotesRequestedAt,
-            connectorQuotesRespondedAt: record.connectorQuotesRespondedAt,
-            transfersRequestedAt: record.transfersRequestedAt,
-            transfersRespondedAt: record.transfersRespondedAt,
-            transfersRequest: disputedPayload(record.transfersRequest),
-            transfersResponse: disputedPayload(record.transfersResponse),
-            transfersError: disputedPayload(record.transfersError),
-            outboundTransfersRequestedAt: record.outboundTransfersRequestedAt,
-            outboundTransfersRespondedAt: record.outboundTransfersRespondedAt,
-            inboundTransfersRequestedAt: record.inboundTransfersRequestedAt,
-            inboundTransfersRespondedAt: record.inboundTransfersRespondedAt,
-            connectorTransfersRequestedAt: record.connectorTransfersRequestedAt,
-            connectorTransfersRespondedAt: record.connectorTransfersRespondedAt,
-            patchRequestedAt: record.patchRequestedAt,
-            patchRespondedAt: record.patchRespondedAt,
-            patchRequest: disputedPayload(record.patchRequest),
-            patchError: disputedPayload(record.patchError),
-            transactionStartedAt: record.transactionStartedAt,
-            transactionCompletedAt: record.transactionCompletedAt,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
+            quotingAmount:   record.quotingAmount,
+            transferState:   record.transferState,
+            dispute:         record.possibleDispute,
+            partiesError:    TransactionRepository.toRawJson(record.partiesError),
+            quotesError:     TransactionRepository.toRawJson(record.quotesError),
+            transfersError:  TransactionRepository.toRawJson(record.transfersError),
+            patchError:      TransactionRepository.toRawJson(record.patchError),
         };
     }
 
@@ -799,6 +1171,23 @@ export class TransactionRepository {
 }
 
 export namespace TransactionRepository {
+
+    export type ReportPage = {
+        records: Record<string, unknown>[];
+        nextCursor?: string;
+    };
+
+    export type SortMeta = {
+        property: string;
+        entityField: string;
+        kind: 'datetime' | 'string';
+        nullable: boolean;
+    };
+
+    export type DecodedCursor = {
+        v: string | null;
+        id: string;
+    };
 
     export type UpsertInput = {
         correlationId: string;

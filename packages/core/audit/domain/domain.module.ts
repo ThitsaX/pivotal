@@ -20,6 +20,7 @@ import {
 } from './command';
 import {ReportDownloadRequest, ReportDownloadRequestParam, Transaction} from './model';
 import {
+    CountTransactionsHandler,
     FindTransactionsHandler,
     GetReportDownloadStatusHandler,
     GetReportDownloadUrlHandler,
@@ -63,6 +64,7 @@ const CommandHandlers = [
 const QueryHandlers = [
     GetTransactionHandler,
     FindTransactionsHandler,
+    CountTransactionsHandler,
     GetReportDownloadStatusHandler,
     GetReportDownloadUrlHandler,
 ];
@@ -112,7 +114,7 @@ export class AuditDomainModule {
                     inject: asyncOptions.inject ?? [],
                 },
             ],
-            exports: [CqrsModule, ...Repositories],
+            exports: [CqrsModule, ...Repositories, S3ReportStorage],
         };
     }
 }
