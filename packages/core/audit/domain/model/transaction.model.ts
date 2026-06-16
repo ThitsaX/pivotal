@@ -35,6 +35,10 @@ const DECIMAL_TRANSFORMER = {
 @Index('transactions_15_idx', ['payerIdType', 'payerId', 'payerSubId', 'transactionStartedAt'])
 @Index('transactions_16_idx', ['payeeIdType', 'payeeId', 'payeeSubId', 'transactionStartedAt'])
 @Index('transactions_17_idx', ['possibleDispute', 'transactionStartedAt'])
+@Index('transactions_18_idx', ['transactionStartedAt', 'id'])
+@Index('transactions_19_idx', ['payerFsp', 'transactionStartedAt', 'id'])
+@Index('transactions_20_idx', ['payeeFsp', 'transactionStartedAt', 'id'])
+@Index('transactions_21_idx', ['transactionCompletedAt', 'id'])
 export class Transaction {
 
     private static readonly SNOWFLAKE = Snowflake.get();

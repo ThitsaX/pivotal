@@ -10,7 +10,7 @@ export namespace FindTransactionsQuery {
     export class Input {
         constructor(
             public readonly criteria: Criteria = new Criteria(),
-            public readonly pageRequest: PageRequest = new PageRequest(),
+            public readonly cursor: Cursor = new Cursor(),
             public readonly order: Order = new Order(),
             public readonly accessScope?: AccessScope,
         ) {
@@ -39,7 +39,6 @@ export namespace FindTransactionsQuery {
             public readonly transferType?: TransactionScenario,
             public readonly subScenario?: string,
             public readonly transactionStartAt?: DateRange,
-            public readonly transactionCompletedAt?: DateRange,
             public readonly error?: boolean,
             public readonly dispute?: boolean,
         ) {
@@ -54,11 +53,31 @@ export namespace FindTransactionsQuery {
         }
     }
 
-    export class PageRequest {
+    /**
+     * Keyset (cursor) navigation request. Replaces offset pagination.
+     *
+     * - `First`           — newest page (no token).
+     * - `Next` / `Prev`   — relative to `token` (the opaque cursor of the boundary row).
+     * - `Last`            — oldest page (no token).
+     *
+     * `size` is the page size; the repository fetches `size + 1` rows internally to
+     * derive `hasNext` / `hasPrev` without a `COUNT(*)`.
+     */
+    export class Cursor {
         constructor(
-            public readonly page: number = 0,
+            public readonly position: Cursor.Position = Cursor.Position.First,
+            public readonly token?: string,
             public readonly size: number = 20,
         ) {
+        }
+    }
+
+    export namespace Cursor {
+        export enum Position {
+            First = 'first',
+            Last = 'last',
+            Next = 'next',
+            Prev = 'prev',
         }
     }
 
@@ -73,18 +92,9 @@ export namespace FindTransactionsQuery {
     export namespace Order {
 
         export enum Column {
-            Id = 'id',
             CorrelationId = 'correlationId',
-            PayerFsp = 'payerFsp',
-            PayeeFsp = 'payeeFsp',
-            PayerId = 'payerId',
-            PayeeId = 'payeeId',
-            TransferType = 'transferType',
-            SubScenario = 'subScenario',
             TransactionStartAt = 'transactionStartAt',
             TransactionCompletedAt = 'transactionCompletedAt',
-            Error = 'error',
-            Dispute = 'dispute',
         }
 
         export enum Direction {
@@ -93,11 +103,20 @@ export namespace FindTransactionsQuery {
         }
     }
 
+    export class PageInfo {
+        constructor(
+            public readonly hasNext: boolean,
+            public readonly hasPrev: boolean,
+            public readonly startCursor?: string,
+            public readonly endCursor?: string,
+        ) {
+        }
+    }
+
     export class Output {
         constructor(
             public readonly records: Record<string, unknown>[],
-            public readonly totalRecords: number,
-            public readonly pageRequest: PageRequest,
+            public readonly pageInfo: PageInfo,
         ) {
         }
     }
