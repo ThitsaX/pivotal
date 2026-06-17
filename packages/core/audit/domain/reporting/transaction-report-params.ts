@@ -22,8 +22,6 @@ export class TransactionReportParams {
             subScenario:                  criteria.subScenario ?? '',
             transactionStartAtStart:      criteria.transactionStartAt?.startInclusive?.toISOString() ?? '',
             transactionStartAtEnd:        criteria.transactionStartAt?.endExclusive?.toISOString() ?? '',
-            transactionCompletedAtStart:  criteria.transactionCompletedAt?.startInclusive?.toISOString() ?? '',
-            transactionCompletedAtEnd:    criteria.transactionCompletedAt?.endExclusive?.toISOString() ?? '',
             error:                        criteria.error == null ? '' : String(criteria.error),
             dispute:                      criteria.dispute == null ? '' : String(criteria.dispute),
             orderColumn:                  order.column,
@@ -47,7 +45,6 @@ export class TransactionReportParams {
             TransactionReportParams.emptyToUndefined(params.transferType) as any,
             TransactionReportParams.emptyToUndefined(params.subScenario),
             TransactionReportParams.toDateRange(params.transactionStartAtStart, params.transactionStartAtEnd),
-            TransactionReportParams.toDateRange(params.transactionCompletedAtStart, params.transactionCompletedAtEnd),
             TransactionReportParams.toOptionalBoolean(params.error),
             TransactionReportParams.toOptionalBoolean(params.dispute),
         );

@@ -6,13 +6,17 @@ export class GetReportDownloadUrlQuery {
 export namespace GetReportDownloadUrlQuery {
 
     export class AccessScope {
-        constructor(public readonly fspId: string) {
+        constructor(
+            public readonly userId?: string,
+            public readonly fspId?: string,
+        ) {
         }
     }
 
     export class Input {
         constructor(
             public readonly requestId: string,
+            public readonly downloadUrl: string,
             public readonly accessScope?: AccessScope,
         ) {
         }

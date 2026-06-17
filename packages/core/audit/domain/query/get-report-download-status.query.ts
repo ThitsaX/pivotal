@@ -6,7 +6,10 @@ export class GetReportDownloadStatusQuery {
 export namespace GetReportDownloadStatusQuery {
 
     export class AccessScope {
-        constructor(public readonly fspId: string) {
+        constructor(
+            public readonly userId?: string,
+            public readonly fspId?: string,
+        ) {
         }
     }
 

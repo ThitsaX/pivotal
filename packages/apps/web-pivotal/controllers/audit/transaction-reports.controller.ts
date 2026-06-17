@@ -1,4 +1,16 @@
-import {BadRequestException, Controller, Get, HttpCode, Inject, NotFoundException, Param, Post, Query} from '@nestjs/common';
+import {
+    BadRequestException,
+    Controller,
+    Get,
+    HttpCode,
+    Inject,
+    NotFoundException,
+    Param,
+    Post,
+    Query,
+    Req,
+    Res,
+} from '@nestjs/common';
 import {CommandBus, QueryBus} from '@nestjs/cqrs';
 import {AccessTokenClaims, PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {
@@ -6,8 +18,10 @@ import {
     FindTransactionsQuery,
     GetReportDownloadStatusQuery,
     GetReportDownloadUrlQuery,
+    S3ReportStorage,
 } from '@core/audit/domain';
 import {PartyIdType, TransactionScenario} from '@shared/fspiop';
+import type {Request, Response} from 'express';
 import {AuthUser} from '../../decorators';
 import {QueryParamsUtil} from '../query-params.util';
 
@@ -19,6 +33,7 @@ export class TransactionReportsAuditController {
         private readonly commandBus: CommandBus,
         @Inject(QueryBus)
         private readonly queryBus: QueryBus,
+        private readonly storage: S3ReportStorage,
     ) {
     }
 
@@ -65,8 +80,8 @@ export class TransactionReportsAuditController {
             subScenario,
             transactionStartAtStart,
             transactionStartAtEnd,
-            transactionCompletedAtStart,
-            transactionCompletedAtEnd,
+        transactionCompletedAtStart,
+        transactionCompletedAtEnd,
             error,
             dispute,
         );
@@ -90,7 +105,7 @@ export class TransactionReportsAuditController {
                 new CreateTransactionReportCommand.Input(
                     criteria,
                     order,
-                    QueryParamsUtil.toOptionalString(fileType) ?? 'csv',
+                    QueryParamsUtil.toOptionalString(fileType) ?? 'xlsx',
                     claims?.sub,
                     accessScope,
                 ),
@@ -128,11 +143,14 @@ export class TransactionReportsAuditController {
     async getReportDownloadUrl(
         @AuthUser() claims: AccessTokenClaims | undefined,
         @Param('requestId') requestId: string,
+        @Req() request: Request,
     ): Promise<GetReportDownloadUrlQuery.Output> {
+        const id = TransactionReportsAuditController.requireRequestId(requestId);
         const output = await this.queryBus.execute<GetReportDownloadUrlQuery, GetReportDownloadUrlQuery.Output>(
             new GetReportDownloadUrlQuery(
                 new GetReportDownloadUrlQuery.Input(
-                    TransactionReportsAuditController.requireRequestId(requestId),
+                    id,
+                    TransactionReportsAuditController.absoluteDownloadUrl(request, id),
                     TransactionReportsAuditController.toUrlAccessScope(claims),
                 ),
             ),
@@ -146,6 +164,49 @@ export class TransactionReportsAuditController {
         }
 
         return output;
+    }
+
+    @Get(':requestId/download')
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
+    async downloadReport(
+        @AuthUser() claims: AccessTokenClaims | undefined,
+        @Param('requestId') requestId: string,
+        @Req() request: Request,
+        @Res() response: Response,
+    ): Promise<void> {
+        const id = TransactionReportsAuditController.requireRequestId(requestId);
+        const output = await this.queryBus.execute<GetReportDownloadUrlQuery, GetReportDownloadUrlQuery.Output>(
+            new GetReportDownloadUrlQuery(
+                new GetReportDownloadUrlQuery.Input(
+                    id,
+                    TransactionReportsAuditController.absoluteDownloadUrl(request, id),
+                    TransactionReportsAuditController.toUrlAccessScope(claims),
+                ),
+            ),
+        );
+
+        if (!output.found) {
+            throw new NotFoundException({
+                code:    'REPORT_REQUEST_NOT_FOUND',
+                message: 'Report request was not found.',
+            });
+        }
+
+        if (output.status !== 'READY' || output.fileKey == null) {
+            throw new BadRequestException({
+                code:    'REPORT_REQUEST_NOT_READY',
+                message: 'Report request is not ready for download.',
+            });
+        }
+
+        const file = await this.storage.download(output.fileKey);
+        const fileName = TransactionReportsAuditController.safeFileName(
+            output.fileKey.split('/').pop() ?? `TransactionDetailReport-${id}.zip`,
+        );
+
+        response.setHeader('Content-Type', file.contentType);
+        response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        response.send(file.bytes);
     }
 
     private static toCriteria(
@@ -163,8 +224,8 @@ export class TransactionReportsAuditController {
         subScenario: string | undefined,
         transactionStartAtStart: string | undefined,
         transactionStartAtEnd: string | undefined,
-        transactionCompletedAtStart: string | undefined,
-        transactionCompletedAtEnd: string | undefined,
+        _transactionCompletedAtStart: string | undefined,
+        _transactionCompletedAtEnd: string | undefined,
         error: string | undefined,
         dispute: string | undefined,
     ): FindTransactionsQuery.Criteria {
@@ -186,13 +247,6 @@ export class TransactionReportsAuditController {
                 transactionStartAtEnd,
                 'transactionStartAtStart',
                 'transactionStartAtEnd',
-                (start?: Date, end?: Date) => new FindTransactionsQuery.DateRange(start, end),
-            ),
-            QueryParamsUtil.toDateRange(
-                transactionCompletedAtStart,
-                transactionCompletedAtEnd,
-                'transactionCompletedAtStart',
-                'transactionCompletedAtEnd',
                 (start?: Date, end?: Date) => new FindTransactionsQuery.DateRange(start, end),
             ),
             QueryParamsUtil.toOptionalBoolean(error, 'error'),
@@ -231,13 +285,17 @@ export class TransactionReportsAuditController {
     private static toStatusAccessScope(
         claims: AccessTokenClaims | undefined,
     ): GetReportDownloadStatusQuery.AccessScope | undefined {
-        return claims?.fspId == null ? undefined : new GetReportDownloadStatusQuery.AccessScope(claims.fspId);
+        return claims == null
+            ? undefined
+            : new GetReportDownloadStatusQuery.AccessScope(claims.sub, claims.fspId ?? undefined);
     }
 
     private static toUrlAccessScope(
         claims: AccessTokenClaims | undefined,
     ): GetReportDownloadUrlQuery.AccessScope | undefined {
-        return claims?.fspId == null ? undefined : new GetReportDownloadUrlQuery.AccessScope(claims.fspId);
+        return claims == null
+            ? undefined
+            : new GetReportDownloadUrlQuery.AccessScope(claims.sub, claims.fspId ?? undefined);
     }
 
     private static requireRequestId(requestId: string): string {
@@ -249,5 +307,26 @@ export class TransactionReportsAuditController {
         }
 
         return requestId;
+    }
+
+    private static absoluteDownloadUrl(request: Request, requestId: string): string {
+        const forwardedProto = TransactionReportsAuditController.firstHeaderValue(request.headers['x-forwarded-proto']);
+        const forwardedHost = TransactionReportsAuditController.firstHeaderValue(request.headers['x-forwarded-host']);
+        const proto = forwardedProto ?? request.protocol;
+        const host = forwardedHost ?? request.get('host');
+        const path = `/audit/transactions/reports/${encodeURIComponent(requestId)}/download`;
+
+        return host == null || host.length === 0 ? path : `${proto}://${host}${path}`;
+    }
+
+    private static firstHeaderValue(value: string | string[] | undefined): string | undefined {
+        const raw = Array.isArray(value) ? value[0] : value;
+        const first = raw?.split(',')[0]?.trim();
+
+        return first == null || first.length === 0 ? undefined : first;
+    }
+
+    private static safeFileName(fileName: string): string {
+        return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     }
 }

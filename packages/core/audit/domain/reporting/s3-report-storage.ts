@@ -51,6 +51,32 @@ export class S3ReportStorage {
         );
     }
 
+    async download(key: string): Promise<{bytes: Buffer; contentType: string}> {
+        if (this.client == null) {
+            throw new Error('Report S3 download is disabled. Set REPORT_S3_ENABLED=true.');
+        }
+
+        const output = await this.client.send(new GetObjectCommand({
+            Bucket: this.settings.s3Bucket,
+            Key:    key,
+        }));
+
+        if (output.Body == null) {
+            throw new Error(`Report object ${key} has no body.`);
+        }
+
+        const body = output.Body as {transformToByteArray?: () => Promise<Uint8Array>};
+
+        if (body.transformToByteArray == null) {
+            throw new Error('Report object body cannot be read by this runtime.');
+        }
+
+        return {
+            bytes: Buffer.from(await body.transformToByteArray()),
+            contentType: output.ContentType ?? 'application/octet-stream',
+        };
+    }
+
     buildObjectKey(reportType: string, requestId: string, extension: string): string {
         const prefix = this.normalizePrefix(this.settings.s3Prefix);
         const timestamp = this.fileDate(new Date());
