@@ -73,6 +73,10 @@ export class ReportDownloadRepository {
             where.requestedByFspId = accessScope.fspId;
         }
 
+        if (accessScope?.userId != null) {
+            where.requestedByUserId = accessScope.userId;
+        }
+
         return this.requestRepository(target).findOne({where});
     }
 
@@ -214,7 +218,8 @@ export class ReportDownloadRepository {
 export namespace ReportDownloadRepository {
 
     export type AccessScope = {
-        fspId: string;
+        fspId?: string;
+        userId?: string;
     };
 
     export type CreatePendingInput = {
