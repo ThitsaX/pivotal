@@ -61,6 +61,9 @@ export class FspiopErrors {
     static readonly GENERIC_PAYEE_BLOCKED_ERROR = new ErrorDefinition(FspiopErrorType.GENERIC_PAYEE_BLOCKED_ERROR, 'Payee is blocked or failed regulatory screening.');
     static readonly ROUNDING_VALUE_ERROR = new ErrorDefinition(FspiopErrorType.ROUNDING_VALUE_ERROR, 'Amount is invalid. Please enter the format specified by the service provider.');
     static readonly INACTIVE_ACCOUNT = new ErrorDefinition(FspiopErrorType.INACTIVE_ACCOUNT, 'Account is not active.');
+    static readonly PHONE_NUMBER_MISMATCH = new ErrorDefinition(FspiopErrorType.PHONE_NUMBER_MISMATCH, 'There was an error with your account number and phone number combination. Please contact your DFSP to verify the numbers.');
+    static readonly DUPLICATE_REFERENCE_ID = new ErrorDefinition(FspiopErrorType.DUPLICATE_REFERENCE_ID, 'Duplicate reference ID.');
+
 
     private static readonly ERROR_MAP: Readonly<Record<string, ErrorDefinition>> = {
         [FspiopErrors.COMMUNICATION_ERROR.errorType.code]: FspiopErrors.COMMUNICATION_ERROR,
@@ -120,7 +123,9 @@ export class FspiopErrors {
         [FspiopErrors.PAYEE_PERMISSION_ERROR.errorType.code]: FspiopErrors.PAYEE_PERMISSION_ERROR,
         [FspiopErrors.GENERIC_PAYEE_BLOCKED_ERROR.errorType.code]: FspiopErrors.GENERIC_PAYEE_BLOCKED_ERROR,
         [FspiopErrors.ROUNDING_VALUE_ERROR.errorType.code]: FspiopErrors.ROUNDING_VALUE_ERROR,
-        [FspiopErrors.INACTIVE_ACCOUNT.errorType.code]: FspiopErrors.INACTIVE_ACCOUNT
+        [FspiopErrors.INACTIVE_ACCOUNT.errorType.code]: FspiopErrors.INACTIVE_ACCOUNT,
+        [FspiopErrors.PHONE_NUMBER_MISMATCH.errorType.code]: FspiopErrors.PHONE_NUMBER_MISMATCH,
+        [FspiopErrors.DUPLICATE_REFERENCE_ID.errorType.code]: FspiopErrors.DUPLICATE_REFERENCE_ID
     };
 
     static find(code: string): ErrorDefinition | undefined {
