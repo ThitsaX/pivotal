@@ -6,7 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config as loadDotEnv } from 'dotenv';
 import { json } from 'express';
-import { FspiopHeaders, PivotalLogger } from '@shared/fspiop';
+import { FspiopHeaders, FspiopUserMessages, PivotalLogger } from '@shared/fspiop';
 import { AccessGuard, OutboundExceptionFilter } from './component';
 import { WebOutboundAppModule } from './app.module';
 import { createOutboundValidationException } from './component/outbound-validation-error';
@@ -19,7 +19,6 @@ const ROOT_MARKER_DIR = 'packages';
 
 const findRepoRoot = (): string => {
     const startPoints = [process.cwd(), dirname(process.argv[1] ?? process.cwd())];
-
     for (const startPoint of startPoints) {
         let current = resolve(startPoint);
 
@@ -49,6 +48,7 @@ const bootstrap = async (): Promise<void> => {
     const rootEnvPath = resolve(repoRoot, ROOT_ENV_LOCATION);
     const moduleEnvPath = resolve(repoRoot, MODULE_ENV_LOCATION);
 
+
     if (existsSync(rootEnvPath)) {
         loadDotEnv({ path: rootEnvPath });
         Logger.log(`Loaded env from ${rootEnvPath}.`, 'Bootstrap');
@@ -58,6 +58,7 @@ const bootstrap = async (): Promise<void> => {
         loadDotEnv({ path: moduleEnvPath, override: true });
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
+    const language = FspiopUserMessages.resolveLanguage(process.env['ERROR_MESSAGE_LANGUAGE']);
 
     const port = Number(process.env['WEB_OUTBOUND_PORT'] ?? DEFAULT_HTTP_PORT);
 
@@ -70,9 +71,10 @@ const bootstrap = async (): Promise<void> => {
         whitelist: true,
         forbidNonWhitelisted: false,
         transform: true,
-        exceptionFactory: createOutboundValidationException,
+        exceptionFactory: (errors) => createOutboundValidationException(errors, language),
     }));
-    app.useGlobalFilters(new OutboundExceptionFilter());
+
+    app.useGlobalFilters(new OutboundExceptionFilter(language));
     app.useGlobalGuards(app.get(AccessGuard));
 
     const swaggerConfig = new DocumentBuilder()

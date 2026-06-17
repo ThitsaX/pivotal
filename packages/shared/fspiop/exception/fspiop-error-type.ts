@@ -14,6 +14,7 @@ export class FspiopErrorType {
     static readonly UNACCEPTABLE_VERSION_REQUESTED = new FspiopErrorType('3001', 'Unacceptable version requested');
     static readonly UNKNOWN_URI = new FspiopErrorType('3002', 'Unknown URI');
     static readonly ADD_PARTY_INFORMATION_ERROR = new FspiopErrorType('3003', 'Add Party information error');
+    static readonly DUPLICATE_REFERENCE_ID = new FspiopErrorType('3041', 'Duplicate reference ID.');
     static readonly GENERIC_VALIDATION_ERROR = new FspiopErrorType('3100', 'Generic validation error');
     static readonly MALFORMED_SYNTAX = new FspiopErrorType('3101', 'Malformed syntax');
     static readonly MISSING_MANDATORY_ELEMENT = new FspiopErrorType('3102', 'Missing mandatory element');
@@ -33,6 +34,7 @@ export class FspiopErrorType {
     static readonly TRANSFER_ID_NOT_FOUND = new FspiopErrorType('3208', 'Transfer ID not found');
     static readonly BULK_QUOTE_ID_NOT_FOUND = new FspiopErrorType('3209', 'Bulk quote ID not found');
     static readonly BULK_TRANSFER_ID_NOT_FOUND = new FspiopErrorType('3210', 'Bulk transfer ID not found');
+    static readonly PHONE_NUMBER_MISMATCH = new FspiopErrorType('3241', 'There was an error with your account number and phone number combination. Please contact your DFSP to verify the numbers.');
     static readonly INACTIVE_ACCOUNT = new FspiopErrorType('3242', 'Account is not active.');
     static readonly GENERIC_EXPIRED_ERROR = new FspiopErrorType('3300', 'Generic expired error');
     static readonly TRANSACTION_REQUEST_EXPIRED = new FspiopErrorType('3301', 'Transaction request expired');
