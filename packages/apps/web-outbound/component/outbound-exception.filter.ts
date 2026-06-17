@@ -1,6 +1,6 @@
 import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } from '@nestjs/common';
 import { Response } from 'express';
-import { ExtensionList, FspiopException, FspiopStatusTranslator } from '@shared/fspiop';
+import { ExtensionList, FspiopException, FspiopStatusTranslator, FspiopUserMessages, ErrorMessageLanguage } from '@shared/fspiop';
 import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error'
 
 export class OutboundErrorInformation {
@@ -17,7 +17,9 @@ export class OutboundErrorInformation {
 export class OutboundExceptionFilter implements ExceptionFilter {
 
     private readonly logger = new Logger(OutboundExceptionFilter.name);
-
+    constructor(
+        private readonly language: ErrorMessageLanguage = FspiopUserMessages.DEFAULT_LANGUAGE,
+    ) { }
     catch(exception: unknown, host: ArgumentsHost): void {
         const response = host.switchToHttp().getResponse<Response>();
 
@@ -43,18 +45,26 @@ export class OutboundExceptionFilter implements ExceptionFilter {
 
         response
             .status(status)
-            .json(OutboundExceptionFilter.toErrorInformation(fspiopException));
+            // .json(OutboundExceptionFilter.toErrorInformation(fspiopException))
+            .json(this.toErrorInformation(fspiopException));
     }
 
     private static toFspiopException(exception: unknown): FspiopException {
         return FspiopException.normalize(exception);
     }
 
-    private static toErrorInformation(exception: FspiopException): OutboundErrorInformation {
+    private toErrorInformation(exception: FspiopException): OutboundErrorInformation {
+        const code = exception.errorDefinition.errorType.code;
+        const defaultMessage = FspiopUserMessages.messageFor(
+            code,
+            FspiopUserMessages.DEFAULT_LANGUAGE,
+        );
+        const localeMessage = FspiopUserMessages.messageFor(code, this.language);
+
         const errorInformation = new OutboundErrorInformation();
-        errorInformation.statusCode = exception.errorDefinition.errorType.code;
-        errorInformation.message = exception.message;
-        errorInformation.localeMessage = exception.message;
+        errorInformation.statusCode = code;
+        errorInformation.message = defaultMessage;
+        errorInformation.localeMessage = localeMessage;
         errorInformation.detailedDescription = OutboundExceptionFilter.toDetailedDescription(exception.extensionList) ?? exception.message;
 
         return errorInformation;
