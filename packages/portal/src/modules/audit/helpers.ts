@@ -20,7 +20,6 @@ export const buildInitialState = (viewDefinitions: ViewDefinition[]): Record<Vie
             view.key,
             {
                 criteria,
-                page: 0,
                 size: 20,
                 orderColumn: view.orderColumns[0]?.value ?? 'createdAt',
                 orderDirection: 'DESC',

@@ -14,8 +14,8 @@ export class FindTransactionsHandler
     }
 
     async execute(query: FindTransactionsQuery): Promise<FindTransactionsQuery.Output> {
-        const {criteria, pageRequest, order, accessScope} = query.input;
+        const {criteria, cursor, order, accessScope} = query.input;
 
-        return this.repository.find(criteria, pageRequest, order, accessScope);
+        return this.repository.find(criteria, cursor, order, accessScope);
     }
 }
