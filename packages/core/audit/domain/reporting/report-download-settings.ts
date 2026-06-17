@@ -1,13 +1,14 @@
 export class ReportDownloadSettings {
 
     static readonly DEFAULTS = new ReportDownloadSettings();
+    static readonly MAX_DOWNLOAD_ROWS = 50_000;
 
     constructor(
         public readonly workerEnabled: boolean = false,
         public readonly pollIntervalMs: number = 5000,
         public readonly pageSize: number = 50000,
-        public readonly maxRowsPerFile: number = 500000,
-        public readonly maxZipFiles: number = 20,
+        public readonly maxRowsPerFile: number = ReportDownloadSettings.MAX_DOWNLOAD_ROWS,
+        public readonly maxZipFiles: number = 1,
         public readonly maxConcurrent: number = 3,
         public readonly staleRunningTtlMs: number = 20 * 60 * 1000,
         public readonly s3Enabled: boolean = false,
