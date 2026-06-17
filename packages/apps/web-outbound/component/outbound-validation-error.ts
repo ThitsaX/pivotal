@@ -1,5 +1,5 @@
 import { BadRequestException, ValidationError } from '@nestjs/common';
-import { FspiopErrors } from '@shared/fspiop';
+import { FspiopErrors, FspiopUserMessages, type ErrorMessageLanguage } from '@shared/fspiop';
 
 export interface OutboundValidationErrorResponse {
    statusCode: string;
@@ -35,14 +35,22 @@ const formatValidationErrors = (
 
 export const createOutboundValidationException = (
    errors: ValidationError[],
+   language: ErrorMessageLanguage = FspiopUserMessages.DEFAULT_LANGUAGE,
 ): BadRequestException => {
    const errorDefinition = FspiopErrors.MISSING_MANDATORY_ELEMENT;
    const validationDetails = formatValidationErrors(errors);
+   const code = errorDefinition.errorType.code;
+   const defaultMessage = FspiopUserMessages.messageFor(
+      code,
+      FspiopUserMessages.DEFAULT_LANGUAGE,
+   );
+   const localeMessage = FspiopUserMessages.messageFor(code, language);
+
 
    const responseBody: OutboundValidationErrorResponse = {
       statusCode: errorDefinition.errorType.code,
-      message: errorDefinition.description,
-      localeMessage: errorDefinition.description,
+      message: defaultMessage,
+      localeMessage: localeMessage,
       detailedDescription: `Input error : ${validationDetails.join(',')}`,
    };
 
