@@ -1,5 +1,5 @@
 import {computed, onMounted, ref, watch, type ComputedRef, type Ref} from 'vue';
-import {apiClient} from '../api/client';
+import {ApiError, apiClient} from '../api/client';
 import {REPORT_DOWNLOAD_CONFIG} from '../configs/report-download';
 import {authStore} from '../stores/auth.store';
 import {toastStore} from '../stores/toast.store';
@@ -449,15 +449,13 @@ export function useReportDownloadState(reportName: string): UseReportDownloadSta
         }
 
         try {
-            const response = await fetch(file.url);
+            const response = await apiClient.download(file.url).catch((error: unknown): never => {
+                if (error instanceof ApiError && error.status === 403) {
+                    throw new Error('The download file has expired and is no longer available. Please try again.');
+                }
 
-            if (response.status === 403) {
-                throw new Error('The download file has expired and is no longer available. Please try again.');
-            }
-
-            if (!response.ok) {
-                throw new Error('Failed to download report file.');
-            }
+                throw error;
+            });
 
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
