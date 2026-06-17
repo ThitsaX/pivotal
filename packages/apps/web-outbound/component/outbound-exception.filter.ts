@@ -61,8 +61,6 @@ export class OutboundExceptionFilter implements ExceptionFilter {
         );
         const localeMessage = FspiopUserMessages.messageFor(code, this.language);
 
-        const userMessage = FspiopUserMessages.messageFor(code, this.language);
-
         const errorInformation = new OutboundErrorInformation();
         errorInformation.statusCode = code;
         errorInformation.message = defaultMessage;
