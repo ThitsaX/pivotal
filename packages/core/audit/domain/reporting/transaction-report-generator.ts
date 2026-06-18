@@ -164,7 +164,9 @@ export class TransactionReportGenerator {
 
         for (const row of result.rows) {
             lines.push(TransactionReportGenerator.COLUMNS
-                .map((column) => TransactionReportGenerator.csvValue(row[column.key]))
+                .map((column) => TransactionReportGenerator.csvValue(
+                    TransactionReportGenerator.reportCellValue(row, column),
+                ))
                 .join(','));
         }
 
@@ -194,7 +196,10 @@ export class TransactionReportGenerator {
         for (const row of result.rows) {
             sheetRows.push(TransactionReportGenerator.xlsxRow(
                 sheetRowNumber,
-                TransactionReportGenerator.COLUMNS.map((column) => row[column.key]),
+                TransactionReportGenerator.COLUMNS.map((column) => TransactionReportGenerator.reportCellValue(
+                    row,
+                    column,
+                )),
             ));
             sheetRowNumber++;
         }
@@ -260,6 +265,62 @@ export class TransactionReportGenerator {
 
     private static reportFileType(fileType: string): ReportFileType {
         return fileType.trim().toLowerCase() === 'csv' ? 'csv' : 'xlsx';
+    }
+
+    private static reportCellValue(row: Record<string, unknown>, column: ReportColumn): unknown {
+        if (column.key === 'patchError') {
+            return TransactionReportGenerator.patchCallErrorValue(row);
+        }
+
+        return row[column.key];
+    }
+
+    private static patchCallErrorValue(row: Record<string, unknown>): unknown {
+        const value = row.patchError;
+
+        if (TransactionReportGenerator.isTrueValue(row.dispute)) {
+            return value;
+        }
+
+        return TransactionReportGenerator.withoutPatchResponseBody(value);
+    }
+
+    private static withoutPatchResponseBody(value: unknown): unknown {
+        if (value == null) {
+            return value;
+        }
+
+        if (typeof value !== 'string') {
+            return TransactionReportGenerator.omitResponseBody(value);
+        }
+
+        const trimmed = value.trim();
+
+        if (!trimmed.startsWith('{')) {
+            return value;
+        }
+
+        try {
+            const sanitized = TransactionReportGenerator.omitResponseBody(JSON.parse(trimmed));
+
+            return sanitized == null ? null : JSON.stringify(sanitized);
+        } catch {
+            return value;
+        }
+    }
+
+    private static omitResponseBody(value: unknown): unknown {
+        if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+            return value;
+        }
+
+        const {responseBody: _responseBody, ...rest} = value as Record<string, unknown>;
+
+        return Object.keys(rest).length === 0 ? null : rest;
+    }
+
+    private static isTrueValue(value: unknown): boolean {
+        return value === true || value === 'true' || value === 1 || value === '1';
     }
 
     private static csvValue(value: unknown): string {

@@ -191,7 +191,10 @@ describe('CreateTransactionReportHandler', () => {
                     partiesError:   JSON.stringify({partyId: '2769200001'}),
                     quotesError:    JSON.stringify({amount: {amount: '12.34', currency: 'USD'}}),
                     transfersError: JSON.stringify({transferState: 'ABORTED'}),
-                    patchError:     JSON.stringify({errorCode: '2001'}),
+                    patchError:     JSON.stringify({
+                        errorCode:    '2001',
+                        responseBody: 'dispute patch response',
+                    }),
                 },
             ]),
             new ReportDownloadSettings(),
@@ -205,7 +208,34 @@ describe('CreateTransactionReportHandler', () => {
         assert.match(csv, /Transfer Call Error/);
         assert.match(csv, /"\{""partyId"":""2769200001""\}"/);
         assert.match(csv, /"\{""transferState"":""ABORTED""\}"/);
-        assert.match(csv, /"\{""errorCode"":""2001""\}"/);
+        assert.match(csv, /dispute patch response/);
+    });
+
+    it('omits patch response body in CSV reports when the row is not disputed', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:         '1',
+                    transferId: 'transfer-normal',
+                    dispute:    false,
+                    patchError: JSON.stringify({
+                        code:         'PAYEE_ERROR',
+                        message:      'Payee failed',
+                        responseBody: 'large non-dispute patch response',
+                    }),
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const csv = report.bytes.toString('utf8');
+
+        assert.doesNotMatch(csv, /Account Lookup Response/);
+        assert.doesNotMatch(csv, /Quote Response/);
+        assert.doesNotMatch(csv, /Transfer Response/);
+        assert.match(csv, /Payee failed/);
+        assert.doesNotMatch(csv, /large non-dispute patch response/);
     });
 
     it('keeps error CSV columns empty when no errors exist', async () => {
