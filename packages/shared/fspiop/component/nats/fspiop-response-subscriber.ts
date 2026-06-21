@@ -129,14 +129,16 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
         const cached = this.takeFromRecent(successSubject, errorSubject, hubErrorSubject);
 
         if (cached != null) {
-            return cached.subject === successSubject
-                ? Promise.resolve(cached.payload as T)
-                : Promise.reject(FspiopResponseSubscriber.toFspiopException(
-                    cached.payload as ErrorInformationObject,
-                ));
+            return FspiopResponseSubscriber.guard(
+                cached.subject === successSubject
+                    ? Promise.resolve(cached.payload as T)
+                    : Promise.reject(FspiopResponseSubscriber.toFspiopException(
+                        cached.payload as ErrorInformationObject,
+                    )),
+            );
         }
 
-        return new Promise<T>((resolve, reject) => {
+        return FspiopResponseSubscriber.guard(new Promise<T>((resolve, reject) => {
             const entry: PendingEntry = {
                 successSubject,
                 errorSubject,
@@ -160,7 +162,21 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
             if (hubErrorSubject != null) {
                 this.pending.set(hubErrorSubject, entry);
             }
-        });
+        }));
+    }
+
+    /**
+     * Callers register the waiter, then `await` a downstream HTTP request, and only
+     * `await` this promise afterwards. The promise can therefore settle (reject) before
+     * that final `await` attaches a handler — via the recent-cache fast path, or via
+     * dispatch() delivering a callback while the HTTP request is still in flight. With no
+     * handler attached, that rejection floats and Node's unhandledRejection guard crashes
+     * the process. Attaching a no-op catch marks it handled; the discarded derived promise
+     * leaves the original untouched, so the caller's later `await` still observes the result.
+     */
+    private static guard<T>(promise: Promise<T>): Promise<T> {
+        promise.catch(() => undefined);
+        return promise;
     }
 
     cancel(successSubject: string): void {
