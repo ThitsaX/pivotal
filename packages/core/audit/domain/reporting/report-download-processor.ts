@@ -32,10 +32,10 @@ export class ReportDownloadProcessor implements OnModuleInit, OnModuleDestroy {
         }
 
         this.pollTimer = setInterval(() => {
-            void this.dispatch();
+            void this.safeDispatch();
         }, this.settings.pollIntervalMs);
 
-        void this.dispatch();
+        void this.safeDispatch();
     }
 
     onModuleDestroy(): void {
@@ -69,6 +69,16 @@ export class ReportDownloadProcessor implements OnModuleInit, OnModuleDestroy {
                 .finally(() => {
                     this.activeWorkers--;
                 });
+        }
+    }
+
+    private async safeDispatch(): Promise<void> {
+        try {
+            await this.dispatch();
+        } catch (error: unknown) {
+            ReportDownloadProcessor.LOGGER.error(
+                `Report worker dispatch failed: ${ReportDownloadProcessor.errorMessage(error)}`,
+            );
         }
     }
 

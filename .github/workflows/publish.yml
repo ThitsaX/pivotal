@@ -22,6 +22,8 @@ jobs:
             dockerfile: docker/app-auditor.Dockerfile
           - name: web-pivotal
             dockerfile: docker/web-pivotal.Dockerfile
+          - name: report-worker
+            dockerfile: docker/report-worker.Dockerfile
           - name: portal
             dockerfile: docker/portal.Dockerfile
 
