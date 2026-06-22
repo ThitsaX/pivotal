@@ -131,6 +131,30 @@ appAuditor:
     NATS_URL: nats://nats:4222
     PIVOTAL_AUDIT_STREAM_NAME: PIVOTAL_AUDIT
 
+reportWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: pivotal-report-worker
+    tag: local
+  env:
+    REPORT_DOWNLOAD_WORKER_ENABLED: "true"
+    REPORT_DOWNLOAD_POLL_INTERVAL_MS: "5000"
+    REPORT_DOWNLOAD_PAGE_SIZE: "50000"
+    REPORT_DOWNLOAD_MAX_ROWS_PER_FILE: "50000"
+    REPORT_DOWNLOAD_MAX_ZIP_FILES: "1"
+    REPORT_DOWNLOAD_MAX_CONCURRENT: "3"
+    REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS: "1200000"
+    REPORT_S3_ENABLED: "false"
+    REPORT_S3_BUCKET: your-aws-s3-bucket-name
+    REPORT_S3_REGION: us-east-1
+    REPORT_S3_ACCESS_KEY_ID: your-aws-access-key-id
+    REPORT_S3_SECRET_ACCESS_KEY: your-aws-secret-access-key
+    REPORT_S3_ENDPOINT: ""
+    REPORT_S3_FORCE_PATH_STYLE: "false"
+    REPORT_S3_PREFIX: reports/
+    REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
+
 webPivotal:
   enabled: true
   replicaCount: 1
@@ -145,6 +169,16 @@ webPivotal:
     CENTRAL_LEDGER_URL: http://host.docker.internal:3001
     CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
+    REPORT_DOWNLOAD_WORKER_ENABLED: "false"
+    REPORT_S3_ENABLED: "false"
+    REPORT_S3_BUCKET: your-aws-s3-bucket-name
+    REPORT_S3_REGION: us-east-1
+    REPORT_S3_ACCESS_KEY_ID: your-aws-access-key-id
+    REPORT_S3_SECRET_ACCESS_KEY: your-aws-secret-access-key
+    REPORT_S3_ENDPOINT: ""
+    REPORT_S3_FORCE_PATH_STYLE: "false"
+    REPORT_S3_PREFIX: reports/
+    REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
 
 portal:
   enabled: true
