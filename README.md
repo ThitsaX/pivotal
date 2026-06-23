@@ -9,6 +9,7 @@ Pivotal is the multi-tenant payment adapter for Mojaloop. It exposes payer-facin
 - [App Service Guides](#app-service-guides)
 - [Architecture](#architecture)
 - [Send-Money Flow](#send-money-flow)
+- [Transfer Patch Flow](#transfer-patch-flow)
 - [Report Download Flow](#report-download-flow)
 - [Run With Docker Compose](#run-with-docker-compose)
 - [Run As Local Node Processes](#run-as-local-node-processes)
@@ -160,6 +161,46 @@ sequenceDiagram
 ```
 
 For the full field-level flow, see `docs/pivotal-e2e.md`.
+
+## Transfer Patch Flow
+
+`PATCH /transfers/{transferId}` is not a fourth `/sendmoney` client call. It is a Mojaloop Hub callback/notification that reaches the payee side through `web-inbound` after the transfer lifecycle has already started.
+
+Pivotal handles it as an inbound transfer patch flow:
+
+1. Hub sends `PATCH /transfers/{transferId}` to `web-inbound`.
+2. `web-inbound` reads `traceparent`, `FSPIOP-Source`, and `FSPIOP-Destination`, then publishes a patch-transfer message to NATS for the payee connector.
+3. The payee connector consumes the message and calls the wallet/backend adapter's `patchTransfers` implementation.
+4. The connector records audit events for patch request, patch response, or patch error.
+5. `app-auditor` persists those events into `patch_requested_at`, `patch_responded_at`, `patch_request`, and `patch_error`.
+6. When the patch callback fails and an error is recorded, the audit record is marked as a possible dispute.
+
+High-level sequence:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Hub as Mojaloop Hub
+    participant Inbound as web-inbound
+    participant NATS as NATS JetStream
+    participant Conn as Payee connector
+    participant Wallet as Payee wallet
+    participant Audit as app-auditor
+    participant DB as Pivotal MySQL
+
+    Hub->>Inbound: PATCH /transfers/{transferId}
+    Inbound->>NATS: publish patch-transfer message
+    NATS->>Conn: consume patch-transfer message
+    Conn->>Audit: publish patch request audit
+    Conn->>Wallet: patchTransfers
+    alt backend accepts patch
+        Conn->>Audit: publish patch response audit
+    else backend rejects or call fails
+        Conn->>Audit: publish patch error audit
+        Audit->>DB: set possible_dispute=true
+    end
+    Audit->>DB: update transaction patch fields
+```
 
 ## Report Download Flow
 

@@ -33,6 +33,21 @@ Default port: `3201`.
 - `PUT /transfers/:transferId/error`
 - `PATCH /transfers/:transferId`
 
+## Transfer Patch Flow
+
+`PATCH /transfers/:transferId` receives Hub transfer patch callbacks. The route does not complete the original payer `/sendmoney` call directly; it forwards the patch to the payee connector over NATS.
+
+Runtime behavior:
+
+1. Read `traceparent` as the audit correlation ID when present, falling back downstream to the transfer ID.
+2. Read `FSPIOP-Source` and `FSPIOP-Destination` as payer/payee context for the patch event.
+3. Publish `HandlePatchTransfersCommand` to the inbound domain.
+4. The inbound handler publishes a connector patch-transfer message to the payee connector subject.
+5. The connector invokes the backend adapter's `patchTransfers` method.
+6. The connector publishes patch request, response, or error audit events.
+
+Patch audit fields are stored on the transaction as `patch_requested_at`, `patch_responded_at`, `patch_request`, and `patch_error`. Patch errors mark the transaction as possible dispute for Find Transactions and report exports.
+
 ## Required Dependencies
 
 - MySQL database with Pivotal participant and audit tables.
