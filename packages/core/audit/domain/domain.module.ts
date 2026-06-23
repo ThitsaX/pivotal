@@ -15,15 +15,34 @@ import {
     AuditTransfersErrorHandler,
     AuditTransfersRequestHandler,
     AuditTransfersResponseHandler,
+    CreateTransactionReportHandler,
     DisputeTransactionHandler,
 } from './command';
-import {Transaction} from './model';
-import {CountTransactionsHandler, FindTransactionsHandler, GetTransactionHandler} from './query';
-import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME, TransactionRepository,} from './repository';
+import {ReportDownloadRequest, ReportDownloadRequestParam, Transaction} from './model';
+import {
+    CountTransactionsHandler,
+    FindTransactionsHandler,
+    GetReportDownloadStatusHandler,
+    GetReportDownloadUrlHandler,
+    GetTransactionHandler,
+} from './query';
+import {
+    PIVOTAL_DB_READ_CONNECTION_NAME,
+    PIVOTAL_DB_WRITE_CONNECTION_NAME,
+    ReportDownloadRepository,
+    TransactionRepository,
+} from './repository';
+import {
+    REPORT_DOWNLOAD_SETTINGS,
+    ReportDownloadProcessor,
+    ReportDownloadSettings,
+    S3ReportStorage,
+    TransactionReportGenerator,
+} from './reporting';
 
-const Entities = [Transaction];
+const Entities = [Transaction, ReportDownloadRequest, ReportDownloadRequestParam];
 
-const Repositories = [TransactionRepository];
+const Repositories = [TransactionRepository, ReportDownloadRepository];
 
 const CommandHandlers = [
     AuditPartiesErrorHandler,
@@ -39,12 +58,21 @@ const CommandHandlers = [
     AuditTransfersRequestHandler,
     AuditTransfersResponseHandler,
     DisputeTransactionHandler,
+    CreateTransactionReportHandler,
 ];
 
 const QueryHandlers = [
     GetTransactionHandler,
     FindTransactionsHandler,
     CountTransactionsHandler,
+    GetReportDownloadStatusHandler,
+    GetReportDownloadUrlHandler,
+];
+
+const ReportingProviders = [
+    S3ReportStorage,
+    TransactionReportGenerator,
+    ReportDownloadProcessor,
 ];
 
 @Module({})
@@ -72,8 +100,21 @@ export class AuditDomainModule {
                 NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_WRITE_CONNECTION_NAME),
                 NestJsTypeOrmModule.forFeature(Entities, PIVOTAL_DB_READ_CONNECTION_NAME),
             ],
-            providers: [...Repositories, ...CommandHandlers, ...QueryHandlers],
-            exports: [CqrsModule, ...Repositories],
+            providers: [
+                ...Repositories,
+                ...CommandHandlers,
+                ...QueryHandlers,
+                ...ReportingProviders,
+                {
+                    provide: REPORT_DOWNLOAD_SETTINGS,
+                    useFactory: async (...args: any[]): Promise<ReportDownloadSettings> => {
+                        const settings = await asyncOptions.useFactory(...args);
+                        return settings.reportDownloadSettings?.() ?? ReportDownloadSettings.DEFAULTS;
+                    },
+                    inject: asyncOptions.inject ?? [],
+                },
+            ],
+            exports: [CqrsModule, ...Repositories, S3ReportStorage],
         };
     }
 }
@@ -81,6 +122,7 @@ export class AuditDomainModule {
 export namespace AuditDomainModule {
 
     export interface RequiredSettings extends TypeOrmModule.RequiredSettings {
+        reportDownloadSettings?(): ReportDownloadSettings;
     }
 
     export type AsyncOptions = {

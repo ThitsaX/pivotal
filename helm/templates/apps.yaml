@@ -130,6 +130,35 @@ spec:
             {{- include "pivotal-stack.envVars" .Values.appAuditor.env | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
 {{- end }}
+{{- if .Values.reportWorker.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-worker
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: report-worker
+spec:
+  replicas: {{ .Values.reportWorker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: report-worker
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: report-worker
+    spec:
+      containers:
+        - name: report-worker
+          image: "{{ .Values.reportWorker.image.repository }}:{{ .Values.reportWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "pivotal-stack.envVars" .Values.reportWorker.env | nindent 12 }}
+            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+{{- end }}
 {{- if .Values.webPivotal.enabled }}
 ---
 apiVersion: apps/v1
