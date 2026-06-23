@@ -8,6 +8,7 @@ export const PermissionKey = {
     PARTICIPANT_SIGNING_KEYS_UPDATE: 'participant.signing-keys.update',
     AUDIT_TRANSACTIONS_LIST:         'audit.transactions.list',
     AUDIT_TRANSACTIONS_VIEW:         'audit.transactions.view',
+    AUDIT_DASHBOARD_VIEW:            'audit.dashboard.view',
     ADMIN_USERS_MANAGE:              'admin.users.manage',
     ADMIN_ROLES_MANAGE:              'admin.roles.manage',
     ADMIN_PERMISSIONS_LIST:          'admin.permissions.list',

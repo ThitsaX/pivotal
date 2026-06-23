@@ -1,9 +1,13 @@
 import {createApp} from 'vue';
+import VueApexCharts from 'vue3-apexcharts';
 import App from './App.vue';
 import {router} from './router';
 import {authStore} from './stores/auth.store';
 import './assets/tailwind.css';
 
 void authStore.bootstrap().finally((): void => {
-    createApp(App).use(router).mount('#app');
+    createApp(App)
+        .use(router)
+        .use(VueApexCharts)
+        .mount('#app');
 });
