@@ -19,7 +19,7 @@ export class AuthErrorCode {
 
 export const AUTH_ERROR_MESSAGES: Record<string, string> = {
     [AuthErrorCode.INVALID_CREDENTIALS]:      'Invalid email or password.',
-    [AuthErrorCode.ACCOUNT_LOCKED]:           'Invalid email or password.',
+    [AuthErrorCode.ACCOUNT_LOCKED]:           'Your account is temporarily locked due to multiple failed sign-in attempts. Please try again later.',
     [AuthErrorCode.INVALID_REFRESH_TOKEN]:    'Invalid or expired refresh token.',
     [AuthErrorCode.REFRESH_TOKEN_REUSE]:      'Invalid or expired refresh token.',
     [AuthErrorCode.PASSWORD_SAME_AS_CURRENT]: 'New password must differ from the current password.',
