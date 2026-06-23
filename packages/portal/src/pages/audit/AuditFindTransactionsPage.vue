@@ -105,7 +105,7 @@ const {
     startPolling,
     consumeDownload,
     clearDownloadState,
-} = useReportDownloadState('TransactionDetailReport');
+} = useReportDownloadState('TransactionReport');
 
 const statusLabel: Record<string, string> = {
     PENDING: 'Queuing report...',
@@ -575,7 +575,7 @@ const buildCriteriaParams = (criteria: Record<string, string>): URLSearchParams 
     return params;
 };
 
-const downloadTransactionDetailReport = async (): Promise<void> => {
+const downloadTransactionReport = async (): Promise<void> => {
     const criteria = Object.keys(lastSubmittedCriteria.value).length > 0
         ? lastSubmittedCriteria.value
         : snapshotCriteriaForQuery();
@@ -1565,8 +1565,9 @@ const goToLastPage = (): void => {
                         <button
                             type="button"
                             class="inline-flex items-center justify-center rounded-full border border-[#d97706] bg-[#d97706] px-3 py-1 font-semibold text-white transition hover:bg-[#b45309] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
-                            :disabled="reportRequesting || isDownloading || loading"
-                            @click="downloadTransactionDetailReport"
+                            :disabled="reportRequesting || isDownloading || loading || hasNoResults"
+                            :title="hasNoResults ? 'No transactions to download' : undefined"
+                            @click="downloadTransactionReport"
                         >
                             {{ reportRequesting || isDownloading ? 'Downloading...' : 'Download' }}
                         </button>

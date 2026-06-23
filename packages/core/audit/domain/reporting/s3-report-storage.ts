@@ -82,7 +82,7 @@ export class S3ReportStorage {
         const timestamp = this.fileDate(new Date());
         const normalizedType = reportType.toLowerCase();
 
-        return `${prefix}${normalizedType}/TransactionDetailReport-${requestId}-${timestamp}.${extension}`;
+        return `${prefix}${normalizedType}/TransactionReport-${requestId}-${timestamp}.${extension}`;
     }
 
     private createClient(): S3Client {

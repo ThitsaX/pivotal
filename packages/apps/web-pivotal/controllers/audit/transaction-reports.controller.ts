@@ -201,7 +201,7 @@ export class TransactionReportsAuditController {
 
         const file = await this.storage.download(output.fileKey);
         const fileName = TransactionReportsAuditController.safeFileName(
-            output.fileKey.split('/').pop() ?? `TransactionDetailReport-${id}.zip`,
+            output.fileKey.split('/').pop() ?? `TransactionReport-${id}.zip`,
         );
 
         response.setHeader('Content-Type', file.contentType);

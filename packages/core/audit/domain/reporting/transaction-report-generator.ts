@@ -100,7 +100,7 @@ export class TransactionReportGenerator {
             const part = await this.generateCsvPart(criteria, order, accessScope, cursor, rowsInPart);
 
             zip.addFile(
-                `TransactionDetailReport-${request.id}-Part${partNumber}.csv`,
+                `TransactionReport-${request.id}-Part${partNumber}.csv`,
                 Buffer.from(part.content, 'utf8'),
             );
 
@@ -134,7 +134,7 @@ export class TransactionReportGenerator {
             const part = await this.generateXlsxPart(criteria, order, accessScope, cursor, rowsInPart);
 
             zip.addFile(
-                `TransactionDetailReport-${request.id}-Part${partNumber}.xlsx`,
+                `TransactionReport-${request.id}-Part${partNumber}.xlsx`,
                 part.bytes,
             );
 
