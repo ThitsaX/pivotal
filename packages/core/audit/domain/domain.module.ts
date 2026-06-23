@@ -18,12 +18,22 @@ import {
     DisputeTransactionHandler,
 } from './command';
 import {Transaction} from './model';
-import {CountTransactionsHandler, FindTransactionsHandler, GetTransactionHandler} from './query';
-import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME, TransactionRepository,} from './repository';
+import {
+    CountTransactionsHandler,
+    FindTransactionsHandler,
+    GetDashboardHandler,
+    GetTransactionHandler,
+} from './query';
+import {
+    PIVOTAL_DB_READ_CONNECTION_NAME,
+    PIVOTAL_DB_WRITE_CONNECTION_NAME,
+    TransactionRepository,
+    TransactionRollupRepository,
+} from './repository';
 
 const Entities = [Transaction];
 
-const Repositories = [TransactionRepository];
+const Repositories = [TransactionRepository, TransactionRollupRepository];
 
 const CommandHandlers = [
     AuditPartiesErrorHandler,
@@ -45,6 +55,7 @@ const QueryHandlers = [
     GetTransactionHandler,
     FindTransactionsHandler,
     CountTransactionsHandler,
+    GetDashboardHandler,
 ];
 
 @Module({})
