@@ -85,6 +85,22 @@ export class PutAcceptPartyHandler
     private async executeLocked(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
         const { transferId, acceptParty, amount, extensionList, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+
+        // Idempotency guard (sequential duplicates): a successful acceptParty persists
+        // `quotes`; any failure clears the whole cache. So a non-null `quotes` means the
+        // quote phase already completed. A repeat acceptParty would re-POST /quotes with
+        // the same quoteId but a fresh body — which the Hub rejects as a hash-mismatch
+        // duplicate (3106) and which pollutes the audit trail (Failed + committed).
+        // Reject here, before any Hub call or audit write. The lock covers concurrent
+        // duplicates; this covers duplicates that arrive after the phase has finished.
+        if (transferRequest.quotes != null) {
+            this.logger.warn(`Duplicate acceptParty for transferId=${transferId} ignored; quote already completed.`);
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Quote already completed for transfer ${transferId}; duplicate acceptParty ignored.`,
+            );
+        }
+
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
