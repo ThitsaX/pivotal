@@ -177,16 +177,17 @@ export class TransactionReportGenerator {
         rowCount: number,
     ): Promise<{content: string; rowCount: number; nextCursor?: string}> {
         const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
-        const lines = [TransactionReportGenerator.COLUMNS
-            .map((column) => TransactionReportGenerator.csvValue(column.header))
-            .join(',')];
+        const lines = [TransactionReportGenerator.csvRow(
+            TransactionReportGenerator.COLUMNS.map((column) => column.header),
+        )];
 
         for (const row of result.rows) {
-            lines.push(TransactionReportGenerator.COLUMNS
-                .map((column) => TransactionReportGenerator.csvValue(
-                    TransactionReportGenerator.reportCellValue(row, column),
-                ))
-                .join(','));
+            lines.push(TransactionReportGenerator.csvRow(
+                TransactionReportGenerator.COLUMNS.map((column) => TransactionReportGenerator.reportCellValue(
+                    row,
+                    column,
+                )),
+            ));
         }
 
         return {
@@ -352,6 +353,10 @@ export class TransactionReportGenerator {
 
     private static isTrueValue(value: unknown): boolean {
         return value === true || value === 'true' || value === 1 || value === '1';
+    }
+
+    private static csvRow(values: readonly unknown[]): string {
+        return values.map((value) => TransactionReportGenerator.csvValue(value)).join(',');
     }
 
     private static csvValue(value: unknown): string {
