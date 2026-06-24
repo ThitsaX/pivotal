@@ -26,6 +26,12 @@ import { SendMoneyResponseMapper } from './send-money-response.mapper';
 export class PutAcceptQuoteHandler
     implements ICommandHandler<PutAcceptQuoteCommand, PutAcceptQuoteCommand.Output> {
 
+    // The lock must outlive the longest in-flight wait (the FSPIOP response
+    // timeout) so a gateway/client retry landing on another replica is rejected
+    // for the whole window the winning replica is still talking to the Hub.
+    // Released in finally; the TTL is only the crash backstop.
+    private static readonly IN_FLIGHT_LOCK_TTL_MS = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS + 10_000;
+
     private readonly logger = new Logger(PutAcceptQuoteHandler.name);
 
     constructor(
@@ -115,6 +121,32 @@ export class PutAcceptQuoteHandler
     }
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
+        const { transferId } = command.input;
+        const lockToken = await this.redisClient.acquireLock(
+            transferId,
+            PutAcceptQuoteHandler.IN_FLIGHT_LOCK_TTL_MS,
+        );
+
+        // Another replica is already driving this transferId (typically a gateway
+        // retry after a per-try timeout). Fail fast WITHOUT re-dispatching the
+        // transfer to the Hub — duplicate POST /transfers on the same transferId is
+        // the dangerous, money-moving leg. GENERIC_CLIENT_ERROR maps to a 4xx, so
+        // the gateway does not retry again.
+        if (lockToken == null) {
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Transfer ${transferId} is already being processed; ignoring duplicate request.`,
+            );
+        }
+
+        try {
+            return await this.executeLocked(command);
+        } finally {
+            await this.redisClient.releaseLock(transferId, lockToken);
+        }
+    }
+
+    private async executeLocked(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const { transferId, acceptQuote, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
