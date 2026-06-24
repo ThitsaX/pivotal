@@ -149,6 +149,20 @@ export class PutAcceptQuoteHandler
     private async executeLocked(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const { transferId, acceptQuote, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+
+        // Idempotency guard (sequential duplicates): a successful acceptQuote deletes the
+        // cache, so a repeat usually surfaces as TRANSFER_ID_NOT_FOUND. This is the
+        // belt-and-suspenders case — if `transfer` is already set the transfer phase has
+        // run, so reject before re-POSTing /transfers (a duplicate prepare on the same
+        // transferId) or writing another audit record.
+        if (transferRequest.transfer != null) {
+            this.logger.warn(`Duplicate acceptQuote for transferId=${transferId} ignored; transfer already completed.`);
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Transfer ${transferId} already completed; duplicate acceptQuote ignored.`,
+            );
+        }
+
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptQuoteHandler.assertSourceCanActForPayer(requestSource, source);
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
