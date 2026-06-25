@@ -45,6 +45,7 @@ const router = useRouter();
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_ORDER_DIRECTION = 'DESC';
 const DEFAULT_START_MODE = 'today';
+const TRANSFER_ID_CRITERIA_KEY = 'transferId';
 const TIME_RANGE_MODE_KEYS = [
     {
         mode: 'transactionStartAtMode',
@@ -63,6 +64,27 @@ const createInitialCriteria = (): Record<string, string> => {
     }
 
     return criteria;
+};
+
+const createBlankCriteria = (): Record<string, string> => {
+    const criteria = Object.fromEntries(
+        props.viewDefinition.criteriaFields.map((field): [string, string] => [field.key, '']),
+    );
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        criteria[field.mode] = '';
+        criteria[field.start] = '';
+        criteria[field.end] = '';
+    }
+
+    return criteria;
+};
+
+const buildTransferIdOnlyCriteria = (transferId: string): Record<string, string> => {
+    return {
+        ...createBlankCriteria(),
+        [TRANSFER_ID_CRITERIA_KEY]: transferId.trim(),
+    };
 };
 
 const defaultOrderColumn = (): string => props.viewDefinition.orderColumns[0]?.value ?? 'transactionStartAt';
@@ -123,6 +145,10 @@ const nav = reactive<{direction: CursorDirection; token: string}>({
 const criteriaSections = computed(() => {
     return getCriteriaSections(props.viewDefinition.criteriaFields);
 });
+
+const transferIdCriteria = computed((): string => state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '');
+
+const transferIdSearchActive = computed((): boolean => transferIdCriteria.value.length > 0);
 
 const hasNoResults = computed((): boolean => {
     return results.value != null && results.value.records.length === 0;
@@ -267,6 +293,10 @@ const resolvePresetRange = (mode: string): {start: string; end: string} => {
 };
 
 const snapshotCriteriaForQuery = (): Record<string, string> => {
+    if (transferIdSearchActive.value) {
+        return buildTransferIdOnlyCriteria(transferIdCriteria.value);
+    }
+
     const snapshot = {...state.criteria};
 
     for (const field of TIME_RANGE_MODE_KEYS) {
@@ -388,6 +418,12 @@ const applyRouteQueryToState = (query: LocationQuery): void => {
     state.size = parsePositiveInteger(firstQueryValue(query.size), DEFAULT_PAGE_SIZE);
     state.orderColumn = parseOrderColumn(firstQueryValue(query.orderColumn));
     state.orderDirection = parseOrderDirection(firstQueryValue(query.orderDirection));
+
+    const transferId = state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '';
+
+    if (transferId.length > 0) {
+        Object.assign(state.criteria, buildTransferIdOnlyCriteria(transferId));
+    }
 };
 
 const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | number): void => {
@@ -400,6 +436,15 @@ const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | 
 
 const buildSearchRouteQuery = (): LocationQueryRaw => {
     const query: LocationQueryRaw = {};
+
+    if (transferIdSearchActive.value) {
+        appendQueryValue(query, TRANSFER_ID_CRITERIA_KEY, transferIdCriteria.value);
+        appendQueryValue(query, 'size', state.size);
+        appendQueryValue(query, 'orderColumn', state.orderColumn);
+        appendQueryValue(query, 'orderDirection', state.orderDirection);
+
+        return query;
+    }
 
     for (const field of props.viewDefinition.criteriaFields) {
         appendQueryValue(query, field.key, state.criteria[field.key] ?? '');
@@ -1519,6 +1564,7 @@ const goToLastPage = (): void => {
                     :sections="criteriaSections"
                     :criteria="state.criteria"
                     :selected-time-zone="selectedTimeZone"
+                    :exclusive-field-key="transferIdSearchActive ? TRANSFER_ID_CRITERIA_KEY : null"
                     :visible="isSearchFormVisible"
                     :loading="loading"
                     :last-loaded-at="lastLoadedAt"
