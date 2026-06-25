@@ -11,8 +11,10 @@ const props = withDefaults(defineProps<{
     loading: boolean;
     lastLoadedAt: string | null;
     formatLastLoadedAt: (value: string) => string;
+    exclusiveFieldKey?: string | null;
     embedded?: boolean;
 }>(), {
+    exclusiveFieldKey: null,
     embedded: false,
 });
 
@@ -49,6 +51,14 @@ const getFieldGridClass = (sectionKey: string): string => {
     }
 
     return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-4';
+};
+
+const isFieldDisabled = (fieldKey: string): boolean => {
+    return props.exclusiveFieldKey != null && props.exclusiveFieldKey !== fieldKey;
+};
+
+const isTimeRangeDisabled = (): boolean => {
+    return props.exclusiveFieldKey != null;
 };
 </script>
 
@@ -145,6 +155,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                     :mode="criteria.transactionStartAtMode"
                                     :start-value="criteria.transactionStartAtStart"
                                     :end-value="criteria.transactionStartAtEnd"
+                                    :disabled="isTimeRangeDisabled()"
                                     @update:mode="criteria.transactionStartAtMode = $event"
                                     @update:start-value="criteria.transactionStartAtStart = $event"
                                     @update:end-value="criteria.transactionStartAtEnd = $event"
@@ -167,6 +178,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             v-model="criteria[field.key]"
                                             type="text"
                                             class="field-input !pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                             :placeholder="field.placeholder ?? field.label"
                                         />
 
@@ -175,6 +187,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             v-model="criteria[field.key]"
                                             type="datetime-local"
                                             class="field-input !pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                         />
 
                                         <CustomDropdown
@@ -183,6 +196,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             :options="field.options ?? []"
                                             :placeholder="field.label"
                                             button-class="!pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                         />
                                     </div>
                                 </div>
