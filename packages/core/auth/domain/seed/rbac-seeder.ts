@@ -68,6 +68,7 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD,        scope: 'HUB',  description: 'Enable an additional currency for an existing participant.'},
     {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   scope: 'HUB',  description: 'Register or replace a participant\'s callback endpoint.'},
     {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'Update the JWS signing keys for a participant.'},
+    {keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,   scope: 'HUB',  description: 'Update the access public key used to verify a participant\'s signed requests.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         scope: 'BOTH', description: 'Query the audited transactions list.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         scope: 'BOTH', description: 'View a single audited transaction by transfer ID.'},
     {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},

@@ -8,3 +8,5 @@ export * from './add-signing-keys.command';
 export * from './add-signing-keys.handler';
 export * from './upsert-endpoint.command';
 export * from './upsert-endpoint.handler';
+export * from './update-access-key.command';
+export * from './update-access-key.handler';
