@@ -85,13 +85,18 @@ onBeforeUnmount((): void => {
     <div ref="rootRef" class="relative">
         <button
             type="button"
-            class="field-input pretty-select flex w-full items-center justify-between text-left text-xs"
+            class="field-input pretty-select flex w-full items-center justify-between text-left text-xs disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
             :class="buttonClass"
             :disabled="disabled"
             @click="toggle"
         >
             <span class="truncate">{{ selectedLabel }}</span>
-            <svg class="h-3.5 w-3.5 shrink-0 text-slate-500 transition" :class="open ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="none">
+            <svg
+                class="h-3.5 w-3.5 shrink-0 transition"
+                :class="[open ? 'rotate-180' : '', disabled ? 'text-slate-300' : 'text-slate-500']"
+                viewBox="0 0 20 20"
+                fill="none"
+            >
                 <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
         </button>
