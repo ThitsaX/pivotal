@@ -8,6 +8,7 @@ This chart reproduces the services from `docker/docker-compose.yml`:
 - `web-inbound`
 - `web-outbound`
 - `web-pivotal`
+- `report-worker`
 - `portal`
 - `app-auditor`
 - `wallet1-connector`

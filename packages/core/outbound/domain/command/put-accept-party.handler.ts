@@ -35,6 +35,12 @@ export class PutAcceptPartyHandler
     private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
     private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
+    // The lock must outlive the longest in-flight wait (the FSPIOP response
+    // timeout) so a gateway/client retry landing on another replica is rejected
+    // for the whole window the winning replica is still talking to the Hub.
+    // Released in finally; the TTL is only the crash backstop.
+    private static readonly IN_FLIGHT_LOCK_TTL_MS = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS + 10_000;
+
     private readonly logger = new Logger(PutAcceptPartyHandler.name);
 
     constructor(
@@ -52,8 +58,49 @@ export class PutAcceptPartyHandler
     }
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
+        const { transferId } = command.input;
+        const lockToken = await this.redisClient.acquireLock(
+            transferId,
+            PutAcceptPartyHandler.IN_FLIGHT_LOCK_TTL_MS,
+        );
+
+        // Another replica is already driving this transferId (typically a gateway
+        // retry after a per-try timeout). Fail fast WITHOUT re-dispatching the quote
+        // to the Hub. GENERIC_CLIENT_ERROR maps to a 4xx, so the gateway does not
+        // retry again and the duplicate never reaches inbound -> NATS -> connector.
+        if (lockToken == null) {
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Transfer ${transferId} is already being processed; ignoring duplicate request.`,
+            );
+        }
+
+        try {
+            return await this.executeLocked(command);
+        } finally {
+            await this.redisClient.releaseLock(transferId, lockToken);
+        }
+    }
+
+    private async executeLocked(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
         const { transferId, acceptParty, amount, extensionList, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+
+        // Idempotency guard (sequential duplicates): a successful acceptParty persists
+        // `quotes`; any failure clears the whole cache. So a non-null `quotes` means the
+        // quote phase already completed. A repeat acceptParty would re-POST /quotes with
+        // the same quoteId but a fresh body — which the Hub rejects as a hash-mismatch
+        // duplicate (3106) and which pollutes the audit trail (Failed + committed).
+        // Reject here, before any Hub call or audit write. The lock covers concurrent
+        // duplicates; this covers duplicates that arrive after the phase has finished.
+        if (transferRequest.quotes != null) {
+            this.logger.warn(`Duplicate acceptParty for transferId=${transferId} ignored; quote already completed.`);
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Quote already completed for transfer ${transferId}; duplicate acceptParty ignored.`,
+            );
+        }
+
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.

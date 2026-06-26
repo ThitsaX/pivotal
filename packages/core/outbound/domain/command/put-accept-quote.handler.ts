@@ -26,6 +26,12 @@ import { SendMoneyResponseMapper } from './send-money-response.mapper';
 export class PutAcceptQuoteHandler
     implements ICommandHandler<PutAcceptQuoteCommand, PutAcceptQuoteCommand.Output> {
 
+    // The lock must outlive the longest in-flight wait (the FSPIOP response
+    // timeout) so a gateway/client retry landing on another replica is rejected
+    // for the whole window the winning replica is still talking to the Hub.
+    // Released in finally; the TTL is only the crash backstop.
+    private static readonly IN_FLIGHT_LOCK_TTL_MS = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS + 10_000;
+
     private readonly logger = new Logger(PutAcceptQuoteHandler.name);
 
     constructor(
@@ -115,8 +121,48 @@ export class PutAcceptQuoteHandler
     }
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
+        const { transferId } = command.input;
+        const lockToken = await this.redisClient.acquireLock(
+            transferId,
+            PutAcceptQuoteHandler.IN_FLIGHT_LOCK_TTL_MS,
+        );
+
+        // Another replica is already driving this transferId (typically a gateway
+        // retry after a per-try timeout). Fail fast WITHOUT re-dispatching the
+        // transfer to the Hub — duplicate POST /transfers on the same transferId is
+        // the dangerous, money-moving leg. GENERIC_CLIENT_ERROR maps to a 4xx, so
+        // the gateway does not retry again.
+        if (lockToken == null) {
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Transfer ${transferId} is already being processed; ignoring duplicate request.`,
+            );
+        }
+
+        try {
+            return await this.executeLocked(command);
+        } finally {
+            await this.redisClient.releaseLock(transferId, lockToken);
+        }
+    }
+
+    private async executeLocked(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const { transferId, acceptQuote, requestSource } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
+
+        // Idempotency guard (sequential duplicates): a successful acceptQuote deletes the
+        // cache, so a repeat usually surfaces as TRANSFER_ID_NOT_FOUND. This is the
+        // belt-and-suspenders case — if `transfer` is already set the transfer phase has
+        // run, so reject before re-POSTing /transfers (a duplicate prepare on the same
+        // transferId) or writing another audit record.
+        if (transferRequest.transfer != null) {
+            this.logger.warn(`Duplicate acceptQuote for transferId=${transferId} ignored; transfer already completed.`);
+            throw new FspiopException(
+                FspiopErrors.GENERIC_CLIENT_ERROR,
+                `Transfer ${transferId} already completed; duplicate acceptQuote ignored.`,
+            );
+        }
+
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptQuoteHandler.assertSourceCanActForPayer(requestSource, source);
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
