@@ -1,6 +1,12 @@
 export type PivotalRuntimeConfig = {
     WEB_PIVOTAL_API_BASE_URL?: string;
     VITE_WEB_PIVOTAL_API_BASE_URL?: string;
+    REPORT_DOWNLOAD_JOB_TTL_MIN?: string;
+    REPORT_DOWNLOAD_READY_TTL_HOURS?: string;
+    REPORT_DOWNLOAD_POLL_INTERVAL_SEC?: string;
+    REPORT_DOWNLOAD_JOB_TTL_MS?: string;
+    REPORT_DOWNLOAD_READY_TTL_MS?: string;
+    REPORT_DOWNLOAD_POLL_INTERVAL_MS?: string;
     SIGNING_KEYS_UI_ENABLED?: string;
 };
 
