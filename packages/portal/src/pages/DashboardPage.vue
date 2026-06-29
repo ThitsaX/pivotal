@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted} from 'vue';
+import {computed, onMounted, onUnmounted} from 'vue';
 import type {ApexChart, ApexFill, ApexGrid, ApexLegend, ApexOptions, ApexYAxis} from 'apexcharts';
 import VueApexCharts from 'vue3-apexcharts';
 import TimeZoneSelector from '../components/TimeZoneSelector.vue';
@@ -25,6 +25,10 @@ const scopedFspId = computed((): string | null => authStore.state.user?.fspId ??
 const data = computed(() => auditDashboardStore.state.data);
 const loading = computed((): boolean => auditDashboardStore.state.loading);
 const loadError = computed((): string | null => auditDashboardStore.state.loadError);
+
+// Near-real-time KPIs (polled). When present, the headline tiles read from these instead of
+// the 5-minute snapshot; charts always stay on the snapshot.
+const live = computed(() => auditDashboardStore.state.live);
 
 // ── palette (modern, cohesive; ApexCharts needs explicit hex) ─────────────────────
 // Each hue has a lighter "…To" companion used as the gradient end for a fresher look.
@@ -335,7 +339,12 @@ function refresh(): void {
 onMounted((): void => {
     if (canView.value) {
         void auditDashboardStore.load();
+        auditDashboardStore.startLivePolling();
     }
+});
+
+onUnmounted((): void => {
+    auditDashboardStore.stopLivePolling();
 });
 </script>
 
@@ -351,6 +360,14 @@ onMounted((): void => {
                     <template v-else>Hub-wide · all FSPs</template>
                     <span class="text-slate-400">· UTC day boundaries</span>
                 </p>
+                <span
+                    v-if="live"
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600"
+                    title="Headline figures update in near real time"
+                >
+                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
+                    Live
+                </span>
             </div>
             <div class="flex items-center gap-2">
                 <button
@@ -403,25 +420,25 @@ onMounted((): void => {
                 <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions Today</p>
-                        <p class="font-display text-xl leading-tight text-ink">{{ formatNumber(data.totals.today) }}</p>
+                        <p class="font-display text-xl leading-tight text-ink">{{ formatNumber(live ? live.today : data.totals.today) }}</p>
                         <p class="text-[11px] text-slate-400">{{ formatNumber(data.totals.last7d) }} / 7d · {{ formatNumber(data.totals.last30d) }} / 30d</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Success Rate</p>
-                        <p class="font-display text-xl leading-tight text-emerald-600">{{ formatPercent(data.successRateToday) }}</p>
+                        <p class="font-display text-xl leading-tight text-emerald-600">{{ formatPercent(live ? live.successRateToday : data.successRateToday) }}</p>
                         <p class="text-[11px] text-slate-400">committed ÷ total today</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Errors / Disputes</p>
                         <p class="font-display text-xl leading-tight text-rose-600">
-                            {{ formatNumber(data.errorsToday) }}<span class="text-sm text-amber-600"> / {{ formatNumber(data.disputesToday) }}</span>
+                            {{ formatNumber(live ? live.errorsToday : data.errorsToday) }}<span class="text-sm text-amber-600"> / {{ formatNumber(live ? live.disputesToday : data.disputesToday) }}</span>
                         </p>
                         <p class="text-[11px] text-slate-400">errors / disputes today</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency</p>
-                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(data.avgLatencyMsToday) }}</p>
-                        <p class="text-[11px] text-slate-400">as of {{ formatTimestamp(data.asOf) }}</p>
+                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(live ? live.avgLatencyMsToday : data.avgLatencyMsToday) }}</p>
+                        <p class="text-[11px] text-slate-400">as of {{ formatTimestamp(live ? live.asOf : data.asOf) }}</p>
                     </article>
                 </div>
 

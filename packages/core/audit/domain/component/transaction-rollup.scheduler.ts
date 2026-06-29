@@ -1,5 +1,6 @@
 import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {TransactionRollupRepository} from '../repository/transaction-rollup.repository';
+import {LiveStatsStore} from './live-stats.store';
 import {RollupLock} from './rollup-lock';
 
 /**
@@ -51,6 +52,7 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
         private readonly repository: TransactionRollupRepository,
         private readonly lock: RollupLock,
         private readonly intervalMs: number = TransactionRollupScheduler.DEFAULT_INTERVAL_MS,
+        private readonly liveStats?: LiveStatsStore,
     ) {
         // A bucket must be re-aggregated at least once after it has settled while still inside
         // the trailing window. If the interval were as long as (or longer than) the window minus
@@ -135,8 +137,55 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
             this.logger.log(
                 `Backfill complete: ${buckets} buckets across ${TransactionRollupScheduler.BACKFILL_DAYS} days.`,
             );
+
+            // Seed today's live counters from the freshly backfilled rollup so the live tier
+            // starts consistent rather than from zero.
+            await this.reconcileLive(new Date());
         } finally {
             await this.lock.release(token);
+        }
+    }
+
+    /**
+     * Overwrites the near-real-time ("live") counters for the current UTC day from the
+     * authoritative rollup — the reconciliation that heals any drift accumulated by the
+     * per-event {@link LiveStatsWriter} (missed/late/duplicate events). Recomputes the hub
+     * scope plus every FSP active today, mirroring the dashboard's scoping exactly. Runs only
+     * on the lock-holding replica (invoked from {@link tick}/{@link backfillIfEmpty}) and is
+     * best-effort — a failure never disrupts the rollup refresh.
+     */
+    private async reconcileLive(now: Date): Promise<void> {
+        if (this.liveStats === undefined) {
+            return;
+        }
+
+        try {
+            const todayStartMs =
+                Math.floor(now.getTime() / TransactionRollupScheduler.MS_PER_DAY) *
+                TransactionRollupScheduler.MS_PER_DAY;
+            const toMs =
+                Math.floor(now.getTime() / TransactionRollupScheduler.MS_PER_HOUR) *
+                TransactionRollupScheduler.MS_PER_HOUR +
+                TransactionRollupScheduler.MS_PER_HOUR;
+            const todayStart = new Date(todayStartMs);
+            const to = new Date(toMs);
+            const dateKey = LiveStatsStore.dateKey(todayStart);
+
+            const hubTotals = await this.repository.getLiveTotals(undefined, todayStart, to);
+            await this.liveStats.reseedScope(dateKey, LiveStatsStore.hubScope(), hubTotals);
+
+            const fsps = await this.repository.getActiveFsps(todayStart, to);
+            for (const fsp of fsps) {
+                const totals = await this.repository.getLiveTotals(fsp, todayStart, to);
+                await this.liveStats.reseedScope(dateKey, LiveStatsStore.fspScope(fsp), totals);
+            }
+
+            this.logger.debug(`Live counters reconciled for ${dateKey} (hub + ${fsps.length} FSP scopes).`);
+        } catch (error) {
+            this.logger.error(
+                `Live reconcile failed: ${error instanceof Error ? error.message : String(error)}`,
+                error instanceof Error ? error.stack : undefined,
+            );
         }
     }
 
@@ -179,6 +228,11 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
                 `Rollup refreshed ${result.bucketsWritten} buckets for ` +
                 `[${windowStart.toISOString()}, ${windowEnd.toISOString()}).`,
             );
+
+            // Reseed the near-real-time counters from the just-rebuilt rollup (authoritative
+            // backstop for the per-event live writers). Lock is held here, so this runs on one
+            // replica only.
+            await this.reconcileLive(new Date());
         } catch (error) {
             this.logger.error(
                 `Rollup tick failed: ${error instanceof Error ? error.message : String(error)}`,
