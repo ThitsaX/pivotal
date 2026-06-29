@@ -37,6 +37,10 @@ export class TransactionRepository {
         'transaction.quotingAmount',
         'transaction.transferCurrency',
         'transaction.transferAmount',
+        'transaction.payeeReceiveAmount',
+        'transaction.payeeFee',
+        'transaction.payerFee',
+        'transaction.schemeFee',
         'transaction.transactionType',
         'transaction.subScenario',
         'transaction.transferState',
@@ -60,6 +64,11 @@ export class TransactionRepository {
         'transaction.payeeSubId',
         'transaction.quotingCurrency',
         'transaction.quotingAmount',
+        'transaction.payeeReceiveAmount',
+        'transaction.transferAmount',
+        'transaction.payeeFee',
+        'transaction.payerFee',
+        'transaction.schemeFee',
         'transaction.transferState',
         'transaction.possibleDispute',
         'transaction.partiesError',
@@ -100,6 +109,10 @@ export class TransactionRepository {
             input.quotingAmount ?? null,
             input.transferCurrency ?? null,
             input.transferAmount ?? null,
+            input.payeeReceiveAmount ?? null,
+            input.payeeFee ?? null,
+            input.payerFee ?? null,
+            input.schemeFee ?? null,
             input.transactionStartedAt,
             input.transactionCompletedAt ?? null,
             input.transactionType ?? null,
@@ -168,6 +181,10 @@ export class TransactionRepository {
                 quoting_amount,
                 transfer_currency,
                 transfer_amount,
+                payee_receive_amount,
+                payee_fee,
+                payer_fee,
+                scheme_fee,
                 transaction_started_at,
                 transaction_completed_at,
                 transaction_type,
@@ -239,6 +256,13 @@ export class TransactionRepository {
                 quoting_amount = COALESCE(VALUES(quoting_amount), transactions.quoting_amount),
                 transfer_currency = COALESCE(VALUES(transfer_currency), transactions.transfer_currency),
                 transfer_amount = COALESCE(VALUES(transfer_amount), transactions.transfer_amount),
+                payee_receive_amount = COALESCE(
+                    VALUES(payee_receive_amount),
+                    transactions.payee_receive_amount
+                ),
+                payee_fee = COALESCE(VALUES(payee_fee), transactions.payee_fee),
+                payer_fee = COALESCE(VALUES(payer_fee), transactions.payer_fee),
+                scheme_fee = COALESCE(VALUES(scheme_fee), transactions.scheme_fee),
                 transaction_started_at = LEAST(transactions.transaction_started_at, VALUES(transaction_started_at)),
                 transaction_completed_at = COALESCE(
                     VALUES(transaction_completed_at),
@@ -1056,6 +1080,10 @@ export class TransactionRepository {
             quotingAmount: record.quotingAmount,
             transferCurrency: record.transferCurrency,
             transferAmount: record.transferAmount,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            payeeFee: record.payeeFee,
+            payerFee: record.payerFee,
+            schemeFee: record.schemeFee,
             transferType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
@@ -1085,6 +1113,10 @@ export class TransactionRepository {
             quotingAmount: record.quotingAmount,
             transferCurrency: record.transferCurrency,
             transferAmount: record.transferAmount,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            payeeFee: record.payeeFee,
+            payerFee: record.payerFee,
+            schemeFee: record.schemeFee,
             transactionType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
@@ -1148,6 +1180,11 @@ export class TransactionRepository {
             payeeSubId:      record.payeeSubId,
             quotingCurrency: record.quotingCurrency,
             quotingAmount:   record.quotingAmount,
+            payeeFee:        record.payeeFee,
+            payerFee:        record.payerFee,
+            schemeFee:       record.schemeFee,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            transferAmount:  record.transferAmount,
             transferState:   record.transferState,
             dispute:         record.possibleDispute,
             partiesError:    TransactionRepository.toRawJson(record.partiesError),
@@ -1204,6 +1241,10 @@ export namespace TransactionRepository {
         quotingAmount?: number | null;
         transferCurrency?: Currency | null;
         transferAmount?: number | null;
+        payeeReceiveAmount?: number | null;
+        payeeFee?: number | null;
+        payerFee?: number | null;
+        schemeFee?: number | null;
         transactionStartedAt: Date;
         transactionCompletedAt?: Date | null;
         transactionType?: TransactionScenario | null;
