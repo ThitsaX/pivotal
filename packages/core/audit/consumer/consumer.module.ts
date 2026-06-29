@@ -1,7 +1,14 @@
 import {CommandBus} from '@nestjs/cqrs';
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
-import {AuditDomainModule, RollupLock, TransactionRollupRepository, TransactionRollupScheduler} from '../domain';
+import {
+    AuditDomainModule,
+    LiveStatsStore,
+    LiveStatsWriter,
+    RollupLock,
+    TransactionRollupRepository,
+    TransactionRollupScheduler,
+} from '../domain';
 import {
     AuditTransactionConsumer,
 } from './listener';
@@ -40,8 +47,9 @@ export class AuditConsumerModule {
         return [
             {
                 provide: AuditTransactionConsumer,
-                useFactory: (ncs: NatsClientService, commandBus: CommandBus) => new AuditTransactionConsumer(ncs, commandBus),
-                inject: [NatsClientService, CommandBus],
+                useFactory: (ncs: NatsClientService, commandBus: CommandBus, liveStats: LiveStatsWriter) =>
+                    new AuditTransactionConsumer(ncs, commandBus, liveStats),
+                inject: [NatsClientService, CommandBus, LiveStatsWriter],
             },
             // Settings resolved once for the rollup providers (ConfigService is global in the host app).
             {
@@ -56,20 +64,38 @@ export class AuditConsumerModule {
                     new RollupLock(settings.redisUrl(), TRANSACTION_ROLLUP_LOCK_KEY),
                 inject: [ROLLUP_SETTINGS],
             },
+            // Near-real-time counter store (own Redis client; written per-event by every replica,
+            // reseeded by the scheduler's reconciliation).
+            {
+                provide: LiveStatsStore,
+                useFactory: (settings: AuditConsumerModule.RequiredSettings) =>
+                    new LiveStatsStore(settings.redisUrl()),
+                inject: [ROLLUP_SETTINGS],
+            },
+            // Per-event live counter writer (classifies the transaction + applies the delta).
+            {
+                provide: LiveStatsWriter,
+                useFactory: (repository: TransactionRollupRepository, store: LiveStatsStore) =>
+                    new LiveStatsWriter(repository, store),
+                inject: [TransactionRollupRepository, LiveStatsStore],
+            },
             // Periodic rollup refresh (lifecycle-managed: starts its own setInterval on init).
+            // Also reconciles the live counters from the freshly rebuilt rollup each tick.
             {
                 provide: TransactionRollupScheduler,
                 useFactory: (
                     settings: AuditConsumerModule.RequiredSettings,
                     repository: TransactionRollupRepository,
                     lock: RollupLock,
+                    liveStats: LiveStatsStore,
                 ) =>
                     new TransactionRollupScheduler(
                         repository,
                         lock,
                         settings.transactionRollupIntervalSeconds() * 1000,
+                        liveStats,
                     ),
-                inject: [ROLLUP_SETTINGS, TransactionRollupRepository, RollupLock],
+                inject: [ROLLUP_SETTINGS, TransactionRollupRepository, RollupLock, LiveStatsStore],
             },
         ];
     }

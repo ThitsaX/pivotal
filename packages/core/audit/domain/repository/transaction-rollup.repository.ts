@@ -375,6 +375,111 @@ export class TransactionRollupRepository {
         return value == null ? null : new Date(value as string);
     }
 
+    // ─── Live tier (near-real-time) ─────────────────────────────────────────────────────────
+
+    /**
+     * Reads the current flag state of a single transaction (by `correlation_id`) for the live
+     * writer to classify. A point lookup on the unique index (`transactions_08_uk`); returns
+     * `null` if the row does not exist yet. Stage flags are reduced to booleans (`IS NOT NULL`)
+     * and latency is precomputed in ms, mirroring the rollup's aggregation expressions exactly.
+     */
+    async findLiveClassification(
+        correlationId: string,
+    ): Promise<TransactionRollupRepository.LiveClassificationRecord | null> {
+        const rows = await this.readRepository.query(
+            `SELECT payer_fsp              AS payer_fsp,
+                    payee_fsp              AS payee_fsp,
+                    transaction_started_at AS started_at,
+                    updated_at             AS updated_at,
+                    error                  AS error,
+                    possible_dispute       AS possible_dispute,
+                    (parties_error    IS NOT NULL) AS parties_error,
+                    (quotes_error     IS NOT NULL) AS quotes_error,
+                    (transfers_error  IS NOT NULL) AS transfers_error,
+                    (patch_error      IS NOT NULL) AS patch_error,
+                    CASE WHEN transaction_completed_at IS NOT NULL
+                         THEN TIMESTAMPDIFF(MICROSECOND, transaction_started_at, transaction_completed_at) / 1000
+                         ELSE NULL END             AS latency_ms
+             FROM transactions
+             WHERE correlation_id = ?
+             LIMIT 1`,
+            [correlationId],
+        );
+        const row = rows[0];
+
+        if (row == null) {
+            return null;
+        }
+
+        return {
+            payerFsp: String(row.payer_fsp),
+            payeeFsp: String(row.payee_fsp),
+            startedAt: row.started_at instanceof Date ? row.started_at : new Date(row.started_at as string),
+            updatedAt: row.updated_at instanceof Date ? row.updated_at : new Date(row.updated_at as string),
+            error: Number(row.error) === 1,
+            possibleDispute: Number(row.possible_dispute) === 1,
+            partiesError: Number(row.parties_error) === 1,
+            quotesError: Number(row.quotes_error) === 1,
+            transfersError: Number(row.transfers_error) === 1,
+            patchError: Number(row.patch_error) === 1,
+            latencyMs: row.latency_ms == null ? null : Number(row.latency_ms),
+        };
+    }
+
+    /**
+     * Authoritative "today" totals for one scope, summed from the rollup buckets — the source
+     * of truth the 5-minute reconciliation writes onto the live counters. `scopeFspId`
+     * undefined ⇒ hub-wide; otherwise the `(payer OR payee)` DFSP scope, matching the reads.
+     */
+    async getLiveTotals(
+        scopeFspId: string | undefined,
+        from: Date,
+        to: Date,
+    ): Promise<TransactionRollupRepository.LiveTotals> {
+        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const rows = await this.readRepository.query(
+            `SELECT COALESCE(SUM(txn_count), 0)                 AS txn,
+                    COALESCE(SUM(txn_count - error_count), 0)   AS success,
+                    COALESCE(SUM(error_count), 0)               AS error,
+                    COALESCE(SUM(dispute_count), 0)             AS dispute,
+                    COALESCE(SUM(parties_error_count), 0)       AS parties_error,
+                    COALESCE(SUM(quotes_error_count), 0)        AS quotes_error,
+                    COALESCE(SUM(transfers_error_count), 0)     AS transfers_error,
+                    COALESCE(SUM(patch_error_count), 0)         AS patch_error,
+                    COALESCE(SUM(latency_count), 0)             AS latency_count,
+                    COALESCE(SUM(sum_latency_ms), 0)            AS sum_latency_ms
+             FROM transaction_hourly_rollup
+             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`,
+            [from, to, ...scope.params],
+        );
+        const row = rows[0] ?? {};
+
+        return {
+            txn: Number(row.txn ?? 0),
+            success: Number(row.success ?? 0),
+            error: Number(row.error ?? 0),
+            dispute: Number(row.dispute ?? 0),
+            partiesError: Number(row.parties_error ?? 0),
+            quotesError: Number(row.quotes_error ?? 0),
+            transfersError: Number(row.transfers_error ?? 0),
+            patchError: Number(row.patch_error ?? 0),
+            latencyCount: Number(row.latency_count ?? 0),
+            sumLatencyMs: Number(row.sum_latency_ms ?? 0),
+        };
+    }
+
+    /** Distinct FSPs (either leg) with buckets in `[from, to)` — the scopes to reconcile today. */
+    async getActiveFsps(from: Date, to: Date): Promise<string[]> {
+        const rows = await this.readRepository.query(
+            `SELECT payer_fsp AS fsp FROM transaction_hourly_rollup WHERE bucket_hour >= ? AND bucket_hour < ?
+             UNION
+             SELECT payee_fsp AS fsp FROM transaction_hourly_rollup WHERE bucket_hour >= ? AND bucket_hour < ?`,
+            [from, to, from, to],
+        );
+
+        return rows.map((row: Record<string, unknown>) => String(row.fsp));
+    }
+
     private static scopeClause(scopeFspId: string | undefined): {clause: string; params: unknown[]} {
         if (scopeFspId == null) {
             return {clause: '', params: []};
@@ -447,4 +552,36 @@ export namespace TransactionRollupRepository {
     export type LatencyPoint = {date: string; avgLatencyMs: number | null};
 
     export type FspLeg = 'payer_fsp' | 'payee_fsp';
+
+    /** Current flag state of one transaction, for the live writer to classify. */
+    export type LiveClassificationRecord = {
+        payerFsp: string;
+        payeeFsp: string;
+        startedAt: Date;
+        updatedAt: Date;   // monotonic rank for the live writer's concurrency guard
+        error: boolean;
+        possibleDispute: boolean;
+        partiesError: boolean;
+        quotesError: boolean;
+        transfersError: boolean;
+        patchError: boolean;
+        latencyMs: number | null;
+    };
+
+    /**
+     * Authoritative per-scope "today" totals from the rollup. Field-compatible with
+     * `LiveVector` so reconciliation can reseed the live counters directly.
+     */
+    export type LiveTotals = {
+        txn: number;
+        success: number;
+        error: number;
+        dispute: number;
+        partiesError: number;
+        quotesError: number;
+        transfersError: number;
+        patchError: number;
+        latencyCount: number;
+        sumLatencyMs: number;
+    };
 }

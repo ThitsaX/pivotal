@@ -47,6 +47,11 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         return this.readRequiredValue('CENTRAL_LEDGER_URL');
     }
 
+    /** Redis URL for reading the near-real-time dashboard counters (written by app-auditor). */
+    redisUrl(): string {
+        return this.readRequiredValue('REDIS_URL');
+    }
+
     centralLedgerAxiosParams(): CentralLedgerAxiosParams {
         const socketTimeoutMs = this.readPositiveInteger('CENTRAL_LEDGER_SOCKET_TIMEOUT_MS');
         const connectionTimeoutMs = this.readPositiveInteger('CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS');
