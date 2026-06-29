@@ -113,6 +113,15 @@
         "tsConfigPath": "packages/apps/web-pivotal/tsconfig.app.json"
       }
     },
+    "apps-report-worker": {
+      "type": "application",
+      "root": "packages/apps/report-worker",
+      "entryFile": "apps/report-worker/main",
+      "sourceRoot": "packages/apps/report-worker",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/report-worker/tsconfig.app.json"
+      }
+    },
     "core-audit-subscriber": {
       "type": "library",
       "root": "packages/core/audit/subscriber",

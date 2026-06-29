@@ -1,5 +1,18 @@
 <script setup lang="ts">
+import {watch} from 'vue';
+import ToastOutlet from './components/ToastOutlet.vue';
+import {resumeStoredReportPolling} from './composables/useDownloadReportState';
 import {authStore} from './stores/auth.store';
+
+watch(
+    (): boolean => authStore.isAuthenticated.value,
+    (isAuthenticated): void => {
+        if (isAuthenticated) {
+            resumeStoredReportPolling();
+        }
+    },
+    {immediate: true},
+);
 </script>
 
 <template>
@@ -10,4 +23,5 @@ import {authStore} from './stores/auth.store';
         Loading…
     </div>
     <router-view v-else />
+    <ToastOutlet />
 </template>

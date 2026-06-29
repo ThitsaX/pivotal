@@ -3,6 +3,7 @@
 This folder contains a complete Docker Compose stack for:
 - `portal` (Vue UI)
 - `web-pivotal` (portal API backend)
+- `report-worker` (asynchronous report export processor)
 - `app-auditor`
 - `web-inbound`
 - `web-outbound`
@@ -39,6 +40,7 @@ docker compose down -v
 
 - Portal UI: `http://localhost:4173`
 - Web Pivotal API: `http://localhost:3202`
+- Report Worker: no HTTP port; processes queued report downloads from MySQL
 - Web Outbound API: `http://localhost:3200`
 - Web Inbound API: `http://localhost:3201`
 - MySQL: `localhost:3306`
