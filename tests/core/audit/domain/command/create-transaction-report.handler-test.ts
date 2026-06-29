@@ -164,7 +164,7 @@ describe('CreateTransactionReportHandler', () => {
 
         const report = await generator.generate(reportRequest('xlsx'), {});
         const zip = new AdmZip(report.bytes);
-        const xlsxEntry = zip.getEntry('TransactionDetailReport-1001-Part1.xlsx');
+        const xlsxEntry = zip.getEntry('TransactionReport-1001-Part1.xlsx');
 
         assert.notEqual(xlsxEntry, null);
 
@@ -209,6 +209,54 @@ describe('CreateTransactionReportHandler', () => {
         assert.match(csv, /"\{""partyId"":""2769200001""\}"/);
         assert.match(csv, /"\{""transferState"":""ABORTED""\}"/);
         assert.match(csv, /dispute patch response/);
+    });
+
+    it('includes fee and amount fields in CSV reports', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                 '1',
+                    transferId:         'transfer-with-fees',
+                    payeeFee:           262,
+                    payerFee:           613,
+                    schemeFee:          125,
+                    payeeReceiveAmount: 9000,
+                    transferAmount:     10000,
+                },
+                {
+                    id:         '2',
+                    transferId: 'transfer-without-fees',
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [header, firstRow, secondRow] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = header.split(',');
+        const firstValues = firstRow.split(',');
+        const secondValues = secondRow.split(',');
+
+        assert.deepEqual(
+            [
+                headers.indexOf('payeeFee'),
+                headers.indexOf('payerFee'),
+                headers.indexOf('schemeFee'),
+                headers.indexOf('payeeReceiveAmount'),
+                headers.indexOf('transferAmount'),
+            ].map((index) => firstValues[index]),
+            ['262', '613', '125', '9000', '10000'],
+        );
+        assert.deepEqual(
+            [
+                headers.indexOf('payeeFee'),
+                headers.indexOf('payerFee'),
+                headers.indexOf('schemeFee'),
+                headers.indexOf('payeeReceiveAmount'),
+                headers.indexOf('transferAmount'),
+            ].map((index) => secondValues[index]),
+            ['NULL', 'NULL', 'NULL', 'NULL', 'NULL'],
+        );
     });
 
     it('omits patch response body in CSV reports when the row is not disputed', async () => {
@@ -290,8 +338,8 @@ describe('CreateTransactionReportHandler', () => {
 
         assert.equal(report.extension, 'zip');
         assert.deepEqual(entries, [
-            'TransactionDetailReport-1001-Part1.xlsx',
-            'TransactionDetailReport-1001-Part2.xlsx',
+            'TransactionReport-1001-Part1.xlsx',
+            'TransactionReport-1001-Part2.xlsx',
         ]);
     });
 });
