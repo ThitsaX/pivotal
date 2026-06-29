@@ -1,3 +1,4 @@
+
 import {getPivotalRuntimeConfig, optionalEnv} from '../configs/pivotal-runtime-config';
 
 const DEFAULT_API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3202`;
@@ -67,6 +68,10 @@ interface RequestOptions {
     skipAuthRetry?: boolean;
 }
 
+function requestUrl(path: string): string {
+    return /^https?:\/\//i.test(path) ? path : `${API_BASE_URL}${path}`;
+}
+
 async function parseBody(response: Response): Promise<unknown> {
     const contentType = response.headers.get('content-type') ?? '';
 
@@ -126,7 +131,7 @@ async function dispatch(
         init.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${API_BASE_URL}${path}`, init);
+    const response = await fetch(requestUrl(path), init);
 
     if (response.status !== 401 || options.skipAuthRetry === true) {
         return response;
@@ -146,7 +151,7 @@ async function dispatch(
         delete headers.Authorization;
     }
 
-    return fetch(`${API_BASE_URL}${path}`, init);
+    return fetch(requestUrl(path), init);
 }
 
 async function request<T>(
@@ -192,6 +197,19 @@ function postWithoutAuthRetry<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('POST', path, body, {skipAuthRetry: true});
 }
 
+async function download(path: string): Promise<Response> {
+    const response = await dispatch('GET', path, undefined, {});
+
+    if (!response.ok) {
+        const parsed = await parseBody(response);
+        const {code, message} = toErrorMessage(response.status, parsed, response.statusText);
+
+        throw new ApiError(response.status, code, message, parsed);
+    }
+
+    return response;
+}
+
 export const apiClient = {
     get,
     post,
@@ -199,4 +217,5 @@ export const apiClient = {
     put,
     delete: del,
     postWithoutAuthRetry,
+    download,
 };

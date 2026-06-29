@@ -32,6 +32,25 @@ x-common-db-env: &common_db_env
   DB_READ_PASSWORD: ${DB_READ_PASSWORD:-mysql}
   DB_READ_NAME: ${DB_READ_NAME:-pivotal}
 
+x-report-storage-env: &report_storage_env
+  REPORT_S3_ENABLED: ${REPORT_S3_ENABLED:-false}
+  REPORT_S3_BUCKET: ${REPORT_S3_BUCKET:-your-aws-s3-bucket-name}
+  REPORT_S3_REGION: ${REPORT_S3_REGION:-us-east-1}
+  REPORT_S3_ACCESS_KEY_ID: ${REPORT_S3_ACCESS_KEY_ID:-your-aws-access-key-id}
+  REPORT_S3_SECRET_ACCESS_KEY: ${REPORT_S3_SECRET_ACCESS_KEY:-your-aws-secret-access-key}
+  REPORT_S3_ENDPOINT: ${REPORT_S3_ENDPOINT:-}
+  REPORT_S3_FORCE_PATH_STYLE: ${REPORT_S3_FORCE_PATH_STYLE:-false}
+  REPORT_S3_PREFIX: ${REPORT_S3_PREFIX:-reports/}
+  REPORT_S3_PRESIGNED_URL_TTL_SECONDS: ${REPORT_S3_PRESIGNED_URL_TTL_SECONDS:-900}
+
+x-report-worker-env: &report_worker_env
+  REPORT_DOWNLOAD_POLL_INTERVAL_MS: ${REPORT_DOWNLOAD_POLL_INTERVAL_MS:-5000}
+  REPORT_DOWNLOAD_PAGE_SIZE: ${REPORT_DOWNLOAD_PAGE_SIZE:-50000}
+  REPORT_DOWNLOAD_MAX_ROWS_PER_FILE: ${REPORT_DOWNLOAD_MAX_ROWS_PER_FILE:-50000}
+  REPORT_DOWNLOAD_MAX_ZIP_FILES: ${REPORT_DOWNLOAD_MAX_ZIP_FILES:-1}
+  REPORT_DOWNLOAD_MAX_CONCURRENT: ${REPORT_DOWNLOAD_MAX_CONCURRENT:-3}
+  REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS: ${REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS:-1200000}
+
 services:
   mysql:
     image: mysql:8.4
@@ -65,6 +84,36 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    profiles: ["reports"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    profiles: ["reports"]
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 1; done
+        mc mb --ignore-existing "local/${MINIO_REPORT_BUCKET:-pivotal-reports}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+
   web-outbound:
     image: pivotal-web-outbound:local
     build:
@@ -85,13 +134,6 @@ services:
       NATS_URL: ${NATS_URL:-nats://nats:4222}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_CACHE_ITEM_TIMEOUT_MS: ${REDIS_CACHE_ITEM_TIMEOUT_MS:-900000}
-      PREFIX_ORACLE_ENDPOINT: ${PREFIX_ORACLE_ENDPOINT:-https://oracle.example.com/admin-api}
-      PREFIX_ORACLE_CACHE_TTL_MS: ${PREFIX_ORACLE_CACHE_TTL_MS:-180000}
-      PREFIX_ORACLE_SOCKET_TIMEOUT_MS: ${PREFIX_ORACLE_SOCKET_TIMEOUT_MS:-}
-      PREFIX_ORACLE_CONNECTION_TIMEOUT_MS: ${PREFIX_ORACLE_CONNECTION_TIMEOUT_MS:-}
-      PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME: ${PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME:-PIVOTAL_FSPIOP_RESPONSE}
-      PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS: ${PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS:-60000}
-      DECIMAL_PLACES: ${DECIMAL_PLACES:-0}
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
@@ -113,8 +155,6 @@ services:
     environment:
       WEB_INBOUND_PORT: ${WEB_INBOUND_PORT:-3201}
       NATS_URL: ${NATS_URL:-nats://nats:4222}
-      PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME: ${PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME:-PIVOTAL_FSPIOP_RESPONSE}
-      PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS: ${PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS:-60000}
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
@@ -152,9 +192,23 @@ services:
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
-      <<: *common_db_env
+      REPORT_DOWNLOAD_WORKER_ENABLED: ${WEB_PIVOTAL_REPORT_DOWNLOAD_WORKER_ENABLED:-false}
+      <<: [*common_db_env, *report_storage_env]
     ports:
       - "${WEB_PIVOTAL_HOST_PORT:-3202}:${WEB_PIVOTAL_PORT:-3202}"
+    restart: unless-stopped
+
+  report-worker:
+    image: pivotal-report-worker:local
+    build:
+      context: ..
+      dockerfile: docker/report-worker.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      REPORT_DOWNLOAD_WORKER_ENABLED: ${REPORT_DOWNLOAD_WORKER_ENABLED:-true}
+      <<: [*common_db_env, *report_storage_env, *report_worker_env]
     restart: unless-stopped
 
   portal:
@@ -163,11 +217,7 @@ services:
       context: ..
       dockerfile: docker/portal.Dockerfile
       args:
-        VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-https://pivotal-api.int.stg-hub.gimpss.com}
-        VITE_SIGNING_KEYS_UI_ENABLED: ${VITE_SIGNING_KEYS_UI_ENABLED:-false}
-    environment:
-      VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-https://pivotal-api.int.stg-hub.gimpss.com}
-      VITE_SIGNING_KEYS_UI_ENABLED: ${VITE_SIGNING_KEYS_UI_ENABLED:-false}
+        VITE_WEB_PIVOTAL_API_BASE_URL: ${VITE_WEB_PIVOTAL_API_BASE_URL:-http://localhost:3202}
     depends_on:
       web-pivotal:
         condition: service_started
@@ -241,3 +291,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  minio_data:
