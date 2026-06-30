@@ -56,7 +56,7 @@ export class QuotesController {
     }
 
     @Put(':quoteId/error')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putQuotesError(
         @Param('quoteId') quoteId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
@@ -88,7 +88,7 @@ export class QuotesController {
     }
 
     @Put(':quoteId')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putQuotes(
         @Param('quoteId') quoteId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
