@@ -8,6 +8,7 @@
 - Seeds IAM roles, permissions, menus, and the configured admin user.
 - Exposes login, refresh, logout, password change, and current-user APIs.
 - Exposes participant onboarding, endpoint, currency, and signing-key APIs.
+- Exposes participant access-key rotation to replace the public key `web-outbound` uses to verify a DFSP's signed requests (HUB-scoped, never available to DFSP roles or the Hub participant).
 - Exposes Find Transactions, transaction detail, count, and report download APIs.
 - Streams generated report ZIP files to authenticated users through the API; it must not expose direct S3 URLs to the portal.
 
@@ -32,7 +33,7 @@ GET /readyz
 - `/auth/*`: login, refresh, logout, password change.
 - `/auth/me/*`: current user and menu.
 - `/admin/*`: IAM users, roles, menus, and permissions.
-- `/participant/*`: onboarding, endpoints, currencies, and participant signing keys.
+- `/participant/*`: onboarding, endpoints, currencies, participant signing keys, and access-key rotation (`PUT /participant/access-key`).
 - `/hub/*`: Hub currency and signing-key setup.
 - `/audit/transactions`: Find Transactions, count, and detail.
 - `/audit/transactions/reports`: report request, status, download URL, and download stream.
@@ -68,6 +69,14 @@ REPORT_S3_FORCE_PATH_STYLE=true
 ```
 
 For AWS S3, leave `REPORT_S3_ENDPOINT` empty and set the real bucket, region, access key, and secret key through deployment secrets.
+
+## Participant Access-Key Rotation
+
+`PUT /participant/access-key` replaces `participant.accessPublicKey` (the PEM public key `web-outbound` uses to verify a participant's signed requests) for the named participant.
+
+- Guarded by the HUB-scoped permission `participant.access-key.update`. It is never grantable to DFSP-scoped roles, and the Hub participant is rejected.
+- The pasted key is validated as a structurally valid PEM public key before it is saved.
+- No restart is needed: `web-outbound` refreshes its participant key store from the DB every `PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS`, so the new key takes effect on the next refresh and the old key stops being accepted.
 
 ## Debug Checklist
 

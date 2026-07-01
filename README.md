@@ -225,6 +225,8 @@ sequenceDiagram
     Worker->>DB: update request READY with object key
     UI->>API: GET /audit/transactions/reports/{requestId}/status
     API-->>UI: READY
+    UI->>API: GET /audit/transactions/reports/{requestId}/download-url
+    API-->>UI: authenticated web-pivotal download URL (not a direct S3 URL)
     UI->>API: GET /audit/transactions/reports/{requestId}/download
     API->>S3: download object
     API-->>UI: ZIP stream
@@ -233,6 +235,8 @@ sequenceDiagram
 Important behavior:
 
 - `web-pivotal` creates requests, checks status, enforces access, and streams the ZIP through an authenticated Pivotal URL.
+- Download is a two-step call: `GET .../{requestId}/download-url` returns an authenticated web-pivotal URL that points back at `GET .../{requestId}/download`, which then proxies (streams) the object from S3/MinIO. The URL handed to the portal is always a Pivotal URL, never a direct S3 URL.
+- The storage layer can also mint short-lived S3 presigned URLs (TTL from `REPORT_S3_PRESIGNED_URL_TTL_SECONDS`); this is an internal capability and is not the URL returned to the portal.
 - `report-worker` performs the expensive query, XLSX generation, ZIP generation, and S3/MinIO upload.
 - Both `web-pivotal` and `report-worker` need matching `REPORT_S3_*` values. The API needs them even though it does not generate files, because it proxies the final download.
 
@@ -324,6 +328,11 @@ Common report environment variables:
 | `REPORT_S3_BUCKET` | both | S3/MinIO bucket for report ZIP files. |
 | `REPORT_S3_ENDPOINT` | both | Set for MinIO, empty for AWS S3. Use `http://minio:9000` in Docker and `http://127.0.0.1:9000` for host-local MinIO. |
 | `REPORT_S3_FORCE_PATH_STYLE` | both | Usually `true` for MinIO and `false` for AWS S3. |
+| `REPORT_S3_REGION` | both | AWS region for the bucket (e.g. `us-east-1`); any value works for MinIO. |
+| `REPORT_S3_ACCESS_KEY_ID` | both | S3/MinIO access key. Supply via deployment secrets. |
+| `REPORT_S3_SECRET_ACCESS_KEY` | both | S3/MinIO secret key. Supply via deployment secrets. |
+| `REPORT_S3_PREFIX` | both | Key prefix (folder) for report objects, e.g. `reports/`. |
+| `REPORT_S3_PRESIGNED_URL_TTL_SECONDS` | both | TTL for storage-layer presigned URLs. Note the portal is served a proxied Pivotal URL, not this presigned URL. |
 
 ## Useful Commands
 
