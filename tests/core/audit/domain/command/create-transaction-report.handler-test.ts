@@ -15,6 +15,34 @@ import {
     TransactionRepository,
 } from '../../../../../packages/core/audit/domain';
 
+function parseCsvRecord(record: string): string[] {
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < record.length; index += 1) {
+        const char = record[index];
+
+        if (char === '"') {
+            if (inQuotes && record[index + 1] === '"') {
+                current += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            fields.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    fields.push(current);
+
+    return fields;
+}
+
 describe('CreateTransactionReportHandler', () => {
 
     it('creates a pending CSV report request from transaction search criteria', async () => {
@@ -164,7 +192,7 @@ describe('CreateTransactionReportHandler', () => {
 
         const report = await generator.generate(reportRequest('xlsx'), {});
         const zip = new AdmZip(report.bytes);
-        const xlsxEntry = zip.getEntry('TransactionDetailReport-1001-Part1.xlsx');
+        const xlsxEntry = zip.getEntry('TransactionReport-1001-Part1.xlsx');
 
         assert.notEqual(xlsxEntry, null);
 
@@ -209,6 +237,99 @@ describe('CreateTransactionReportHandler', () => {
         assert.match(csv, /"\{""partyId"":""2769200001""\}"/);
         assert.match(csv, /"\{""transferState"":""ABORTED""\}"/);
         assert.match(csv, /dispute patch response/);
+    });
+
+    it('includes fee and amount fields in CSV reports', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                 '1',
+                    transferId:         'transfer-with-fees',
+                    payeeFee:           262,
+                    payerFee:           613,
+                    schemeFee:          125,
+                    payeeReceiveAmount: 9000,
+                    transferAmount:     10000,
+                },
+                {
+                    id:         '2',
+                    transferId: 'transfer-without-fees',
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [header, firstRow, secondRow] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = header.split(',');
+        const firstValues = firstRow.split(',');
+        const secondValues = secondRow.split(',');
+
+        assert.deepEqual(
+            [
+                headers.indexOf('payeeFee'),
+                headers.indexOf('payerFee'),
+                headers.indexOf('schemeFee'),
+                headers.indexOf('payeeReceiveAmount'),
+                headers.indexOf('transferAmount'),
+            ].map((index) => firstValues[index]),
+            ['262', '613', '125', '9000', '10000'],
+        );
+        assert.deepEqual(
+            [
+                headers.indexOf('payeeFee'),
+                headers.indexOf('payerFee'),
+                headers.indexOf('schemeFee'),
+                headers.indexOf('payeeReceiveAmount'),
+                headers.indexOf('transferAmount'),
+            ].map((index) => secondValues[index]),
+            ['0', '0', '0', 'NULL', 'NULL'],
+        );
+    });
+
+    it('escapes serialized JSON values with commas and quotes in CSV reports', async () => {
+        const partiesError = JSON.stringify({
+            errorInformation: {
+                errorCode:        '3200',
+                errorDescription: 'Payee lookup failed, retry later',
+                detail:           'Wallet said "not found"',
+            },
+        });
+        const quotesError = JSON.stringify({
+            message: 'Fee rule failed, amount is invalid',
+            reason:  'Expected "USD" quote currency',
+        });
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:           '1',
+                    transferId:   'transfer-json-comma',
+                    partiesError,
+                    quotesError,
+                    transfersError: JSON.stringify({
+                        transferState: 'ABORTED',
+                        note:          'Rejected, no liquidity',
+                    }),
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [headerLine, rowLine] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = parseCsvRecord(headerLine);
+        const values = parseCsvRecord(rowLine);
+
+        assert.equal(values.length, headers.length);
+        assert.equal(values[headers.indexOf('Account Lookup Error')], partiesError);
+        assert.equal(values[headers.indexOf('Quote Call Error')], quotesError);
+        assert.equal(
+            values[headers.indexOf('Transfer Call Error')],
+            JSON.stringify({
+                transferState: 'ABORTED',
+                note:          'Rejected, no liquidity',
+            }),
+        );
     });
 
     it('omits patch response body in CSV reports when the row is not disputed', async () => {
@@ -290,8 +411,8 @@ describe('CreateTransactionReportHandler', () => {
 
         assert.equal(report.extension, 'zip');
         assert.deepEqual(entries, [
-            'TransactionDetailReport-1001-Part1.xlsx',
-            'TransactionDetailReport-1001-Part2.xlsx',
+            'TransactionReport-1001-Part1.xlsx',
+            'TransactionReport-1001-Part2.xlsx',
         ]);
     });
 });
