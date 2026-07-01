@@ -28,6 +28,7 @@ const PERMISSION_SCOPES: Record<string, PermissionScope> = {
     [PermissionKey.AUDIT_TRANSACTIONS_LIST]:   'BOTH',
     [PermissionKey.AUDIT_TRANSACTIONS_VIEW]:   'BOTH',
     [PermissionKey.PARTICIPANT_LIST]:          'HUB',
+    [PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE]: 'HUB',
 };
 
 function freshState(): State {
@@ -246,7 +247,7 @@ describe('ReplaceRolePermissionsHandler', () => {
 
         await assert.rejects(
             makeHandler(state).execute(new ReplaceRolePermissionsCommand(
-                new ReplaceRolePermissionsCommand.Input('role-dfsp', [PermissionKey.PARTICIPANT_LIST]),
+                new ReplaceRolePermissionsCommand.Input('role-dfsp', [PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE]),
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_PERMISSION_SCOPE_MISMATCH',
