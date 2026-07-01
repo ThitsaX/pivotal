@@ -15,6 +15,34 @@ import {
     TransactionRepository,
 } from '../../../../../packages/core/audit/domain';
 
+function parseCsvRecord(record: string): string[] {
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < record.length; index += 1) {
+        const char = record[index];
+
+        if (char === '"') {
+            if (inQuotes && record[index + 1] === '"') {
+                current += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            fields.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    fields.push(current);
+
+    return fields;
+}
+
 describe('CreateTransactionReportHandler', () => {
 
     it('creates a pending CSV report request from transaction search criteria', async () => {
@@ -256,6 +284,51 @@ describe('CreateTransactionReportHandler', () => {
                 headers.indexOf('transferAmount'),
             ].map((index) => secondValues[index]),
             ['0', '0', '0', 'NULL', 'NULL'],
+        );
+    });
+
+    it('escapes serialized JSON values with commas and quotes in CSV reports', async () => {
+        const partiesError = JSON.stringify({
+            errorInformation: {
+                errorCode:        '3200',
+                errorDescription: 'Payee lookup failed, retry later',
+                detail:           'Wallet said "not found"',
+            },
+        });
+        const quotesError = JSON.stringify({
+            message: 'Fee rule failed, amount is invalid',
+            reason:  'Expected "USD" quote currency',
+        });
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:           '1',
+                    transferId:   'transfer-json-comma',
+                    partiesError,
+                    quotesError,
+                    transfersError: JSON.stringify({
+                        transferState: 'ABORTED',
+                        note:          'Rejected, no liquidity',
+                    }),
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [headerLine, rowLine] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = parseCsvRecord(headerLine);
+        const values = parseCsvRecord(rowLine);
+
+        assert.equal(values.length, headers.length);
+        assert.equal(values[headers.indexOf('Account Lookup Error')], partiesError);
+        assert.equal(values[headers.indexOf('Quote Call Error')], quotesError);
+        assert.equal(
+            values[headers.indexOf('Transfer Call Error')],
+            JSON.stringify({
+                transferState: 'ABORTED',
+                note:          'Rejected, no liquidity',
+            }),
         );
     });
 
