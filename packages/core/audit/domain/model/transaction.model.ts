@@ -102,6 +102,46 @@ export class Transaction {
     })
     public transferAmount!: number | null;
 
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payee_receive_amount',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payeeReceiveAmount!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payee_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payeeFee!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payer_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payerFee!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'scheme_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public schemeFee!: number | null;
+
     @Column({type: 'varchar', length: 32, name: 'transaction_type', nullable: true})
     public transactionType!: TransactionScenario | null;
 

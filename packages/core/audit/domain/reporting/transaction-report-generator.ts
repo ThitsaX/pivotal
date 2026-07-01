@@ -33,6 +33,11 @@ export class TransactionReportGenerator {
         {header: 'Payee Sub ID', key: 'payeeSubId'},
         {header: 'Currency', key: 'quotingCurrency'},
         {header: 'Amount', key: 'quotingAmount'},
+        {header: 'payeeFee', key: 'payeeFee'},
+        {header: 'payerFee', key: 'payerFee'},
+        {header: 'schemeFee', key: 'schemeFee'},
+        {header: 'payeeReceiveAmount', key: 'payeeReceiveAmount'},
+        {header: 'transferAmount', key: 'transferAmount'},
         {header: 'Transfer State in Hub', key: 'transferState'},
         {header: 'Disputed', key: 'dispute'},
         {header: 'Account Lookup Error', key: 'partiesError'},
@@ -40,6 +45,20 @@ export class TransactionReportGenerator {
         {header: 'Transfer Call Error', key: 'transfersError'},
         {header: 'Patch Call Error', key: 'patchError'},
     ];
+
+    // Fees default to 0 when absent, matching the outbound send-money API surface
+    // (send-money-response.mapper.ts) so the same transaction reads identically on both.
+    private static readonly ZERO_DEFAULT_COLUMN_KEYS = new Set([
+        'payeeFee',
+        'payerFee',
+        'schemeFee',
+    ]);
+
+    // Amounts have no natural zero, so an unavailable value stays NULL in the export.
+    private static readonly NULL_TEXT_COLUMN_KEYS = new Set([
+        'payeeReceiveAmount',
+        'transferAmount',
+    ]);
 
     constructor(
         private readonly transactionRepository: TransactionRepository,
@@ -273,7 +292,19 @@ export class TransactionReportGenerator {
             return TransactionReportGenerator.patchCallErrorValue(row);
         }
 
-        return row[column.key];
+        const value = row[column.key];
+
+        if (value == null) {
+            if (TransactionReportGenerator.ZERO_DEFAULT_COLUMN_KEYS.has(column.key)) {
+                return 0;
+            }
+
+            if (TransactionReportGenerator.NULL_TEXT_COLUMN_KEYS.has(column.key)) {
+                return 'NULL';
+            }
+        }
+
+        return value;
     }
 
     private static patchCallErrorValue(row: Record<string, unknown>): unknown {
