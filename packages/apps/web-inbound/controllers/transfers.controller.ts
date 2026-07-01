@@ -56,7 +56,7 @@ export class TransfersController {
     }
 
     @Patch(':transferId')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     patchTransfers(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
@@ -81,7 +81,7 @@ export class TransfersController {
     }
 
     @Put(':transferId/error')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putTransfersError(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
@@ -113,7 +113,7 @@ export class TransfersController {
     }
 
     @Put(':transferId')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putTransfers(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
