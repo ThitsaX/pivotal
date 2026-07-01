@@ -20,6 +20,7 @@ import {
     RolesAdminController,
     TransactionReportsAuditController,
     TransactionsAuditController,
+    UpdateAccessKeyController,
     UpsertEndpointController,
     UsersAdminController,
 } from './controllers';
@@ -68,6 +69,7 @@ export class WebPivotalModule {
                 AddHubCurrencyController,
                 AddHubSigningKeysController,
                 AddSigningKeysController,
+                UpdateAccessKeyController,
                 ListCentralLedgerParticipantsController,
                 UpsertEndpointController,
                 GenerateSigningKeyController,

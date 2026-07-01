@@ -66,7 +66,7 @@ export class PartiesController {
     }
 
     @Put(':type/:id{/:subId}/error')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putPartiesError(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
@@ -103,7 +103,7 @@ export class PartiesController {
     }
 
     @Put(':type/:id{/:subId}')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putParties(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
