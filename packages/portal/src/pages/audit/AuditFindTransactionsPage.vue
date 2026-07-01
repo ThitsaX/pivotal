@@ -1032,6 +1032,19 @@ const resolveAmountCurrency = (record: Record<string, unknown>): unknown => {
     return record.transferCurrency ?? record.quotingCurrency;
 };
 
+// Fees default to 0 (never "no data"), matching the transaction export, which
+// renders absent payer/payee/scheme fees as 0 rather than NULL.
+const formatFeeDisplay = (currency: unknown, amount: unknown): string => {
+    const formattedAmount = formatAmountNumber(amount ?? 0);
+    const feeAmount = formattedAmount === '-' ? '0' : formattedAmount;
+
+    if (typeof currency === 'string' && currency.trim().length > 0) {
+        return `${currency} ${feeAmount}`;
+    }
+
+    return feeAmount;
+};
+
 const getDetailAmountRows = (record: Record<string, unknown>): Array<{label: string; value: string}> => {
     const amountCurrency = resolveAmountCurrency(record);
 
@@ -1050,15 +1063,15 @@ const getDetailAmountRows = (record: Record<string, unknown>): Array<{label: str
         },
         {
             label: 'Payer fee',
-            value: formatMoneyDisplay(amountCurrency, record.payerFee),
+            value: formatFeeDisplay(amountCurrency, record.payerFee),
         },
         {
             label: 'Payee fee',
-            value: formatMoneyDisplay(amountCurrency, record.payeeFee),
+            value: formatFeeDisplay(amountCurrency, record.payeeFee),
         },
         {
             label: 'Scheme fee',
-            value: formatMoneyDisplay(amountCurrency, record.schemeFee),
+            value: formatFeeDisplay(amountCurrency, record.schemeFee),
         },
     ];
 };
