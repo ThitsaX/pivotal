@@ -255,7 +255,7 @@ describe('CreateTransactionReportHandler', () => {
                 headers.indexOf('payeeReceiveAmount'),
                 headers.indexOf('transferAmount'),
             ].map((index) => secondValues[index]),
-            ['NULL', 'NULL', 'NULL', 'NULL', 'NULL'],
+            ['0', '0', '0', 'NULL', 'NULL'],
         );
     });
 

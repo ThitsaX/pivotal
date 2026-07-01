@@ -46,10 +46,16 @@ export class TransactionReportGenerator {
         {header: 'Patch Call Error', key: 'patchError'},
     ];
 
-    private static readonly NULL_TEXT_COLUMN_KEYS = new Set([
+    // Fees default to 0 when absent, matching the outbound send-money API surface
+    // (send-money-response.mapper.ts) so the same transaction reads identically on both.
+    private static readonly ZERO_DEFAULT_COLUMN_KEYS = new Set([
         'payeeFee',
         'payerFee',
         'schemeFee',
+    ]);
+
+    // Amounts have no natural zero, so an unavailable value stays NULL in the export.
+    private static readonly NULL_TEXT_COLUMN_KEYS = new Set([
         'payeeReceiveAmount',
         'transferAmount',
     ]);
@@ -287,8 +293,14 @@ export class TransactionReportGenerator {
 
         const value = row[column.key];
 
-        if (value == null && TransactionReportGenerator.NULL_TEXT_COLUMN_KEYS.has(column.key)) {
-            return 'NULL';
+        if (value == null) {
+            if (TransactionReportGenerator.ZERO_DEFAULT_COLUMN_KEYS.has(column.key)) {
+                return 0;
+            }
+
+            if (TransactionReportGenerator.NULL_TEXT_COLUMN_KEYS.has(column.key)) {
+                return 'NULL';
+            }
         }
 
         return value;
