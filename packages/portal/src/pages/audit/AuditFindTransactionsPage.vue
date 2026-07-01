@@ -1028,6 +1028,54 @@ const getAmountDisplay = (record: Record<string, unknown>): {
     };
 };
 
+const resolveAmountCurrency = (record: Record<string, unknown>): unknown => {
+    return record.transferCurrency ?? record.quotingCurrency;
+};
+
+// Fees default to 0 (never "no data"), matching the transaction export, which
+// renders absent payer/payee/scheme fees as 0 rather than NULL.
+const formatFeeDisplay = (currency: unknown, amount: unknown): string => {
+    const formattedAmount = formatAmountNumber(amount ?? 0);
+    const feeAmount = formattedAmount === '-' ? '0' : formattedAmount;
+
+    if (typeof currency === 'string' && currency.trim().length > 0) {
+        return `${currency} ${feeAmount}`;
+    }
+
+    return feeAmount;
+};
+
+const getDetailAmountRows = (record: Record<string, unknown>): Array<{label: string; value: string}> => {
+    const amountCurrency = resolveAmountCurrency(record);
+
+    return [
+        {
+            label: 'Quoting amount',
+            value: formatMoneyDisplay(record.quotingCurrency, record.quotingAmount),
+        },
+        {
+            label: 'Transfer amount',
+            value: formatMoneyDisplay(record.transferCurrency, record.transferAmount),
+        },
+        {
+            label: 'Payee receive amount',
+            value: formatMoneyDisplay(amountCurrency, record.payeeReceiveAmount),
+        },
+        {
+            label: 'Payer fee',
+            value: formatFeeDisplay(amountCurrency, record.payerFee),
+        },
+        {
+            label: 'Payee fee',
+            value: formatFeeDisplay(amountCurrency, record.payeeFee),
+        },
+        {
+            label: 'Scheme fee',
+            value: formatFeeDisplay(amountCurrency, record.schemeFee),
+        },
+    ];
+};
+
 const STATUS_BADGE_BASE_CLASS =
     'inline-flex w-[6.75rem] justify-center rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]';
 
@@ -2482,22 +2530,20 @@ const goToLastPage = (): void => {
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                     Amount
                                 </p>
-                                <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                        Quoting
-                                    </p>
-                                    <p class="text-right text-sm font-semibold text-slate-700 tabular-nums">
-                                        {{ getAmountDisplay(selectedTransaction.record).quoting }}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                        Transfer
-                                    </p>
-                                    <p class="text-right text-sm font-semibold text-slate-700 tabular-nums">
-                                        {{ getAmountDisplay(selectedTransaction.record).transfer }}
-                                    </p>
-                                </div>
+                                <dl class="space-y-1.5">
+                                    <div
+                                        v-for="row in getDetailAmountRows(selectedTransaction.record)"
+                                        :key="row.label"
+                                        class="flex items-baseline justify-between gap-3 border-b border-slate-100 pb-1.5 last:border-b-0 last:pb-0"
+                                    >
+                                        <dt class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                            {{ row.label }}
+                                        </dt>
+                                        <dd class="text-right text-sm font-semibold text-slate-700 tabular-nums">
+                                            {{ row.value }}
+                                        </dd>
+                                    </div>
+                                </dl>
                             </section>
 
                             <section class="space-y-2 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
