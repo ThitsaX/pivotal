@@ -75,3 +75,6 @@ packages/**/*.js
 
 *.factorypath
 .qodo
+
+# Claude Code local/personal config (machine-local only)
+.claude/
