@@ -14,6 +14,7 @@ export namespace AuditPatchResponseCommand {
             public readonly payeeFsp: string,
             public readonly gateway: TransactionMessage.InvocationGateway,
             public readonly request: unknown | null,
+            public readonly payeeHomeTransactionId: string | null = null,
             public readonly occurredAt: Date | null = null,
         ) {
         }

@@ -64,6 +64,7 @@ describe('Audit transaction handlers', () => {
                 'SUB',
                 TransactionMessage.InvocationGateway.Outbound,
                 {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
+                'payer-home-1',
                 occurredAt,
             ),
         ));
@@ -82,6 +83,7 @@ describe('Audit transaction handlers', () => {
             transactionInitiatorType: TransactionInitiatorType.Consumer,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            payerHomeTransactionId: 'payer-home-1',
             error: false,
             partiesRequestedAt: occurredAt,
             partiesRequest: {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
