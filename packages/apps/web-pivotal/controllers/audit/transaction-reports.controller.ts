@@ -264,18 +264,18 @@ export class TransactionReportsAuditController {
         }
 
         const scopedFspId = claims.fspId;
+        const payer = QueryParamsUtil.toOptionalString(payerFsp);
+        const payee = QueryParamsUtil.toOptionalString(payeeFsp);
 
-        if (payerFsp !== undefined && payerFsp !== scopedFspId) {
+        if (
+            payer !== undefined
+            && payee !== undefined
+            && payer !== scopedFspId
+            && payee !== scopedFspId
+        ) {
             throw new BadRequestException({
                 code:    'AUTH_FSP_SCOPE_VIOLATION',
-                message: 'payerFsp must match the caller fspId.',
-            });
-        }
-
-        if (payeeFsp !== undefined && payeeFsp !== scopedFspId) {
-            throw new BadRequestException({
-                code:    'AUTH_FSP_SCOPE_VIOLATION',
-                message: 'payeeFsp must match the caller fspId.',
+                message: 'Either payerFsp or payeeFsp must match the caller fspId.',
             });
         }
 

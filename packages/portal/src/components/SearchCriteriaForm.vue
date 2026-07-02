@@ -54,7 +54,11 @@ const getFieldGridClass = (sectionKey: string): string => {
 };
 
 const isFieldDisabled = (fieldKey: string): boolean => {
-    return props.exclusiveFieldKey != null && props.exclusiveFieldKey !== fieldKey;
+    const field = props.sections
+        .flatMap((section: CriteriaSection) => section.fields)
+        .find((candidate) => candidate.key === fieldKey);
+
+    return field?.disabled === true || (props.exclusiveFieldKey != null && props.exclusiveFieldKey !== fieldKey);
 };
 
 const isTimeRangeDisabled = (): boolean => {
