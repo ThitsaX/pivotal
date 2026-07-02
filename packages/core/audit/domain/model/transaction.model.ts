@@ -277,6 +277,12 @@ export class Transaction {
     @Column({type: 'text', name: 'patch_error', nullable: true})
     public patchError!: string | null;
 
+    @Column({type: 'varchar', length: 128, name: 'payer_home_transaction_id', nullable: true})
+    public payerHomeTransactionId!: string | null;
+
+    @Column({type: 'varchar', length: 128, name: 'payee_home_transaction_id', nullable: true})
+    public payeeHomeTransactionId!: string | null;
+
     @Column({type: 'datetime', name: 'created_at'})
     public createdAt!: Date;
 

@@ -59,9 +59,11 @@ export class TransactionRepository {
         'transaction.payerIdType',
         'transaction.payerId',
         'transaction.payerSubId',
+        'transaction.payerHomeTransactionId',
         'transaction.payeeIdType',
         'transaction.payeeId',
         'transaction.payeeSubId',
+        'transaction.payeeHomeTransactionId',
         'transaction.quotingCurrency',
         'transaction.quotingAmount',
         'transaction.payeeReceiveAmount',
@@ -158,6 +160,8 @@ export class TransactionRepository {
             input.patchRespondedAt ?? null,
             TransactionRepository.toJsonValue(input.patchRequest),
             input.patchError ?? null,
+            input.payerHomeTransactionId ?? null,
+            input.payeeHomeTransactionId ?? null,
             input.createdAt ?? input.transactionStartedAt,
             now,
         ];
@@ -230,6 +234,8 @@ export class TransactionRepository {
                 patch_responded_at,
                 patch_request,
                 patch_error,
+                payer_home_transaction_id,
+                payee_home_transaction_id,
                 created_at,
                 updated_at
             ) VALUES (${placeholders})
@@ -419,6 +425,14 @@ export class TransactionRepository {
                 END,
                 patch_request = COALESCE(VALUES(patch_request), transactions.patch_request),
                 patch_error = COALESCE(VALUES(patch_error), transactions.patch_error),
+                payer_home_transaction_id = COALESCE(
+                    VALUES(payer_home_transaction_id),
+                    transactions.payer_home_transaction_id
+                ),
+                payee_home_transaction_id = COALESCE(
+                    VALUES(payee_home_transaction_id),
+                    transactions.payee_home_transaction_id
+                ),
                 created_at = LEAST(transactions.created_at, VALUES(created_at)),
                 updated_at = VALUES(updated_at)
             `,
@@ -1162,6 +1176,8 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            payerHomeTransactionId: record.payerHomeTransactionId,
+            payeeHomeTransactionId: record.payeeHomeTransactionId,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
         };
@@ -1175,9 +1191,11 @@ export class TransactionRepository {
             payerIdType:     record.payerIdType,
             payerId:         record.payerId,
             payerSubId:      record.payerSubId,
+            payerHomeTransactionId: record.payerHomeTransactionId,
             payeeIdType:     record.payeeIdType,
             payeeId:         record.payeeId,
             payeeSubId:      record.payeeSubId,
+            payeeHomeTransactionId: record.payeeHomeTransactionId,
             quotingCurrency: record.quotingCurrency,
             quotingAmount:   record.quotingAmount,
             payeeFee:        record.payeeFee,
@@ -1290,6 +1308,8 @@ export namespace TransactionRepository {
         patchRespondedAt?: Date | null;
         patchRequest?: unknown | null;
         patchError?: string | null;
+        payerHomeTransactionId?: string | null;
+        payeeHomeTransactionId?: string | null;
         createdAt?: Date | null;
     };
 }

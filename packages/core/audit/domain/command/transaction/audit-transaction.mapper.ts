@@ -49,6 +49,7 @@ export class AuditTransactionMapper {
             transactionInitiatorType: input.transactionInitiatorType,
             transactionType: input.transactionType,
             subScenario: input.subScenario,
+            payerHomeTransactionId: input.payerHomeTransactionId ?? null,
             error: false,
             partiesRequestedAt: occurredAt,
             partiesRequest: input.request,
@@ -322,6 +323,7 @@ export class AuditTransactionMapper {
             error: false,
             patchRespondedAt: occurredAt,
             patchRequest: input.request,
+            payeeHomeTransactionId: input.payeeHomeTransactionId ?? null,
             createdAt: occurredAt,
         };
     }

@@ -1106,6 +1106,20 @@ const getStatusDisplay = (record: Record<string, unknown>): {
     };
 };
 
+const getTransferStateClass = (state: string | null | undefined): string => {
+    switch ((state ?? '').trim().toUpperCase()) {
+        case 'COMMITTED':
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        case 'ABORTED':
+            return 'border-rose-200 bg-rose-50 text-rose-700';
+        case 'RECEIVED':
+        case 'RESERVED':
+            return 'border-amber-200 bg-amber-50 text-amber-700';
+        default:
+            return 'border-slate-200 bg-slate-50 text-slate-500';
+    }
+};
+
 interface PatchErrorChip {
     label: string;
     tone: 'neutral' | 'warn' | 'danger';
@@ -1902,7 +1916,7 @@ const goToLastPage = (): void => {
                                                     v-if="hasVisibleValue(getFlowDisplay(record).transferState ?? '-')"
                                                     :class="[
                                                         STATUS_BADGE_BASE_CLASS,
-                                                        'border-rose-200 bg-rose-50 text-rose-700',
+                                                        getTransferStateClass(getFlowDisplay(record).transferState),
                                                     ]"
                                                 >
                                                     {{ getFlowDisplay(record).transferState }}
@@ -2148,7 +2162,7 @@ const goToLastPage = (): void => {
                                                 v-if="hasVisibleValue(getFlowDisplay(record).transferState ?? '-')"
                                                 :class="[
                                                     STATUS_BADGE_BASE_CLASS,
-                                                    'border-rose-200 bg-rose-50 text-rose-700',
+                                                    getTransferStateClass(getFlowDisplay(record).transferState),
                                                 ]"
                                             >
                                                 {{ getFlowDisplay(record).transferState }}
@@ -2488,6 +2502,32 @@ const goToLastPage = (): void => {
                                     <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
                                     {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payer').subId }}
                                 </p>
+                                <div
+                                    v-if="hasVisibleValue(formatValue(selectedTransaction.record.payerHomeTransactionId))"
+                                    class="space-y-0.5 text-[12px] text-slate-600"
+                                >
+                                    <p class="leading-5">
+                                        <span class="font-semibold uppercase text-ink underline decoration-accent/50 underline-offset-2">
+                                            Home Transaction Id
+                                        </span>
+                                    </p>
+                                    <p class="flex items-center gap-1.5 leading-5">
+                                        <svg
+                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="font-semibold text-ink">{{ formatValue(selectedTransaction.record.payerHomeTransactionId) }}</span>
+                                    </p>
+                                </div>
                             </section>
 
                             <section class="space-y-1.5 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
@@ -2524,6 +2564,32 @@ const goToLastPage = (): void => {
                                     <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
                                     {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payee').subId }}
                                 </p>
+                                <div
+                                    v-if="hasVisibleValue(formatValue(selectedTransaction.record.payeeHomeTransactionId))"
+                                    class="space-y-0.5 text-[12px] text-slate-600"
+                                >
+                                    <p class="leading-5">
+                                        <span class="font-semibold uppercase text-ink underline decoration-accent/50 underline-offset-2">
+                                            Home Transaction Id
+                                        </span>
+                                    </p>
+                                    <p class="flex items-center gap-1.5 leading-5">
+                                        <svg
+                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="font-semibold text-ink">{{ formatValue(selectedTransaction.record.payeeHomeTransactionId) }}</span>
+                                    </p>
+                                </div>
                             </section>
 
                             <section class="space-y-2 rounded-xl border border-accent/10 bg-[#fafdff] px-3 py-2.5">
