@@ -15,6 +15,7 @@ import SearchCriteriaForm from '../../components/SearchCriteriaForm.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
 import TimeZoneSelector from '../../components/TimeZoneSelector.vue';
 import { useReportDownloadState } from '../../composables/useDownloadReportState';
+import {fetchAuditFspOptions} from '../../modules/audit/fsp-options-api';
 import {
     getCriteriaSections,
     PAGE_SIZE_OPTIONS,
@@ -23,6 +24,7 @@ import type {
     CountResponse,
     CursorDirection,
     DateTimeDisplayParts,
+    FilterField,
     PageInfo,
     QueryResponse,
     SelectOption,
@@ -46,6 +48,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_ORDER_DIRECTION = 'DESC';
 const DEFAULT_START_MODE = 'today';
 const TRANSFER_ID_CRITERIA_KEY = 'transferId';
+const FSP_FILTER_KEYS = new Set(['payerFsp', 'payeeFsp']);
 const TIME_RANGE_MODE_KEYS = [
     {
         mode: 'transactionStartAtMode',
@@ -112,6 +115,9 @@ const activeDetailsTab = ref<'parties' | 'quotes' | 'transfers'>('parties');
 const isPageSizeDialogOpen = ref(false);
 const copiedCellKey = ref<string | null>(null);
 const lastSubmittedCriteria = ref<Record<string, string>>({});
+const fetchedFspOptions = ref<SelectOption[]>([]);
+const fspOptionsLoading = ref(false);
+const fspOptionsError = ref<string | null>(null);
 
 const state = reactive<ViewState>({
     criteria: createInitialCriteria(),
@@ -142,8 +148,46 @@ const nav = reactive<{direction: CursorDirection; token: string}>({
     token: '',
 });
 
+const fspDropdownOptions = computed((): SelectOption[] => {
+    const optionsByValue = new Map<string, SelectOption>();
+
+    optionsByValue.set('', {label: '(Any)', value: ''});
+
+    for (const option of fetchedFspOptions.value) {
+        const value = option.value.trim();
+
+        if (value.length > 0) {
+            optionsByValue.set(value, {label: option.label.trim() || value, value});
+        }
+    }
+
+    for (const fieldKey of FSP_FILTER_KEYS) {
+        const selectedValue = state.criteria[fieldKey]?.trim() ?? '';
+
+        if (selectedValue.length > 0 && !optionsByValue.has(selectedValue)) {
+            optionsByValue.set(selectedValue, {label: selectedValue, value: selectedValue});
+        }
+    }
+
+    return Array.from(optionsByValue.values());
+});
+
+const criteriaFields = computed<FilterField[]>(() => {
+    return props.viewDefinition.criteriaFields.map((field: FilterField): FilterField => {
+        if (!FSP_FILTER_KEYS.has(field.key)) {
+            return field;
+        }
+
+        return {
+            ...field,
+            type: 'select',
+            options: fspDropdownOptions.value,
+        };
+    });
+});
+
 const criteriaSections = computed(() => {
-    return getCriteriaSections(props.viewDefinition.criteriaFields);
+    return getCriteriaSections(criteriaFields.value);
 });
 
 const transferIdCriteria = computed((): string => state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '');
@@ -544,8 +588,25 @@ const applySearchRouteQuery = (query: LocationQuery): void => {
     executeNewSearch();
 };
 
+const loadFspOptions = async (): Promise<void> => {
+    fspOptionsLoading.value = true;
+    fspOptionsError.value = null;
+
+    try {
+        fetchedFspOptions.value = await fetchAuditFspOptions();
+    } catch (error) {
+        fetchedFspOptions.value = [];
+        fspOptionsError.value = error instanceof Error
+            ? error.message
+            : String(error);
+    } finally {
+        fspOptionsLoading.value = false;
+    }
+};
+
 onMounted((): void => {
     window.addEventListener('keydown', handleKeyDown);
+    void loadFspOptions();
 });
 
 onBeforeUnmount((): void => {
@@ -1575,6 +1636,18 @@ const goToLastPage = (): void => {
                     @reset="resetFilters"
                     @refresh="refreshResults"
                 />
+
+                <p
+                    v-if="fspOptionsLoading || fspOptionsError"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
+                    <template v-if="fspOptionsLoading">
+                        Loading DFSP options...
+                    </template>
+                    <template v-else>
+                        DFSP dropdown options could not be refreshed: {{ fspOptionsError }}
+                    </template>
+                </p>
 
                 <section v-if="requestError || loading || results || isDownloading || readyFile || (downloadStatus === 'FAILED' && failedMessage)">
         <article class="overflow-hidden border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">
