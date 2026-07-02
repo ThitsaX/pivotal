@@ -30,6 +30,7 @@ export interface FilterField {
     type: FieldType;
     placeholder?: string;
     options?: SelectOption[];
+    disabled?: boolean;
 }
 
 export interface ColumnDefinition {
