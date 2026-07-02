@@ -7,6 +7,10 @@ const BOOL_OPTIONS: SelectOption[] = [
     {label: 'False', value: 'false'},
 ];
 
+const FSP_OPTIONS: SelectOption[] = [
+    {label: '(Any)', value: ''},
+];
+
 const PARTY_ID_TYPE_OPTIONS: SelectOption[] = [
     {label: '(Any)', value: ''},
     {label: 'MSISDN', value: 'MSISDN'},
@@ -111,8 +115,8 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
         subtitle: 'Search audited transactions across parties, quotes, and transfers from one place.',
         endpoint: '/audit/transactions',
         criteriaFields: [
-            {key: 'payerFsp', label: 'Payer FSP', type: 'text', placeholder: '(Any)'},
-            {key: 'payeeFsp', label: 'Payee FSP', type: 'text', placeholder: '(Any)'},
+            {key: 'payerFsp', label: 'Payer FSP', type: 'select', options: FSP_OPTIONS},
+            {key: 'payeeFsp', label: 'Payee FSP', type: 'select', options: FSP_OPTIONS},
             {key: 'payerIdType', label: 'Payer ID Type', type: 'select', options: PARTY_ID_TYPE_OPTIONS},
             {key: 'payerId', label: 'Payer ID', type: 'text', placeholder: '(Any)'},
             {key: 'payerSubId', label: 'Payer Sub ID', type: 'text', placeholder: '(Any)'},
