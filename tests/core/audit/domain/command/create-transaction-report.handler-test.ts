@@ -267,21 +267,21 @@ describe('CreateTransactionReportHandler', () => {
 
         assert.deepEqual(
             [
-                headers.indexOf('payeeFee'),
-                headers.indexOf('payerFee'),
-                headers.indexOf('schemeFee'),
-                headers.indexOf('payeeReceiveAmount'),
-                headers.indexOf('transferAmount'),
+                headers.indexOf('Payee Fee'),
+                headers.indexOf('Payer Fee'),
+                headers.indexOf('Scheme Fee'),
+                headers.indexOf('Payee Receive Amount'),
+                headers.indexOf('Transfer Amount'),
             ].map((index) => firstValues[index]),
             ['262', '613', '125', '9000', '10000'],
         );
         assert.deepEqual(
             [
-                headers.indexOf('payeeFee'),
-                headers.indexOf('payerFee'),
-                headers.indexOf('schemeFee'),
-                headers.indexOf('payeeReceiveAmount'),
-                headers.indexOf('transferAmount'),
+                headers.indexOf('Payee Fee'),
+                headers.indexOf('Payer Fee'),
+                headers.indexOf('Scheme Fee'),
+                headers.indexOf('Payee Receive Amount'),
+                headers.indexOf('Transfer Amount'),
             ].map((index) => secondValues[index]),
             ['0', '0', '0', 'NULL', 'NULL'],
         );
