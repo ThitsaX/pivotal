@@ -255,15 +255,25 @@ describe('CreateTransactionReportHandler', () => {
                     id:         '2',
                     transferId: 'transfer-without-fees',
                 },
+                {
+                    id:                 '3',
+                    transferId:         'transfer-with-zero-fees',
+                    payeeFee:           0,
+                    payerFee:           0,
+                    schemeFee:          0,
+                    payeeReceiveAmount: 0,
+                    transferAmount:     0,
+                },
             ]),
             new ReportDownloadSettings(),
         );
 
         const report = await generator.generate(reportRequest('csv'), {});
-        const [header, firstRow, secondRow] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const [header, firstRow, secondRow, thirdRow] = report.bytes.toString('utf8').trimEnd().split('\n');
         const headers = header.split(',');
         const firstValues = firstRow.split(',');
         const secondValues = secondRow.split(',');
+        const thirdValues = thirdRow.split(',');
 
         assert.deepEqual(
             [
@@ -283,7 +293,17 @@ describe('CreateTransactionReportHandler', () => {
                 headers.indexOf('Payee Receive Amount'),
                 headers.indexOf('Transfer Amount'),
             ].map((index) => secondValues[index]),
-            ['0', '0', '0', 'NULL', 'NULL'],
+            ['-', '-', '-', '-', '-'],
+        );
+        assert.deepEqual(
+            [
+                headers.indexOf('Payee Fee'),
+                headers.indexOf('Payer Fee'),
+                headers.indexOf('Scheme Fee'),
+                headers.indexOf('Payee Receive Amount'),
+                headers.indexOf('Transfer Amount'),
+            ].map((index) => thirdValues[index]),
+            ['0', '0', '0', '0', '0'],
         );
     });
 
