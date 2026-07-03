@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
 import {AxiosClientBuilder} from '@shared/axios/component';
 import {CentralLedgerException} from '../exception';

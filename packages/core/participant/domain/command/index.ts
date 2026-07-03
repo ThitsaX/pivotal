@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './onboard-fsp.command';
 export * from './onboard-fsp.handler';
 export * from './add-fsp-currency.command';

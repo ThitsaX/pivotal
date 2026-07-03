@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `users` (
     `id` BIGINT NOT NULL,
     `email` VARCHAR(255) NOT NULL,

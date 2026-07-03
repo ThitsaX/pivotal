@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Injectable} from '@nestjs/common';
 import {Ca, CaStore} from '@shared/security/component/cert';
 

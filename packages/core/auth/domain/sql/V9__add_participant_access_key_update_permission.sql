@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 INSERT INTO permissions (id, key_name, description, scope)
 SELECT
     1126000000000000001,

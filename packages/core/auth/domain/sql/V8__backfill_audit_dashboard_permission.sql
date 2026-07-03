@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 -- Backfill the `audit.dashboard.view` permission and its role grants on EXISTING installs.
 --
 -- Why a migration is needed: `RbacSeeder` only seeds when the `permissions` table is

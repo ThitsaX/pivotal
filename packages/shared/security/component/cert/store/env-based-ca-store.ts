@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Ca} from '../ca';
 import {CaCert} from '../ca-cert';
 import {CaStore} from '../ca-store';

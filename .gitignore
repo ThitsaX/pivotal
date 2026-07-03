@@ -73,6 +73,11 @@ hs_err_pid*
 packages/**/*.js
 !packages/portal/public/*.js
 
+# Environment files — may contain secrets. Only *.env.example is tracked.
+.env
+.env.*
+!.env.example
+
 *.factorypath
 .qodo
 

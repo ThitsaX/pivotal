@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {AmountType, Currency, Party, QuotesIDPutResponse, TransactionScenario, TransfersIDPutResponse} from '@shared/fspiop';
 import {FspParty} from '../dto';
 

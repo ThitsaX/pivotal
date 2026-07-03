@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 -- Pre-aggregated hourly summary of `transactions`, powering the portal dashboard.
 --
 -- One row per (hour, payer, payee, currency). A scheduled job folds raw `transactions`

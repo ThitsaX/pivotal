@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import AdmZip = require('adm-zip');
 import {TransactionRepository} from '../repository';

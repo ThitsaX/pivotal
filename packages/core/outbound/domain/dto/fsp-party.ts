@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Type} from 'class-transformer';
 import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested} from 'class-validator';
 import {Extension, PartyIdType, TransactionInitiatorType} from '@shared/fspiop';

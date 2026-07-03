@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { Logger } from '@nestjs/common';
 import { AxiosInstance, isAxiosError } from 'axios';
 import { AxiosClientBuilder, AxiosClientBuilderParams } from '@shared/axios/component';

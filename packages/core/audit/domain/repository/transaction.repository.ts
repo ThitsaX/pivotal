@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {BadRequestException, Injectable} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';

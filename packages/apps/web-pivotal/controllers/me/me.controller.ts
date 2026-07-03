@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Controller, Get, Inject, UnauthorizedException} from '@nestjs/common';
 import {AccessTokenClaims, MenuRepository, UserRepository} from '@core/auth/domain';
 import {DbTarget} from '@shared/typeorm';

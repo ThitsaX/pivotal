@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './auth/auth.controller';
 export * from './health/health.controller';
 export * from './me/me.controller';

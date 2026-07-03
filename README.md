@@ -396,3 +396,11 @@ See `helm/README.md` for more chart-specific examples.
 - `docker/README.md`: Docker Compose stack notes.
 - `helm/README.md`: Helm deployment notes.
 - `docs/mtpa.drawio`: editable architecture diagram source.
+
+## License
+
+Copyright 2026 ThitsaWorks.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may not use
+this project except in compliance with the License. See the [LICENSE](LICENSE)
+and [NOTICE](NOTICE) files for details.

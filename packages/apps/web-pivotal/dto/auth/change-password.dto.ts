@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {IsNotEmpty, IsString, Matches, MaxLength, MinLength} from 'class-validator';
 
 export class ChangePasswordDto {

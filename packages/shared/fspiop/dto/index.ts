@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './amount-type';
 export * from './authentication-info';
 export * from './authentication-type';

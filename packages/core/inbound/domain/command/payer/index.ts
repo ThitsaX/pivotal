@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './handle-put-parties.command';
 export * from './handle-put-parties.handler';
 export * from './handle-put-parties-error.command';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './login.command';
 export * from './login.handler';
 export * from './refresh-tokens.command';

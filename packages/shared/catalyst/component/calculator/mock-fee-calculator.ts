@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Currency, FspiopCurrencies, FspiopMoney, Money} from '@shared/fspiop';
 import {FeeCalculationResult} from '../../dto';
 import {FeeCalculator} from '../fee-calculator';

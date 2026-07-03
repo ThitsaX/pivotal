@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export enum ParticipantFundsAction {
     RECORD_FUNDS_IN = 'recordFundsIn',
     RECORD_FUNDS_OUT_PREPARE_RESERVE = 'recordFundsOutPrepareReserve',

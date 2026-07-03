@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {ApiProperty} from '@nestjs/swagger';
 import {ExtensionList} from '@shared/fspiop';
 import {ParticipantFundsAction} from './central-ledger-types';

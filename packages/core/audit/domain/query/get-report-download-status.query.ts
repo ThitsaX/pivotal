@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export class GetReportDownloadStatusQuery {
     constructor(public readonly input: GetReportDownloadStatusQuery.Input) {
     }

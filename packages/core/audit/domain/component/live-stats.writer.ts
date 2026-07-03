@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Logger} from '@nestjs/common';
 import {TransactionRollupRepository} from '../repository/transaction-rollup.repository';
 import {classify, LiveVector} from './live-stats.classifier';
