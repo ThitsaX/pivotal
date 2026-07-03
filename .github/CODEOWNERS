@@ -1,0 +1,17 @@
+# CODEOWNERS — required reviewers for Pivotal.
+#
+# Combined with branch protection on `main` ("Require a pull request before
+# merging" + "Require review from Code Owners"), every PR into `main` must be
+# approved by at least one of the owners listed below before it can merge.
+#
+# Syntax: <path pattern>  <owner> [<owner> ...]
+#   - Owners are GitHub usernames (@handle) or teams (@org/team).
+#   - The LAST matching pattern for a file wins.
+#   - Any ONE listed owner approving satisfies the requirement.
+#
+# Commit this file to `main` before enabling the branch rule so GitHub can
+# read it. Owners must have write access, or GitHub ignores them.
+
+# Whole repository — any ONE of these owners must approve a change to main.
+# NOTE: CODEOWNERS does not support line continuations; keep this on one line.
+*   @aungmonko-tw @kyaw-soe-tw @myo-min-htet @nniwin @nyeinnyeinei22 @nyisai02 @pyaesoneaung-thitsaworks @pye-aung @sandioo1 @sandisoee @tw-moenandiaung @tw-aungthawaye @tw-sithumyo @ZweHMyat @myakyayemonetw @pyaephyohein-tw @wsyp1123 @SithuKyaw-Thitsaworks
