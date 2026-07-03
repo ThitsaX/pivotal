@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Snowflake} from '@shared/snowflake';
 import {BeforeInsert, Column, Entity, Index, PrimaryColumn} from 'typeorm';
 

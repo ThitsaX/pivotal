@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {AccessKeyStore} from '../access-key-store';
 import {PublicKey} from '../public-key';
 

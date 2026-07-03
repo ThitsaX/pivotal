@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {CustomDecorator, SetMetadata} from '@nestjs/common';
 
 export const REQUIRES_PERMISSION_KEY = 'auth:requires-permission';

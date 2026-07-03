@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Logger} from '@nestjs/common';
 import {Currency, Money} from '@shared/fspiop';
 import {

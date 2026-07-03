@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {createPrivateKey, createPublicKey} from 'node:crypto';
 
 export class PublicKey {

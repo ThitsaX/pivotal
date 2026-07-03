@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Logger, OnModuleInit} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';

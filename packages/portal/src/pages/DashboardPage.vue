@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 ThitsaWorks -->
+
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted} from 'vue';
 import type {ApexChart, ApexFill, ApexGrid, ApexLegend, ApexOptions, ApexYAxis} from 'apexcharts';

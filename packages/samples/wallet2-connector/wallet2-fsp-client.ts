@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Logger} from '@nestjs/common';
 import {ConnectorSettings, FspClient} from '@core/connector/domain';
 import {FspClientException} from '@core/connector/domain/exception/fsp-client-exception';

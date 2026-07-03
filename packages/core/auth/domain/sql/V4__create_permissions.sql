@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `permissions` (
     `id` BIGINT NOT NULL,
     `key_name` VARCHAR(128) NOT NULL,

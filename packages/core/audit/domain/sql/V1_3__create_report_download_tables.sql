@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+-- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `report_download_requests` (
     `id` BIGINT NOT NULL,
     `report_type` VARCHAR(64) NOT NULL,

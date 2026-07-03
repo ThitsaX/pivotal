@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './post-send-money.command';
 export * from './post-send-money.handler';
 export * from './put-accept-party.command';

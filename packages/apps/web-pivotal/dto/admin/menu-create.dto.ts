@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Min} from 'class-validator';
 
 export class MenuCreateDto {

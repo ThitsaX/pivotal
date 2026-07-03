@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './audit-quotes-request.command';
 export * from './audit-quotes-request.handler';
 export * from './audit-quotes-response.command';

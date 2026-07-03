@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { FspiopErrors, FspiopException, FspiopMoney, Money } from '@shared/fspiop';
 
 export class AmountDecimalValidator {

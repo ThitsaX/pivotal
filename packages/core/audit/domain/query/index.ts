@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './get-transaction.query';
 export * from './get-transaction.handler';
 export * from './find-transactions.query';

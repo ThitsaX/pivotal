@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export const PermissionKey = {
     HUB_CURRENCY_ADD:                'hub.currency.add',
     HUB_SIGNING_KEYS_UPDATE:         'hub.signing-keys.update',

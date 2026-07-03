@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {APP_GUARD} from '@nestjs/core';
 import {AuditDomainModule, LiveStatsStore} from '@core/audit/domain';

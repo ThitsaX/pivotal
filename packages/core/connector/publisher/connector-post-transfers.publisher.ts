@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {NatsClientService} from '@shared/nats';
 import {TransfersPostRequest} from '@shared/fspiop';
 import {resolveFspiopStream} from '../consumer/listener/fspiop-stream.resolver';

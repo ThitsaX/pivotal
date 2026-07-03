@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Transform} from 'class-transformer';
 import {IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min} from 'class-validator';
 

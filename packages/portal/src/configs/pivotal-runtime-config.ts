@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export type PivotalRuntimeConfig = {
     WEB_PIVOTAL_API_BASE_URL?: string;
     VITE_WEB_PIVOTAL_API_BASE_URL?: string;

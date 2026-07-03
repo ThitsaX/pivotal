@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 ThitsaWorks -->
+
 <script setup lang="ts" generic="T extends {id: string}">
 import {computed} from 'vue';
 

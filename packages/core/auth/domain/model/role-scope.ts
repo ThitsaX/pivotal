@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export const ROLE_SCOPES = ['HUB', 'DFSP'] as const;
 
 export type RoleScope = typeof ROLE_SCOPES[number];

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {reactive, readonly} from 'vue';
 import {apiClient} from '../api/client';
 

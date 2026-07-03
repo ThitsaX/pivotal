@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {PartiesTypeIDPutResponse} from '@shared/fspiop';
 import {SendMoneyRequest, SendMoneyResponse} from '../dto';
 

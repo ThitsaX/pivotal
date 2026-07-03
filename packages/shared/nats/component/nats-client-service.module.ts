@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {NatsClientService} from './nats-client.service';
 
