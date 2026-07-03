@@ -71,6 +71,7 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,   scope: 'HUB',  description: 'Update the access public key used to verify a participant\'s signed requests.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         scope: 'BOTH', description: 'Query the audited transactions list.'},
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         scope: 'BOTH', description: 'View a single audited transaction by transfer ID.'},
+    {keyName: PermissionKey.AUDIT_DASHBOARD_VIEW,            scope: 'BOTH', description: 'View the transaction statistics dashboard.'},
     {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
     {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              scope: 'HUB',  description: 'Manage portal roles and their granted permissions.'},
     {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          scope: 'HUB',  description: 'Browse the read-only permission catalogue.'},
@@ -82,6 +83,7 @@ const ROLE_GRANTS: Record<string, string[]> = {
     [DFSP_USER_ROLE_CODE]: [
         PermissionKey.AUDIT_TRANSACTIONS_LIST,
         PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+        PermissionKey.AUDIT_DASHBOARD_VIEW,
     ],
 };
 

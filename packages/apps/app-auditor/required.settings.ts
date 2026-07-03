@@ -30,6 +30,14 @@ export class AuditConsumerSettings implements AuditConsumerModule.RequiredSettin
         );
     }
 
+    redisUrl(): string {
+        return this.readRequiredValue('REDIS_URL');
+    }
+
+    transactionRollupIntervalSeconds(): number {
+        return this.readPositiveIntWithDefault('TRANSACTION_ROLLUP_INTERVAL_SECONDS', 300);
+    }
+
     private readRequiredValue(name: string): string {
         const value = this.configService.get<string>(name);
 
@@ -42,6 +50,21 @@ export class AuditConsumerSettings implements AuditConsumerModule.RequiredSettin
 
     private readPort(name: string): number {
         const value = this.readRequiredValue(name);
+
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            throw new Error(`Invalid environment variable ${name}: expected a positive integer.`);
+        }
+
+        return parsed;
+    }
+
+    private readPositiveIntWithDefault(name: string, fallback: number): number {
+        const value = this.configService.get<string>(name);
+
+        if (value == null || value.trim().length === 0) {
+            return fallback;
+        }
 
         const parsed = Number(value);
         if (!Number.isInteger(parsed) || parsed <= 0) {
