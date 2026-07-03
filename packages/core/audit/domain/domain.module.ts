@@ -22,6 +22,7 @@ import {ReportDownloadRequest, ReportDownloadRequestParam, Transaction} from './
 import {
     CountTransactionsHandler,
     FindTransactionsHandler,
+    GetDashboardHandler,
     GetReportDownloadStatusHandler,
     GetReportDownloadUrlHandler,
     GetTransactionHandler,
@@ -31,6 +32,7 @@ import {
     PIVOTAL_DB_WRITE_CONNECTION_NAME,
     ReportDownloadRepository,
     TransactionRepository,
+    TransactionRollupRepository,
 } from './repository';
 import {
     REPORT_DOWNLOAD_SETTINGS,
@@ -42,7 +44,7 @@ import {
 
 const Entities = [Transaction, ReportDownloadRequest, ReportDownloadRequestParam];
 
-const Repositories = [TransactionRepository, ReportDownloadRepository];
+const Repositories = [TransactionRepository, TransactionRollupRepository, ReportDownloadRepository];
 
 const CommandHandlers = [
     AuditPartiesErrorHandler,
@@ -65,6 +67,7 @@ const QueryHandlers = [
     GetTransactionHandler,
     FindTransactionsHandler,
     CountTransactionsHandler,
+    GetDashboardHandler,
     GetReportDownloadStatusHandler,
     GetReportDownloadUrlHandler,
 ];
