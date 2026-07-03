@@ -3,4 +3,5 @@ export * from './command';
 export * from './query';
 export * from './model';
 export * from './repository';
+export * from './component';
 export * from './reporting';
