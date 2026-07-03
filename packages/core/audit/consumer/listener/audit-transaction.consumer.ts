@@ -14,6 +14,7 @@ import {
     AuditTransfersErrorCommand,
     AuditTransfersRequestCommand,
     AuditTransfersResponseCommand,
+    LiveStatsWriter,
 } from '@core/audit/domain';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
 import {NatsClientService} from '@shared/nats';
@@ -30,6 +31,7 @@ export class AuditTransactionConsumer implements OnModuleInit {
     constructor(
         private readonly nats: NatsClientService,
         private readonly commandBus: CommandBus,
+        private readonly liveStats?: LiveStatsWriter,
     ) {
     }
 
@@ -86,6 +88,7 @@ export class AuditTransactionConsumer implements OnModuleInit {
 
             try {
                 await this.dispatch(message);
+                await this.recordLiveStats(message);
                 msg.ack();
             } catch (error) {
                 this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
@@ -358,6 +361,25 @@ export class AuditTransactionConsumer implements OnModuleInit {
             default:
                 throw new Error(`Unsupported patch action: ${String(message.action)}`);
         }
+    }
+
+    /**
+     * Updates the near-real-time dashboard counters for this event's transaction. Best-effort
+     * and isolated: the writer never throws, but we guard here too so live-stats can never
+     * affect audit acking. Every phase's content carries `correlationId`.
+     */
+    private async recordLiveStats(message: TransactionMessage): Promise<void> {
+        if (this.liveStats === undefined) {
+            return;
+        }
+
+        const correlationId = (message.content as {correlationId?: string} | undefined)?.correlationId;
+
+        if (correlationId == null) {
+            return;
+        }
+
+        await this.liveStats.onTransactionEvent(correlationId);
     }
 
     private static toOccurredAt(value: Date | string | null | undefined): Date | null {

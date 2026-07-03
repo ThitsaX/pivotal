@@ -1,6 +1,6 @@
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {APP_GUARD} from '@nestjs/core';
-import {AuditDomainModule} from '@core/audit/domain';
+import {AuditDomainModule, LiveStatsStore} from '@core/audit/domain';
 import {AuthDomainModule} from '@core/auth/domain';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {
@@ -9,6 +9,7 @@ import {
     AddHubSigningKeysController,
     AddSigningKeysController,
     AuthController,
+    DashboardAuditController,
     GenerateSigningKeyController,
     HealthController,
     ListCentralLedgerParticipantsController,
@@ -74,6 +75,7 @@ export class WebPivotalModule {
                 UpsertEndpointController,
                 GenerateSigningKeyController,
                 TransactionsAuditController,
+                DashboardAuditController,
                 TransactionReportsAuditController,
                 UsersAdminController,
                 RolesAdminController,
@@ -109,6 +111,13 @@ export class WebPivotalModule {
                 useFactory: (settings: WebPivotalModule.RequiredSettings): number => settings.auditMaxLimit(),
                 inject: [REQUIRED_SETTINGS],
             },
+            // Read-only access to the near-real-time dashboard counters (written by app-auditor).
+            {
+                provide: LiveStatsStore,
+                useFactory: (settings: WebPivotalModule.RequiredSettings): LiveStatsStore =>
+                    new LiveStatsStore(settings.redisUrl()),
+                inject: [REQUIRED_SETTINGS],
+            },
         ];
     }
 }
@@ -120,6 +129,7 @@ export namespace WebPivotalModule {
             AuthDomainModule.RequiredSettings,
             ParticipantDomainModule.RequiredSettings {
         auditMaxLimit(): number;
+        redisUrl(): string;
     }
 
     export type AsyncOptions = {
