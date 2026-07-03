@@ -5,6 +5,7 @@ export * from './participant/onboard-fsp.controller';
 export * from './participant/add-fsp-currency.controller';
 export * from './participant/add-signing-keys.controller';
 export * from './participant/upsert-endpoint.controller';
+export * from './participant/update-access-key.controller';
 export * from './participant/generate-signing-key.controller';
 export * from './hub/add-currency.controller';
 export * from './hub/add-signing-keys.controller';

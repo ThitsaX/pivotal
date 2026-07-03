@@ -134,13 +134,13 @@ describe('RbacSeeder', () => {
         state = freshState();
     });
 
-    it('cold-boot seeds 2 roles / 13 permissions / 15 role_permissions / 12 menus / 12 menu_permissions', async () => {
+    it('cold-boot seeds 2 roles / 14 permissions / 16 role_permissions / 12 menus / 12 menu_permissions', async () => {
 
         const result = await makeSeeder(state).seed();
 
         assert.equal(result.roles.inserted, 2);
-        assert.equal(result.permissions.inserted, 13);
-        assert.equal(result.rolePermissions.inserted, 15);
+        assert.equal(result.permissions.inserted, 14);
+        assert.equal(result.rolePermissions.inserted, 16);
         assert.equal(result.menus.inserted, 12);
         assert.equal(result.menuPermissions.inserted, 12);
 
@@ -168,9 +168,10 @@ describe('RbacSeeder', () => {
         assert.equal(state.permissions.get('admin.users.manage')!.scope, 'HUB');
         assert.equal(state.permissions.get('hub.currency.add')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.list')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.access-key.update')!.scope, 'HUB');
     });
 
-    it('grants ADMIN all 13 permissions and DFSP_USER exactly the 2 audit permissions', async () => {
+    it('grants ADMIN all 14 permissions and DFSP_USER exactly the 2 audit permissions', async () => {
 
         await makeSeeder(state).seed();
 
@@ -180,7 +181,7 @@ describe('RbacSeeder', () => {
         const adminGrants = state.rolePermissions.filter((rp) => rp.roleId === adminRoleId);
         const dfspGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspRoleId);
 
-        assert.equal(adminGrants.length, 13);
+        assert.equal(adminGrants.length, 14);
         assert.equal(dfspGrants.length, 2);
     });
 

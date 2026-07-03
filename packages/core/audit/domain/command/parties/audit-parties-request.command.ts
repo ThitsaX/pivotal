@@ -24,6 +24,7 @@ export namespace AuditPartiesRequestCommand {
             public readonly subScenario: string | null,
             public readonly gateway: TransactionMessage.InvocationGateway,
             public readonly request: unknown | null = null,
+            public readonly payerHomeTransactionId: string | null = null,
             public readonly occurredAt: Date | null = null,
         ) {
         }

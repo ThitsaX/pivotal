@@ -88,6 +88,7 @@ export namespace TransactionMessage {
         transactionInitiatorType?: TransactionInitiatorType | null;
         transactionType?: TransactionScenario | null;
         subScenario?: string | null;
+        payerHomeTransactionId?: string | null;
         request?: unknown | null;
         response?: unknown | null;
         error?: unknown | null;
@@ -109,6 +110,7 @@ export namespace TransactionMessage {
         request?: unknown | null;
         response?: unknown | null;
         error?: string | null;
+        homeTransactionId?: string | null;
     }
 
     export type Content = PartiesContent | QuotesContent | TransfersContent | PatchContent;

@@ -28,11 +28,18 @@ export class TransactionReportGenerator {
         {header: 'Payer ID Type', key: 'payerIdType'},
         {header: 'Payer ID', key: 'payerId'},
         {header: 'Payer Sub ID', key: 'payerSubId'},
+        {header: 'Payer Home Transaction ID', key: 'payerHomeTransactionId'},
         {header: 'Payee ID Type', key: 'payeeIdType'},
         {header: 'Payee ID', key: 'payeeId'},
         {header: 'Payee Sub ID', key: 'payeeSubId'},
+        {header: 'Payee Home Transaction ID', key: 'payeeHomeTransactionId'},
         {header: 'Currency', key: 'quotingCurrency'},
         {header: 'Amount', key: 'quotingAmount'},
+        {header: 'Payee Fee', key: 'payeeFee'},
+        {header: 'Payer Fee', key: 'payerFee'},
+        {header: 'Scheme Fee', key: 'schemeFee'},
+        {header: 'Payee Receive Amount', key: 'payeeReceiveAmount'},
+        {header: 'Transfer Amount', key: 'transferAmount'},
         {header: 'Transfer State in Hub', key: 'transferState'},
         {header: 'Disputed', key: 'dispute'},
         {header: 'Account Lookup Error', key: 'partiesError'},
@@ -40,6 +47,14 @@ export class TransactionReportGenerator {
         {header: 'Transfer Call Error', key: 'transfersError'},
         {header: 'Patch Call Error', key: 'patchError'},
     ];
+
+    private static readonly NULL_TEXT_COLUMN_KEYS = new Set([
+        'payeeFee',
+        'payerFee',
+        'schemeFee',
+        'payeeReceiveAmount',
+        'transferAmount',
+    ]);
 
     constructor(
         private readonly transactionRepository: TransactionRepository,
@@ -158,16 +173,17 @@ export class TransactionReportGenerator {
         rowCount: number,
     ): Promise<{content: string; rowCount: number; nextCursor?: string}> {
         const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
-        const lines = [TransactionReportGenerator.COLUMNS
-            .map((column) => TransactionReportGenerator.csvValue(column.header))
-            .join(',')];
+        const lines = [TransactionReportGenerator.csvRow(
+            TransactionReportGenerator.COLUMNS.map((column) => column.header),
+        )];
 
         for (const row of result.rows) {
-            lines.push(TransactionReportGenerator.COLUMNS
-                .map((column) => TransactionReportGenerator.csvValue(
-                    TransactionReportGenerator.reportCellValue(row, column),
-                ))
-                .join(','));
+            lines.push(TransactionReportGenerator.csvRow(
+                TransactionReportGenerator.COLUMNS.map((column) => TransactionReportGenerator.reportCellValue(
+                    row,
+                    column,
+                )),
+            ));
         }
 
         return {
@@ -272,7 +288,13 @@ export class TransactionReportGenerator {
             return TransactionReportGenerator.patchCallErrorValue(row);
         }
 
-        return row[column.key];
+        const value = row[column.key];
+
+        if (value == null && TransactionReportGenerator.NULL_TEXT_COLUMN_KEYS.has(column.key)) {
+            return '-';
+        }
+
+        return value;
     }
 
     private static patchCallErrorValue(row: Record<string, unknown>): unknown {
@@ -321,6 +343,10 @@ export class TransactionReportGenerator {
 
     private static isTrueValue(value: unknown): boolean {
         return value === true || value === 'true' || value === 1 || value === '1';
+    }
+
+    private static csvRow(values: readonly unknown[]): string {
+        return values.map((value) => TransactionReportGenerator.csvValue(value)).join(',');
     }
 
     private static csvValue(value: unknown): string {
@@ -373,6 +399,10 @@ export class TransactionReportGenerator {
             normalized = String(value);
         } else {
             normalized = JSON.stringify(value);
+        }
+
+        if (normalized === '-') {
+            return normalized;
         }
 
         return /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
