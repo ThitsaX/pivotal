@@ -1,7 +1,9 @@
 import {TransactionMessage} from '@core/audit/common';
 import {
     Currency,
+    ExtensionList,
     PartyIdType,
+    QuotesIDPutResponse,
     QuotesPostRequest,
     TransferState,
     TransfersIDPatchResponse,
@@ -47,6 +49,7 @@ export class AuditTransactionMapper {
             transactionInitiatorType: input.transactionInitiatorType,
             transactionType: input.transactionType,
             subScenario: input.subScenario,
+            payerHomeTransactionId: input.payerHomeTransactionId ?? null,
             error: false,
             partiesRequestedAt: occurredAt,
             partiesRequest: input.request,
@@ -166,6 +169,7 @@ export class AuditTransactionMapper {
             quotingAmount: AuditTransactionMapper.toNumber(request?.amount.amount),
             transferCurrency: AuditTransactionMapper.toCurrency(transferAmount?.currency),
             transferAmount: AuditTransactionMapper.toNumber(transferAmount?.amount),
+            ...AuditTransactionMapper.toQuoteExportAmounts(response),
             transactionStartedAt: occurredAt,
             transactionType: request?.transactionType?.scenario ?? null,
             subScenario: request?.transactionType?.subScenario ?? null,
@@ -319,6 +323,7 @@ export class AuditTransactionMapper {
             error: false,
             patchRespondedAt: occurredAt,
             patchRequest: input.request,
+            payeeHomeTransactionId: input.payeeHomeTransactionId ?? null,
             createdAt: occurredAt,
         };
     }
@@ -345,6 +350,58 @@ export class AuditTransactionMapper {
         return value == null ? null : Number(value);
     }
 
+    private static toOptionalNumber(value: string | null | undefined): number | null {
+        const normalized = value?.trim();
+
+        if (normalized == null || normalized.length === 0) {
+            return null;
+        }
+
+        const amount = Number(normalized);
+
+        return Number.isFinite(amount) ? amount : null;
+    }
+
+    private static toFeeAmount(extensionList: ExtensionList | undefined, key: string): number | null {
+        return AuditTransactionMapper.toOptionalNumber(AuditTransactionMapper.findExtensionValue(extensionList, key));
+    }
+
+    private static toQuoteExportAmounts(response: QuotesIDPutResponse | null): Partial<{
+        payeeReceiveAmount: number | null;
+        payeeFee: number | null;
+        payerFee: number | null;
+        schemeFee: number | null;
+    }> {
+        if (response == null) {
+            return {};
+        }
+
+        return AuditTransactionMapper.withPresentValues({
+            payeeReceiveAmount: AuditTransactionMapper.toOptionalNumber(response.payeeReceiveAmount?.amount),
+            payeeFee: AuditTransactionMapper.toFeeAmount(response.extensionList, 'payeeFee'),
+            payerFee: AuditTransactionMapper.toFeeAmount(response.extensionList, 'payerFee'),
+            schemeFee: AuditTransactionMapper.toFeeAmount(response.extensionList, 'schemeFee'),
+        });
+    }
+
+    private static withPresentValues<T extends Record<string, unknown>>(values: T): Partial<T> {
+        return Object.fromEntries(
+            Object.entries(values).filter(([, value]) => value != null),
+        ) as Partial<T>;
+    }
+
+    private static findExtensionValue(extensionList: ExtensionList | undefined, targetKey: string): string | undefined {
+        const normalizedTargetKey = targetKey.trim().toLowerCase();
+
+        for (const extension of extensionList?.extension ?? []) {
+            if (extension.key?.trim().toLowerCase() === normalizedTargetKey) {
+                return extension.value;
+            }
+        }
+
+        return undefined;
+    }
+
     private static toCurrency(value: string | null | undefined): Currency | null {
         return value == null ? null : value as Currency;
     }
@@ -357,10 +414,10 @@ export class AuditTransactionMapper {
         return request == null ? null : request as QuotesPostRequest;
     }
 
-    private static toQuotesResponse(response: unknown): {transferAmount?: {currency?: string; amount?: string}} | null {
+    private static toQuotesResponse(response: unknown): QuotesIDPutResponse | null {
         return response == null
             ? null
-            : response as {transferAmount?: {currency?: string; amount?: string}};
+            : response as QuotesIDPutResponse;
     }
 
     private static toTransfersRequest(request: unknown): TransfersPostRequest | null {

@@ -102,6 +102,46 @@ export class Transaction {
     })
     public transferAmount!: number | null;
 
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payee_receive_amount',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payeeReceiveAmount!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payee_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payeeFee!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'payer_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public payerFee!: number | null;
+
+    @Column({
+        type: 'decimal',
+        precision: 34,
+        scale: 4,
+        name: 'scheme_fee',
+        nullable: true,
+        transformer: DECIMAL_TRANSFORMER,
+    })
+    public schemeFee!: number | null;
+
     @Column({type: 'varchar', length: 32, name: 'transaction_type', nullable: true})
     public transactionType!: TransactionScenario | null;
 
@@ -236,6 +276,12 @@ export class Transaction {
 
     @Column({type: 'text', name: 'patch_error', nullable: true})
     public patchError!: string | null;
+
+    @Column({type: 'varchar', length: 128, name: 'payer_home_transaction_id', nullable: true})
+    public payerHomeTransactionId!: string | null;
+
+    @Column({type: 'varchar', length: 128, name: 'payee_home_transaction_id', nullable: true})
+    public payeeHomeTransactionId!: string | null;
 
     @Column({type: 'datetime', name: 'created_at'})
     public createdAt!: Date;

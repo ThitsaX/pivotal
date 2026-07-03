@@ -6,6 +6,7 @@ export const PermissionKey = {
     PARTICIPANT_CURRENCY_ADD:        'participant.currency.add',
     PARTICIPANT_ENDPOINT_REGISTER:   'participant.endpoint.register',
     PARTICIPANT_SIGNING_KEYS_UPDATE: 'participant.signing-keys.update',
+    PARTICIPANT_ACCESS_KEY_UPDATE:   'participant.access-key.update',
     AUDIT_TRANSACTIONS_LIST:         'audit.transactions.list',
     AUDIT_TRANSACTIONS_VIEW:         'audit.transactions.view',
     AUDIT_DASHBOARD_VIEW:            'audit.dashboard.view',
