@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {PermissionKey} from '../model/permission-key';
 import {RoleScope} from '../model/role-scope';
 
@@ -23,6 +25,7 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_CURRENCY_ADD,
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
+            PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
             PermissionKey.AUDIT_TRANSACTIONS_VIEW,
             PermissionKey.ADMIN_USERS_MANAGE,
@@ -42,6 +45,7 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_CURRENCY_ADD,
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
+            PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
         ],
     },
     {

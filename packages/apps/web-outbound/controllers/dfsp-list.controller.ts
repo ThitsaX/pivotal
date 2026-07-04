@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { Controller, Get, Inject, Param } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetDfspListByUsecaseQuery, GetDfspListQuery } from '@core/outbound/domain';

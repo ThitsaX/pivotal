@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 ThitsaWorks -->
+
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
 

@@ -1,9 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {CentralLedgerAxios, CentralLedgerAxiosParams, CentralLedgerFacade} from '@shared/central-ledger';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
-import {AddFspCurrencyHandler, AddHubCurrencyHandler, AddSigningKeysHandler, OnboardFspHandler, UpsertEndpointHandler,} from './command';
+import {
+    AddFspCurrencyHandler,
+    AddHubCurrencyHandler,
+    AddSigningKeysHandler,
+    OnboardFspHandler,
+    UpdateAccessKeyHandler,
+    UpsertEndpointHandler,
+} from './command';
 import {Participant} from './model';
 import {ListCentralLedgerParticipantsHandler} from './query';
 import {ParticipantRepository, PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME,} from './repository';
@@ -29,6 +38,7 @@ const CommandHandlers = [
     AddHubCurrencyHandler,
     AddSigningKeysHandler,
     UpsertEndpointHandler,
+    UpdateAccessKeyHandler,
 ];
 
 const QueryHandlers = [

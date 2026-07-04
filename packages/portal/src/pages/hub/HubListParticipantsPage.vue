@@ -1,8 +1,12 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 ThitsaWorks -->
+
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue';
 import TimeZoneSelector from '../../components/TimeZoneSelector.vue';
 import {VIEW_BY_KEY} from '../../modules/audit/view-definitions';
-import {fetchParticipantResource, type ParticipantSummary} from '../../modules/participant/api';
+import {executeParticipantAction, fetchParticipantResource, type ParticipantSummary} from '../../modules/participant/api';
+import {authStore} from '../../stores/auth.store';
 
 const props = defineProps<{
     selectedTimeZone: string;
@@ -14,11 +18,18 @@ const emit = defineEmits<{
 
 const viewDefinition = VIEW_BY_KEY['hub-list-participants'];
 const HUB_PARTICIPANT_NAME = 'Hub';
+const PARTICIPANT_ACCESS_KEY_UPDATE_PERMISSION = 'participant.access-key.update';
 
 const loading = ref(false);
 const errorMessage = ref<string | null>(null);
+const successMessage = ref<string | null>(null);
 const participants = ref<ParticipantSummary[]>([]);
 const selectedCurrencyByParticipant = ref<Record<string, string>>({});
+const accessKeyDialogParticipant = ref<ParticipantSummary | null>(null);
+const accessKeyText = ref('');
+const accessKeyConfirmed = ref(false);
+const accessKeySubmitting = ref(false);
+const accessKeyErrorMessage = ref<string | null>(null);
 
 const totalParticipants = computed((): number => {
     return participants.value.length;
@@ -50,6 +61,7 @@ const sortedParticipants = computed((): ParticipantSummary[] => {
 const loadParticipants = async (): Promise<void> => {
     loading.value = true;
     errorMessage.value = null;
+    successMessage.value = null;
 
     try {
         participants.value = await fetchParticipantResource<ParticipantSummary[]>(viewDefinition.endpoint);
@@ -95,6 +107,87 @@ const isActiveValue = (value: unknown): boolean => {
 
 const isHubParticipant = (participant: ParticipantSummary): boolean => {
     return participant.name.trim().toLowerCase() === HUB_PARTICIPANT_NAME.toLowerCase();
+};
+
+const canUpdateAccessKey = (participant: ParticipantSummary): boolean => {
+    return !isHubParticipant(participant)
+        && authStore.hasPermission(PARTICIPANT_ACCESS_KEY_UPDATE_PERMISSION);
+};
+
+const hasPemPublicKeyEnvelope = (value: string): boolean => {
+    return /^-----BEGIN [A-Z ]*PUBLIC KEY-----[\s\S]+-----END [A-Z ]*PUBLIC KEY-----$/m.test(value.trim());
+};
+
+const openAccessKeyDialog = (participant: ParticipantSummary): void => {
+    accessKeyDialogParticipant.value = participant;
+    accessKeyText.value = '';
+    accessKeyConfirmed.value = false;
+    accessKeyErrorMessage.value = null;
+    errorMessage.value = null;
+    successMessage.value = null;
+};
+
+const resetAccessKeyDialog = (): void => {
+    accessKeyDialogParticipant.value = null;
+    accessKeyText.value = '';
+    accessKeyConfirmed.value = false;
+    accessKeyErrorMessage.value = null;
+};
+
+const closeAccessKeyDialog = (): void => {
+    if (accessKeySubmitting.value) {
+        return;
+    }
+
+    resetAccessKeyDialog();
+};
+
+const accessKeySubmitDisabled = computed((): boolean => {
+    return accessKeySubmitting.value
+        || accessKeyText.value.trim().length === 0
+        || !accessKeyConfirmed.value;
+});
+
+const submitAccessKeyUpdate = async (): Promise<void> => {
+    const participant = accessKeyDialogParticipant.value;
+
+    if (participant == null) {
+        return;
+    }
+
+    const accessPublicKey = accessKeyText.value.trim();
+    accessKeyErrorMessage.value = null;
+
+    if (accessPublicKey.length === 0) {
+        accessKeyErrorMessage.value = 'Paste the DFSP public key before confirming.';
+        return;
+    }
+
+    if (!hasPemPublicKeyEnvelope(accessPublicKey)) {
+        accessKeyErrorMessage.value = 'Access key must use a PEM public key envelope.';
+        return;
+    }
+
+    if (!accessKeyConfirmed.value) {
+        accessKeyErrorMessage.value = 'Confirm that this rotation should replace the participant access key.';
+        return;
+    }
+
+    accessKeySubmitting.value = true;
+
+    try {
+        await executeParticipantAction('PUT', '/participant/access-key', {
+            name: participant.name,
+            accessPublicKey,
+        });
+
+        successMessage.value = `Access key was updated for ${participant.name}. It will be picked up by web-outbound on the next key-store refresh.`;
+        resetAccessKeyDialog();
+    } catch (error) {
+        accessKeyErrorMessage.value = error instanceof Error ? error.message : String(error);
+    } finally {
+        accessKeySubmitting.value = false;
+    }
 };
 
 const resolveCurrencies = (participant: ParticipantSummary): string[] => {
@@ -229,13 +322,20 @@ onMounted((): void => {
                     </div>
 
                     <div
-                        v-else-if="!loading && participants.length === 0"
+                        v-if="successMessage != null"
+                        class="border-b border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+                    >
+                        {{ successMessage }}
+                    </div>
+
+                    <div
+                        v-if="errorMessage == null && !loading && participants.length === 0"
                         class="px-4 py-6 text-sm text-slate-500"
                     >
                         No participants were returned.
                     </div>
 
-                    <div v-else class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div v-else-if="errorMessage == null" class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
                         <article
                             v-for="participant in sortedParticipants"
                             :key="participant.name"
@@ -281,6 +381,15 @@ onMounted((): void => {
                                         >
                                             {{ isActiveValue(participant.isActive) ? 'Active' : 'Inactive' }}
                                         </span>
+
+                                        <button
+                                            v-if="canUpdateAccessKey(participant)"
+                                            type="button"
+                                            class="rounded-full border border-accent/30 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-accent transition hover:border-accent hover:bg-accentSoft"
+                                            @click="openAccessKeyDialog(participant)"
+                                        >
+                                            Update access key
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -409,5 +518,93 @@ onMounted((): void => {
                 </article>
             </div>
         </article>
+
+        <div
+            v-if="accessKeyDialogParticipant != null"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6"
+            @click.self="closeAccessKeyDialog"
+        >
+            <article class="w-full max-w-3xl overflow-hidden rounded-2xl border border-accent/20 bg-white shadow-[0_26px_80px_rgba(15,23,42,0.28)]">
+                <header class="border-b border-accent/15 bg-[linear-gradient(135deg,rgba(20,127,195,0.12),rgba(255,255,255,0.96))] px-5 py-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                                Access Key Rotation
+                            </p>
+                            <h3 class="mt-2 font-display text-2xl text-ink">
+                                Update {{ accessKeyDialogParticipant.name }}
+                            </h3>
+                            <p class="mt-2 text-sm text-slate-600">
+                                Paste the DFSP-supplied PEM public key. This replaces the key used by web-outbound to verify signed requests.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400"
+                            :disabled="accessKeySubmitting"
+                            @click="closeAccessKeyDialog"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </header>
+
+                <div class="space-y-4 px-5 py-5">
+                    <div
+                        v-if="accessKeyErrorMessage != null"
+                        class="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"
+                    >
+                        {{ accessKeyErrorMessage }}
+                    </div>
+
+                    <label class="block">
+                        <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            New public key PEM
+                        </span>
+                        <textarea
+                            v-model="accessKeyText"
+                            class="mt-2 min-h-[18rem] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-xs text-ink outline-none transition focus:border-accent focus:bg-white"
+                            placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+                            spellcheck="false"
+                            :disabled="accessKeySubmitting"
+                        />
+                    </label>
+
+                    <label class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <input
+                            v-model="accessKeyConfirmed"
+                            type="checkbox"
+                            class="mt-0.5 h-4 w-4 rounded border-amber-300 text-accent focus:ring-accent"
+                            :disabled="accessKeySubmitting"
+                        >
+                        <span>
+                            I confirm this replaces the participant access key for
+                            <strong>{{ accessKeyDialogParticipant.name }}</strong>.
+                            Existing requests signed with the old key will be rejected after web-outbound refreshes its key store.
+                        </span>
+                    </label>
+                </div>
+
+                <footer class="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4">
+                    <button
+                        type="button"
+                        class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="accessKeySubmitting"
+                        @click="closeAccessKeyDialog"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accentDark disabled:cursor-not-allowed disabled:bg-slate-300"
+                        :disabled="accessKeySubmitDisabled"
+                        @click="submitAccessKeyUpdate"
+                    >
+                        {{ accessKeySubmitting ? 'Saving...' : 'Confirm and save key' }}
+                    </button>
+                </footer>
+            </article>
+        </div>
     </section>
 </template>

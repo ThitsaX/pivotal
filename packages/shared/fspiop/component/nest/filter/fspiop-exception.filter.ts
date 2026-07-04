@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {ArgumentsHost, Catch, ExceptionFilter, Logger} from '@nestjs/common';
 import {Response} from 'express';
 import {ErrorInformationResponse} from '../../../dto/error-information-response';

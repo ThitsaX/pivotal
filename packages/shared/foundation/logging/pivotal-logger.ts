@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { ConsoleLogger, Injectable, Scope } from '@nestjs/common';
 import { MdcContext } from './mdc-context';
 

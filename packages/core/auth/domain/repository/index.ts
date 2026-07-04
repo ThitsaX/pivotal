@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './menu.repository';
 export * from './menu-permission.repository';
 export * from './permission.repository';

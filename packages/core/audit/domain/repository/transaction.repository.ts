@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {BadRequestException, Injectable} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';
@@ -37,6 +39,10 @@ export class TransactionRepository {
         'transaction.quotingAmount',
         'transaction.transferCurrency',
         'transaction.transferAmount',
+        'transaction.payeeReceiveAmount',
+        'transaction.payeeFee',
+        'transaction.payerFee',
+        'transaction.schemeFee',
         'transaction.transactionType',
         'transaction.subScenario',
         'transaction.transferState',
@@ -55,11 +61,18 @@ export class TransactionRepository {
         'transaction.payerIdType',
         'transaction.payerId',
         'transaction.payerSubId',
+        'transaction.payerHomeTransactionId',
         'transaction.payeeIdType',
         'transaction.payeeId',
         'transaction.payeeSubId',
+        'transaction.payeeHomeTransactionId',
         'transaction.quotingCurrency',
         'transaction.quotingAmount',
+        'transaction.payeeReceiveAmount',
+        'transaction.transferAmount',
+        'transaction.payeeFee',
+        'transaction.payerFee',
+        'transaction.schemeFee',
         'transaction.transferState',
         'transaction.possibleDispute',
         'transaction.partiesError',
@@ -100,6 +113,10 @@ export class TransactionRepository {
             input.quotingAmount ?? null,
             input.transferCurrency ?? null,
             input.transferAmount ?? null,
+            input.payeeReceiveAmount ?? null,
+            input.payeeFee ?? null,
+            input.payerFee ?? null,
+            input.schemeFee ?? null,
             input.transactionStartedAt,
             input.transactionCompletedAt ?? null,
             input.transactionType ?? null,
@@ -145,6 +162,8 @@ export class TransactionRepository {
             input.patchRespondedAt ?? null,
             TransactionRepository.toJsonValue(input.patchRequest),
             input.patchError ?? null,
+            input.payerHomeTransactionId ?? null,
+            input.payeeHomeTransactionId ?? null,
             input.createdAt ?? input.transactionStartedAt,
             now,
         ];
@@ -168,6 +187,10 @@ export class TransactionRepository {
                 quoting_amount,
                 transfer_currency,
                 transfer_amount,
+                payee_receive_amount,
+                payee_fee,
+                payer_fee,
+                scheme_fee,
                 transaction_started_at,
                 transaction_completed_at,
                 transaction_type,
@@ -213,6 +236,8 @@ export class TransactionRepository {
                 patch_responded_at,
                 patch_request,
                 patch_error,
+                payer_home_transaction_id,
+                payee_home_transaction_id,
                 created_at,
                 updated_at
             ) VALUES (${placeholders})
@@ -239,6 +264,13 @@ export class TransactionRepository {
                 quoting_amount = COALESCE(VALUES(quoting_amount), transactions.quoting_amount),
                 transfer_currency = COALESCE(VALUES(transfer_currency), transactions.transfer_currency),
                 transfer_amount = COALESCE(VALUES(transfer_amount), transactions.transfer_amount),
+                payee_receive_amount = COALESCE(
+                    VALUES(payee_receive_amount),
+                    transactions.payee_receive_amount
+                ),
+                payee_fee = COALESCE(VALUES(payee_fee), transactions.payee_fee),
+                payer_fee = COALESCE(VALUES(payer_fee), transactions.payer_fee),
+                scheme_fee = COALESCE(VALUES(scheme_fee), transactions.scheme_fee),
                 transaction_started_at = LEAST(transactions.transaction_started_at, VALUES(transaction_started_at)),
                 transaction_completed_at = COALESCE(
                     VALUES(transaction_completed_at),
@@ -395,6 +427,14 @@ export class TransactionRepository {
                 END,
                 patch_request = COALESCE(VALUES(patch_request), transactions.patch_request),
                 patch_error = COALESCE(VALUES(patch_error), transactions.patch_error),
+                payer_home_transaction_id = COALESCE(
+                    VALUES(payer_home_transaction_id),
+                    transactions.payer_home_transaction_id
+                ),
+                payee_home_transaction_id = COALESCE(
+                    VALUES(payee_home_transaction_id),
+                    transactions.payee_home_transaction_id
+                ),
                 created_at = LEAST(transactions.created_at, VALUES(created_at)),
                 updated_at = VALUES(updated_at)
             `,
@@ -1056,6 +1096,10 @@ export class TransactionRepository {
             quotingAmount: record.quotingAmount,
             transferCurrency: record.transferCurrency,
             transferAmount: record.transferAmount,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            payeeFee: record.payeeFee,
+            payerFee: record.payerFee,
+            schemeFee: record.schemeFee,
             transferType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
@@ -1085,6 +1129,10 @@ export class TransactionRepository {
             quotingAmount: record.quotingAmount,
             transferCurrency: record.transferCurrency,
             transferAmount: record.transferAmount,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            payeeFee: record.payeeFee,
+            payerFee: record.payerFee,
+            schemeFee: record.schemeFee,
             transactionType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
@@ -1130,6 +1178,8 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            payerHomeTransactionId: record.payerHomeTransactionId,
+            payeeHomeTransactionId: record.payeeHomeTransactionId,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
         };
@@ -1143,11 +1193,18 @@ export class TransactionRepository {
             payerIdType:     record.payerIdType,
             payerId:         record.payerId,
             payerSubId:      record.payerSubId,
+            payerHomeTransactionId: record.payerHomeTransactionId,
             payeeIdType:     record.payeeIdType,
             payeeId:         record.payeeId,
             payeeSubId:      record.payeeSubId,
+            payeeHomeTransactionId: record.payeeHomeTransactionId,
             quotingCurrency: record.quotingCurrency,
             quotingAmount:   record.quotingAmount,
+            payeeFee:        record.payeeFee,
+            payerFee:        record.payerFee,
+            schemeFee:       record.schemeFee,
+            payeeReceiveAmount: record.payeeReceiveAmount,
+            transferAmount:  record.transferAmount,
             transferState:   record.transferState,
             dispute:         record.possibleDispute,
             partiesError:    TransactionRepository.toRawJson(record.partiesError),
@@ -1204,6 +1261,10 @@ export namespace TransactionRepository {
         quotingAmount?: number | null;
         transferCurrency?: Currency | null;
         transferAmount?: number | null;
+        payeeReceiveAmount?: number | null;
+        payeeFee?: number | null;
+        payerFee?: number | null;
+        schemeFee?: number | null;
         transactionStartedAt: Date;
         transactionCompletedAt?: Date | null;
         transactionType?: TransactionScenario | null;
@@ -1249,6 +1310,8 @@ export namespace TransactionRepository {
         patchRespondedAt?: Date | null;
         patchRequest?: unknown | null;
         patchError?: string | null;
+        payerHomeTransactionId?: string | null;
+        payeeHomeTransactionId?: string | null;
         createdAt?: Date | null;
     };
 }

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Pivotal : The multi-tenant payment adapter for Mojaloop",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "nest build",
     "build:core-inbound-domain": "nest build core-inbound-domain",

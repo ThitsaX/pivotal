@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { ErrorInformationObject } from '@shared/fspiop';
 import { FspiopErrorType } from '@shared/fspiop';
 import { ExtensionList } from '../dto/extension-list';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Body, Controller, Post} from '@nestjs/common';
 import {Type} from 'class-transformer';
 import {IsInt} from 'class-validator';

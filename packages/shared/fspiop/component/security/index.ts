@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './fspiop-jws-public-key-store';
 export * from './fspiop-jws-private-key-store';
 export * from './fspiop-mtls-ca-store';

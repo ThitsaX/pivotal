@@ -64,6 +64,7 @@ describe('Audit transaction handlers', () => {
                 'SUB',
                 TransactionMessage.InvocationGateway.Outbound,
                 {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
+                'payer-home-1',
                 occurredAt,
             ),
         ));
@@ -82,6 +83,7 @@ describe('Audit transaction handlers', () => {
             transactionInitiatorType: TransactionInitiatorType.Consumer,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            payerHomeTransactionId: 'payer-home-1',
             error: false,
             partiesRequestedAt: occurredAt,
             partiesRequest: {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
@@ -102,7 +104,17 @@ describe('Audit transaction handlers', () => {
             payee: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959420000111'}},
             transactionType: {scenario: 'TRANSFER', subScenario: 'SUB'},
         } as unknown as QuotesPostRequest;
-        const response = {transferAmount: {amount: '12', currency: 'USD'}} as const;
+        const response = {
+            transferAmount:      {amount: '12', currency: 'USD'},
+            payeeReceiveAmount:  {amount: '10', currency: 'USD'},
+            extensionList:       {
+                extension: [
+                    {key: 'payeeFee', value: '1'},
+                    {key: 'payerFee', value: '2'},
+                    {key: 'schemeFee', value: '3'},
+                ],
+            },
+        } as const;
 
         await handler.execute(new AuditQuotesResponseCommand(
             new AuditQuotesResponseCommand.Input(
@@ -131,6 +143,10 @@ describe('Audit transaction handlers', () => {
             quotingAmount: 10,
             transferCurrency: 'USD',
             transferAmount: 12,
+            payeeReceiveAmount: 10,
+            payeeFee: 1,
+            payerFee: 2,
+            schemeFee: 3,
             transactionStartedAt: occurredAt,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {IsIn, IsNotEmpty, IsOptional, IsString, MaxLength} from 'class-validator';
 import {ROLE_SCOPES, RoleScope} from '@core/auth/domain';
 

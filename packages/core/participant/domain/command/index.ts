@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './onboard-fsp.command';
 export * from './onboard-fsp.handler';
 export * from './add-fsp-currency.command';
@@ -8,3 +10,5 @@ export * from './add-signing-keys.command';
 export * from './add-signing-keys.handler';
 export * from './upsert-endpoint.command';
 export * from './upsert-endpoint.handler';
+export * from './update-access-key.command';
+export * from './update-access-key.handler';

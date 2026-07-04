@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import 'reflect-metadata';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

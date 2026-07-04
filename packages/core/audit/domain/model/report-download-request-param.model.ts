@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 
 @Entity({name: 'report_download_request_params'})

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export class DeleteMenuCommand {
 
     constructor(public readonly input: DeleteMenuCommand.Input) {

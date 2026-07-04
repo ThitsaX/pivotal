@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Controller, Get, Inject, ServiceUnavailableException} from '@nestjs/common';
 import {InjectDataSource} from '@nestjs/typeorm';
 import {PIVOTAL_DB_READ_CONNECTION_NAME, Public} from '@core/auth/domain';

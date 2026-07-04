@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { InternalAxiosRequestConfig } from 'axios';
 import { FspiopAxiosInterceptor } from '../fspiop-axios';
 import { FspiopHeaders } from '../../fspiop-headers';

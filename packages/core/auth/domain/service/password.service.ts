@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Inject, Injectable} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import {AUTH_DOMAIN_REQUIRED_SETTINGS, AuthDomainSettings} from './auth-domain-settings';
