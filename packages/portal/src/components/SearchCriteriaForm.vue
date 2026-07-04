@@ -2,9 +2,13 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
+import {ref} from 'vue';
 import CustomDropdown from './CustomDropdown.vue';
 import TimeRangeSelector from './TimeRangeSelector.vue';
 import type {CriteriaSection} from '../modules/audit/types';
+
+// True while the custom Transaction Period has start >= end. Blocks submission.
+const rangeInvalid = ref(false);
 
 const props = withDefaults(defineProps<{
     sections: CriteriaSection[];
@@ -14,8 +18,10 @@ const props = withDefaults(defineProps<{
     loading: boolean;
     lastLoadedAt: string | null;
     formatLastLoadedAt: (value: string) => string;
+    exclusiveFieldKey?: string | null;
     embedded?: boolean;
 }>(), {
+    exclusiveFieldKey: null,
     embedded: false,
 });
 
@@ -52,6 +58,18 @@ const getFieldGridClass = (sectionKey: string): string => {
     }
 
     return 'grid gap-3 sm:grid-cols-2 xl:grid-cols-4';
+};
+
+const isFieldDisabled = (fieldKey: string): boolean => {
+    const field = props.sections
+        .flatMap((section: CriteriaSection) => section.fields)
+        .find((candidate) => candidate.key === fieldKey);
+
+    return field?.disabled === true || (props.exclusiveFieldKey != null && props.exclusiveFieldKey !== fieldKey);
+};
+
+const isTimeRangeDisabled = (): boolean => {
+    return props.exclusiveFieldKey != null;
 };
 </script>
 
@@ -127,7 +145,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                 leave-from-class="max-h-[1600px] translate-y-0 opacity-100"
                 leave-to-class="max-h-0 -translate-y-1 opacity-0"
             >
-                <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="emit('submit')">
+                <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="!rangeInvalid && emit('submit')">
                     <div class="grid gap-4 xl:grid-cols-6">
                         <section
                             v-for="section in sections"
@@ -148,9 +166,11 @@ const getFieldGridClass = (sectionKey: string): string => {
                                     :mode="criteria.transactionStartAtMode"
                                     :start-value="criteria.transactionStartAtStart"
                                     :end-value="criteria.transactionStartAtEnd"
+                                    :disabled="isTimeRangeDisabled()"
                                     @update:mode="criteria.transactionStartAtMode = $event"
                                     @update:start-value="criteria.transactionStartAtStart = $event"
                                     @update:end-value="criteria.transactionStartAtEnd = $event"
+                                    @update:invalid="rangeInvalid = $event"
                                 />
                             </div>
 
@@ -170,6 +190,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             v-model="criteria[field.key]"
                                             type="text"
                                             class="field-input !pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                             :placeholder="field.placeholder ?? field.label"
                                         />
 
@@ -178,6 +199,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             v-model="criteria[field.key]"
                                             type="datetime-local"
                                             class="field-input !pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                         />
 
                                         <CustomDropdown
@@ -186,6 +208,7 @@ const getFieldGridClass = (sectionKey: string): string => {
                                             :options="field.options ?? []"
                                             :placeholder="field.label"
                                             button-class="!pb-1.5 !pt-5 text-xs"
+                                            :disabled="isFieldDisabled(field.key)"
                                         />
                                     </div>
                                 </div>
@@ -197,7 +220,8 @@ const getFieldGridClass = (sectionKey: string): string => {
                         <button
                             type="submit"
                             class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
-                            :disabled="loading"
+                            :disabled="loading || rangeInvalid"
+                            :title="rangeInvalid ? 'Fix the date range before searching' : ''"
                         >
                             <span
                                 class="inline-block h-2.5 w-2.5 rounded-full bg-accentWarm"

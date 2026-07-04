@@ -2,7 +2,7 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue';
+import {computed, onMounted, ref, watch} from 'vue';
 import CustomDropdown from './CustomDropdown.vue';
 
 type RangeMode = 'today' | 'last24' | 'custom';
@@ -13,12 +13,14 @@ const props = defineProps<{
     mode?: string;
     startValue: string;
     endValue: string;
+    disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
     (event: 'update:startValue', value: string): void;
     (event: 'update:endValue', value: string): void;
     (event: 'update:mode', value: string): void;
+    (event: 'update:invalid', value: boolean): void;
 }>();
 
 const padTwo = (value: number | string): string => String(value).padStart(2, '0');
@@ -67,6 +69,10 @@ const formatDateDisplay = (dateStr: string): string => {
 };
 
 const openDatePicker = (target: 'start' | 'end'): void => {
+    if (props.disabled === true) {
+        return;
+    }
+
     const input = target === 'start' ? startDateInputRef.value : endDateInputRef.value;
     if (input) {
         input.showPicker();
@@ -310,6 +316,10 @@ const syncCustomInputsFromProps = (): void => {
 };
 
 const onModeSelected = (value: string): void => {
+    if (props.disabled === true) {
+        return;
+    }
+
     selectedMode.value = value as RangeMode | '';
     emit('update:mode', value);
 
@@ -329,6 +339,10 @@ const onModeSelected = (value: string): void => {
 };
 
 const updateTimePart = (target: 'start' | 'end', part: 'hour' | 'minute' | 'second', value: string): void => {
+    if (props.disabled === true) {
+        return;
+    }
+
     if (target === 'start') {
         if (part === 'hour') {
             customStartHour.value = value;
@@ -349,6 +363,10 @@ const updateTimePart = (target: 'start' | 'end', part: 'hour' | 'minute' | 'seco
 };
 
 const updateDatePart = (target: 'start' | 'end', value: string): void => {
+    if (props.disabled === true) {
+        return;
+    }
+
     if (target === 'start') {
         customStartDate.value = value;
     } else {
@@ -357,6 +375,31 @@ const updateDatePart = (target: 'start' | 'end', value: string): void => {
 
     applyCustom();
 };
+
+// Validation: a custom range is invalid when the resolved start is not strictly
+// before the end. Presets always produce a valid range, so they never error.
+const rangeError = computed((): string => {
+    if (selectedMode.value !== 'custom' || !props.startValue || !props.endValue) {
+        return '';
+    }
+
+    const start = new Date(props.startValue).getTime();
+    const end = new Date(props.endValue).getTime();
+
+    if (Number.isNaN(start) || Number.isNaN(end)) {
+        return '';
+    }
+
+    return start >= end ? 'Start date & time must be before the end date & time.' : '';
+});
+
+watch(
+    rangeError,
+    (message: string): void => {
+        emit('update:invalid', message.length > 0);
+    },
+    {immediate: true},
+);
 
 onMounted((): void => {
     selectedMode.value = (props.mode as RangeMode | '') || detectPresetMode(props.startValue, props.endValue);
@@ -401,7 +444,10 @@ watch(
 </script>
 
 <template>
-    <div class="time-range-selector">
+    <div
+        class="time-range-selector"
+        :class="props.disabled === true ? 'opacity-60' : ''"
+    >
         <div class="flex items-center gap-2 mb-3">
             <svg class="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
@@ -414,6 +460,7 @@ watch(
             :options="RANGE_OPTIONS"
             placeholder="Select Range"
             button-class="!py-2.5 !text-sm !rounded-xl"
+            :disabled="props.disabled === true"
             @update:model-value="onModeSelected"
         />
 
@@ -440,7 +487,11 @@ watch(
                             <!-- Date picker -->
                             <div class="datetime-field-group">
                                 <label class="datetime-field-label">Date</label>
-                                <div class="date-picker-wrap" @click="openDatePicker('start')">
+                                <div
+                                    class="date-picker-wrap"
+                                    :class="props.disabled === true ? 'cursor-not-allowed bg-slate-100' : ''"
+                                    @click="openDatePicker('start')"
+                                >
                                     <svg class="date-picker-icon" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd" />
                                     </svg>
@@ -451,6 +502,7 @@ watch(
                                         ref="startDateInputRef"
                                         :value="customStartDate"
                                         type="date"
+                                        :disabled="props.disabled === true"
                                         class="date-hidden-input"
                                         @input="updateDatePart('start', ($event.target as HTMLInputElement).value)"
                                     />
@@ -467,6 +519,7 @@ watch(
                                         placeholder="HH"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('start', 'hour', v)"
                                     />
                                     <span class="time-sep">:</span>
@@ -476,6 +529,7 @@ watch(
                                         placeholder="MM"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('start', 'minute', v)"
                                     />
                                     <span class="time-sep">:</span>
@@ -485,6 +539,7 @@ watch(
                                         placeholder="SS"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('start', 'second', v)"
                                     />
                                 </div>
@@ -505,7 +560,11 @@ watch(
                             <!-- Date picker -->
                             <div class="datetime-field-group">
                                 <label class="datetime-field-label">Date</label>
-                                <div class="date-picker-wrap" @click="openDatePicker('end')">
+                                <div
+                                    class="date-picker-wrap"
+                                    :class="props.disabled === true ? 'cursor-not-allowed bg-slate-100' : ''"
+                                    @click="openDatePicker('end')"
+                                >
                                     <svg class="date-picker-icon" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd" />
                                     </svg>
@@ -516,6 +575,7 @@ watch(
                                         ref="endDateInputRef"
                                         :value="customEndDate"
                                         type="date"
+                                        :disabled="props.disabled === true"
                                         class="date-hidden-input"
                                         @input="updateDatePart('end', ($event.target as HTMLInputElement).value)"
                                     />
@@ -532,6 +592,7 @@ watch(
                                         placeholder="HH"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('end', 'hour', v)"
                                     />
                                     <span class="time-sep">:</span>
@@ -541,6 +602,7 @@ watch(
                                         placeholder="MM"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('end', 'minute', v)"
                                     />
                                     <span class="time-sep">:</span>
@@ -550,6 +612,7 @@ watch(
                                         placeholder="SS"
                                         button-class="time-dropdown-btn"
                                         menu-class="!w-20"
+                                        :disabled="props.disabled === true"
                                         @update:model-value="(v) => updateTimePart('end', 'second', v)"
                                     />
                                 </div>
@@ -557,6 +620,17 @@ watch(
                         </div>
                     </div>
                 </div>
+
+                <p
+                    v-if="rangeError"
+                    class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-600"
+                    role="alert"
+                >
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                    </svg>
+                    {{ rangeError }}
+                </p>
             </div>
         </Transition>
     </div>
