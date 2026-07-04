@@ -42,7 +42,12 @@ export const getCriteriaSections = (fields: FilterField[]): CriteriaSection[] =>
     ]);
 
     for (const field of fields) {
-        if (field.key === 'payerFsp' || field.key === 'payeeFsp') {
+        if (
+            field.key === 'payerFsp'
+            || field.key === 'payeeFsp'
+            || field.key === 'dfspDirection'
+            || field.key === 'counterpartyFsp'
+        ) {
             sectionMap.get('participant')?.fields.push(field);
             continue;
         }
