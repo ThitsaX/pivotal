@@ -2,9 +2,13 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
+import {ref} from 'vue';
 import CustomDropdown from './CustomDropdown.vue';
 import TimeRangeSelector from './TimeRangeSelector.vue';
 import type {CriteriaSection} from '../modules/audit/types';
+
+// True while the custom Transaction Period has start >= end. Blocks submission.
+const rangeInvalid = ref(false);
 
 const props = withDefaults(defineProps<{
     sections: CriteriaSection[];
@@ -141,7 +145,7 @@ const isTimeRangeDisabled = (): boolean => {
                 leave-from-class="max-h-[1600px] translate-y-0 opacity-100"
                 leave-to-class="max-h-0 -translate-y-1 opacity-0"
             >
-                <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="emit('submit')">
+                <form v-show="visible" class="space-y-4 px-4 py-4" @submit.prevent="!rangeInvalid && emit('submit')">
                     <div class="grid gap-4 xl:grid-cols-6">
                         <section
                             v-for="section in sections"
@@ -166,6 +170,7 @@ const isTimeRangeDisabled = (): boolean => {
                                     @update:mode="criteria.transactionStartAtMode = $event"
                                     @update:start-value="criteria.transactionStartAtStart = $event"
                                     @update:end-value="criteria.transactionStartAtEnd = $event"
+                                    @update:invalid="rangeInvalid = $event"
                                 />
                             </div>
 
@@ -215,7 +220,8 @@ const isTimeRangeDisabled = (): boolean => {
                         <button
                             type="submit"
                             class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
-                            :disabled="loading"
+                            :disabled="loading || rangeInvalid"
+                            :title="rangeInvalid ? 'Fix the date range before searching' : ''"
                         >
                             <span
                                 class="inline-block h-2.5 w-2.5 rounded-full bg-accentWarm"
