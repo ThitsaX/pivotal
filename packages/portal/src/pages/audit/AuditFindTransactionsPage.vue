@@ -18,6 +18,8 @@ import SearchCriteriaForm from '../../components/SearchCriteriaForm.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
 import TimeZoneSelector from '../../components/TimeZoneSelector.vue';
 import { useReportDownloadState } from '../../composables/useDownloadReportState';
+import {fetchAuditFspOptions} from '../../modules/audit/fsp-options-api';
+import {authStore} from '../../stores/auth.store';
 import {
     getCriteriaSections,
     PAGE_SIZE_OPTIONS,
@@ -26,6 +28,7 @@ import type {
     CountResponse,
     CursorDirection,
     DateTimeDisplayParts,
+    FilterField,
     PageInfo,
     QueryResponse,
     SelectOption,
@@ -48,6 +51,15 @@ const router = useRouter();
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_ORDER_DIRECTION = 'DESC';
 const DEFAULT_START_MODE = 'today';
+const TRANSFER_ID_CRITERIA_KEY = 'transferId';
+const FSP_FILTER_KEYS = new Set(['payerFsp', 'payeeFsp']);
+const DFSP_DIRECTION_CRITERIA_KEY = 'dfspDirection';
+const COUNTERPARTY_FSP_CRITERIA_KEY = 'counterpartyFsp';
+const DFSP_DIRECTION_OPTIONS: SelectOption[] = [
+    {label: '(Any)', value: ''},
+    {label: 'Inbound', value: 'INBOUND'},
+    {label: 'Outbound', value: 'OUTBOUND'},
+];
 const TIME_RANGE_MODE_KEYS = [
     {
         mode: 'transactionStartAtMode',
@@ -61,11 +73,38 @@ const createInitialCriteria = (): Record<string, string> => {
         props.viewDefinition.criteriaFields.map((field): [string, string] => [field.key, '']),
     );
 
+    criteria[DFSP_DIRECTION_CRITERIA_KEY] = '';
+    criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = '';
+
     for (const field of TIME_RANGE_MODE_KEYS) {
         criteria[field.mode] = DEFAULT_START_MODE;
     }
 
     return criteria;
+};
+
+const createBlankCriteria = (): Record<string, string> => {
+    const criteria = Object.fromEntries(
+        props.viewDefinition.criteriaFields.map((field): [string, string] => [field.key, '']),
+    );
+
+    criteria[DFSP_DIRECTION_CRITERIA_KEY] = '';
+    criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = '';
+
+    for (const field of TIME_RANGE_MODE_KEYS) {
+        criteria[field.mode] = '';
+        criteria[field.start] = '';
+        criteria[field.end] = '';
+    }
+
+    return criteria;
+};
+
+const buildTransferIdOnlyCriteria = (transferId: string): Record<string, string> => {
+    return {
+        ...createBlankCriteria(),
+        [TRANSFER_ID_CRITERIA_KEY]: transferId.trim(),
+    };
 };
 
 const defaultOrderColumn = (): string => props.viewDefinition.orderColumns[0]?.value ?? 'transactionStartAt';
@@ -93,6 +132,9 @@ const activeDetailsTab = ref<'parties' | 'quotes' | 'transfers'>('parties');
 const isPageSizeDialogOpen = ref(false);
 const copiedCellKey = ref<string | null>(null);
 const lastSubmittedCriteria = ref<Record<string, string>>({});
+const fetchedFspOptions = ref<SelectOption[]>([]);
+const fspOptionsLoading = ref(false);
+const fspOptionsError = ref<string | null>(null);
 
 const state = reactive<ViewState>({
     criteria: createInitialCriteria(),
@@ -123,9 +165,123 @@ const nav = reactive<{direction: CursorDirection; token: string}>({
     token: '',
 });
 
-const criteriaSections = computed(() => {
-    return getCriteriaSections(props.viewDefinition.criteriaFields);
+const scopedFspId = computed((): string | null => authStore.state.user?.fspId ?? null);
+
+const isDfspScopedUser = computed((): boolean => {
+    return scopedFspId.value != null && scopedFspId.value.trim().length > 0;
 });
+
+const fspDropdownOptions = computed((): SelectOption[] => {
+    const optionsByValue = new Map<string, SelectOption>();
+
+    optionsByValue.set('', {label: '(Any)', value: ''});
+
+    for (const option of fetchedFspOptions.value) {
+        const value = option.value.trim();
+
+        if (value.length > 0) {
+            optionsByValue.set(value, {label: option.label.trim() || value, value});
+        }
+    }
+
+    for (const fieldKey of FSP_FILTER_KEYS) {
+        const selectedValue = state.criteria[fieldKey]?.trim() ?? '';
+
+        if (selectedValue.length > 0 && !optionsByValue.has(selectedValue)) {
+            optionsByValue.set(selectedValue, {label: selectedValue, value: selectedValue});
+        }
+    }
+
+    const selectedCounterparty = state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY]?.trim() ?? '';
+
+    if (selectedCounterparty.length > 0 && !optionsByValue.has(selectedCounterparty)) {
+        optionsByValue.set(selectedCounterparty, {label: selectedCounterparty, value: selectedCounterparty});
+    }
+
+    return Array.from(optionsByValue.values());
+});
+
+const counterpartyFspOptions = computed((): SelectOption[] => {
+    const ownFspId = scopedFspId.value?.trim();
+
+    return fspDropdownOptions.value.filter((option: SelectOption): boolean => {
+        return option.value === '' || option.value !== ownFspId;
+    });
+});
+
+// A transfer is always between two distinct FSPs (never wallet1 → wallet1), so each
+// FSP dropdown hides whatever the other one currently has selected. The empty "(Any)"
+// option is always retained.
+const optionsExcludingSelected = (selectedFsp: string): SelectOption[] => {
+    const excluded = selectedFsp.trim();
+
+    if (excluded.length === 0) {
+        return fspDropdownOptions.value;
+    }
+
+    return fspDropdownOptions.value.filter((option: SelectOption): boolean => {
+        return option.value === '' || option.value !== excluded;
+    });
+};
+
+const payerFspOptions = computed((): SelectOption[] => {
+    return optionsExcludingSelected(state.criteria.payeeFsp ?? '');
+});
+
+const payeeFspOptions = computed((): SelectOption[] => {
+    return optionsExcludingSelected(state.criteria.payerFsp ?? '');
+});
+
+const criteriaFields = computed<FilterField[]>(() => {
+    if (isDfspScopedUser.value) {
+        return props.viewDefinition.criteriaFields.flatMap((field: FilterField): FilterField[] => {
+            if (field.key === 'payerFsp') {
+                return [
+                    {
+                        key: 'dfspDirection',
+                        label: 'Direction',
+                        type: 'select',
+                        options: DFSP_DIRECTION_OPTIONS,
+                    },
+                ];
+            }
+
+            if (field.key === 'payeeFsp') {
+                return [
+                    {
+                        key: 'counterpartyFsp',
+                        label: 'Counterparty DFSP',
+                        type: 'select',
+                        options: counterpartyFspOptions.value,
+                        disabled: state.criteria[DFSP_DIRECTION_CRITERIA_KEY] === '',
+                    },
+                ];
+            }
+
+            return [field];
+        });
+    }
+
+    return props.viewDefinition.criteriaFields.map((field: FilterField): FilterField => {
+        if (!FSP_FILTER_KEYS.has(field.key)) {
+            return field;
+        }
+
+        return {
+            ...field,
+            type: 'select',
+            options: field.key === 'payerFsp' ? payerFspOptions.value : payeeFspOptions.value,
+        };
+    });
+});
+
+const criteriaSections = computed(() => {
+    return getCriteriaSections(criteriaFields.value);
+});
+
+const transferIdCriteria = computed((): string => state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '');
+
+const transferIdSearchActive = computed((): boolean => transferIdCriteria.value.length > 0);
 
 const hasNoResults = computed((): boolean => {
     return results.value != null && results.value.records.length === 0;
@@ -269,7 +425,36 @@ const resolvePresetRange = (mode: string): {start: string; end: string} => {
     };
 };
 
+const applyDfspLegSelection = (criteria: Record<string, string>): Record<string, string> => {
+    if (!isDfspScopedUser.value) {
+        return criteria;
+    }
+
+    const ownFspId = scopedFspId.value?.trim() ?? '';
+    const direction = criteria[DFSP_DIRECTION_CRITERIA_KEY]?.trim() ?? '';
+    const counterpartyFsp = criteria[COUNTERPARTY_FSP_CRITERIA_KEY]?.trim() ?? '';
+
+    criteria.payerFsp = '';
+    criteria.payeeFsp = '';
+
+    if (direction === 'INBOUND') {
+        criteria.payeeFsp = ownFspId;
+        criteria.payerFsp = counterpartyFsp;
+    }
+
+    if (direction === 'OUTBOUND') {
+        criteria.payerFsp = ownFspId;
+        criteria.payeeFsp = counterpartyFsp;
+    }
+
+    return criteria;
+};
+
 const snapshotCriteriaForQuery = (): Record<string, string> => {
+    if (transferIdSearchActive.value) {
+        return buildTransferIdOnlyCriteria(transferIdCriteria.value);
+    }
+
     const snapshot = {...state.criteria};
 
     for (const field of TIME_RANGE_MODE_KEYS) {
@@ -292,7 +477,7 @@ const snapshotCriteriaForQuery = (): Record<string, string> => {
         snapshot[field.end] = range.end;
     }
 
-    return snapshot;
+    return applyDfspLegSelection(snapshot);
 };
 
 const firstQueryValue = (value: LocationQueryValue | LocationQueryValue[] | undefined): string => {
@@ -314,7 +499,7 @@ const hasSearchRouteQuery = (query: LocationQuery): boolean => {
         return true;
     }
 
-    for (const field of props.viewDefinition.criteriaFields) {
+    for (const field of criteriaFields.value) {
         if (queryHasValue(query, field.key)) {
             return true;
         }
@@ -348,6 +533,9 @@ const resetCriteriaState = (): void => {
         state.criteria[field.key] = '';
     }
 
+    state.criteria[DFSP_DIRECTION_CRITERIA_KEY] = '';
+    state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = '';
+
     for (const field of TIME_RANGE_MODE_KEYS) {
         state.criteria[field.mode] = DEFAULT_START_MODE;
     }
@@ -377,6 +565,42 @@ const resetSearchState = (): void => {
     isSearchFormVisible.value = true;
 };
 
+const applyDfspRouteQueryToState = (query: LocationQuery): void => {
+    if (!isDfspScopedUser.value) {
+        return;
+    }
+
+    const ownFspId = scopedFspId.value?.trim() ?? '';
+    const routeDirection = firstQueryValue(query[DFSP_DIRECTION_CRITERIA_KEY]).trim();
+    const routeCounterparty = firstQueryValue(query[COUNTERPARTY_FSP_CRITERIA_KEY]).trim();
+
+    if (routeDirection.length > 0 || routeCounterparty.length > 0) {
+        state.criteria[DFSP_DIRECTION_CRITERIA_KEY] = routeDirection;
+        state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = routeDirection.length > 0 ? routeCounterparty : '';
+        state.criteria.payerFsp = '';
+        state.criteria.payeeFsp = '';
+        return;
+    }
+
+    const payerFsp = state.criteria.payerFsp?.trim() ?? '';
+    const payeeFsp = state.criteria.payeeFsp?.trim() ?? '';
+
+    if (payeeFsp === ownFspId && payerFsp !== ownFspId) {
+        state.criteria[DFSP_DIRECTION_CRITERIA_KEY] = 'INBOUND';
+        state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = payerFsp;
+        state.criteria.payerFsp = '';
+        state.criteria.payeeFsp = '';
+        return;
+    }
+
+    if (payerFsp === ownFspId && payeeFsp !== ownFspId) {
+        state.criteria[DFSP_DIRECTION_CRITERIA_KEY] = 'OUTBOUND';
+        state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = payeeFsp;
+        state.criteria.payerFsp = '';
+        state.criteria.payeeFsp = '';
+    }
+};
+
 const applyRouteQueryToState = (query: LocationQuery): void => {
     resetCriteriaState();
 
@@ -391,6 +615,14 @@ const applyRouteQueryToState = (query: LocationQuery): void => {
     state.size = parsePositiveInteger(firstQueryValue(query.size), DEFAULT_PAGE_SIZE);
     state.orderColumn = parseOrderColumn(firstQueryValue(query.orderColumn));
     state.orderDirection = parseOrderDirection(firstQueryValue(query.orderDirection));
+
+    applyDfspRouteQueryToState(query);
+
+    const transferId = state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '';
+
+    if (transferId.length > 0) {
+        Object.assign(state.criteria, buildTransferIdOnlyCriteria(transferId));
+    }
 };
 
 const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | number): void => {
@@ -404,7 +636,16 @@ const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | 
 const buildSearchRouteQuery = (): LocationQueryRaw => {
     const query: LocationQueryRaw = {};
 
-    for (const field of props.viewDefinition.criteriaFields) {
+    if (transferIdSearchActive.value) {
+        appendQueryValue(query, TRANSFER_ID_CRITERIA_KEY, transferIdCriteria.value);
+        appendQueryValue(query, 'size', state.size);
+        appendQueryValue(query, 'orderColumn', state.orderColumn);
+        appendQueryValue(query, 'orderDirection', state.orderDirection);
+
+        return query;
+    }
+
+    for (const field of criteriaFields.value) {
         appendQueryValue(query, field.key, state.criteria[field.key] ?? '');
     }
 
@@ -502,8 +743,25 @@ const applySearchRouteQuery = (query: LocationQuery): void => {
     executeNewSearch();
 };
 
+const loadFspOptions = async (): Promise<void> => {
+    fspOptionsLoading.value = true;
+    fspOptionsError.value = null;
+
+    try {
+        fetchedFspOptions.value = await fetchAuditFspOptions();
+    } catch (error) {
+        fetchedFspOptions.value = [];
+        fspOptionsError.value = error instanceof Error
+            ? error.message
+            : String(error);
+    } finally {
+        fspOptionsLoading.value = false;
+    }
+};
+
 onMounted((): void => {
     window.addEventListener('keydown', handleKeyDown);
+    void loadFspOptions();
 });
 
 onBeforeUnmount((): void => {
@@ -704,6 +962,15 @@ watch(
         applySearchRouteQuery(query);
     },
     {immediate: true},
+);
+
+watch(
+    () => state.criteria[DFSP_DIRECTION_CRITERIA_KEY],
+    (direction: string): void => {
+        if (direction === '') {
+            state.criteria[COUNTERPARTY_FSP_CRITERIA_KEY] = '';
+        }
+    },
 );
 
 const formatValue = (value: unknown): string => {
@@ -911,9 +1178,11 @@ const toDateTimeParts = (value: unknown): DateTimeDisplayParts | null => {
         hour12: false,
     }).format(parsed);
 
+    // `shortOffset` yields a uniform GMT±HH:MM label for every zone (e.g. "GMT+1"),
+    // instead of `short`, which mixes abbreviations like "BST"/"EST" with GMT offsets.
     const zone = new Intl.DateTimeFormat('en-GB', {
         timeZone: props.selectedTimeZone,
-        timeZoneName: 'short',
+        timeZoneName: 'shortOffset',
     }).formatToParts(parsed)
         .find((part: Intl.DateTimeFormatPart): boolean => part.type === 'timeZoneName')
         ?.value ?? props.selectedTimeZone;
@@ -1584,6 +1853,7 @@ const goToLastPage = (): void => {
                     :sections="criteriaSections"
                     :criteria="state.criteria"
                     :selected-time-zone="selectedTimeZone"
+                    :exclusive-field-key="transferIdSearchActive ? TRANSFER_ID_CRITERIA_KEY : null"
                     :visible="isSearchFormVisible"
                     :loading="loading"
                     :last-loaded-at="lastLoadedAt"
@@ -1594,6 +1864,18 @@ const goToLastPage = (): void => {
                     @reset="resetFilters"
                     @refresh="refreshResults"
                 />
+
+                <p
+                    v-if="fspOptionsLoading || fspOptionsError"
+                    class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
+                    <template v-if="fspOptionsLoading">
+                        Loading DFSP options...
+                    </template>
+                    <template v-else>
+                        DFSP dropdown options could not be refreshed: {{ fspOptionsError }}
+                    </template>
+                </p>
 
                 <section v-if="requestError || loading || results || isDownloading || readyFile || (downloadStatus === 'FAILED' && failedMessage)">
         <article class="overflow-hidden border border-accent/20 bg-white shadow-[0_18px_40px_rgba(20,127,195,0.08)]">

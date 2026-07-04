@@ -39,6 +39,51 @@ const allTimeZones = computed((): string[] => {
     return FALLBACK_TIME_ZONES;
 });
 
+// Current UTC offset of a zone, in minutes (e.g. GMT+05:30 → 330). Used to order the
+// list from GMT-12 → GMT+14 instead of alphabetically.
+const zoneOffsetMinutes = (timeZone: string): number => {
+    try {
+        const zonePart = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            timeZoneName: 'shortOffset',
+        }).formatToParts(new Date())
+            .find((part: Intl.DateTimeFormatPart): boolean => part.type === 'timeZoneName')?.value ?? 'GMT+00:00';
+
+        const matches = zonePart.match(/GMT([+\-])(\d{1,2})(?::?(\d{2}))?/i);
+
+        if (!matches) {
+            return 0;
+        }
+
+        const sign = matches[1] === '-' ? -1 : 1;
+
+        return sign * (Number(matches[2]) * 60 + Number(matches[3] ?? '0'));
+    } catch {
+        return 0;
+    }
+};
+
+// Cache the offset for every zone once (not per keystroke) so sorting the filtered
+// list is a cheap Map lookup.
+const offsetByZone = computed((): Map<string, number> => {
+    const map = new Map<string, number>();
+
+    for (const timeZone of allTimeZones.value) {
+        map.set(timeZone, zoneOffsetMinutes(timeZone));
+    }
+
+    return map;
+});
+
+const byOffsetThenName = (
+    left: {label: string; value: string},
+    right: {label: string; value: string},
+): number => {
+    const diff = (offsetByZone.value.get(left.value) ?? 0) - (offsetByZone.value.get(right.value) ?? 0);
+
+    return diff !== 0 ? diff : left.label.localeCompare(right.label);
+};
+
 const quickTimeZones = computed((): string[] => {
     const preferred = [
         'UTC',
@@ -70,12 +115,14 @@ const groupedTimeZones = computed((): Array<{label: string; options: Array<{labe
 
     const commonOptions = quickTimeZones.value
         .filter((timeZone: string): boolean => includesQuery(timeZone))
-        .map((timeZone: string): {label: string; value: string} => ({label: timeZone, value: timeZone}));
+        .map((timeZone: string): {label: string; value: string} => ({label: timeZone, value: timeZone}))
+        .sort(byOffsetThenName);
 
     const commonValues = new Set(commonOptions.map((option): string => option.value));
     const allOptions = allTimeZones.value
         .filter((timeZone: string): boolean => includesQuery(timeZone) && !commonValues.has(timeZone))
-        .map((timeZone: string): {label: string; value: string} => ({label: timeZone, value: timeZone}));
+        .map((timeZone: string): {label: string; value: string} => ({label: timeZone, value: timeZone}))
+        .sort(byOffsetThenName);
 
     return [
         {
