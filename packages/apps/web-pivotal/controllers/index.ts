@@ -15,6 +15,7 @@ export * from './hub/list-central-ledger-participants.controller';
 export * from './audit/transactions.controller';
 export * from './audit/dashboard.controller';
 export * from './audit/transaction-reports.controller';
+export * from './audit/fsp-options.controller';
 export * from './admin/menus.controller';
 export * from './admin/permissions.controller';
 export * from './admin/role-presets.controller';
