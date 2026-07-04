@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { AxiosClientBuilderParams } from '@shared/axios/component';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 

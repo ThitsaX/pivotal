@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {PublicKey, PublicKeyStore} from '@shared/security';
 import {ParticipantSigningKeysCache} from './participant-signing-keys-cache';
 import {Inject, Injectable} from "@nestjs/common";

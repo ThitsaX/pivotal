@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export * from './auth/auth.controller';
 export * from './health/health.controller';
 export * from './me/me.controller';
@@ -5,11 +7,13 @@ export * from './participant/onboard-fsp.controller';
 export * from './participant/add-fsp-currency.controller';
 export * from './participant/add-signing-keys.controller';
 export * from './participant/upsert-endpoint.controller';
+export * from './participant/update-access-key.controller';
 export * from './participant/generate-signing-key.controller';
 export * from './hub/add-currency.controller';
 export * from './hub/add-signing-keys.controller';
 export * from './hub/list-central-ledger-participants.controller';
 export * from './audit/transactions.controller';
+export * from './audit/dashboard.controller';
 export * from './audit/transaction-reports.controller';
 export * from './audit/fsp-options.controller';
 export * from './admin/menus.controller';

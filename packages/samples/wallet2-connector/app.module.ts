@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Module, Provider} from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
 import {ConnectorConsumerModule} from '@core/connector/consumer';

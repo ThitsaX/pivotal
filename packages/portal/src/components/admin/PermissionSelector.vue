@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 ThitsaWorks -->
+
 <script setup lang="ts">
 import {computed} from 'vue';
 import {type AdminPermission, namespaceLabel, namespaceOf} from '../../stores/permissions-admin.store';

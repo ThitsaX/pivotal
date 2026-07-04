@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { FspiopDates } from './fspiop-dates';
 
 export type FspiopHeadersMap = Record<string, string>;

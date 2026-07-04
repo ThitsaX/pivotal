@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export class AuthErrorCode {
 
     static readonly INVALID_CREDENTIALS         = 'AUTH_INVALID_CREDENTIALS';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {ConfigService} from '@nestjs/config';
 import {ReportDownloadSettings} from '@core/audit/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
@@ -45,6 +47,11 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     centralLedgerUrl(): string {
         return this.readRequiredValue('CENTRAL_LEDGER_URL');
+    }
+
+    /** Redis URL for reading the near-real-time dashboard counters (written by app-auditor). */
+    redisUrl(): string {
+        return this.readRequiredValue('REDIS_URL');
     }
 
     centralLedgerAxiosParams(): CentralLedgerAxiosParams {

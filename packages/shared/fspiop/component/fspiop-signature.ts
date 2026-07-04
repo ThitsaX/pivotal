@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {Jwt} from '@shared/security/component/jwt';
 import {PrivateKey} from '@shared/security/component/key/private-key';
 import {PublicKey} from '@shared/security/component/key/public-key';

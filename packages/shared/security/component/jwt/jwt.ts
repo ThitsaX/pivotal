@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import * as JsonWebToken from 'jsonwebtoken';
 import {PrivateKey} from '../key/private-key';
 import {PublicKey} from '../key/public-key';

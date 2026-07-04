@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 type RuntimeConfig = {
     REPORT_DOWNLOAD_JOB_TTL_MIN?: string;
     REPORT_DOWNLOAD_READY_TTL_HOURS?: string;

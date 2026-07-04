@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import 'reflect-metadata';
 import {existsSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
@@ -106,6 +108,15 @@ const bootstrap = async (): Promise<void> => {
     if (settings.useMutualTls) {
         Logger.log('Inbound mTLS is enabled.', 'Bootstrap');
     }
+
+    // Keep the server's idle keep-alive window LONGER than any client/proxy that pools
+    // connections to us (the Hub quoting-service-handler and our own sidecar Envoy).
+    // Node's default keepAliveTimeout is 5s, which is shorter than upstream idle windows,
+    // so the server closes idle sockets first and reused sockets fail with read ECONNRESET.
+    // headersTimeout must stay above keepAliveTimeout.
+    const httpServer = app.getHttpServer();
+    httpServer.keepAliveTimeout = Number(process.env['WEB_INBOUND_KEEP_ALIVE_TIMEOUT_MS'] ?? 65000);
+    httpServer.headersTimeout = Number(process.env['WEB_INBOUND_HEADERS_TIMEOUT_MS'] ?? 66000);
 
     await app.listen(port);
     const protocol = settings.useMutualTls ? 'https' : 'http';

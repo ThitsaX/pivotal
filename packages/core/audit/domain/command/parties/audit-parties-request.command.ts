@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {TransactionMessage} from '@core/audit/common';
 import {PartyIdType, TransactionInitiatorType, TransactionScenario} from '@shared/fspiop';
 
@@ -24,6 +26,7 @@ export namespace AuditPartiesRequestCommand {
             public readonly subScenario: string | null,
             public readonly gateway: TransactionMessage.InvocationGateway,
             public readonly request: unknown | null = null,
+            public readonly payerHomeTransactionId: string | null = null,
             public readonly occurredAt: Date | null = null,
         ) {
         }

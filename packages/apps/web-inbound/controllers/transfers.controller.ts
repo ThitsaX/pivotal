@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Patch, Post, Put, } from '@nestjs/common';
 import { CommandBus, ICommand } from '@nestjs/cqrs';
 import { HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand, } from '@core/inbound/domain';
@@ -56,7 +58,7 @@ export class TransfersController {
     }
 
     @Patch(':transferId')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     patchTransfers(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
@@ -81,7 +83,7 @@ export class TransfersController {
     }
 
     @Put(':transferId/error')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putTransfersError(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
@@ -113,7 +115,7 @@ export class TransfersController {
     }
 
     @Put(':transferId')
-    @HttpCode(HttpStatus.ACCEPTED)
+    @HttpCode(HttpStatus.OK)
     putTransfers(
         @Param('transferId') transferId: string,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {randomBytes, createHash} from 'node:crypto';
 import {Inject, Injectable} from '@nestjs/common';
 import {JwtService} from '@nestjs/jwt';

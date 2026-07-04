@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import { Inject, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { TransactionMessage } from '@core/audit/common';
@@ -198,6 +200,7 @@ export class PostSendMoneyHandler
                         transactionInitiatorType: request.from.type ?? null,
                         transactionType: request.transactionType,
                         subScenario: request.subScenario,
+                        payerHomeTransactionId: request.homeTransactionId ?? null,
                         request: {
                             partyIdType: type,
                             partyId: id,

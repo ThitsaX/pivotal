@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 import {generateKeyPairSync} from 'node:crypto';
 import {PrivateKey} from './private-key';
 import {PublicKey} from './public-key';

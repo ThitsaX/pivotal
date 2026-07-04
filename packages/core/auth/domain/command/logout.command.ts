@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ThitsaWorks
 export class LogoutCommand {
 
     constructor(public readonly input: LogoutCommand.Input) {
