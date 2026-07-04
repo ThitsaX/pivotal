@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `transactions` (
     `id` BIGINT NOT NULL,
     `correlation_id` VARCHAR(128) NOT NULL,

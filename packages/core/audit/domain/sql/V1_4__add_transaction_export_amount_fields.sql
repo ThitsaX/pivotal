@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 ALTER TABLE `transactions`
     ADD COLUMN `payee_receive_amount` DECIMAL(34, 4) NULL AFTER `transfer_amount`,
     ADD COLUMN `payee_fee` DECIMAL(34, 4) NULL AFTER `payee_receive_amount`,

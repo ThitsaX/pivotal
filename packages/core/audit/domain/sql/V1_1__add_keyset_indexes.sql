@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 -- Keyset (cursor) pagination support for "Find Transactions".
 --
 -- Each surviving sort column needs its own `(sortColumn, id)` covering tuple so the

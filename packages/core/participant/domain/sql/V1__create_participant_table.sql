@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `participant` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(128) NOT NULL,
