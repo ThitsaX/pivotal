@@ -209,6 +209,29 @@ const counterpartyFspOptions = computed((): SelectOption[] => {
     });
 });
 
+// A transfer is always between two distinct FSPs (never wallet1 → wallet1), so each
+// FSP dropdown hides whatever the other one currently has selected. The empty "(Any)"
+// option is always retained.
+const optionsExcludingSelected = (selectedFsp: string): SelectOption[] => {
+    const excluded = selectedFsp.trim();
+
+    if (excluded.length === 0) {
+        return fspDropdownOptions.value;
+    }
+
+    return fspDropdownOptions.value.filter((option: SelectOption): boolean => {
+        return option.value === '' || option.value !== excluded;
+    });
+};
+
+const payerFspOptions = computed((): SelectOption[] => {
+    return optionsExcludingSelected(state.criteria.payeeFsp ?? '');
+});
+
+const payeeFspOptions = computed((): SelectOption[] => {
+    return optionsExcludingSelected(state.criteria.payerFsp ?? '');
+});
+
 const criteriaFields = computed<FilterField[]>(() => {
     if (isDfspScopedUser.value) {
         return props.viewDefinition.criteriaFields.flatMap((field: FilterField): FilterField[] => {
@@ -247,7 +270,7 @@ const criteriaFields = computed<FilterField[]>(() => {
         return {
             ...field,
             type: 'select',
-            options: fspDropdownOptions.value,
+            options: field.key === 'payerFsp' ? payerFspOptions.value : payeeFspOptions.value,
         };
     });
 });
@@ -1155,9 +1178,11 @@ const toDateTimeParts = (value: unknown): DateTimeDisplayParts | null => {
         hour12: false,
     }).format(parsed);
 
+    // `shortOffset` yields a uniform GMT±HH:MM label for every zone (e.g. "GMT+1"),
+    // instead of `short`, which mixes abbreviations like "BST"/"EST" with GMT offsets.
     const zone = new Intl.DateTimeFormat('en-GB', {
         timeZone: props.selectedTimeZone,
-        timeZoneName: 'short',
+        timeZoneName: 'shortOffset',
     }).formatToParts(parsed)
         .find((part: Intl.DateTimeFormatPart): boolean => part.type === 'timeZoneName')
         ?.value ?? props.selectedTimeZone;

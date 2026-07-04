@@ -2,7 +2,7 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue';
+import {computed, onMounted, ref, watch} from 'vue';
 import CustomDropdown from './CustomDropdown.vue';
 
 type RangeMode = 'today' | 'last24' | 'custom';
@@ -20,6 +20,7 @@ const emit = defineEmits<{
     (event: 'update:startValue', value: string): void;
     (event: 'update:endValue', value: string): void;
     (event: 'update:mode', value: string): void;
+    (event: 'update:invalid', value: boolean): void;
 }>();
 
 const padTwo = (value: number | string): string => String(value).padStart(2, '0');
@@ -375,6 +376,31 @@ const updateDatePart = (target: 'start' | 'end', value: string): void => {
     applyCustom();
 };
 
+// Validation: a custom range is invalid when the resolved start is not strictly
+// before the end. Presets always produce a valid range, so they never error.
+const rangeError = computed((): string => {
+    if (selectedMode.value !== 'custom' || !props.startValue || !props.endValue) {
+        return '';
+    }
+
+    const start = new Date(props.startValue).getTime();
+    const end = new Date(props.endValue).getTime();
+
+    if (Number.isNaN(start) || Number.isNaN(end)) {
+        return '';
+    }
+
+    return start >= end ? 'Start date & time must be before the end date & time.' : '';
+});
+
+watch(
+    rangeError,
+    (message: string): void => {
+        emit('update:invalid', message.length > 0);
+    },
+    {immediate: true},
+);
+
 onMounted((): void => {
     selectedMode.value = (props.mode as RangeMode | '') || detectPresetMode(props.startValue, props.endValue);
 });
@@ -594,6 +620,17 @@ watch(
                         </div>
                     </div>
                 </div>
+
+                <p
+                    v-if="rangeError"
+                    class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-600"
+                    role="alert"
+                >
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                    </svg>
+                    {{ rangeError }}
+                </p>
             </div>
         </Transition>
     </div>
