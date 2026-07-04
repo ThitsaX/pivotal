@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `menu_permissions` (
     `menu_id` BIGINT NOT NULL,
     `permission_id` BIGINT NOT NULL,

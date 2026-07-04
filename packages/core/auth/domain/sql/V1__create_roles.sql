@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `roles` (
     `id` BIGINT NOT NULL,
     `code` VARCHAR(64) NOT NULL,

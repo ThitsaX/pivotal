@@ -1,5 +1,3 @@
--- SPDX-License-Identifier: Apache-2.0
--- Copyright 2026 ThitsaWorks
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
     `id` BIGINT NOT NULL,
     `user_id` BIGINT NOT NULL,
