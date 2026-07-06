@@ -19,17 +19,28 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand, Cre
 
     async execute(command: CreateRoleCommand): Promise<CreateRoleCommand.Output> {
 
-        const {name, scope, description} = command.input;
+        const {scope, description} = command.input;
         const code = CreateRoleHandler.normalizeCode(command.input.code);
+        const name = command.input.name.trim();
 
         if (code.length === 0) {
             throw new BadRequestException(adminError(AdminErrorCode.ROLE_CODE_REQUIRED));
+        }
+
+        if (name.length === 0) {
+            throw new BadRequestException(adminError(AdminErrorCode.ROLE_NAME_REQUIRED));
         }
 
         const existing = await this.roleRepository.findByCode(code, DbTarget.Write);
 
         if (existing != null) {
             throw new ConflictException(adminError(AdminErrorCode.ROLE_CODE_TAKEN));
+        }
+
+        const existingName = await this.roleRepository.findByName(name, DbTarget.Write);
+
+        if (existingName != null) {
+            throw new ConflictException(adminError(AdminErrorCode.ROLE_NAME_TAKEN));
         }
 
         const role = new Role(code, name, scope, description, false);

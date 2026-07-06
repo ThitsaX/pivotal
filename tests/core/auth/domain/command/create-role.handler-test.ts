@@ -7,11 +7,12 @@ import {Role} from '../../../../../packages/core/auth/domain/model';
 
 interface State {
     rolesByCode: Map<string, Role>;
+    rolesByName: Map<string, Role>;
     saved:       Role[];
 }
 
 function freshState(): State {
-    return {rolesByCode: new Map(), saved: []};
+    return {rolesByCode: new Map(), rolesByName: new Map(), saved: []};
 }
 
 function makeHandler(state: State): CreateRoleHandler {
@@ -19,10 +20,14 @@ function makeHandler(state: State): CreateRoleHandler {
         async findByCode(code: string): Promise<Role | null> {
             return state.rolesByCode.get(code) ?? null;
         },
+        async findByName(name: string): Promise<Role | null> {
+            return state.rolesByName.get(name) ?? null;
+        },
         async save(role: Role): Promise<Role> {
             role.id = `role-${state.saved.length + 1}`;
             state.saved.push(role);
             state.rolesByCode.set(role.code, role);
+            state.rolesByName.set(role.name, role);
             return role;
         },
     } as unknown as RoleRepository;
@@ -89,6 +94,22 @@ describe('CreateRoleHandler', () => {
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_REQUIRED',
+        );
+
+        assert.equal(state.saved.length, 0);
+    });
+
+    it('rejects duplicate display names', async () => {
+
+        const state = freshState();
+        state.rolesByName.set('Auditor', new Role('AUDITOR', 'Auditor', 'HUB', null, false, 'role-existing'));
+
+        await assert.rejects(
+            makeHandler(state).execute(new CreateRoleCommand(
+                new CreateRoleCommand.Input('AUDITOR_2', 'Auditor', 'HUB', null),
+            )),
+            (error: unknown) => error instanceof ConflictException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_NAME_TAKEN',
         );
 
         assert.equal(state.saved.length, 0);
