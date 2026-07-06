@@ -55,6 +55,7 @@ interface CreateForm {
 }
 
 const createOpen = ref(false);
+const scopeChoiceRenderKey = ref(0);
 const createForm = reactive<CreateForm>({
     step:         1,
     scope:        null,
@@ -120,7 +121,10 @@ const onScopeChange = (next: RoleScope): void => {
     if (createForm.scope === next) return;
     if (createForm.scope != null && hasTouchedStep2Or3()) {
         const ok = window.confirm('Changing scope will clear your selections in the next steps. Continue?');
-        if (!ok) return;
+        if (!ok) {
+            scopeChoiceRenderKey.value += 1;
+            return;
+        }
         createForm.code = '';
         createForm.name = '';
         createForm.description = '';
@@ -513,7 +517,7 @@ watch(() => editState.role, (role) => {
                         Choose whether this role grants hub-wide powers or operates within a single FSP.
                         This choice is permanent — to change scope later, delete the role and create a new one.
                     </p>
-                    <div class="space-y-2">
+                    <div :key="scopeChoiceRenderKey" class="space-y-2">
                         <label
                             class="flex cursor-pointer items-start gap-3 rounded-lg border-2 px-3 py-3 transition"
                             :class="createForm.scope === 'HUB' ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300'"
