@@ -22,26 +22,6 @@ export class MenuPermissionRepository {
         return this.writeRepository.save(entity);
     }
 
-    async findByMenuId(menuId: string, target: DbTarget = DbTarget.Read): Promise<MenuPermission[]> {
-        return this.getRepository(target).find({where: {menuId}});
-    }
-
-    async findPermissionKeysByMenuId(menuId: string, target: DbTarget = DbTarget.Read): Promise<string[]> {
-
-        const rows = await this.getRepository(target)
-                               .createQueryBuilder('mp')
-                               .innerJoin('permissions', 'p', 'p.id = mp.permission_id')
-                               .select('p.key_name', 'keyName')
-                               .where('mp.menu_id = :menuId', {menuId})
-                               .getRawMany<{keyName: string}>();
-
-        return rows.map((row) => row.keyName);
-    }
-
-    async countByMenuId(menuId: string, target: DbTarget = DbTarget.Read): Promise<number> {
-        return this.getRepository(target).count({where: {menuId}});
-    }
-
     async count(target: DbTarget = DbTarget.Read): Promise<number> {
         return this.getRepository(target).count();
     }

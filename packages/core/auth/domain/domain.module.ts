@@ -7,18 +7,15 @@ import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {
     ChangePasswordHandler,
-    CreateMenuHandler,
     CreateRoleHandler,
     CreateUserHandler,
     DeactivateUserHandler,
-    DeleteMenuHandler,
     DeleteRoleHandler,
     LoginHandler,
     LogoutHandler,
     RefreshTokensHandler,
     ReplaceRolePermissionsHandler,
     ResetUserPasswordHandler,
-    UpdateMenuHandler,
     UpdateRoleHandler,
     UpdateUserHandler,
 } from './command';
@@ -87,9 +84,6 @@ const CommandHandlers = [
     UpdateRoleHandler,
     DeleteRoleHandler,
     ReplaceRolePermissionsHandler,
-    CreateMenuHandler,
-    UpdateMenuHandler,
-    DeleteMenuHandler,
 ];
 
 @Module({})

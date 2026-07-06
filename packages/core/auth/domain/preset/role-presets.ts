@@ -31,7 +31,6 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.ADMIN_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
-            PermissionKey.ADMIN_MENUS_MANAGE,
         ],
     },
     {
