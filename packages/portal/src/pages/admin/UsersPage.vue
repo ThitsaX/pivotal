@@ -117,6 +117,10 @@ watch(() => createForm.roleId, () => {
     }
 });
 
+watch(() => [createForm.roleId, createForm.fspId], () => {
+    createForm.error = null;
+});
+
 const submitCreate = async (): Promise<void> => {
 
     if (createDisabled.value) return;
@@ -201,6 +205,10 @@ const closeEdit = (): void => {
 
 watch(() => editForm.roleId, () => {
     if (editRoleForbidsFspId.value) editForm.fspId = '';
+});
+
+watch(() => [editForm.roleId, editForm.fspId], () => {
+    editForm.error = null;
 });
 
 const editDirty = computed((): boolean => {
