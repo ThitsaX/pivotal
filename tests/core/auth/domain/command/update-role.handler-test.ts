@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {NotFoundException} from '@nestjs/common';
+import {BadRequestException, NotFoundException} from '@nestjs/common';
 import {RoleRepository} from '../../../../../packages/core/auth/domain';
 import {UpdateRoleCommand, UpdateRoleHandler} from '../../../../../packages/core/auth/domain/command';
 import {Role} from '../../../../../packages/core/auth/domain/model';
@@ -39,10 +39,26 @@ describe('UpdateRoleHandler', () => {
         state.rolesById.set('role-1', new Role('OPS', 'Old', 'HUB', 'Old desc', false, 'role-1'));
 
         await makeHandler(state).execute(new UpdateRoleCommand(
-            new UpdateRoleCommand.Input('role-1', 'New name', 'New desc'),
+            new UpdateRoleCommand.Input('role-1', '  New name  ', 'New desc'),
         ));
 
         assert.deepEqual(state.updateCalls[0].partial, {name: 'New name', description: 'New desc'});
+    });
+
+    it('rejects blank display names', async () => {
+
+        const state = freshState();
+        state.rolesById.set('role-1', new Role('OPS', 'Old', 'HUB', null, false, 'role-1'));
+
+        await assert.rejects(
+            makeHandler(state).execute(new UpdateRoleCommand(
+                new UpdateRoleCommand.Input('role-1', '   ', undefined),
+            )),
+            (error: unknown) => error instanceof BadRequestException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_NAME_REQUIRED',
+        );
+
+        assert.equal(state.updateCalls.length, 0);
     });
 
     it('skips the DB update when nothing changes', async () => {
