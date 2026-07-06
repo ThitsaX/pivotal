@@ -129,6 +129,10 @@ const onScopeChange = (next: RoleScope): void => {
 };
 
 const goToStep = (step: 1 | 2 | 3): void => {
+    if (step < createForm.step) {
+        createForm.error = null;
+    }
+
     createForm.step = step;
 };
 
@@ -166,6 +170,16 @@ const onCreatePermissionsChange = (next: string[]): void => {
         }
     }
 };
+
+watch(() => [
+    createForm.scope,
+    createForm.code,
+    createForm.name,
+    createForm.description,
+    createForm.presetKey,
+], () => {
+    createForm.error = null;
+});
 
 const submitCreate = async (): Promise<void> => {
 
