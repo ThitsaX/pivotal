@@ -88,6 +88,8 @@ const createSubmitDisabled = computed((): boolean => {
     return false;
 });
 
+const normalizeRoleCode = (code: string): string => code.trim().replace(/\s+/g, ' ').toUpperCase();
+
 const openCreate = (): void => {
     createForm.step = 1;
     createForm.scope = null;
@@ -190,7 +192,7 @@ const submitCreate = async (): Promise<void> => {
 
     try {
         const input: AdminRoleCreateInput = {
-            code:        createForm.code.trim().toUpperCase(),
+            code:        normalizeRoleCode(createForm.code),
             name:        createForm.name.trim(),
             scope:       createForm.scope!,
             description: createForm.description.trim().length > 0 ? createForm.description.trim() : null,

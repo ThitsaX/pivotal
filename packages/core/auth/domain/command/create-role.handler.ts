@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 ThitsaWorks
-import {ConflictException, Inject} from '@nestjs/common';
+import {BadRequestException, ConflictException, Inject} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
@@ -19,7 +19,12 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand, Cre
 
     async execute(command: CreateRoleCommand): Promise<CreateRoleCommand.Output> {
 
-        const {code, name, scope, description} = command.input;
+        const {name, scope, description} = command.input;
+        const code = CreateRoleHandler.normalizeCode(command.input.code);
+
+        if (code.length === 0) {
+            throw new BadRequestException(adminError(AdminErrorCode.ROLE_CODE_REQUIRED));
+        }
 
         const existing = await this.roleRepository.findByCode(code, DbTarget.Write);
 
@@ -31,5 +36,10 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand, Cre
         const saved = await this.roleRepository.save(role);
 
         return new CreateRoleCommand.Output(saved);
+    }
+
+    private static normalizeCode(code: string): string {
+
+        return code.trim().replace(/\s+/g, ' ').toUpperCase();
     }
 }

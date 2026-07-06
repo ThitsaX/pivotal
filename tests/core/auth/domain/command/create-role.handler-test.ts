@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {ConflictException} from '@nestjs/common';
+import {BadRequestException, ConflictException} from '@nestjs/common';
 import {RoleRepository} from '../../../../../packages/core/auth/domain';
 import {CreateRoleCommand, CreateRoleHandler} from '../../../../../packages/core/auth/domain/command';
 import {Role} from '../../../../../packages/core/auth/domain/model';
@@ -68,6 +68,32 @@ describe('CreateRoleHandler', () => {
         assert.equal(output.role.description, null);
     });
 
+    it('normalizes role codes before uniqueness check and save', async () => {
+
+        const state = freshState();
+        await makeHandler(state).execute(new CreateRoleCommand(
+            new CreateRoleCommand.Input('  t   t  ', 'Operator', 'HUB', null),
+        ));
+
+        assert.equal(state.saved[0].code, 'T T');
+        assert.ok(state.rolesByCode.has('T T'));
+    });
+
+    it('rejects blank role codes after normalization', async () => {
+
+        const state = freshState();
+
+        await assert.rejects(
+            makeHandler(state).execute(new CreateRoleCommand(
+                new CreateRoleCommand.Input('   ', 'Operator', 'HUB', null),
+            )),
+            (error: unknown) => error instanceof BadRequestException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_REQUIRED',
+        );
+
+        assert.equal(state.saved.length, 0);
+    });
+
     it('rejects 409 ROLE_CODE_TAKEN when the code already exists', async () => {
 
         const state = freshState();
@@ -75,7 +101,7 @@ describe('CreateRoleHandler', () => {
 
         await assert.rejects(
             makeHandler(state).execute(new CreateRoleCommand(
-                new CreateRoleCommand.Input('AUDITOR', 'New', 'HUB', null),
+                new CreateRoleCommand.Input('  auditor  ', 'New', 'HUB', null),
             )),
             (error: unknown) => error instanceof ConflictException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_TAKEN',
