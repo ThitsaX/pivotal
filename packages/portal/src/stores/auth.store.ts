@@ -139,7 +139,7 @@ export const authStore = {
     async changePassword(currentPassword: string, newPassword: string): Promise<void> {
         await apiClient.post<void>('/auth/change-password', {currentPassword, newPassword});
 
-        state.mustChangePassword = false;
+        clearState();
     },
 
     async bootstrap(): Promise<void> {
