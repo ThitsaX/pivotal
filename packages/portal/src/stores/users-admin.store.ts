@@ -184,12 +184,7 @@ export const usersAdminStore = {
     async updateUser(id: string, input: AdminUserUpdateInput): Promise<AdminUser> {
 
         const updated = await apiClient.patch<AdminUser>(`/admin/users/${id}`, input);
-
-        // Refresh the row in place so the table reflects the new role/status without a full reload.
-        const index = state.items.findIndex((u) => u.id === id);
-        if (index >= 0) {
-            state.items[index] = updated;
-        }
+        await usersAdminStore.loadUsers();
 
         return updated;
     },
@@ -209,11 +204,7 @@ export const usersAdminStore = {
     async deactivateUser(id: string): Promise<AdminUser> {
 
         const updated = await apiClient.delete<AdminUser>(`/admin/users/${id}`);
-
-        const index = state.items.findIndex((u) => u.id === id);
-        if (index >= 0) {
-            state.items[index] = updated;
-        }
+        await usersAdminStore.loadUsers();
 
         return updated;
     },
