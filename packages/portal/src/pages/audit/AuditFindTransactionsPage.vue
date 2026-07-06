@@ -116,6 +116,7 @@ const requestErrorTitle = ref('Audit search could not be completed');
 const results = ref<QueryResponse | null>(null);
 const reportFileType = ref<'xlsx' | 'csv'>('xlsx');
 const reportRequesting = ref(false);
+const canDownloadReports = computed((): boolean => authStore.hasPermission('audit.transactions.view'));
 const pageInfo = ref<PageInfo>({hasNext: false, hasPrev: false});
 const totalCount = ref<CountResponse | null>(null);
 const countLoading = ref(false);
@@ -837,6 +838,10 @@ const buildCriteriaParams = (criteria: Record<string, string>): URLSearchParams 
 };
 
 const downloadTransactionReport = async (): Promise<void> => {
+    if (!canDownloadReports.value) {
+        return;
+    }
+
     const criteria = Object.keys(lastSubmittedCriteria.value).length > 0
         ? lastSubmittedCriteria.value
         : snapshotCriteriaForQuery();
@@ -1912,12 +1917,15 @@ const goToLastPage = (): void => {
                         <button
                             type="button"
                             class="inline-flex items-center justify-center rounded-full border border-[#d97706] bg-[#d97706] px-3 py-1 font-semibold text-white transition hover:bg-[#b45309] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
-                            :disabled="reportRequesting || isDownloading || loading || hasNoResults"
-                            :title="hasNoResults ? 'No transactions to download' : undefined"
+                            :disabled="!canDownloadReports || reportRequesting || isDownloading || loading || hasNoResults"
+                            :title="!canDownloadReports ? 'Requires audit.transactions.view permission' : (hasNoResults ? 'No transactions to download' : undefined)"
                             @click="downloadTransactionReport"
                         >
                             {{ reportRequesting || isDownloading ? 'Downloading...' : 'Download' }}
                         </button>
+                        <span v-if="!canDownloadReports" class="text-xs font-medium text-slate-500">
+                            Report download requires transaction detail permission.
+                        </span>
                     </template>
                 </div>
             </div>
