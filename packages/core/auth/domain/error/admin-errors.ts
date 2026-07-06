@@ -20,6 +20,8 @@ export class AdminErrorCode {
 
     static readonly ROLE_NOT_FOUND              = 'ADMIN_ROLE_NOT_FOUND';
 
+    static readonly ROLE_CODE_REQUIRED          = 'ADMIN_ROLE_CODE_REQUIRED';
+
     static readonly ROLE_CODE_TAKEN             = 'ADMIN_ROLE_CODE_TAKEN';
 
     static readonly ROLE_NAME_REQUIRED          = 'ADMIN_ROLE_NAME_REQUIRED';
@@ -47,6 +49,7 @@ export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.USER_ROLE_NOT_FOUND]:            'The specified role does not exist.',
     [AdminErrorCode.USER_FSP_ID_NOT_FOUND]:          'The specified FSP ID does not exist.',
     [AdminErrorCode.ROLE_NOT_FOUND]:                 'Role not found.',
+    [AdminErrorCode.ROLE_CODE_REQUIRED]:             'Role Code is required.',
     [AdminErrorCode.ROLE_CODE_TAKEN]:                'A role with that code already exists.',
     [AdminErrorCode.ROLE_NAME_REQUIRED]:             'Display Name is required.',
     [AdminErrorCode.ROLE_IMMUTABLE_FIELD]:           'The code and isSystem fields cannot be changed after the role is created.',
