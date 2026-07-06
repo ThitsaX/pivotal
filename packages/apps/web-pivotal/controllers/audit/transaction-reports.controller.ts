@@ -41,7 +41,7 @@ export class TransactionReportsAuditController {
 
     @Post()
     @HttpCode(200)
-    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_VIEW)
     async requestTransactionReport(
         @AuthUser() claims: AccessTokenClaims | undefined,
         @Query('payerFsp') payerFsp: string | undefined,
@@ -116,7 +116,7 @@ export class TransactionReportsAuditController {
     }
 
     @Get(':requestId/status')
-    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_VIEW)
     async getReportStatus(
         @AuthUser() claims: AccessTokenClaims | undefined,
         @Param('requestId') requestId: string,
@@ -141,7 +141,7 @@ export class TransactionReportsAuditController {
     }
 
     @Get(':requestId/download-url')
-    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_VIEW)
     async getReportDownloadUrl(
         @AuthUser() claims: AccessTokenClaims | undefined,
         @Param('requestId') requestId: string,
@@ -169,7 +169,7 @@ export class TransactionReportsAuditController {
     }
 
     @Get(':requestId/download')
-    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_LIST)
+    @RequiresPermission(PermissionKey.AUDIT_TRANSACTIONS_VIEW)
     async downloadReport(
         @AuthUser() claims: AccessTokenClaims | undefined,
         @Param('requestId') requestId: string,
