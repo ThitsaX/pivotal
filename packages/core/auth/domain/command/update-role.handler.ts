@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 ThitsaWorks
-import {Inject, NotFoundException} from '@nestjs/common';
+import {BadRequestException, Inject, NotFoundException} from '@nestjs/common';
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
@@ -29,7 +29,13 @@ export class UpdateRoleHandler implements ICommandHandler<UpdateRoleCommand, Upd
         const patch: RoleUpdate = {};
 
         if (name !== undefined) {
-            patch.name = name;
+            const normalizedName = name.trim();
+
+            if (normalizedName.length === 0) {
+                throw new BadRequestException(adminError(AdminErrorCode.ROLE_NAME_REQUIRED));
+            }
+
+            patch.name = normalizedName;
         }
 
         if (description !== undefined) {

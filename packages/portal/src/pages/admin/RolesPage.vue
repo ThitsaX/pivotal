@@ -270,9 +270,24 @@ const permissionsDirty = computed((): boolean => {
 
 const editDirty = computed((): boolean => detailsDirty.value || permissionsDirty.value);
 
+const editNameValidationMessage = computed((): string | null => {
+    if (editState.role != null && editState.name.trim().length === 0) {
+        return 'Display Name is required.';
+    }
+
+    return null;
+});
+
+const editSubmitDisabled = computed((): boolean => {
+    if (editState.submitting) return true;
+    if (!editDirty.value) return true;
+    if (editNameValidationMessage.value != null) return true;
+    return false;
+});
+
 const submitEdit = async (): Promise<void> => {
 
-    if (editState.role == null || editState.submitting || !editDirty.value) return;
+    if (editState.role == null || editSubmitDisabled.value) return;
 
     editState.submitting = true;
     editState.saveError = null;
@@ -722,8 +737,13 @@ watch(() => editState.role, (role) => {
                             <input
                                 v-model="editState.name"
                                 type="text"
+                                required
+                                :aria-invalid="editNameValidationMessage != null"
                                 class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                             >
+                            <p v-if="editNameValidationMessage != null" class="mt-1 text-xs text-red-600">
+                                {{ editNameValidationMessage }}
+                            </p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Description</label>
@@ -780,7 +800,7 @@ watch(() => editState.role, (role) => {
                         <button
                             type="submit"
                             class="rounded-lg bg-accentWarm px-3 py-2 text-sm font-semibold text-white transition hover:bg-accentWarm/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="editState.submitting || !editDirty"
+                            :disabled="editSubmitDisabled"
                         >
                             {{ editState.submitting ? 'Saving…' : 'Save changes' }}
                         </button>
