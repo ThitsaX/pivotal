@@ -2,7 +2,7 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
-import {computed, onDeactivated, onMounted, reactive, ref, watch} from 'vue';
+import {computed, onActivated, onDeactivated, onMounted, reactive, ref, watch} from 'vue';
 import {onBeforeRouteLeave} from 'vue-router';
 import {ApiError} from '../../api/client';
 import AccessDeniedPanel from '../../components/admin/AccessDeniedPanel.vue';
@@ -60,6 +60,11 @@ const clearFilters = async (): Promise<void> => {
 onMounted(async (): Promise<void> => {
     if (!hasPermission.value) return;
     await Promise.all([usersAdminStore.loadUsers(), usersAdminStore.loadRoles(), usersAdminStore.loadFspOptions()]);
+});
+
+onActivated((): void => {
+    if (!hasPermission.value) return;
+    void usersAdminStore.loadRoles();
 });
 
 // --- Create modal -----------------------------------------------------------
