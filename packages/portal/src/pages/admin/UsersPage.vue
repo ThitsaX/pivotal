@@ -582,7 +582,9 @@ const onPageChange = async (page: number): Promise<void> => {
 
                 <form class="mt-4 space-y-3" @submit.prevent="submitCreate">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Email</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Email <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.email"
                             type="email"
@@ -592,7 +594,9 @@ const onPageChange = async (page: number): Promise<void> => {
                         >
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Role</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Role <span class="text-red-500">*</span>
+                        </label>
                         <select
                             v-model="createForm.roleId"
                             required
@@ -606,7 +610,9 @@ const onPageChange = async (page: number): Promise<void> => {
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="createRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
-                            <span v-else-if="createRoleRequiresFspId" class="font-normal normal-case text-slate-400">— required</span>
+                            <span v-else-if="createRoleRequiresFspId" class="font-normal normal-case text-slate-400">
+                                — required <span class="text-red-500">*</span>
+                            </span>
                         </label>
                         <select
                             v-model="createForm.fspId"
