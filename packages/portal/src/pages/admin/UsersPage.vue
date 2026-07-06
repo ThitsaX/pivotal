@@ -11,6 +11,7 @@ import ConfirmDialog from '../../components/admin/ConfirmDialog.vue';
 import RevocationBanner from '../../components/admin/RevocationBanner.vue';
 import TempPasswordReveal from '../../components/admin/TempPasswordReveal.vue';
 import {authStore} from '../../stores/auth.store';
+import {toastStore} from '../../stores/toast.store';
 import {
     type AdminUser,
     type AdminUserCreateInput,
@@ -317,7 +318,13 @@ const submitDeactivate = async (): Promise<void> => {
         const email = deactivateTarget.value.email;
         await usersAdminStore.deactivateUser(deactivateTarget.value.id);
         deactivateTarget.value = null;
-        deactivateBanner.value = `${email} has been deactivated. Their active session will end within seconds.`;
+        const message = `${email} has been deactivated. Their active session will end within seconds.`;
+        deactivateBanner.value = message;
+        toastStore.show({
+            tone: 'success',
+            title: 'User deactivated',
+            message,
+        });
         window.setTimeout(() => { deactivateBanner.value = null; }, 8000);
     } catch (error) {
         deactivateError.value = describeApiError(error);
