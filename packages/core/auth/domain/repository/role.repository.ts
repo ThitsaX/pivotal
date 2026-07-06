@@ -35,6 +35,10 @@ export class RoleRepository {
         return this.getRepository(target).findOne({where: {code}});
     }
 
+    async findByName(name: string, target: DbTarget = DbTarget.Read): Promise<Role | null> {
+        return this.getRepository(target).findOne({where: {name}});
+    }
+
     async findAll(target: DbTarget = DbTarget.Read): Promise<Role[]> {
         return this.getRepository(target).find({order: {createdAt: 'ASC'}});
     }
