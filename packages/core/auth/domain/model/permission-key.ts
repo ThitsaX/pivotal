@@ -15,7 +15,6 @@ export const PermissionKey = {
     ADMIN_USERS_MANAGE:              'admin.users.manage',
     ADMIN_ROLES_MANAGE:              'admin.roles.manage',
     ADMIN_PERMISSIONS_LIST:          'admin.permissions.list',
-    ADMIN_MENUS_MANAGE:              'admin.menus.manage',
 } as const;
 
 export type PermissionKeyValue = typeof PermissionKey[keyof typeof PermissionKey];
