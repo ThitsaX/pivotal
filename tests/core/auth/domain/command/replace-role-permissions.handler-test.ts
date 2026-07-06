@@ -23,7 +23,6 @@ interface State {
 const PERMISSION_SCOPES: Record<string, PermissionScope> = {
     [PermissionKey.ADMIN_USERS_MANAGE]:        'HUB',
     [PermissionKey.ADMIN_ROLES_MANAGE]:        'HUB',
-    [PermissionKey.ADMIN_MENUS_MANAGE]:        'HUB',
     [PermissionKey.ADMIN_PERMISSIONS_LIST]:    'HUB',
     [PermissionKey.AUDIT_TRANSACTIONS_LIST]:   'BOTH',
     [PermissionKey.AUDIT_TRANSACTIONS_VIEW]:   'BOTH',
