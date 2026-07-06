@@ -506,6 +506,9 @@ watch(() => editState.role, (role) => {
 
                 <!-- Step 1: scope -->
                 <div v-if="createForm.step === 1" class="mt-4 space-y-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                        Scope <span class="text-red-500">*</span>
+                    </p>
                     <p class="text-sm text-slate-600">
                         Choose whether this role grants hub-wide powers or operates within a single FSP.
                         This choice is permanent — to change scope later, delete the role and create a new one.
@@ -585,7 +588,9 @@ watch(() => editState.role, (role) => {
                 <!-- Step 2: code, name, description, preset -->
                 <form v-else-if="createForm.step === 2" class="mt-4 space-y-3" @submit.prevent="goToStep(3)">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Code</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Code <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.code"
                             type="text"
@@ -596,7 +601,9 @@ watch(() => editState.role, (role) => {
                         <p class="mt-1 text-xs text-slate-500">Immutable after creation. Used as a stable identifier in code.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Display name</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Display name <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.name"
                             type="text"
