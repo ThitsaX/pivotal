@@ -17,7 +17,6 @@ import {
     HealthController,
     ListCentralLedgerParticipantsController,
     MeController,
-    MenusAdminController,
     OnboardFspController,
     PermissionsAdminController,
     RolePresetsAdminController,
@@ -85,7 +84,6 @@ export class WebPivotalModule {
                 RolesAdminController,
                 RolePresetsAdminController,
                 PermissionsAdminController,
-                MenusAdminController,
             ],
             providers: [
                 JwtAuthGuard,
