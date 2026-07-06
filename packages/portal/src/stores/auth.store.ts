@@ -9,6 +9,7 @@ import {
     setAccessToken,
 } from '../api/client';
 import {clearMenuStore, loadMenuStore} from './menu.store';
+import {usersAdminStore} from './users-admin.store';
 
 export interface AuthUser {
     id: string;
@@ -78,6 +79,7 @@ function clearState(): void {
     state.mustChangePassword = false;
     state.isAuthenticated = false;
     clearMenuStore();
+    usersAdminStore.reset();
 }
 
 registerRefreshHandler(async (): Promise<boolean> => {
