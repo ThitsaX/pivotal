@@ -2,7 +2,8 @@
 <!-- Copyright 2026 ThitsaWorks -->
 
 <script setup lang="ts">
-import {computed, onMounted, reactive, ref, watch} from 'vue';
+import {computed, onDeactivated, onMounted, reactive, ref, watch} from 'vue';
+import {onBeforeRouteLeave} from 'vue-router';
 import {ApiError} from '../../api/client';
 import AccessDeniedPanel from '../../components/admin/AccessDeniedPanel.vue';
 import AdminTable from '../../components/admin/AdminTable.vue';
@@ -305,6 +306,24 @@ const closeTempPassword = (): void => {
     tempPassword.email = '';
     tempPassword.tempPassword = '';
 };
+
+onBeforeRouteLeave((): boolean => {
+    if (!tempPassword.open) {
+        return true;
+    }
+
+    const leave = window.confirm('The temporary password will not be shown again if you leave this page before clicking Done. Continue?');
+
+    if (leave) {
+        closeTempPassword();
+    }
+
+    return leave;
+});
+
+onDeactivated((): void => {
+    closeTempPassword();
+});
 
 // --- Helpers ----------------------------------------------------------------
 function describeApiError(error: unknown): string {
