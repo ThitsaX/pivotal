@@ -33,9 +33,36 @@ const sidebarScrollContainer = ref<HTMLElement | null>(null);
 const sidebarScrollIndicatorHeight = ref(0);
 const sidebarScrollIndicatorOffset = ref(0);
 const isSidebarScrollIndicatorVisible = ref(false);
-const selectedTimeZone = ref(
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-);
+
+const TIME_ZONE_STORAGE_KEY = 'pivotal.portal.selectedTimeZone';
+
+const browserDefaultTimeZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const isValidTimeZone = (timeZone: string): boolean => {
+    try {
+        new Intl.DateTimeFormat('en-US', {timeZone}).format(new Date());
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const readStoredTimeZone = (): string => {
+    try {
+        const stored = window.localStorage.getItem(TIME_ZONE_STORAGE_KEY);
+
+        if (stored != null && isValidTimeZone(stored)) {
+            return stored;
+        }
+    } catch {
+        // localStorage can be disabled; fall back to the browser default.
+    }
+
+    return browserDefaultTimeZone();
+};
+
+const selectedTimeZone = ref(readStoredTimeZone());
 
 const pageComponentByKey: Record<ViewKey, Component> = {
     'hub-add-currency': HubAddCurrencyPage,
@@ -217,6 +244,18 @@ onMounted((): void => {
 onBeforeUnmount((): void => {
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('resize', handleWindowResize);
+});
+
+watch(selectedTimeZone, (timeZone): void => {
+    if (!isValidTimeZone(timeZone)) {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(TIME_ZONE_STORAGE_KEY, timeZone);
+    } catch {
+        // Persistence is best-effort; the current tab still keeps the selection.
+    }
 });
 
 watch(isSidebarOpen, async (): Promise<void> => {
