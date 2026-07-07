@@ -17,6 +17,14 @@ import {
     usersAdminStore,
 } from '../../stores/users-admin.store';
 
+const props = defineProps<{
+    selectedTimeZone: string;
+}>();
+
+defineEmits<{
+    (event: 'update:selectedTimeZone', value: string): void;
+}>();
+
 const hasPermission = computed((): boolean => authStore.hasPermission('admin.users.manage'));
 const currentUserId = computed((): string | null => authStore.state.user?.id ?? null);
 
@@ -312,7 +320,16 @@ function describeApiError(error: unknown): string {
 const formatDate = (value: string | null): string => {
     if (value == null) return '—';
     try {
-        return new Date(value).toLocaleString();
+        return new Intl.DateTimeFormat('en-GB', {
+            timeZone: props.selectedTimeZone,
+            year:     'numeric',
+            month:    'short',
+            day:      '2-digit',
+            hour:     '2-digit',
+            minute:   '2-digit',
+            second:   '2-digit',
+            hour12:   false,
+        }).format(new Date(value));
     } catch {
         return value;
     }
