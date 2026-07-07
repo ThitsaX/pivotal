@@ -65,6 +65,9 @@ interface UsersAdminState {
     roles:     AdminRoleSummary[];
     rolesLoaded: boolean;
     rolesError: string | null;
+    fspOptions: string[];
+    fspOptionsLoaded: boolean;
+    fspOptionsError: string | null;
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -80,6 +83,9 @@ const state = reactive<UsersAdminState>({
     roles:       [],
     rolesLoaded: false,
     rolesError:  null,
+    fspOptions: [],
+    fspOptionsLoaded: false,
+    fspOptionsError: null,
 });
 
 function buildQueryString(): string {
@@ -149,6 +155,20 @@ export const usersAdminStore = {
         } catch (error) {
             state.rolesError = describeError(error);
             state.rolesLoaded = false;
+        }
+    },
+
+    async loadFspOptions(): Promise<void> {
+
+        state.fspOptionsError = null;
+
+        try {
+            state.fspOptions = await apiClient.get<string[]>('/admin/users/fsp-options');
+            state.fspOptionsLoaded = true;
+        } catch (error) {
+            state.fspOptionsError = describeError(error);
+            state.fspOptions = [];
+            state.fspOptionsLoaded = false;
         }
     },
 
@@ -235,5 +255,8 @@ export const usersAdminStore = {
         state.roles = [];
         state.rolesLoaded = false;
         state.rolesError = null;
+        state.fspOptions = [];
+        state.fspOptionsLoaded = false;
+        state.fspOptionsError = null;
     },
 };
