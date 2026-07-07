@@ -51,13 +51,18 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
 
         if (user.lockedUntil != null && user.lockedUntil > now) {
             LoginHandler.LOGGER.warn(`Login blocked: account locked until ${user.lockedUntil.toISOString()} for user ${user.id}.`);
-            throw new UnauthorizedException(authError(AuthErrorCode.ACCOUNT_LOCKED));
+            throw new UnauthorizedException(this.accountLockedError(this.remainingLockoutMinutes(user.lockedUntil, now)));
         }
 
         const passwordValid = await this.passwordService.verify(password, user.passwordHash);
 
         if (!passwordValid) {
-            await this.handleFailedAttempt(user.id, user.failedLoginAttempts + 1);
+            const locked = await this.handleFailedAttempt(user.id, user.failedLoginAttempts + 1);
+
+            if (locked) {
+                throw new UnauthorizedException(this.accountLockedError(this.settings.loginLockoutDurationMinutes()));
+            }
+
             throw new UnauthorizedException(authError(AuthErrorCode.INVALID_CREDENTIALS));
         }
 
@@ -105,7 +110,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
         );
     }
 
-    private async handleFailedAttempt(userId: string, attemptCount: number): Promise<void> {
+    private async handleFailedAttempt(userId: string, attemptCount: number): Promise<boolean> {
 
         await this.userRepository.incrementFailedAttempts(userId);
 
@@ -116,6 +121,25 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
             const lockedUntil = new Date(Date.now() + lockoutMs);
             await this.userRepository.lockUntil(userId, lockedUntil);
             LoginHandler.LOGGER.warn(`Account ${userId} locked until ${lockedUntil.toISOString()} after ${attemptCount} failed attempts.`);
+
+            return true;
         }
+
+        return false;
+    }
+
+    private accountLockedError(lockoutMinutes: number): {code: string; message: string} {
+
+        const unit = lockoutMinutes === 1 ? 'minute' : 'minutes';
+
+        return {
+            code:    AuthErrorCode.ACCOUNT_LOCKED,
+            message: `Your account has been temporarily locked due to multiple failed login attempts. Please try again after ${lockoutMinutes} ${unit} or contact your administrator.`,
+        };
+    }
+
+    private remainingLockoutMinutes(lockedUntil: Date, now: Date): number {
+
+        return Math.max(1, Math.ceil((lockedUntil.getTime() - now.getTime()) / 60_000));
     }
 }
