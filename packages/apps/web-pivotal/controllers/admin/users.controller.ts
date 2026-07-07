@@ -31,6 +31,8 @@ import {
     User,
     UserRepository,
 } from '@core/auth/domain';
+import {ParticipantRepository} from '@core/participant/domain';
+import {DbTarget} from '@shared/typeorm';
 import {AuthUser} from '../../decorators';
 import {
     UserCreateDto,
@@ -52,6 +54,8 @@ export class UsersAdminController {
         private readonly userRepository: UserRepository,
         @Inject(RoleRepository)
         private readonly roleRepository: RoleRepository,
+        @Inject(ParticipantRepository)
+        private readonly participantRepository: ParticipantRepository,
     ) {
     }
 
@@ -82,6 +86,18 @@ export class UsersAdminController {
         return new UserListResponseDto(items, page.page, page.pageSize, page.total);
     }
 
+    @Get('fsp-options')
+    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
+    async listFspOptions(): Promise<string[]> {
+
+        const participants = await this.participantRepository.findAll();
+
+        return participants
+            .map((participant) => participant.name)
+            .filter((name) => name.trim().length > 0 && name.trim().toLowerCase() !== 'hub')
+            .sort((left, right) => left.localeCompare(right));
+    }
+
     @Get(':id')
     @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
     async getById(@Param('id') id: string): Promise<UserResponseDto> {
@@ -105,9 +121,11 @@ export class UsersAdminController {
     @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
     async create(@Body() dto: UserCreateDto): Promise<UserWithTempPasswordResponseDto> {
 
+        await this.validateFspIdForRole(dto.roleId, dto.fspId);
+
         const output = await this.commandBus.execute<CreateUserCommand, CreateUserCommand.Output>(
             new CreateUserCommand(
-                new CreateUserCommand.Input(dto.email, dto.roleId, dto.fspId ?? null),
+                new CreateUserCommand.Input(dto.email, dto.roleId, UsersAdminController.normalizeFspId(dto.fspId)),
             ),
         );
 
@@ -129,9 +147,17 @@ export class UsersAdminController {
             throw new BadRequestException(adminError(AdminErrorCode.USER_SELF_LOCK));
         }
 
+        await this.validateFspIdForUpdate(id, dto.roleId, dto.fspId);
+
         const output = await this.commandBus.execute<UpdateUserCommand, UpdateUserCommand.Output>(
             new UpdateUserCommand(
-                new UpdateUserCommand.Input(id, claims.sub, dto.roleId, dto.fspId, dto.isActive),
+                new UpdateUserCommand.Input(
+                    id,
+                    claims.sub,
+                    dto.roleId,
+                    dto.fspId === undefined ? undefined : UsersAdminController.normalizeFspId(dto.fspId),
+                    dto.isActive,
+                ),
             ),
         );
 
@@ -183,5 +209,48 @@ export class UsersAdminController {
             user.lastLoginAt,
             user.createdAt,
         );
+    }
+
+    private async validateFspIdForUpdate(userId: string, roleId: string | undefined, fspId: string | null | undefined): Promise<void> {
+
+        if (roleId === undefined && fspId === undefined) {
+            return;
+        }
+
+        const target = await this.userRepository.findById(userId, DbTarget.Write);
+
+        if (target == null) {
+            throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
+        }
+
+        await this.validateFspIdForRole(
+            roleId ?? target.roleId,
+            fspId === undefined ? target.fspId : fspId,
+        );
+    }
+
+    private async validateFspIdForRole(roleId: string, fspId: string | null | undefined): Promise<void> {
+
+        const role = await this.roleRepository.findById(roleId, DbTarget.Write);
+
+        if (role == null) {
+            throw new BadRequestException(adminError(AdminErrorCode.USER_ROLE_NOT_FOUND));
+        }
+
+        const normalizedFspId = UsersAdminController.normalizeFspId(fspId);
+
+        if (role.scope !== 'DFSP' || normalizedFspId == null) {
+            return;
+        }
+
+        const participant = await this.participantRepository.findByName(normalizedFspId, DbTarget.Write);
+
+        if (participant == null) {
+            throw new BadRequestException(adminError(AdminErrorCode.USER_FSP_ID_NOT_FOUND));
+        }
+    }
+
+    private static normalizeFspId(value: string | null | undefined): string | null {
+        return value != null && value.trim().length > 0 ? value.trim() : null;
     }
 }

@@ -16,6 +16,8 @@ export class AdminErrorCode {
 
     static readonly USER_ROLE_NOT_FOUND         = 'ADMIN_USER_ROLE_NOT_FOUND';
 
+    static readonly USER_FSP_ID_NOT_FOUND       = 'ADMIN_USER_FSP_ID_NOT_FOUND';
+
     static readonly ROLE_NOT_FOUND              = 'ADMIN_ROLE_NOT_FOUND';
 
     static readonly ROLE_CODE_TAKEN             = 'ADMIN_ROLE_CODE_TAKEN';
@@ -41,6 +43,7 @@ export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.USER_LAST_ADMIN]:                'This change would leave no active users able to manage other users.',
     [AdminErrorCode.USER_NOT_FOUND]:                 'User not found.',
     [AdminErrorCode.USER_ROLE_NOT_FOUND]:            'The specified role does not exist.',
+    [AdminErrorCode.USER_FSP_ID_NOT_FOUND]:          'The specified FSP ID does not exist.',
     [AdminErrorCode.ROLE_NOT_FOUND]:                 'Role not found.',
     [AdminErrorCode.ROLE_CODE_TAKEN]:                'A role with that code already exists.',
     [AdminErrorCode.ROLE_IMMUTABLE_FIELD]:           'The code and isSystem fields cannot be changed after the role is created.',
