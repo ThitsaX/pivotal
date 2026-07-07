@@ -27,7 +27,7 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
     [AuthErrorCode.PASSWORD_SAME_AS_CURRENT]: 'New password must differ from the current password.',
     [AuthErrorCode.UNKNOWN_ROLE]:             'Invalid email or password.',
     [AuthErrorCode.TOKEN_REVOKED]:            'Session has been revoked. Please sign in again.',
-    [AuthErrorCode.USER_INACTIVE]:            'This account is inactive.',
+    [AuthErrorCode.USER_INACTIVE]:            'Your account is inactive or has been deactivated. Please contact your administrator.',
 };
 
 export function authError(code: string): { code: string; message: string } {

@@ -148,4 +148,25 @@ describe('LoginHandler', () => {
         assert.equal(state.lockUntilCalls.length, 0);
     });
 
+    it('returns USER_INACTIVE for inactive accounts without checking the password', async () => {
+
+        const state: LoginState = {
+            user: makeUser({isActive: false}),
+            passwordValid: true,
+            incrementFailedAttemptsCalls: [],
+            lockUntilCalls: [],
+            verifyCalls: 0,
+        };
+
+        await assert.rejects(
+            makeHandler(state).execute(new LoginCommand(new LoginCommand.Input('user@example.com', 'correct'))),
+            (error: unknown) => error instanceof UnauthorizedException
+                && (error.getResponse() as {code: string; message: string}).code === 'AUTH_USER_INACTIVE'
+                && (error.getResponse() as {code: string; message: string}).message
+                    === 'Your account is inactive or has been deactivated. Please contact your administrator.',
+        );
+
+        assert.equal(state.verifyCalls, 0);
+        assert.equal(state.incrementFailedAttemptsCalls.length, 0);
+    });
 });
