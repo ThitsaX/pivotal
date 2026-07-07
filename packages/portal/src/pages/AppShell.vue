@@ -232,9 +232,18 @@ const handleWindowResize = (): void => {
     updateSidebarScrollIndicator();
 };
 
+const handleStorageChange = (event: StorageEvent): void => {
+    if (event.key !== TIME_ZONE_STORAGE_KEY || event.newValue == null || !isValidTimeZone(event.newValue)) {
+        return;
+    }
+
+    selectedTimeZone.value = event.newValue;
+};
+
 onMounted((): void => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('storage', handleStorageChange);
     isSidebarOpen.value = window.innerWidth >= DESKTOP_BREAKPOINT;
     void nextTick((): void => {
         updateSidebarScrollIndicator();
@@ -244,6 +253,7 @@ onMounted((): void => {
 onBeforeUnmount((): void => {
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('resize', handleWindowResize);
+    window.removeEventListener('storage', handleStorageChange);
 });
 
 watch(selectedTimeZone, (timeZone): void => {
