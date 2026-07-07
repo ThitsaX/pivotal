@@ -157,6 +157,19 @@ const editRoleForbidsFspId = computed((): boolean => {
     return role?.scope === 'HUB';
 });
 
+const editRoleRequiresFspId = computed((): boolean => {
+    const role = state.roles.find((r) => r.id === editForm.roleId);
+    return role?.scope === 'DFSP';
+});
+
+const editFspValidationMessage = computed((): string | null => {
+    if (editRoleRequiresFspId.value && editForm.fspId.trim().length === 0) {
+        return 'A DFSP-scoped role requires FSP ID.';
+    }
+
+    return null;
+});
+
 const openEdit = (user: AdminUser): void => {
     editForm.user = user;
     editForm.roleId = user.role.id;
@@ -182,9 +195,16 @@ const editDirty = computed((): boolean => {
     return false;
 });
 
+const editDisabled = computed((): boolean => {
+    if (editForm.submitting) return true;
+    if (!editDirty.value) return true;
+    if (editFspValidationMessage.value != null) return true;
+    return false;
+});
+
 const submitEdit = async (): Promise<void> => {
 
-    if (editForm.user == null || editForm.submitting || !editDirty.value) return;
+    if (editForm.user == null || editDisabled.value) return;
 
     editForm.submitting = true;
     editForm.error = null;
@@ -616,13 +636,18 @@ const onPageChange = async (page: number): Promise<void> => {
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="editRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
+                            <span v-else-if="editRoleRequiresFspId" class="font-normal normal-case text-slate-400">— required</span>
                         </label>
                         <input
                             v-model="editForm.fspId"
                             type="text"
                             :disabled="editRoleForbidsFspId"
+                            :aria-invalid="editFspValidationMessage != null"
                             class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-slate-50 disabled:text-slate-400"
                         >
+                        <p v-if="editFspValidationMessage != null" class="mt-1 text-xs text-red-600">
+                            {{ editFspValidationMessage }}
+                        </p>
                     </div>
                     <label class="flex items-center gap-2 text-sm text-ink">
                         <input
@@ -656,7 +681,7 @@ const onPageChange = async (page: number): Promise<void> => {
                         <button
                             type="submit"
                             class="rounded-lg bg-accentWarm px-3 py-2 text-sm font-semibold text-white transition hover:bg-accentWarm/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="editForm.submitting || !editDirty"
+                            :disabled="editDisabled"
                         >
                             {{ editForm.submitting ? 'Saving…' : 'Save changes' }}
                         </button>
