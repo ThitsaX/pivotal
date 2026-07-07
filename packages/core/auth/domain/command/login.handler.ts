@@ -43,8 +43,12 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
 
         const user = await this.userRepository.findByEmail(email, DbTarget.Write);
 
-        if (user == null || !user.isActive) {
+        if (user == null) {
             throw new UnauthorizedException(authError(AuthErrorCode.INVALID_CREDENTIALS));
+        }
+
+        if (!user.isActive) {
+            throw new UnauthorizedException(authError(AuthErrorCode.USER_INACTIVE));
         }
 
         const now = new Date();
