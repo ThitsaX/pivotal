@@ -81,7 +81,8 @@ export class ParticipantDomainModule {
             ],
             exports: [
                 CqrsModule,
-                ...Components
+                ...Repositories,
+                ...Components,
             ],
         };
     }
