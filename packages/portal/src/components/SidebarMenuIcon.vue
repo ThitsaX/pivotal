@@ -25,10 +25,6 @@ const variant = computed((): string => {
         return 'admin-permissions';
     }
 
-    if (props.item === 'admin-menus') {
-        return 'admin-menus';
-    }
-
     if (props.item.includes('onboarding')) {
         return 'onboarding';
     }
@@ -180,18 +176,6 @@ const variant = computed((): string => {
     >
         <circle cx="7.5" cy="9" r="3" stroke="currentColor" stroke-width="1.7" />
         <path d="m9.7 7.2 7 7m-2.5-.5 1.5 1.5m-3-3 1.4 1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
-
-    <svg
-        v-else-if="variant === 'admin-menus'"
-        class="h-4 w-4 shrink-0"
-        viewBox="0 0 20 20"
-        fill="none"
-        aria-hidden="true"
-    >
-        <rect x="3" y="4" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
-        <rect x="3" y="8.5" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
-        <rect x="3" y="13" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.6" />
     </svg>
 
     <svg

@@ -11,8 +11,7 @@ export type ViewKey =
     | 'transactions'
     | 'admin-users'
     | 'admin-roles'
-    | 'admin-permissions'
-    | 'admin-menus';
+    | 'admin-permissions';
 
 export type FieldType = 'text' | 'datetime' | 'select';
 export type OrderDirection = 'ASC' | 'DESC';

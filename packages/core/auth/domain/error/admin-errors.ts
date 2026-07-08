@@ -31,14 +31,6 @@ export class AdminErrorCode {
     static readonly ROLE_PERMISSION_SCOPE_MISMATCH = 'ADMIN_ROLE_PERMISSION_SCOPE_MISMATCH';
 
     static readonly PERMISSION_NOT_FOUND        = 'ADMIN_PERMISSION_NOT_FOUND';
-
-    static readonly MENU_NOT_FOUND              = 'ADMIN_MENU_NOT_FOUND';
-
-    static readonly MENU_KEY_TAKEN              = 'ADMIN_MENU_KEY_TAKEN';
-
-    static readonly MENU_IMMUTABLE_FIELD        = 'ADMIN_MENU_IMMUTABLE_FIELD';
-
-    static readonly MENU_PARENT_NOT_FOUND       = 'ADMIN_MENU_PARENT_NOT_FOUND';
 }
 
 export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
@@ -57,10 +49,6 @@ export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.ROLE_CANNOT_REMOVE_ADMIN_KEY]:   'System roles must retain their admin.* permissions.',
     [AdminErrorCode.ROLE_PERMISSION_SCOPE_MISMATCH]: 'One or more permissions cannot be assigned to a role with that scope.',
     [AdminErrorCode.PERMISSION_NOT_FOUND]:           'One or more of the requested permission keys does not exist.',
-    [AdminErrorCode.MENU_NOT_FOUND]:                 'Menu not found.',
-    [AdminErrorCode.MENU_KEY_TAKEN]:                 'A menu with that menuKey already exists.',
-    [AdminErrorCode.MENU_IMMUTABLE_FIELD]:           'The menuKey field cannot be changed after the menu is created.',
-    [AdminErrorCode.MENU_PARENT_NOT_FOUND]:          'The specified parent menu does not exist.',
 };
 
 export function adminError(code: string): { code: string; message: string } {

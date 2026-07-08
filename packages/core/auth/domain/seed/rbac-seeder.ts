@@ -77,7 +77,6 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
     {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              scope: 'HUB',  description: 'Manage portal roles and their granted permissions.'},
     {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          scope: 'HUB',  description: 'Browse the read-only permission catalogue.'},
-    {keyName: PermissionKey.ADMIN_MENUS_MANAGE,              scope: 'HUB',  description: 'Manage sidebar menus and the permissions that reveal them.'},
 ];
 
 const ROLE_GRANTS: Record<string, string[]> = {
@@ -88,21 +87,6 @@ const ROLE_GRANTS: Record<string, string[]> = {
         PermissionKey.AUDIT_DASHBOARD_VIEW,
     ],
 };
-
-export const SEEDED_MENU_KEYS: readonly string[] = [
-    'hub-add-currency',
-    'hub-list-participants',
-    'hub-add-signing-keys',
-    'participant-onboarding',
-    'participant-add-new-currency',
-    'participant-register-endpoint',
-    'participant-add-signing-keys',
-    'transactions',
-    'admin-users',
-    'admin-roles',
-    'admin-permissions',
-    'admin-menus',
-];
 
 const MENU_SEEDS: MenuSeed[] = [
     {menuKey: 'hub-add-currency',              groupLabel: 'Hub',         label: 'Add Currency',         route: '/views/hub-add-currency',              sortOrder: 10, permissionKey: PermissionKey.HUB_CURRENCY_ADD},
@@ -116,7 +100,6 @@ const MENU_SEEDS: MenuSeed[] = [
     {menuKey: 'admin-users',                   groupLabel: 'Admin',       label: 'Users',                route: '/views/admin-users',                   sortOrder: 10, permissionKey: PermissionKey.ADMIN_USERS_MANAGE},
     {menuKey: 'admin-roles',                   groupLabel: 'Admin',       label: 'Roles',                route: '/views/admin-roles',                   sortOrder: 20, permissionKey: PermissionKey.ADMIN_ROLES_MANAGE},
     {menuKey: 'admin-permissions',             groupLabel: 'Admin',       label: 'Permissions',          route: '/views/admin-permissions',             sortOrder: 30, permissionKey: PermissionKey.ADMIN_PERMISSIONS_LIST},
-    {menuKey: 'admin-menus',                   groupLabel: 'Admin',       label: 'Menus',                route: '/views/admin-menus',                   sortOrder: 40, permissionKey: PermissionKey.ADMIN_MENUS_MANAGE},
 ];
 
 @Injectable()
