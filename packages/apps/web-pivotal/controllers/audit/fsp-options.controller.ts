@@ -29,7 +29,7 @@ export class AuditFspOptionsController {
         for (const participant of participants) {
             const name = participant.name?.trim();
 
-            if (name != null && name.length > 0) {
+            if (name != null && name.length > 0 && name.toLowerCase() !== 'hub') {
                 names.add(name);
             }
         }

@@ -134,15 +134,15 @@ describe('RbacSeeder', () => {
         state = freshState();
     });
 
-    it('cold-boot seeds 2 roles / 14 permissions / 16 role_permissions / 12 menus / 12 menu_permissions', async () => {
+    it('cold-boot seeds 2 roles / 14 permissions / 17 role_permissions / 11 menus / 11 menu_permissions', async () => {
 
         const result = await makeSeeder(state).seed();
 
         assert.equal(result.roles.inserted, 2);
         assert.equal(result.permissions.inserted, 14);
-        assert.equal(result.rolePermissions.inserted, 16);
-        assert.equal(result.menus.inserted, 12);
-        assert.equal(result.menuPermissions.inserted, 12);
+        assert.equal(result.rolePermissions.inserted, 17);
+        assert.equal(result.menus.inserted, 11);
+        assert.equal(result.menuPermissions.inserted, 11);
 
         for (const step of Object.values(result)) {
             assert.equal(step.skipped, false);
@@ -171,7 +171,7 @@ describe('RbacSeeder', () => {
         assert.equal(state.permissions.get('participant.access-key.update')!.scope, 'HUB');
     });
 
-    it('grants ADMIN all 14 permissions and DFSP_USER exactly the 2 audit permissions', async () => {
+    it('grants ADMIN all 14 permissions and DFSP_USER exactly the 3 audit permissions', async () => {
 
         await makeSeeder(state).seed();
 
@@ -182,20 +182,19 @@ describe('RbacSeeder', () => {
         const dfspGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspRoleId);
 
         assert.equal(adminGrants.length, 14);
-        assert.equal(dfspGrants.length, 2);
+        assert.equal(dfspGrants.length, 3);
     });
 
-    it('seeds the four admin permission keys', async () => {
+    it('seeds the three admin permission keys', async () => {
 
         await makeSeeder(state).seed();
 
         assert.ok(state.permissions.has('admin.users.manage'));
         assert.ok(state.permissions.has('admin.roles.manage'));
         assert.ok(state.permissions.has('admin.permissions.list'));
-        assert.ok(state.permissions.has('admin.menus.manage'));
     });
 
-    it('seeds the four Admin-group menus in sort_order', async () => {
+    it('seeds the three Admin-group menus in sort_order', async () => {
 
         await makeSeeder(state).seed();
 
@@ -203,14 +202,14 @@ describe('RbacSeeder', () => {
             .filter((m) => m.groupLabel === 'Admin')
             .sort((a, b) => a.sortOrder - b.sortOrder);
 
-        assert.equal(adminMenus.length, 4);
+        assert.equal(adminMenus.length, 3);
         assert.deepEqual(
             adminMenus.map((m) => m.menuKey),
-            ['admin-users', 'admin-roles', 'admin-permissions', 'admin-menus'],
+            ['admin-users', 'admin-roles', 'admin-permissions'],
         );
         assert.deepEqual(
             adminMenus.map((m) => m.sortOrder),
-            [10, 20, 30, 40],
+            [10, 20, 30],
         );
     });
 

@@ -12,7 +12,6 @@ import {DESKTOP_BREAKPOINT} from '../modules/audit/helpers';
 import type {ViewKey} from '../modules/audit/types';
 import {SIGNING_KEYS_UI_ENABLED} from '../configs/pivotal-runtime-config';
 import {menuStore, type MenuGroup, type MenuItem} from '../stores/menu.store';
-import MenusAdminPage from './admin/MenusPage.vue';
 import PermissionsAdminPage from './admin/PermissionsPage.vue';
 import RolesAdminPage from './admin/RolesPage.vue';
 import UsersAdminPage from './admin/UsersPage.vue';
@@ -50,7 +49,6 @@ const pageComponentByKey: Record<ViewKey, Component> = {
     'admin-users': UsersAdminPage,
     'admin-roles': RolesAdminPage,
     'admin-permissions': PermissionsAdminPage,
-    'admin-menus': MenusAdminPage,
 };
 
 const warnedMenuKeys = new Set<string>();

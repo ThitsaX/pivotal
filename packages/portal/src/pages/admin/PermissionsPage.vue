@@ -5,7 +5,6 @@
 import {computed, onMounted, ref} from 'vue';
 import AccessDeniedPanel from '../../components/admin/AccessDeniedPanel.vue';
 import {authStore} from '../../stores/auth.store';
-import {type AdminMenu, menusAdminStore} from '../../stores/menus-admin.store';
 import {permissionsAdminStore} from '../../stores/permissions-admin.store';
 import {type AdminRole, rolesAdminStore} from '../../stores/roles-admin.store';
 
@@ -13,13 +12,10 @@ const hasPermission = computed((): boolean => authStore.hasPermission('admin.per
 
 const permState = permissionsAdminStore.state;
 const rolesState = rolesAdminStore.state;
-const menusState = menusAdminStore.state;
 
 const rolesFetchedForCrossRef = ref(false);
-const menusFetchedForCrossRef = ref(false);
 const crossRefError = ref<string | null>(null);
 const canReadRoles = computed((): boolean => authStore.hasPermission('admin.roles.manage'));
-const canReadMenus = computed((): boolean => authStore.hasPermission('admin.menus.manage'));
 
 const groups = permissionsAdminStore.groupedByNamespace;
 
@@ -49,36 +45,10 @@ const loadRoleCrossReferences = async (): Promise<void> => {
     }
 };
 
-const loadMenuCrossReferences = async (): Promise<void> => {
-
-    if (!canReadMenus.value) return;
-
-    try {
-
-        if (menusState.items.length === 0 && menusState.loadError == null) {
-            await menusAdminStore.loadMenus();
-        }
-        if (menusState.loadError != null) return;
-
-        for (const menu of menusState.items) {
-            if (menusState.permissionsByMenu[menu.id] != null) continue;
-            try {
-                await menusAdminStore.loadPermissions(menu.id);
-            } catch (error) {
-                crossRefError.value = error instanceof Error ? error.message : 'Could not load cross-references for some menus.';
-            }
-        }
-
-        menusFetchedForCrossRef.value = true;
-    } catch (error) {
-        crossRefError.value = error instanceof Error ? error.message : 'Could not load menu cross-references.';
-    }
-};
-
 onMounted(async (): Promise<void> => {
     if (!hasPermission.value) return;
     await permissionsAdminStore.load();
-    await Promise.all([loadRoleCrossReferences(), loadMenuCrossReferences()]);
+    await loadRoleCrossReferences();
 });
 
 const rolesGrantingKey = (keyName: string): AdminRole[] => {
@@ -92,16 +62,6 @@ const rolesGrantingKey = (keyName: string): AdminRole[] => {
     return out;
 };
 
-const menusGatedByKey = (keyName: string): AdminMenu[] => {
-    const out: AdminMenu[] = [];
-    for (const menu of menusState.items) {
-        const keys = menusState.permissionsByMenu[menu.id];
-        if (keys != null && keys.includes(keyName)) {
-            out.push(menu);
-        }
-    }
-    return out;
-};
 </script>
 
 <template>
@@ -162,19 +122,6 @@ const menusGatedByKey = (keyName: string): AdminMenu[] => {
                                 </span>
                             </template>
                             <span v-else class="text-slate-400">Granted to: no role.</span>
-                        </div>
-                        <div v-if="menusFetchedForCrossRef" class="flex flex-wrap items-center gap-1">
-                            <template v-if="menusGatedByKey(perm.keyName).length > 0">
-                                <span class="text-slate-500">Gates menus:</span>
-                                <span
-                                    v-for="menu in menusGatedByKey(perm.keyName)"
-                                    :key="menu.id"
-                                    class="rounded bg-accentWarm/10 px-2 py-0.5 font-medium text-accentWarm"
-                                >
-                                    {{ menu.label }}
-                                </span>
-                            </template>
-                            <span v-else class="text-slate-400">Gates menus: none.</span>
                         </div>
                     </div>
                 </li>
