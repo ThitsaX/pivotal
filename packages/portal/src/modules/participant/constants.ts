@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Currency} from '../../../../shared/fspiop/dto/currency';
 
 export const DEFAULT_PARTICIPANT_CURRENCY = Currency.Mmk;

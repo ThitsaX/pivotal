@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import * as https from 'https';
 import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
 import {AxiosClientBuilder} from '@shared/axios/component';

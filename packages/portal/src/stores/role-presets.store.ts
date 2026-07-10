@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {reactive, readonly} from 'vue';
 import {apiClient} from '../api/client';
 import type {RoleScope} from './roles-admin.store';
