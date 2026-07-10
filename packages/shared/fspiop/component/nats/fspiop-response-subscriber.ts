@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JsMsg, ReplayPolicy} from 'nats';
 import {NatsClientService} from '@shared/nats';

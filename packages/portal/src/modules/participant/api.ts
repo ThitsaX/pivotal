@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {apiClient, API_BASE_URL, ApiError} from '../../api/client';
 
 export const PARTICIPANT_API_BASE_URL = API_BASE_URL;

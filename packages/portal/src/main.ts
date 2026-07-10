@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {createApp} from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
 import App from './App.vue';

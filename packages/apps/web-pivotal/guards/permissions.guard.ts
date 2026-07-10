@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, Logger} from '@nestjs/common';
 import {Reflector} from '@nestjs/core';
 import {IS_PUBLIC_KEY, REQUIRES_PERMISSION_KEY} from '@core/auth/domain';

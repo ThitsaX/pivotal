@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { ExtensionList, FspiopException, FspiopStatusTranslator, FspiopUserMessages, ErrorMessageLanguage } from '@shared/fspiop';

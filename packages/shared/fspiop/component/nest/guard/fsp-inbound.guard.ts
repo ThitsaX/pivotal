@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {CanActivate, ExecutionContext, Injectable} from '@nestjs/common';
 import {Request} from 'express';
 import {Jwt} from '@shared/security/component/jwt';
