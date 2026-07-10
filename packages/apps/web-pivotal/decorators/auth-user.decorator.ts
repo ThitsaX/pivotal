@@ -4,9 +4,13 @@ import {createParamDecorator, ExecutionContext} from '@nestjs/common';
 import {AccessTokenClaims} from '@core/auth/domain';
 import type {Request} from 'express';
 
+type AuthenticatedRequest = Request & {
+    authUser?: AccessTokenClaims;
+};
+
 export const AuthUser = createParamDecorator(
     (_data: unknown, ctx: ExecutionContext): AccessTokenClaims | undefined => {
-        const request = ctx.switchToHttp().getRequest<Request>();
+        const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
         return request.authUser;
     },
 );

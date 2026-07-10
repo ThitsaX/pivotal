@@ -75,9 +75,16 @@ export class AuthController {
             throw new UnauthorizedException(authError(AuthErrorCode.INVALID_REFRESH_TOKEN));
         }
 
-        const output = await this.commandBus.execute<RefreshTokensCommand, RefreshTokensCommand.Output>(
-            new RefreshTokensCommand(new RefreshTokensCommand.Input(refreshToken)),
-        );
+        let output: RefreshTokensCommand.Output;
+
+        try {
+            output = await this.commandBus.execute<RefreshTokensCommand, RefreshTokensCommand.Output>(
+                new RefreshTokensCommand(new RefreshTokensCommand.Input(refreshToken)),
+            );
+        } catch (error) {
+            this.clearRefreshCookie(response);
+            throw error;
+        }
 
         this.setRefreshCookie(response, output.refreshToken, output.refreshTokenExpiresAt);
 

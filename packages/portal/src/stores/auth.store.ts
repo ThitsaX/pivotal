@@ -9,6 +9,7 @@ import {
     setAccessToken,
 } from '../api/client';
 import {clearMenuStore, loadMenuStore} from './menu.store';
+import {usersAdminStore} from './users-admin.store';
 
 export interface AuthUser {
     id: string;
@@ -78,6 +79,7 @@ function clearState(): void {
     state.mustChangePassword = false;
     state.isAuthenticated = false;
     clearMenuStore();
+    usersAdminStore.reset();
 }
 
 registerRefreshHandler(async (): Promise<boolean> => {
@@ -139,7 +141,7 @@ export const authStore = {
     async changePassword(currentPassword: string, newPassword: string): Promise<void> {
         await apiClient.post<void>('/auth/change-password', {currentPassword, newPassword});
 
-        state.mustChangePassword = false;
+        clearState();
     },
 
     async bootstrap(): Promise<void> {

@@ -20,14 +20,14 @@ export class AuthErrorCode {
 }
 
 export const AUTH_ERROR_MESSAGES: Record<string, string> = {
-    [AuthErrorCode.INVALID_CREDENTIALS]:      'Invalid email or password.',
-    [AuthErrorCode.ACCOUNT_LOCKED]:           'Invalid email or password.',
+    [AuthErrorCode.INVALID_CREDENTIALS]:      'Email or password is incorrect.',
+    [AuthErrorCode.ACCOUNT_LOCKED]:           'Your account is temporarily locked due to multiple failed sign-in attempts. Please try again later.',
     [AuthErrorCode.INVALID_REFRESH_TOKEN]:    'Invalid or expired refresh token.',
     [AuthErrorCode.REFRESH_TOKEN_REUSE]:      'Invalid or expired refresh token.',
     [AuthErrorCode.PASSWORD_SAME_AS_CURRENT]: 'New password must differ from the current password.',
     [AuthErrorCode.UNKNOWN_ROLE]:             'Invalid email or password.',
     [AuthErrorCode.TOKEN_REVOKED]:            'Session has been revoked. Please sign in again.',
-    [AuthErrorCode.USER_INACTIVE]:            'This account is inactive.',
+    [AuthErrorCode.USER_INACTIVE]:            'Your account is inactive or has been deactivated. Please contact your administrator.',
 };
 
 export function authError(code: string): { code: string; message: string } {

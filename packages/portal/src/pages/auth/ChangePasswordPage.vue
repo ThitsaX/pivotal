@@ -3,11 +3,10 @@
 
 <script setup lang="ts">
 import {computed, ref} from 'vue';
-import {useRoute, useRouter} from 'vue-router';
+import {useRouter} from 'vue-router';
 import {ApiError} from '../../api/client';
 import {authStore} from '../../stores/auth.store';
 
-const route = useRoute();
 const router = useRouter();
 
 const currentPassword = ref('');
@@ -53,17 +52,6 @@ const submitDisabled = computed((): boolean => {
     return false;
 });
 
-const redirectTarget = (): string => {
-
-    const next = route.query.next;
-
-    if (typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')) {
-        return next;
-    }
-
-    return '/';
-};
-
 const handleSubmit = async (): Promise<void> => {
 
     if (submitDisabled.value) {
@@ -75,7 +63,7 @@ const handleSubmit = async (): Promise<void> => {
 
     try {
         await authStore.changePassword(currentPassword.value, newPassword.value);
-        await router.replace(redirectTarget());
+        await router.replace('/login');
     } catch (error) {
 
         if (error instanceof ApiError) {
