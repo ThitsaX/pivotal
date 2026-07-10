@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {FspiopCurrencies, FspiopMoney, Money} from '@shared/fspiop';
 import {FeeCalculationResult, FeeSplitRole} from '../dto';
 import {CatalystException} from '../exception';

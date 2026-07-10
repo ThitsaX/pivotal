@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 /**
  * DI token for the audit `MAX_LIMIT` value (the single system-wide cap on how many rows
  * the Find Transactions feature will count/return). Read once from the environment via

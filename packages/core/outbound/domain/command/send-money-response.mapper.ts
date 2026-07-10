@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Extension, ExtensionList, TransferState } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
 import { SendMoneyResponse, StateEnum } from '../dto';

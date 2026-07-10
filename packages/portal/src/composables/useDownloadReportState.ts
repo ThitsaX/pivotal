@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {computed, onMounted, ref, watch, type ComputedRef, type Ref} from 'vue';
 import {ApiError, apiClient} from '../api/client';
 import {REPORT_DOWNLOAD_CONFIG} from '../configs/report-download';

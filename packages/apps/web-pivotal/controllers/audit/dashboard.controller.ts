@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Controller, Get, Inject} from '@nestjs/common';
 import {QueryBus} from '@nestjs/cqrs';
 import {AccessTokenClaims, PermissionKey, RequiresPermission} from '@core/auth/domain';

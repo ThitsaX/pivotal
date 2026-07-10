@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Controller, Get} from '@nestjs/common';
 import {PermissionKey, RequiresPermission, ROLE_PRESETS} from '@core/auth/domain';
 import {RolePresetResponseDto} from '../../dto/admin';

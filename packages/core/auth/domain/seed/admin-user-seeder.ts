@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {DbTarget} from '@shared/typeorm';
 import {ADMIN_ROLE_CODE, User} from '../model';

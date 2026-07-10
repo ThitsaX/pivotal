@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {AmountType, Money, PartyIdInfo, TransactionScenario} from '../dto';
 
 export class FspiopAgreement {

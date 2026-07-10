@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {PermissionKey} from '../model/permission-key';
 import {RoleScope} from '../model/role-scope';
 

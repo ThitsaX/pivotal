@@ -399,7 +399,7 @@ See `helm/README.md` for more chart-specific examples.
 
 ## License
 
-Copyright 2026 ThitsaWorks.
+Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 
 Licensed under the [Apache License, Version 2.0](LICENSE). You may not use
 this project except in compliance with the License. See the [LICENSE](LICENSE)
