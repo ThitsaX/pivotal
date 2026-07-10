@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {ConfigService} from '@nestjs/config';
 import {AuditDomainModule, ReportDownloadSettings} from '@core/audit/domain';
 import {TypeOrmSettings} from '@shared/typeorm';

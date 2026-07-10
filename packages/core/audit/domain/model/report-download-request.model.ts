@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Column, Entity, Index, PrimaryColumn} from 'typeorm';
 import {ReportDownloadStatus, ReportType} from './report-download-status';
 

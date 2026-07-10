@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 ThitsaWorks
+// Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put, } from '@nestjs/common';
 import { CommandBus, ICommand } from '@nestjs/cqrs';
 import { HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCommand, } from '@core/inbound/domain';

@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- Copyright 2026 ThitsaWorks -->
+<!-- Copyright 2024-2026 ThitsaWorks Pte. Ltd. -->
 
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue';
