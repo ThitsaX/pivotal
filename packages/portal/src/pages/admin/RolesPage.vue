@@ -55,6 +55,7 @@ interface CreateForm {
 }
 
 const createOpen = ref(false);
+const scopeChoiceRenderKey = ref(0);
 const createForm = reactive<CreateForm>({
     step:         1,
     scope:        null,
@@ -88,6 +89,8 @@ const createSubmitDisabled = computed((): boolean => {
     return false;
 });
 
+const normalizeRoleCode = (code: string): string => code.trim().replace(/\s+/g, ' ').toUpperCase();
+
 const openCreate = (): void => {
     createForm.step = 1;
     createForm.scope = null;
@@ -118,7 +121,10 @@ const onScopeChange = (next: RoleScope): void => {
     if (createForm.scope === next) return;
     if (createForm.scope != null && hasTouchedStep2Or3()) {
         const ok = window.confirm('Changing scope will clear your selections in the next steps. Continue?');
-        if (!ok) return;
+        if (!ok) {
+            scopeChoiceRenderKey.value += 1;
+            return;
+        }
         createForm.code = '';
         createForm.name = '';
         createForm.description = '';
@@ -129,6 +135,10 @@ const onScopeChange = (next: RoleScope): void => {
 };
 
 const goToStep = (step: 1 | 2 | 3): void => {
+    if (step < createForm.step) {
+        createForm.error = null;
+    }
+
     createForm.step = step;
 };
 
@@ -167,6 +177,16 @@ const onCreatePermissionsChange = (next: string[]): void => {
     }
 };
 
+watch(() => [
+    createForm.scope,
+    createForm.code,
+    createForm.name,
+    createForm.description,
+    createForm.presetKey,
+], () => {
+    createForm.error = null;
+});
+
 const submitCreate = async (): Promise<void> => {
 
     if (createSubmitDisabled.value) return;
@@ -176,7 +196,7 @@ const submitCreate = async (): Promise<void> => {
 
     try {
         const input: AdminRoleCreateInput = {
-            code:        createForm.code.trim().toUpperCase(),
+            code:        normalizeRoleCode(createForm.code),
             name:        createForm.name.trim(),
             scope:       createForm.scope!,
             description: createForm.description.trim().length > 0 ? createForm.description.trim() : null,
@@ -270,9 +290,24 @@ const permissionsDirty = computed((): boolean => {
 
 const editDirty = computed((): boolean => detailsDirty.value || permissionsDirty.value);
 
+const editNameValidationMessage = computed((): string | null => {
+    if (editState.role != null && editState.name.trim().length === 0) {
+        return 'Display Name is required.';
+    }
+
+    return null;
+});
+
+const editSubmitDisabled = computed((): boolean => {
+    if (editState.submitting) return true;
+    if (!editDirty.value) return true;
+    if (editNameValidationMessage.value != null) return true;
+    return false;
+});
+
 const submitEdit = async (): Promise<void> => {
 
-    if (editState.role == null || editState.submitting || !editDirty.value) return;
+    if (editState.role == null || editSubmitDisabled.value) return;
 
     editState.submitting = true;
     editState.saveError = null;
@@ -475,11 +510,14 @@ watch(() => editState.role, (role) => {
 
                 <!-- Step 1: scope -->
                 <div v-if="createForm.step === 1" class="mt-4 space-y-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                        Scope <span class="text-red-500">*</span>
+                    </p>
                     <p class="text-sm text-slate-600">
                         Choose whether this role grants hub-wide powers or operates within a single FSP.
                         This choice is permanent — to change scope later, delete the role and create a new one.
                     </p>
-                    <div class="space-y-2">
+                    <div :key="scopeChoiceRenderKey" class="space-y-2">
                         <label
                             class="flex cursor-pointer items-start gap-3 rounded-lg border-2 px-3 py-3 transition"
                             :class="createForm.scope === 'HUB' ? 'border-accent bg-accent/5' : 'border-slate-200 hover:border-slate-300'"
@@ -554,7 +592,9 @@ watch(() => editState.role, (role) => {
                 <!-- Step 2: code, name, description, preset -->
                 <form v-else-if="createForm.step === 2" class="mt-4 space-y-3" @submit.prevent="goToStep(3)">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Code</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Code <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.code"
                             type="text"
@@ -565,7 +605,9 @@ watch(() => editState.role, (role) => {
                         <p class="mt-1 text-xs text-slate-500">Immutable after creation. Used as a stable identifier in code.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Display name</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Display name <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.name"
                             type="text"
@@ -722,8 +764,13 @@ watch(() => editState.role, (role) => {
                             <input
                                 v-model="editState.name"
                                 type="text"
+                                required
+                                :aria-invalid="editNameValidationMessage != null"
                                 class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                             >
+                            <p v-if="editNameValidationMessage != null" class="mt-1 text-xs text-red-600">
+                                {{ editNameValidationMessage }}
+                            </p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Description</label>
@@ -780,7 +827,7 @@ watch(() => editState.role, (role) => {
                         <button
                             type="submit"
                             class="rounded-lg bg-accentWarm px-3 py-2 text-sm font-semibold text-white transition hover:bg-accentWarm/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="editState.submitting || !editDirty"
+                            :disabled="editSubmitDisabled"
                         >
                             {{ editState.submitting ? 'Saving…' : 'Save changes' }}
                         </button>

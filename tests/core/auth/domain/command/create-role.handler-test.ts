@@ -1,17 +1,18 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {ConflictException} from '@nestjs/common';
+import {BadRequestException, ConflictException} from '@nestjs/common';
 import {RoleRepository} from '../../../../../packages/core/auth/domain';
 import {CreateRoleCommand, CreateRoleHandler} from '../../../../../packages/core/auth/domain/command';
 import {Role} from '../../../../../packages/core/auth/domain/model';
 
 interface State {
     rolesByCode: Map<string, Role>;
+    rolesByName: Map<string, Role>;
     saved:       Role[];
 }
 
 function freshState(): State {
-    return {rolesByCode: new Map(), saved: []};
+    return {rolesByCode: new Map(), rolesByName: new Map(), saved: []};
 }
 
 function makeHandler(state: State): CreateRoleHandler {
@@ -19,10 +20,14 @@ function makeHandler(state: State): CreateRoleHandler {
         async findByCode(code: string): Promise<Role | null> {
             return state.rolesByCode.get(code) ?? null;
         },
+        async findByName(name: string): Promise<Role | null> {
+            return state.rolesByName.get(name) ?? null;
+        },
         async save(role: Role): Promise<Role> {
             role.id = `role-${state.saved.length + 1}`;
             state.saved.push(role);
             state.rolesByCode.set(role.code, role);
+            state.rolesByName.set(role.name, role);
             return role;
         },
     } as unknown as RoleRepository;
@@ -68,6 +73,48 @@ describe('CreateRoleHandler', () => {
         assert.equal(output.role.description, null);
     });
 
+    it('normalizes role codes before uniqueness check and save', async () => {
+
+        const state = freshState();
+        await makeHandler(state).execute(new CreateRoleCommand(
+            new CreateRoleCommand.Input('  t   t  ', 'Operator', 'HUB', null),
+        ));
+
+        assert.equal(state.saved[0].code, 'T T');
+        assert.ok(state.rolesByCode.has('T T'));
+    });
+
+    it('rejects blank role codes after normalization', async () => {
+
+        const state = freshState();
+
+        await assert.rejects(
+            makeHandler(state).execute(new CreateRoleCommand(
+                new CreateRoleCommand.Input('   ', 'Operator', 'HUB', null),
+            )),
+            (error: unknown) => error instanceof BadRequestException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_REQUIRED',
+        );
+
+        assert.equal(state.saved.length, 0);
+    });
+
+    it('rejects duplicate display names', async () => {
+
+        const state = freshState();
+        state.rolesByName.set('Auditor', new Role('AUDITOR', 'Auditor', 'HUB', null, false, 'role-existing'));
+
+        await assert.rejects(
+            makeHandler(state).execute(new CreateRoleCommand(
+                new CreateRoleCommand.Input('AUDITOR_2', 'Auditor', 'HUB', null),
+            )),
+            (error: unknown) => error instanceof ConflictException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_NAME_TAKEN',
+        );
+
+        assert.equal(state.saved.length, 0);
+    });
+
     it('rejects 409 ROLE_CODE_TAKEN when the code already exists', async () => {
 
         const state = freshState();
@@ -75,7 +122,7 @@ describe('CreateRoleHandler', () => {
 
         await assert.rejects(
             makeHandler(state).execute(new CreateRoleCommand(
-                new CreateRoleCommand.Input('AUDITOR', 'New', 'HUB', null),
+                new CreateRoleCommand.Input('  auditor  ', 'New', 'HUB', null),
             )),
             (error: unknown) => error instanceof ConflictException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CODE_TAKEN',

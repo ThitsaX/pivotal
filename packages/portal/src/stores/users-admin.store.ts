@@ -65,6 +65,9 @@ interface UsersAdminState {
     roles:     AdminRoleSummary[];
     rolesLoaded: boolean;
     rolesError: string | null;
+    fspOptions: string[];
+    fspOptionsLoaded: boolean;
+    fspOptionsError: string | null;
 }
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -80,6 +83,9 @@ const state = reactive<UsersAdminState>({
     roles:       [],
     rolesLoaded: false,
     rolesError:  null,
+    fspOptions: [],
+    fspOptionsLoaded: false,
+    fspOptionsError: null,
 });
 
 function buildQueryString(): string {
@@ -152,6 +158,20 @@ export const usersAdminStore = {
         }
     },
 
+    async loadFspOptions(): Promise<void> {
+
+        state.fspOptionsError = null;
+
+        try {
+            state.fspOptions = await apiClient.get<string[]>('/admin/users/fsp-options');
+            state.fspOptionsLoaded = true;
+        } catch (error) {
+            state.fspOptionsError = describeError(error);
+            state.fspOptions = [];
+            state.fspOptionsLoaded = false;
+        }
+    },
+
     async createUser(input: AdminUserCreateInput): Promise<AdminUserWithTempPassword> {
 
         const created = await apiClient.post<AdminUserWithTempPassword>('/admin/users', input);
@@ -164,12 +184,7 @@ export const usersAdminStore = {
     async updateUser(id: string, input: AdminUserUpdateInput): Promise<AdminUser> {
 
         const updated = await apiClient.patch<AdminUser>(`/admin/users/${id}`, input);
-
-        // Refresh the row in place so the table reflects the new role/status without a full reload.
-        const index = state.items.findIndex((u) => u.id === id);
-        if (index >= 0) {
-            state.items[index] = updated;
-        }
+        await usersAdminStore.loadUsers();
 
         return updated;
     },
@@ -189,11 +204,7 @@ export const usersAdminStore = {
     async deactivateUser(id: string): Promise<AdminUser> {
 
         const updated = await apiClient.delete<AdminUser>(`/admin/users/${id}`);
-
-        const index = state.items.findIndex((u) => u.id === id);
-        if (index >= 0) {
-            state.items[index] = updated;
-        }
+        await usersAdminStore.loadUsers();
 
         return updated;
     },
@@ -235,5 +246,8 @@ export const usersAdminStore = {
         state.roles = [];
         state.rolesLoaded = false;
         state.rolesError = null;
+        state.fspOptions = [];
+        state.fspOptionsLoaded = false;
+        state.fspOptionsError = null;
     },
 };

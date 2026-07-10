@@ -2,7 +2,8 @@
 <!-- Copyright 2024-2026 ThitsaWorks Pte. Ltd. -->
 
 <script setup lang="ts">
-import {computed, onMounted, reactive, ref, watch} from 'vue';
+import {computed, onActivated, onDeactivated, onMounted, reactive, ref, watch} from 'vue';
+import {onBeforeRouteLeave} from 'vue-router';
 import {ApiError} from '../../api/client';
 import AccessDeniedPanel from '../../components/admin/AccessDeniedPanel.vue';
 import AdminTable from '../../components/admin/AdminTable.vue';
@@ -10,12 +11,21 @@ import ConfirmDialog from '../../components/admin/ConfirmDialog.vue';
 import RevocationBanner from '../../components/admin/RevocationBanner.vue';
 import TempPasswordReveal from '../../components/admin/TempPasswordReveal.vue';
 import {authStore} from '../../stores/auth.store';
+import {toastStore} from '../../stores/toast.store';
 import {
     type AdminUser,
     type AdminUserCreateInput,
     type AdminUserUpdateInput,
     usersAdminStore,
 } from '../../stores/users-admin.store';
+
+const props = defineProps<{
+    selectedTimeZone: string;
+}>();
+
+defineEmits<{
+    (event: 'update:selectedTimeZone', value: string): void;
+}>();
 
 const hasPermission = computed((): boolean => authStore.hasPermission('admin.users.manage'));
 const currentUserId = computed((): string | null => authStore.state.user?.id ?? null);
@@ -49,7 +59,12 @@ const clearFilters = async (): Promise<void> => {
 
 onMounted(async (): Promise<void> => {
     if (!hasPermission.value) return;
-    await Promise.all([usersAdminStore.loadUsers(), usersAdminStore.loadRoles()]);
+    await Promise.all([usersAdminStore.loadUsers(), usersAdminStore.loadRoles(), usersAdminStore.loadFspOptions()]);
+});
+
+onActivated((): void => {
+    if (!hasPermission.value) return;
+    void usersAdminStore.loadRoles();
 });
 
 // --- Create modal -----------------------------------------------------------
@@ -86,6 +101,10 @@ const createDisabled = computed((): boolean => {
 });
 
 const openCreate = (): void => {
+    if (!state.fspOptionsLoaded && state.fspOptionsError == null) {
+        void usersAdminStore.loadFspOptions();
+    }
+
     createForm.email = '';
     createForm.roleId = '';
     createForm.fspId = '';
@@ -102,6 +121,10 @@ watch(() => createForm.roleId, () => {
     if (createRoleForbidsFspId.value) {
         createForm.fspId = '';
     }
+});
+
+watch(() => [createForm.roleId, createForm.fspId], () => {
+    createForm.error = null;
 });
 
 const submitCreate = async (): Promise<void> => {
@@ -148,7 +171,32 @@ const editRoleForbidsFspId = computed((): boolean => {
     return role?.scope === 'HUB';
 });
 
+const editRoleRequiresFspId = computed((): boolean => {
+    const role = state.roles.find((r) => r.id === editForm.roleId);
+    return role?.scope === 'DFSP';
+});
+
+const editFspValidationMessage = computed((): string | null => {
+    if (editRoleRequiresFspId.value && editForm.fspId.trim().length === 0) {
+        return 'A DFSP-scoped role requires FSP ID.';
+    }
+
+    return null;
+});
+
+const editFspOptions = computed((): string[] => {
+    if (editForm.fspId.length === 0 || state.fspOptions.includes(editForm.fspId)) {
+        return state.fspOptions.slice();
+    }
+
+    return [editForm.fspId, ...state.fspOptions];
+});
+
 const openEdit = (user: AdminUser): void => {
+    if (!state.fspOptionsLoaded && state.fspOptionsError == null) {
+        void usersAdminStore.loadFspOptions();
+    }
+
     editForm.user = user;
     editForm.roleId = user.role.id;
     editForm.fspId = user.fspId ?? '';
@@ -165,6 +213,10 @@ watch(() => editForm.roleId, () => {
     if (editRoleForbidsFspId.value) editForm.fspId = '';
 });
 
+watch(() => [editForm.roleId, editForm.fspId], () => {
+    editForm.error = null;
+});
+
 const editDirty = computed((): boolean => {
     if (editForm.user == null) return false;
     if (editForm.roleId !== editForm.user.role.id) return true;
@@ -173,9 +225,16 @@ const editDirty = computed((): boolean => {
     return false;
 });
 
+const editDisabled = computed((): boolean => {
+    if (editForm.submitting) return true;
+    if (!editDirty.value) return true;
+    if (editFspValidationMessage.value != null) return true;
+    return false;
+});
+
 const submitEdit = async (): Promise<void> => {
 
-    if (editForm.user == null || editForm.submitting || !editDirty.value) return;
+    if (editForm.user == null || editDisabled.value) return;
 
     editForm.submitting = true;
     editForm.error = null;
@@ -264,7 +323,13 @@ const submitDeactivate = async (): Promise<void> => {
         const email = deactivateTarget.value.email;
         await usersAdminStore.deactivateUser(deactivateTarget.value.id);
         deactivateTarget.value = null;
-        deactivateBanner.value = `${email} has been deactivated. Their active session will end within seconds.`;
+        const message = `${email} has been deactivated. Their active session will end within seconds.`;
+        deactivateBanner.value = message;
+        toastStore.show({
+            tone: 'success',
+            title: 'User deactivated',
+            message,
+        });
         window.setTimeout(() => { deactivateBanner.value = null; }, 8000);
     } catch (error) {
         deactivateError.value = describeApiError(error);
@@ -298,6 +363,24 @@ const closeTempPassword = (): void => {
     tempPassword.tempPassword = '';
 };
 
+onBeforeRouteLeave((): boolean => {
+    if (!tempPassword.open) {
+        return true;
+    }
+
+    const leave = window.confirm('The temporary password will not be shown again if you leave this page before clicking Done. Continue?');
+
+    if (leave) {
+        closeTempPassword();
+    }
+
+    return leave;
+});
+
+onDeactivated((): void => {
+    closeTempPassword();
+});
+
 // --- Helpers ----------------------------------------------------------------
 function describeApiError(error: unknown): string {
     if (error instanceof ApiError) {
@@ -312,7 +395,16 @@ function describeApiError(error: unknown): string {
 const formatDate = (value: string | null): string => {
     if (value == null) return '—';
     try {
-        return new Date(value).toLocaleString();
+        return new Intl.DateTimeFormat('en-GB', {
+            timeZone: props.selectedTimeZone,
+            year:     'numeric',
+            month:    'short',
+            day:      '2-digit',
+            hour:     '2-digit',
+            minute:   '2-digit',
+            second:   '2-digit',
+            hour12:   false,
+        }).format(new Date(value));
     } catch {
         return value;
     }
@@ -406,6 +498,9 @@ const onPageChange = async (page: number): Promise<void> => {
         <p v-if="state.rolesError != null" class="text-xs text-amber-700">
             Could not load role options ({{ state.rolesError }}). Role filtering and editing may be limited.
         </p>
+        <p v-if="state.fspOptionsError != null" class="text-xs text-amber-700">
+            Could not load FSP options ({{ state.fspOptionsError }}). DFSP user creation and editing may be limited.
+        </p>
 
         <AdminTable
             :columns="columns"
@@ -487,7 +582,9 @@ const onPageChange = async (page: number): Promise<void> => {
 
                 <form class="mt-4 space-y-3" @submit.prevent="submitCreate">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Email</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Email <span class="text-red-500">*</span>
+                        </label>
                         <input
                             v-model="createForm.email"
                             type="email"
@@ -497,7 +594,9 @@ const onPageChange = async (page: number): Promise<void> => {
                         >
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Role</label>
+                        <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Role <span class="text-red-500">*</span>
+                        </label>
                         <select
                             v-model="createForm.roleId"
                             required
@@ -511,14 +610,22 @@ const onPageChange = async (page: number): Promise<void> => {
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="createRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
-                            <span v-else-if="createRoleRequiresFspId" class="font-normal normal-case text-slate-400">— required</span>
+                            <span v-else-if="createRoleRequiresFspId" class="font-normal normal-case text-slate-400">
+                                — required <span class="text-red-500">*</span>
+                            </span>
                         </label>
-                        <input
+                        <select
                             v-model="createForm.fspId"
-                            type="text"
-                            :disabled="createRoleForbidsFspId"
+                            :disabled="createRoleForbidsFspId || !state.fspOptionsLoaded"
                             class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-slate-50 disabled:text-slate-400"
                         >
+                            <option value="">
+                                {{ state.fspOptionsLoaded ? 'Select a registered FSP…' : 'Loading FSPs…' }}
+                            </option>
+                            <option v-for="fspId in state.fspOptions" :key="fspId" :value="fspId">
+                                {{ fspId }}
+                            </option>
+                        </select>
                     </div>
 
                     <div
@@ -580,13 +687,24 @@ const onPageChange = async (page: number): Promise<void> => {
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="editRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
+                            <span v-else-if="editRoleRequiresFspId" class="font-normal normal-case text-slate-400">— required</span>
                         </label>
-                        <input
+                        <select
                             v-model="editForm.fspId"
-                            type="text"
-                            :disabled="editRoleForbidsFspId"
+                            :disabled="editRoleForbidsFspId || !state.fspOptionsLoaded"
+                            :aria-invalid="editFspValidationMessage != null"
                             class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-slate-50 disabled:text-slate-400"
                         >
+                            <option value="">
+                                {{ state.fspOptionsLoaded ? 'Select a registered FSP…' : 'Loading FSPs…' }}
+                            </option>
+                            <option v-for="fspId in editFspOptions" :key="fspId" :value="fspId">
+                                {{ fspId }}{{ state.fspOptions.includes(fspId) ? '' : ' (not registered)' }}
+                            </option>
+                        </select>
+                        <p v-if="editFspValidationMessage != null" class="mt-1 text-xs text-red-600">
+                            {{ editFspValidationMessage }}
+                        </p>
                     </div>
                     <label class="flex items-center gap-2 text-sm text-ink">
                         <input
@@ -620,7 +738,7 @@ const onPageChange = async (page: number): Promise<void> => {
                         <button
                             type="submit"
                             class="rounded-lg bg-accentWarm px-3 py-2 text-sm font-semibold text-white transition hover:bg-accentWarm/90 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="editForm.submitting || !editDirty"
+                            :disabled="editDisabled"
                         >
                             {{ editForm.submitting ? 'Saving…' : 'Save changes' }}
                         </button>
