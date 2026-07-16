@@ -41,6 +41,8 @@ export class TransactionsAuditController {
         @Query('payeeId') payeeId: string | undefined,
         @Query('payeeSubId') payeeSubId: string | undefined,
         @Query('transferId') transferId: string | undefined,
+        @Query('payerHomeTransactionId') payerHomeTransactionId: string | undefined,
+        @Query('payeeHomeTransactionId') payeeHomeTransactionId: string | undefined,
         @Query('flow') flow: string | undefined,
         @Query('transferType') transferType: string | undefined,
         @Query('subScenario') subScenario: string | undefined,
@@ -66,6 +68,8 @@ export class TransactionsAuditController {
             payeeId,
             payeeSubId,
             transferId,
+            payerHomeTransactionId,
+            payeeHomeTransactionId,
             flow,
             transferType,
             subScenario,
@@ -112,6 +116,8 @@ export class TransactionsAuditController {
         @Query('payeeId') payeeId: string | undefined,
         @Query('payeeSubId') payeeSubId: string | undefined,
         @Query('transferId') transferId: string | undefined,
+        @Query('payerHomeTransactionId') payerHomeTransactionId: string | undefined,
+        @Query('payeeHomeTransactionId') payeeHomeTransactionId: string | undefined,
         @Query('flow') flow: string | undefined,
         @Query('transferType') transferType: string | undefined,
         @Query('subScenario') subScenario: string | undefined,
@@ -132,6 +138,8 @@ export class TransactionsAuditController {
             payeeId,
             payeeSubId,
             transferId,
+            payerHomeTransactionId,
+            payeeHomeTransactionId,
             flow,
             transferType,
             subScenario,
@@ -167,11 +175,13 @@ export class TransactionsAuditController {
         params: TransactionsAuditController.CriteriaParams,
     ): FindTransactionsQuery.Criteria {
         const transferId = QueryParamsUtil.toOptionalString(params.transferId);
+        const payerHomeTransactionId = QueryParamsUtil.toOptionalString(params.payerHomeTransactionId);
+        const payeeHomeTransactionId = QueryParamsUtil.toOptionalString(params.payeeHomeTransactionId);
 
         const transactionStartAt = TransactionsAuditController.resolveStartWindow(
             params.transactionStartAtStart,
             params.transactionStartAtEnd,
-            transferId,
+            transferId ?? payerHomeTransactionId ?? payeeHomeTransactionId,
         );
 
         return new FindTransactionsQuery.Criteria(
@@ -184,6 +194,8 @@ export class TransactionsAuditController {
             QueryParamsUtil.toOptionalString(params.payeeId),
             QueryParamsUtil.toOptionalNullableString(params.payeeSubId),
             transferId,
+            payerHomeTransactionId,
+            payeeHomeTransactionId,
             QueryParamsUtil.toOptionalInteger(params.flow, 'flow'),
             QueryParamsUtil.toOptionalEnum(params.transferType, TransactionScenario, 'transferType'),
             QueryParamsUtil.toOptionalString(params.subScenario),
@@ -196,13 +208,13 @@ export class TransactionsAuditController {
     /**
      * Resolves the Transaction Start window. If the caller supplied an explicit range it is
      * used verbatim (no time-span ceiling — bounded by MAX_LIMIT instead). Otherwise a rolling
-     * last-24h window is injected as a sensible default, EXCEPT for `transferId` point lookups,
-     * which are exempt.
+     * last-24h window is injected as a sensible default, EXCEPT for transaction ID point
+     * lookups, which are exempt.
      */
     private static resolveStartWindow(
         startValue: string | undefined,
         endValue: string | undefined,
-        transferId: string | undefined,
+        pointLookupId: string | undefined,
     ): FindTransactionsQuery.DateRange | undefined {
         const explicit = QueryParamsUtil.toDateRange(
             startValue,
@@ -216,7 +228,7 @@ export class TransactionsAuditController {
             return explicit;
         }
 
-        if (transferId !== undefined) {
+        if (pointLookupId !== undefined) {
             return undefined;
         }
 
@@ -327,6 +339,8 @@ export namespace TransactionsAuditController {
         payeeId: string | undefined;
         payeeSubId: string | undefined;
         transferId: string | undefined;
+        payerHomeTransactionId: string | undefined;
+        payeeHomeTransactionId: string | undefined;
         flow: string | undefined;
         transferType: string | undefined;
         subScenario: string | undefined;
