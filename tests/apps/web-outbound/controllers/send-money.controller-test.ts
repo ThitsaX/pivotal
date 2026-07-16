@@ -31,7 +31,31 @@ async function validateSendMoneyRequest(body: Record<string, unknown>): Promise<
 }
 
 function messages(errors: ValidationError[]): string[] {
-    return errors.flatMap((error) => Object.values(error.constraints ?? {}));
+    return errors.flatMap((error) => [
+        ...Object.values(error.constraints ?? {}),
+        ...messages(error.children ?? []),
+    ]);
+}
+
+function sendMoneyBody(fromFspId: string, toFspId: string): Record<string, unknown> {
+    return {
+        homeTransactionId: 'home-1',
+        from: {
+            idType: 'MSISDN',
+            idValue: '2769100001',
+            fspId: fromFspId,
+        },
+        to: {
+            idType: 'MSISDN',
+            idValue: '2769200001',
+            fspId: toFspId,
+        },
+        amountType: 'SEND',
+        amount: 12,
+        currency: 'USD',
+        transactionType: 'TRANSFER',
+        subScenario: 'PERSON_TO_PERSON',
+    };
 }
 
 describe('PutSendMoneyRequest', () => {
@@ -105,27 +129,29 @@ describe('PutSendMoneyRequest', () => {
 describe('SendMoneyRequest', () => {
 
     it('normalizes a valid numeric amount', async () => {
-        const {request, errors} = await validateSendMoneyRequest({
-            homeTransactionId: 'home-1',
-            from: {
-                idType: 'MSISDN',
-                idValue: '2769100001',
-                fspId: 'wallet1',
-            },
-            to: {
-                idType: 'MSISDN',
-                idValue: '2769200001',
-                fspId: 'wallet2',
-            },
-            amountType: 'SEND',
-            amount: 12,
-            currency: 'USD',
-            transactionType: 'TRANSFER',
-            subScenario: 'PERSON_TO_PERSON',
-        });
+        const {request, errors} = await validateSendMoneyRequest(sendMoneyBody('wallet1', 'wallet2'));
 
         assert.deepEqual(errors, []);
         assert.equal(request.amount, '12');
+    });
+
+    it('accepts 32-character payer and payee FSP IDs', async () => {
+        const fspId = 'f'.repeat(32);
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody(fspId, fspId));
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects a 33-character payer FSP ID', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('f'.repeat(33), 'wallet2'));
+
+        assert.ok(messages(errors).includes('fspId must not exceed 32 characters'));
+    });
+
+    it('rejects a 33-character payee FSP ID', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('wallet1', 'f'.repeat(33)));
+
+        assert.ok(messages(errors).includes('fspId must not exceed 32 characters'));
     });
 });
 
