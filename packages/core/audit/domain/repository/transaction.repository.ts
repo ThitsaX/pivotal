@@ -1030,6 +1030,20 @@ export class TransactionRepository {
             queryBuilder.andWhere('transaction.correlationId = :transferId', {transferId: criteria.transferId});
         }
 
+        if (criteria.payerHomeTransactionId !== undefined) {
+            queryBuilder.andWhere(
+                'transaction.payerHomeTransactionId = :payerHomeTransactionId',
+                {payerHomeTransactionId: criteria.payerHomeTransactionId},
+            );
+        }
+
+        if (criteria.payeeHomeTransactionId !== undefined) {
+            queryBuilder.andWhere(
+                'transaction.payeeHomeTransactionId = :payeeHomeTransactionId',
+                {payeeHomeTransactionId: criteria.payeeHomeTransactionId},
+            );
+        }
+
         if (criteria.flow !== undefined) {
             queryBuilder.andWhere('transaction.flow = :flow', {flow: criteria.flow});
         }
