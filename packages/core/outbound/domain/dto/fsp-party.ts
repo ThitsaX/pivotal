@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 ThitsaWorks
 import {Type} from 'class-transformer';
-import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, ValidateNested} from 'class-validator';
+import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested} from 'class-validator';
 import {Extension, PartyIdType, TransactionInitiatorType} from '@shared/fspiop';
 
 export class FspParty {
@@ -47,6 +47,7 @@ export class FspParty {
 
     @IsNotEmpty()
     @IsString()
+    @MaxLength(32, {message: 'fspId must not exceed 32 characters'})
     fspId!: string;
 
     @IsOptional()
