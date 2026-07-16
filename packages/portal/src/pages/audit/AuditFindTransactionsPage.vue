@@ -51,7 +51,12 @@ const router = useRouter();
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_ORDER_DIRECTION = 'DESC';
 const DEFAULT_START_MODE = 'today';
-const TRANSFER_ID_CRITERIA_KEY = 'transferId';
+const POINT_LOOKUP_CRITERIA_KEYS = [
+    'transferId',
+    'payerHomeTransactionId',
+    'payeeHomeTransactionId',
+] as const;
+type PointLookupCriteriaKey = typeof POINT_LOOKUP_CRITERIA_KEYS[number];
 const FSP_FILTER_KEYS = new Set(['payerFsp', 'payeeFsp']);
 const DFSP_DIRECTION_CRITERIA_KEY = 'dfspDirection';
 const COUNTERPARTY_FSP_CRITERIA_KEY = 'counterpartyFsp';
@@ -100,10 +105,10 @@ const createBlankCriteria = (): Record<string, string> => {
     return criteria;
 };
 
-const buildTransferIdOnlyCriteria = (transferId: string): Record<string, string> => {
+const buildPointLookupOnlyCriteria = (key: PointLookupCriteriaKey, value: string): Record<string, string> => {
     return {
         ...createBlankCriteria(),
-        [TRANSFER_ID_CRITERIA_KEY]: transferId.trim(),
+        [key]: value.trim(),
     };
 };
 
@@ -279,9 +284,17 @@ const criteriaSections = computed(() => {
     return getCriteriaSections(criteriaFields.value);
 });
 
-const transferIdCriteria = computed((): string => state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '');
+const activePointLookup = computed((): {key: PointLookupCriteriaKey; value: string} | null => {
+    for (const key of POINT_LOOKUP_CRITERIA_KEYS) {
+        const value = state.criteria[key]?.trim() ?? '';
 
-const transferIdSearchActive = computed((): boolean => transferIdCriteria.value.length > 0);
+        if (value.length > 0) {
+            return {key, value};
+        }
+    }
+
+    return null;
+});
 
 const hasNoResults = computed((): boolean => {
     return results.value != null && results.value.records.length === 0;
@@ -451,8 +464,8 @@ const applyDfspLegSelection = (criteria: Record<string, string>): Record<string,
 };
 
 const snapshotCriteriaForQuery = (): Record<string, string> => {
-    if (transferIdSearchActive.value) {
-        return buildTransferIdOnlyCriteria(transferIdCriteria.value);
+    if (activePointLookup.value != null) {
+        return buildPointLookupOnlyCriteria(activePointLookup.value.key, activePointLookup.value.value);
     }
 
     const snapshot = {...state.criteria};
@@ -618,10 +631,10 @@ const applyRouteQueryToState = (query: LocationQuery): void => {
 
     applyDfspRouteQueryToState(query);
 
-    const transferId = state.criteria[TRANSFER_ID_CRITERIA_KEY]?.trim() ?? '';
+    const pointLookup = activePointLookup.value;
 
-    if (transferId.length > 0) {
-        Object.assign(state.criteria, buildTransferIdOnlyCriteria(transferId));
+    if (pointLookup != null) {
+        Object.assign(state.criteria, buildPointLookupOnlyCriteria(pointLookup.key, pointLookup.value));
     }
 };
 
@@ -636,8 +649,8 @@ const appendQueryValue = (query: LocationQueryRaw, key: string, value: string | 
 const buildSearchRouteQuery = (): LocationQueryRaw => {
     const query: LocationQueryRaw = {};
 
-    if (transferIdSearchActive.value) {
-        appendQueryValue(query, TRANSFER_ID_CRITERIA_KEY, transferIdCriteria.value);
+    if (activePointLookup.value != null) {
+        appendQueryValue(query, activePointLookup.value.key, activePointLookup.value.value);
         appendQueryValue(query, 'size', state.size);
         appendQueryValue(query, 'orderColumn', state.orderColumn);
         appendQueryValue(query, 'orderDirection', state.orderDirection);
@@ -1853,7 +1866,7 @@ const goToLastPage = (): void => {
                     :sections="criteriaSections"
                     :criteria="state.criteria"
                     :selected-time-zone="selectedTimeZone"
-                    :exclusive-field-key="transferIdSearchActive ? TRANSFER_ID_CRITERIA_KEY : null"
+                    :exclusive-field-key="activePointLookup?.key ?? null"
                     :visible="isSearchFormVisible"
                     :loading="loading"
                     :last-loaded-at="lastLoadedAt"
