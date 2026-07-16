@@ -189,7 +189,7 @@ const isTimeRangeDisabled = (): boolean => {
                                             v-if="field.type === 'text'"
                                             v-model="criteria[field.key]"
                                             type="text"
-                                            class="field-input !pb-1.5 !pt-5 text-xs"
+                                            class="field-input !pb-1.5 !pt-5 text-xs disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                                             :disabled="isFieldDisabled(field.key)"
                                             :placeholder="field.placeholder ?? field.label"
                                         />
@@ -198,7 +198,7 @@ const isTimeRangeDisabled = (): boolean => {
                                             v-else-if="field.type === 'datetime'"
                                             v-model="criteria[field.key]"
                                             type="datetime-local"
-                                            class="field-input !pb-1.5 !pt-5 text-xs"
+                                            class="field-input !pb-1.5 !pt-5 text-xs disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                                             :disabled="isFieldDisabled(field.key)"
                                         />
 
