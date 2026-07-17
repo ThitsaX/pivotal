@@ -15,26 +15,32 @@ export class FspParty {
 
     @IsNotEmpty()
     @IsString()
+    @MaxLength(128, {message: 'idValue must not exceed 128 characters'})
     idValue!: string;
 
     @IsOptional()
     @IsString()
+    @MaxLength(128, {message: 'idSubValue must not exceed 128 characters'})
     idSubValue?: string;
 
     @IsOptional()
     @IsString()
+    @MaxLength(128, {message: 'displayName must not exceed 128 characters'})
     displayName?: string;
 
     @IsOptional()
     @IsString()
+    @MaxLength(128, {message: 'firstName must not exceed 128 characters'})
     firstName?: string;
 
     @IsOptional()
     @IsString()
+    @MaxLength(128, {message: 'middleName must not exceed 128 characters'})
     middleName?: string;
 
     @IsOptional()
     @IsString()
+    @MaxLength(128, {message: 'lastName must not exceed 128 characters'})
     lastName?: string;
 
     @IsOptional()
@@ -43,6 +49,7 @@ export class FspParty {
 
     @IsOptional()
     @IsString()
+    @MaxLength(4, {message: 'merchantClassificationCode must not exceed 4 characters'})
     merchantClassificationCode?: string;
 
     @IsNotEmpty()

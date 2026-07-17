@@ -153,6 +153,96 @@ describe('SendMoneyRequest', () => {
 
         assert.ok(messages(errors).includes('fspId must not exceed 32 characters'));
     });
+
+    it('accepts a 128-character payer idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = 'x'.repeat(128);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects a 129-character payer idValue (the payer_id overflow that jammed the audit consumer)', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('idValue must not exceed 128 characters'));
+    });
+
+    it('rejects a 129-character payee idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.to as Record<string, unknown>).idValue = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('idValue must not exceed 128 characters'));
+    });
+
+    it('rejects an over-length idSubValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idSubValue = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('idSubValue must not exceed 128 characters'));
+    });
+
+    it('accepts a 32-character subScenario', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'S'.repeat(32);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects a 33-character subScenario (FSPIOP TransactionSubScenario max 32)', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'S'.repeat(33);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('subScenario must not exceed 32 characters'));
+    });
+
+    it('rejects an over-length note', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.note = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('note must not exceed 128 characters'));
+    });
+
+    it('rejects an over-length homeTransactionId', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.homeTransactionId = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('homeTransactionId must not exceed 128 characters'));
+    });
+
+    it('rejects an over-length party name field (lastName)', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).lastName = 'x'.repeat(129);
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('lastName must not exceed 128 characters'));
+    });
+
+    it('rejects an over-length merchantClassificationCode', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.to as Record<string, unknown>).merchantClassificationCode = '12345';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('merchantClassificationCode must not exceed 4 characters'));
+    });
 });
 
 describe('SendMoneyController', () => {
