@@ -1,8 +1,78 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
+import {FindTransactionsQuery} from '../../../../../packages/core/audit/domain/query/find-transactions.query';
 import {TransactionRepository} from '../../../../../packages/core/audit/domain/repository/transaction.repository';
 
+class CapturingQueryBuilder {
+    readonly where: Array<{sql: string; params?: Record<string, unknown>}> = [];
+
+    select(): this {
+        return this;
+    }
+
+    andWhere(sql: string, params?: Record<string, unknown>): this {
+        this.where.push({sql, params});
+        return this;
+    }
+
+    orderBy(): this {
+        return this;
+    }
+
+    addOrderBy(): this {
+        return this;
+    }
+
+    limit(): this {
+        return this;
+    }
+
+    async getMany(): Promise<never[]> {
+        return [];
+    }
+}
+
 describe('TransactionRepository', () => {
+
+    it('filters by payer and payee home transaction IDs', async () => {
+        const queryBuilder = new CapturingQueryBuilder();
+        const readRepository = {
+            createQueryBuilder(): CapturingQueryBuilder {
+                return queryBuilder;
+            },
+        };
+        const repository = new TransactionRepository({} as never, readRepository as never);
+        const criteria = new FindTransactionsQuery.Criteria(
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'payer-home-1',
+            'payee-home-1',
+        );
+
+        await repository.find(
+            criteria,
+            new FindTransactionsQuery.Cursor(),
+            new FindTransactionsQuery.Order(),
+        );
+
+        assert.deepEqual(queryBuilder.where, [
+            {
+                sql: 'transaction.payerHomeTransactionId = :payerHomeTransactionId',
+                params: {payerHomeTransactionId: 'payer-home-1'},
+            },
+            {
+                sql: 'transaction.payeeHomeTransactionId = :payeeHomeTransactionId',
+                params: {payeeHomeTransactionId: 'payee-home-1'},
+            },
+        ]);
+    });
 
     it('should serialize JSON columns before executing raw upsert', async () => {
         const queries: Array<{sql: string; params: unknown[]}> = [];
@@ -57,7 +127,7 @@ describe('TransactionRepository', () => {
             /WHEN transactions\.payee_id IS NOT NULL AND VALUES\(payee_id\) IS NULL THEN transactions\.payee_fsp/,
         );
         assert.equal(
-            queries[0]?.params[26],
+            queries[0]?.params[30],
             JSON.stringify(partiesResponse),
         );
     });
