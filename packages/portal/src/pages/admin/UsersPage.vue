@@ -300,7 +300,6 @@ const submitReset = async (): Promise<void> => {
 const deactivateTarget = ref<AdminUser | null>(null);
 const deactivateBusy = ref(false);
 const deactivateError = ref<string | null>(null);
-const deactivateBanner = ref<string | null>(null);
 
 const openDeactivate = (user: AdminUser): void => {
     deactivateTarget.value = user;
@@ -324,13 +323,11 @@ const submitDeactivate = async (): Promise<void> => {
         await usersAdminStore.deactivateUser(deactivateTarget.value.id);
         deactivateTarget.value = null;
         const message = `${email} has been deactivated. Their active session will end within seconds.`;
-        deactivateBanner.value = message;
         toastStore.show({
             tone: 'success',
             title: 'User deactivated',
             message,
         });
-        window.setTimeout(() => { deactivateBanner.value = null; }, 8000);
     } catch (error) {
         deactivateError.value = describeApiError(error);
     } finally {
@@ -442,8 +439,6 @@ const onPageChange = async (page: number): Promise<void> => {
                 + Add user
             </button>
         </header>
-
-        <RevocationBanner v-if="deactivateBanner != null" :message="deactivateBanner" />
 
         <section class="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-soft md:grid-cols-[2fr_1fr_1fr_auto]">
             <div>
