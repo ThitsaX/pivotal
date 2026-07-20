@@ -1188,6 +1188,7 @@ export class TransactionRepository {
     private static toReportRecord(record: Transaction): Record<string, unknown> {
         return {
             transferId:      record.correlationId,
+            initiatedTimestamp: record.transactionStartedAt,
             payerFsp:        record.payerFsp,
             payeeFsp:        record.payeeFsp,
             payerIdType:     record.payerIdType,
