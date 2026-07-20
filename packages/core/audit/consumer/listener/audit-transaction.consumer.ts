@@ -18,7 +18,7 @@ import {
     AuditTransfersResponseCommand,
     LiveStatsWriter,
 } from '@core/audit/domain';
-import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
+import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, JsMsg, ReplayPolicy} from 'nats';
 import {NatsClientService} from '@shared/nats';
 import {AuditTransactionPublisher} from '../../producer/publisher';
 import {resolveAuditStream} from './audit-stream.resolver';
@@ -27,6 +27,25 @@ export class AuditTransactionConsumer implements OnModuleInit {
 
     static readonly SUBJECT = AuditTransactionPublisher.SUBJECT;
     static readonly DURABLE = 'audit-consumer-transaction';
+
+    /**
+     * Cap on how many times a message is retried before it is terminated. A backstop for
+     * failures we do not explicitly classify as permanent, so a poison message can never be
+     * redelivered forever.
+     */
+    private static readonly MAX_DELIVERY_ATTEMPTS = 5;
+
+    /**
+     * mysql2 errnos for write failures caused by bad input — retrying cannot make them succeed.
+     * Verified against mysql2/lib/constants/errors.js.
+     */
+    private static readonly PERMANENT_DB_ERRNOS = new Set<number>([
+        1048, // ER_BAD_NULL_ERROR
+        1264, // ER_WARN_DATA_OUT_OF_RANGE
+        1265, // WARN_DATA_TRUNCATED
+        1366, // ER_TRUNCATED_WRONG_VALUE_FOR_FIELD
+        1406, // ER_DATA_TOO_LONG
+    ]);
 
     private readonly logger = new Logger(AuditTransactionConsumer.name);
 
@@ -93,10 +112,56 @@ export class AuditTransactionConsumer implements OnModuleInit {
                 await this.recordLiveStats(message);
                 msg.ack();
             } catch (error) {
-                this.logger.error(`Failed to process message: ${(error as Error).message}`, (error as Error).stack);
-                msg.nak();
+                this.handleProcessingFailure(msg, message, error);
             }
         }
+    }
+
+    /**
+     * Decides whether a failed message should be retried or dropped.
+     *
+     * Transient failures (DB unreachable, connection reset) are nak'd so the audit record is
+     * preserved and replayed once the DB is healthy. But a message that can *never* be stored —
+     * bad input that violates a column constraint — would otherwise nak → redeliver forever
+     * (the consumer has no max_deliver cap), stalling the consumer's ack floor. Such poison
+     * messages are terminated so they stop being redelivered. A delivery-count backstop also
+     * terminates anything that keeps failing for an unclassified reason, so no single message
+     * can jam the consumer indefinitely.
+     */
+    private handleProcessingFailure(msg: JsMsg, message: TransactionMessage, error: unknown): void {
+        const attempts = msg.info.redeliveryCount;
+        const permanent = AuditTransactionConsumer.isPermanentDbError(error);
+
+        if (permanent || attempts >= AuditTransactionConsumer.MAX_DELIVERY_ATTEMPTS) {
+            // Log the full payload: for permanent failures this is the only forensic record,
+            // since the message is about to be dropped from the stream.
+            this.logger.error(
+                `Terminating poison audit message (permanent=${permanent}, attempts=${attempts}) ` +
+                `phase=${String(message.phase)} action=${String(message.action)}: ${(error as Error).message}`,
+                JSON.stringify(message),
+            );
+            msg.term();
+
+            return;
+        }
+
+        this.logger.warn(
+            `Retrying audit message (attempt ${attempts}): ${(error as Error).message}`,
+            (error as Error).stack,
+        );
+        msg.nak();
+    }
+
+    /**
+     * True for MySQL write errors caused by bad input that will fail identically on every retry
+     * (e.g. Data too long for column). TypeORM wraps the driver error in QueryFailedError and
+     * copies the mysql2 `errno` onto it, so it is readable either directly or via `driverError`.
+     */
+    private static isPermanentDbError(error: unknown): boolean {
+        const candidate = error as {errno?: number; driverError?: {errno?: number}};
+        const errno = candidate?.driverError?.errno ?? candidate?.errno;
+
+        return errno != null && AuditTransactionConsumer.PERMANENT_DB_ERRNOS.has(errno);
     }
 
     private async dispatch(message: TransactionMessage): Promise<void> {
