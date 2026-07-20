@@ -25,6 +25,7 @@ export class TransactionReportGenerator {
 
     private static readonly COLUMNS: readonly ReportColumn[] = [
         {header: 'Transfer ID', key: 'transferId'},
+        {header: 'Initiated Timestamp', key: 'initiatedTimestamp'},
         {header: 'Payer FSP ID', key: 'payerFsp'},
         {header: 'Payee FSP ID', key: 'payeeFsp'},
         {header: 'Payer ID Type', key: 'payerIdType'},

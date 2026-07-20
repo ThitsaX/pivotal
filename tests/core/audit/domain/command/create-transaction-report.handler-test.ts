@@ -174,17 +174,18 @@ describe('CreateTransactionReportHandler', () => {
         const generator = new TransactionReportGenerator(
             reportTransactionRepository([
                 {
-                    id:              '1',
-                    transferId:      'transfer-1',
-                    payerFsp:        'wallet1',
-                    payeeFsp:        'wallet2',
-                    payerIdType:     'MSISDN',
-                    payerId:         '2769100001',
-                    payeeIdType:     'MSISDN',
-                    payeeId:         '2769200001',
-                    quotingCurrency: 'USD',
-                    quotingAmount:   '12.34',
-                    transferState:   'COMMITTED',
+                    id:                 '1',
+                    transferId:         'transfer-1',
+                    initiatedTimestamp: new Date('2026-07-20T03:15:30.000Z'),
+                    payerFsp:           'wallet1',
+                    payeeFsp:           'wallet2',
+                    payerIdType:        'MSISDN',
+                    payerId:            '2769100001',
+                    payeeIdType:        'MSISDN',
+                    payeeId:            '2769200001',
+                    quotingCurrency:    'USD',
+                    quotingAmount:      '12.34',
+                    transferState:      'COMMITTED',
                 },
             ]),
             new ReportDownloadSettings(),
@@ -202,11 +203,36 @@ describe('CreateTransactionReportHandler', () => {
         assert.equal(report.extension, 'zip');
         assert.equal(report.contentType, 'application/zip');
         assert.match(sheet, /Transfer ID/);
+        assert.match(sheet, /Initiated Timestamp/);
+        assert.match(sheet, /2026-07-20T03:15:30\.000Z/);
         assert.match(sheet, /transfer-1/);
         assert.match(sheet, /wallet1/);
         assert.match(sheet, /wallet2/);
         assert.match(sheet, /2769100001/);
         assert.match(sheet, /2769200001/);
+    });
+
+    it('includes the initiated timestamp in CSV reports', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                 '1',
+                    transferId:         'transfer-initiated',
+                    initiatedTimestamp: new Date('2026-07-20T03:15:30.000Z'),
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [headerLine, rowLine] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = parseCsvRecord(headerLine);
+        const values = parseCsvRecord(rowLine);
+
+        assert.equal(
+            values[headers.indexOf('Initiated Timestamp')],
+            '2026-07-20T03:15:30.000Z',
+        );
     });
 
     it('includes serialized error JSON in CSV reports', async () => {
