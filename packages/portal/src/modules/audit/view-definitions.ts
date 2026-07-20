@@ -126,6 +126,8 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
             {key: 'payeeId', label: 'Payee ID', type: 'text', placeholder: '(Any)'},
             {key: 'payeeSubId', label: 'Payee Sub ID', type: 'text', placeholder: '(Any)'},
             {key: 'transferId', label: 'Transfer ID', type: 'text', placeholder: '(Any)'},
+            {key: 'payerHomeTransactionId', label: 'Payer Home Transaction ID', type: 'text', placeholder: '(Any)'},
+            {key: 'payeeHomeTransactionId', label: 'Payee Home Transaction ID', type: 'text', placeholder: '(Any)'},
             {key: 'flow', label: 'Flow', type: 'select', options: FLOW_OPTIONS},
             {key: 'transferType', label: 'Transaction Type', type: 'select', options: TRANSACTION_SCENARIO_OPTIONS},
             {key: 'subScenario', label: 'Sub Scenario', type: 'text', placeholder: '(Any)'},

@@ -12,6 +12,7 @@ import {
     ReportDownloadStatus,
     ReportType,
     TransactionReportGenerator,
+    TransactionReportParams,
     TransactionRepository,
 } from '../../../../../packages/core/audit/domain';
 
@@ -44,6 +45,30 @@ function parseCsvRecord(record: string): string[] {
 }
 
 describe('CreateTransactionReportHandler', () => {
+
+    it('round-trips home transaction ID filters through report parameters', () => {
+        const criteria = new FindTransactionsQuery.Criteria(
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'payer-home-1',
+            'payee-home-1',
+        );
+
+        const params = TransactionReportParams.fromInput(criteria, new FindTransactionsQuery.Order());
+        const restored = TransactionReportParams.toCriteria(params);
+
+        assert.equal(params.payerHomeTransactionId, 'payer-home-1');
+        assert.equal(params.payeeHomeTransactionId, 'payee-home-1');
+        assert.equal(restored.payerHomeTransactionId, 'payer-home-1');
+        assert.equal(restored.payeeHomeTransactionId, 'payee-home-1');
+    });
 
     it('creates a pending CSV report request from transaction search criteria', async () => {
         let capturedInput: ReportDownloadRepository.CreatePendingInput | undefined;

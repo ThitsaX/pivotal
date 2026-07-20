@@ -37,6 +37,8 @@ export namespace FindTransactionsQuery {
             public readonly payeeId?: string,
             public readonly payeeSubId?: string | null,
             public readonly transferId?: string,
+            public readonly payerHomeTransactionId?: string,
+            public readonly payeeHomeTransactionId?: string,
             public readonly flow?: number,
             public readonly transferType?: TransactionScenario,
             public readonly subScenario?: string,
