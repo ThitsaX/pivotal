@@ -12,6 +12,7 @@ import RevocationBanner from '../../components/admin/RevocationBanner.vue';
 import {authStore} from '../../stores/auth.store';
 import {permissionsAdminStore} from '../../stores/permissions-admin.store';
 import {rolePresetsStore} from '../../stores/role-presets.store';
+import {toastStore} from '../../stores/toast.store';
 import {
     type AdminRole,
     type AdminRoleCreateInput,
@@ -24,13 +25,6 @@ const hasPermission = computed((): boolean => authStore.hasPermission('admin.rol
 const state = rolesAdminStore.state;
 const permState = permissionsAdminStore.state;
 const presetState = rolePresetsStore.state;
-
-const banner = ref<string | null>(null);
-
-const setBanner = (message: string): void => {
-    banner.value = message;
-    window.setTimeout(() => { banner.value = null; }, 8000);
-};
 
 onMounted(async (): Promise<void> => {
     if (!hasPermission.value) return;
@@ -206,7 +200,11 @@ const submitCreate = async (): Promise<void> => {
             await rolesAdminStore.replacePermissions(created.id, createForm.selectedKeys);
         }
         createOpen.value = false;
-        setBanner(`Role "${created.name}" created.`);
+        toastStore.show({
+            tone: 'success',
+            title: 'Role created',
+            message: `Role "${created.name}" has been created.`,
+        });
     } catch (error) {
         createForm.error = describeApiError(error);
     } finally {
@@ -323,7 +321,11 @@ const submitEdit = async (): Promise<void> => {
 
         if (permissionsDirty.value) {
             await rolesAdminStore.replacePermissions(editState.role.id, editState.selectedKeys);
-            setBanner(`Permissions updated. Active sessions for ${editState.role.name} will end within seconds.`);
+            toastStore.show({
+                tone: 'success',
+                title: 'Role updated',
+                message: `Permissions for ${editState.role.name} were updated. Active sessions will end within seconds.`,
+            });
         }
 
         editState.role = null;
@@ -360,7 +362,11 @@ const submitDelete = async (): Promise<void> => {
         const name = deleteTarget.value.name;
         await rolesAdminStore.deleteRole(deleteTarget.value.id);
         deleteTarget.value = null;
-        setBanner(`${name} has been deleted.`);
+        toastStore.show({
+            tone: 'success',
+            title: 'Role deleted',
+            message: `${name} has been deleted.`,
+        });
     } catch (error) {
         deleteError.value = describeApiError(error);
     } finally {
@@ -415,8 +421,6 @@ watch(() => editState.role, (role) => {
                 + Add role
             </button>
         </header>
-
-        <RevocationBanner v-if="banner != null" :message="banner" />
 
         <AdminTable
             :columns="columns"
