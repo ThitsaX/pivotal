@@ -70,6 +70,7 @@
     "test:core-audit-producer:publishers": "node --test -r ts-node/register -r tsconfig-paths/register -r ./tests/core/audit/producer/publishers/env-setup.ts \"tests/core/audit/producer/publishers/**/*-test.ts\"",
     "test:shared-security:jwt": "node --test -r ts-node/register tests/shared/security/component/jwt/jwt-test.ts",
     "test:shared-security": "node --test -r ts-node/register \"tests/shared/security/**/*-test.ts\"",
+    "test:shared-nats": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/shared/nats/**/*-test.ts\"",
     "clean:fspiop-dto": "rm -rf packages/shared/fspiop/dto && mkdir -p packages/shared/fspiop/dto",
     "clean:catalyst-dto": "rm -rf packages/shared/catalyst/dto && mkdir -p packages/shared/catalyst/dto",
     "prepare:catalyst-dto-spec": "node scripts/prepare-catalyst-dto-spec.mjs",
