@@ -1120,6 +1120,7 @@ export class TransactionRepository {
             error: record.error,
             dispute: record.possibleDispute,
             flow: record.flow,
+            initiatedTimestamp: record.transactionStartedAt,
             transactionStartAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
         };

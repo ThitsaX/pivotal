@@ -1250,7 +1250,7 @@ const getDateTimeDisplay = (record: Record<string, unknown>): {
     startedAt: {dateTime: string; zone: string; hasValue: boolean};
     completedAt: {dateTime: string; zone: string; hasValue: boolean};
 } => {
-    const startedValue = record.transactionStartAt ?? record.transactionStartedAt;
+    const startedValue = record.initiatedTimestamp ?? record.transactionStartAt ?? record.transactionStartedAt;
     const completedValue = record.transactionCompletedAt;
 
     return {
@@ -1662,8 +1662,9 @@ const getDesktopHeaderCellClass = (columnKey: string): string => {
             return 'w-[10%]';
         case 'amount':
             return 'w-[10%] text-right';
-        case 'transactionStartAt':
-            return 'w-[15%]';
+        case 'initiatedTimestamp':
+        case 'transactionCompletedAt':
+            return 'w-[11%]';
         case 'status':
             return 'w-[7%] text-center';
         case 'details':
@@ -1764,12 +1765,18 @@ const closeRequestErrorDialog = (): void => {
     requestError.value = null;
 };
 
+const toOrderColumn = (columnKey: string): string => {
+    return columnKey === 'initiatedTimestamp' ? 'transactionStartAt' : columnKey;
+};
+
 const isSortableColumn = (columnKey: string): boolean => {
-    return props.viewDefinition.orderColumns.some((column: SelectOption): boolean => column.value === columnKey);
+    const orderColumn = toOrderColumn(columnKey);
+
+    return props.viewDefinition.orderColumns.some((column: SelectOption): boolean => column.value === orderColumn);
 };
 
 const sortIndicator = (columnKey: string): string => {
-    if (state.orderColumn !== columnKey) {
+    if (state.orderColumn !== toOrderColumn(columnKey)) {
         return '';
     }
 
@@ -1781,10 +1788,12 @@ const sortByColumn = (columnKey: string): void => {
         return;
     }
 
-    if (state.orderColumn === columnKey) {
+    const orderColumn = toOrderColumn(columnKey);
+
+    if (state.orderColumn === orderColumn) {
         state.orderDirection = state.orderDirection === 'ASC' ? 'DESC' : 'ASC';
     } else {
-        state.orderColumn = columnKey;
+        state.orderColumn = orderColumn;
         state.orderDirection = 'ASC';
     }
 
@@ -2243,39 +2252,27 @@ const goToLastPage = (): void => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div v-else-if="column.key === 'transactionStartAt'" class="space-y-1.5">
-                                                <div>
-                                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Started
-                                                    </p>
-                                                    <div class="space-y-1">
-                                                        <p class="text-[11px] leading-4 text-slate-700">
-                                                            {{ getDateTimeDisplay(record).startedAt.dateTime }}
-                                                        </p>
-                                                        <span
-                                                            v-if="getDateTimeDisplay(record).startedAt.hasValue"
-                                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
-                                                        >
-                                                            {{ getDateTimeDisplay(record).startedAt.zone }}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Completed
-                                                    </p>
-                                                    <div class="space-y-1">
-                                                        <p class="text-[11px] leading-4 text-slate-700">
-                                                            {{ getDateTimeDisplay(record).completedAt.dateTime }}
-                                                        </p>
-                                                        <span
-                                                            v-if="getDateTimeDisplay(record).completedAt.hasValue"
-                                                            class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
-                                                        >
-                                                            {{ getDateTimeDisplay(record).completedAt.zone }}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                            <div v-else-if="column.key === 'initiatedTimestamp'" class="space-y-1">
+                                                <p class="text-[11px] leading-4 text-slate-700">
+                                                    {{ getDateTimeDisplay(record).startedAt.dateTime }}
+                                                </p>
+                                                <span
+                                                    v-if="getDateTimeDisplay(record).startedAt.hasValue"
+                                                    class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                >
+                                                    {{ getDateTimeDisplay(record).startedAt.zone }}
+                                                </span>
+                                            </div>
+                                            <div v-else-if="column.key === 'transactionCompletedAt'" class="space-y-1">
+                                                <p class="text-[11px] leading-4 text-slate-700">
+                                                    {{ getDateTimeDisplay(record).completedAt.dateTime }}
+                                                </p>
+                                                <span
+                                                    v-if="getDateTimeDisplay(record).completedAt.hasValue"
+                                                    class="inline-flex rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+                                                >
+                                                    {{ getDateTimeDisplay(record).completedAt.zone }}
+                                                </span>
                                             </div>
                                             <div v-else-if="column.key === 'details'" class="flex justify-center">
                                                 <button
@@ -2497,7 +2494,7 @@ const goToLastPage = (): void => {
                                         </p>
                                         <div>
                                             <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                Started
+                                                Initiated Timestamp
                                             </p>
                                             <div class="space-y-1">
                                                 <p class="text-sm text-slate-700">
@@ -2513,7 +2510,7 @@ const goToLastPage = (): void => {
                                         </div>
                                         <div>
                                             <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                Completed
+                                                Completed Timestamp
                                             </p>
                                             <div class="space-y-1">
                                                 <p class="text-sm text-slate-700">
@@ -2924,7 +2921,7 @@ const goToLastPage = (): void => {
                                 </p>
                                 <div>
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                        Started
+                                        Initiated Timestamp
                                     </p>
                                     <div class="space-y-1">
                                         <p class="text-[12px] leading-5 text-slate-700">
@@ -2940,7 +2937,7 @@ const goToLastPage = (): void => {
                                 </div>
                                 <div>
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                        Completed
+                                        Completed Timestamp
                                     </p>
                                     <div class="space-y-1">
                                         <p class="text-[12px] leading-5 text-slate-700">

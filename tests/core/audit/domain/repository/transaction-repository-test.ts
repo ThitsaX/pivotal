@@ -6,6 +6,9 @@ import {TransactionRepository} from '../../../../../packages/core/audit/domain/r
 class CapturingQueryBuilder {
     readonly where: Array<{sql: string; params?: Record<string, unknown>}> = [];
 
+    constructor(private readonly rows: never[] = []) {
+    }
+
     select(): this {
         return this;
     }
@@ -28,7 +31,7 @@ class CapturingQueryBuilder {
     }
 
     async getMany(): Promise<never[]> {
-        return [];
+        return this.rows;
     }
 }
 
@@ -72,6 +75,31 @@ describe('TransactionRepository', () => {
                 params: {payeeHomeTransactionId: 'payee-home-1'},
             },
         ]);
+    });
+
+    it('exposes the initiated timestamp in search records', async () => {
+        const initiatedTimestamp = new Date('2026-07-20T03:15:30.000Z');
+        const queryBuilder = new CapturingQueryBuilder([{
+            id: 'txn-1',
+            correlationId: 'transfer-1',
+            transactionStartedAt: initiatedTimestamp,
+            transactionCompletedAt: null,
+        } as never]);
+        const readRepository = {
+            createQueryBuilder(): CapturingQueryBuilder {
+                return queryBuilder;
+            },
+        };
+        const repository = new TransactionRepository({} as never, readRepository as never);
+
+        const output = await repository.find(
+            new FindTransactionsQuery.Criteria(),
+            new FindTransactionsQuery.Cursor(),
+            new FindTransactionsQuery.Order(),
+        );
+
+        assert.equal(output.records[0]?.initiatedTimestamp, initiatedTimestamp);
+        assert.equal(output.records[0]?.transactionStartAt, initiatedTimestamp);
     });
 
     it('should serialize JSON columns before executing raw upsert', async () => {
