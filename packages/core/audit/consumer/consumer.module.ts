@@ -13,6 +13,9 @@ import {
 } from '../domain';
 import {
     AuditTransactionConsumer,
+    buildEnforcedStreamLimits,
+    getEnforceIntervalMs,
+    StreamLimitsEnforcer,
 } from './listener';
 
 const TRANSACTION_ROLLUP_LOCK_KEY = 'pivotal:transaction-rollup:lock';
@@ -52,6 +55,15 @@ export class AuditConsumerModule {
                 useFactory: (ncs: NatsClientService, commandBus: CommandBus, liveStats: LiveStatsWriter) =>
                     new AuditTransactionConsumer(ncs, commandBus, liveStats),
                 inject: [NatsClientService, CommandBus, LiveStatsWriter],
+            },
+            // Periodically bounds retention on the streams this deployment shares with the Java
+            // connectors (chiefly PIVOTAL_FSPIOP, which they own) so JetStream storage can't grow
+            // unbounded — enforced from the shared NATS account, no connector code change needed.
+            {
+                provide: StreamLimitsEnforcer,
+                useFactory: (ncs: NatsClientService) =>
+                    new StreamLimitsEnforcer(ncs, buildEnforcedStreamLimits(), getEnforceIntervalMs()),
+                inject: [NatsClientService],
             },
             // Settings resolved once for the rollup providers (ConfigService is global in the host app).
             {
