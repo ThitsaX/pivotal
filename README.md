@@ -344,11 +344,6 @@ both the current files and every reachable Git ref:
 ./scripts/scan-secrets.sh
 ```
 
-The script enables archive and encoded-value inspection and writes only
-redacted findings to the ignored `security-scan-results/` directory. See
-`docs/security/secret-scan-report-2026-07-28.md` for the latest reviewed report
-and the public-release gates.
-
 Install the staged-change pre-commit check once per clone:
 
 ```bash
@@ -356,10 +351,9 @@ python3 -m pip install pre-commit
 pre-commit install
 ```
 
-The hook scans only staged changes, so known findings in legacy history do not
-block new commits. CI follows the same prospective policy: it scans the current
-tree and only commits introduced by the push or pull request. The manual
-`scan-secrets.sh` full-history scan remains the explicit historical audit.
+The hook scans only staged changes. CI scans the current tree and commits
+introduced by the push or pull request. The manual `scan-secrets.sh`
+full-history scan remains the explicit historical audit.
 
 ## Useful Commands
 
