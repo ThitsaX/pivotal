@@ -83,3 +83,6 @@ packages/**/*.js
 
 # Claude Code local/personal config (machine-local only)
 .claude/
+
+# Redacted local output from scripts/scan-secrets.sh.
+security-scan-results/
