@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Transform, Type } from 'class-transformer';
-import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested, ValidateIf } from 'class-validator';
 import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
+import { IsAmountType } from '@shared/fspiop';
 
 export class SendMoneyRequest {
     @IsNotEmpty()
@@ -23,6 +24,8 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @IsEnum(AmountType)
+    @ValidateIf(() => process.env['STRICT_AMOUNT_TYPE']?.toLowerCase() === 'true')
+    @IsAmountType()
     amountType!: AmountType;
 
     @IsDefined()
