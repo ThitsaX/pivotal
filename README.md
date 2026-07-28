@@ -14,6 +14,7 @@ Pivotal is the multi-tenant payment adapter for Mojaloop. It exposes payer-facin
 - [Run With Docker Compose](#run-with-docker-compose)
 - [Run As Local Node Processes](#run-as-local-node-processes)
 - [Report Download Configuration](#report-download-configuration)
+- [Secret Scanning](#secret-scanning)
 - [Useful Commands](#useful-commands)
 - [Helm](#helm)
 - [Troubleshooting](#troubleshooting)
@@ -333,6 +334,32 @@ Common report environment variables:
 | `REPORT_S3_SECRET_ACCESS_KEY` | both | S3/MinIO secret key. Supply via deployment secrets. |
 | `REPORT_S3_PREFIX` | both | Key prefix (folder) for report objects, e.g. `reports/`. |
 | `REPORT_S3_PRESIGNED_URL_TTL_SECONDS` | both | TTL for storage-layer presigned URLs. Note the portal is served a proxied Pivotal URL, not this presigned URL. |
+
+## Secret Scanning
+
+Install [Gitleaks](https://github.com/gitleaks/gitleaks#installing), then scan
+both the current files and every reachable Git ref:
+
+```bash
+./scripts/scan-secrets.sh
+```
+
+The script enables archive and encoded-value inspection and writes only
+redacted findings to the ignored `security-scan-results/` directory. See
+`docs/security/secret-scan-report-2026-07-28.md` for the latest reviewed report
+and the public-release gates.
+
+Install the staged-change pre-commit check once per clone:
+
+```bash
+python3 -m pip install pre-commit
+pre-commit install
+```
+
+The hook scans only staged changes, so known findings in legacy history do not
+block new commits. CI follows the same prospective policy: it scans the current
+tree and only commits introduced by the push or pull request. The manual
+`scan-secrets.sh` full-history scan remains the explicit historical audit.
 
 ## Useful Commands
 

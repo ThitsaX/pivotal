@@ -1,0 +1,9 @@
+title = "Pivotal Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deterministic certificate fixture used only by shared security tests"
+targetRules = ["private-key"]
+paths = ['''^tests/shared/security/component/cert/test-cert-fixtures\.ts$''']
