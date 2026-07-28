@@ -243,6 +243,39 @@ describe('SendMoneyRequest', () => {
 
         assert.ok(messages(errors).includes('merchantClassificationCode must not exceed 4 characters'));
     });
+
+    it('rejects SEND amountType if subScenario is PERSON_TO_PERSON', async () => {
+        process.env["STRICT_AMOUNT_TYPE"] = 'true';
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_PERSON';
+        body.amountType = 'SEND'
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('Invalid amountType value'));
+    })
+
+    it('rejects RECEIVE amountType if subScenario is PERSON_TO_BUSINESS', async () => {
+        process.env["STRICT_AMOUNT_TYPE"] = 'true';
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'RECEIVE'
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('Invalid amountType value'));
+    })
+
+    it('does not validate amountType if STRICT_AMOUNT_TYPE is set to false', async () => {
+        process.env["STRICT_AMOUNT_TYPE"] = 'false';
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'RECEIVE'
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    })
 });
 
 describe('SendMoneyController', () => {

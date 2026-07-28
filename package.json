@@ -63,6 +63,7 @@
     "start:samples-wallet3-connector": "nest start samples-wallet3-connector",
     "start:samples-wallet3-connector:dev": "nest start samples-wallet3-connector --watch",
     "start:samples-wallet3-connector:prod": "node dist/packages/samples/wallet3-connector/main.js",
+    "test:app-web-outbound": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/apps/web-outbound/**/*-test.ts\"",
     "test:core-audit-domain:command": "node --test -r ts-node/register -r tsconfig-paths/register -r ./tests/core/audit/domain/command/env-setup.ts \"tests/core/audit/domain/command/**/*-test.ts\"",
     "test:core-audit-consumer": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/audit/consumer/**/*-test.ts\"",
     "test:core-outbound-domain:command": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/outbound/domain/command/**/*-test.ts\"",
