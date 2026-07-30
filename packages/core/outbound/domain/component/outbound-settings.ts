@@ -12,7 +12,8 @@ export class OutboundSettings {
         public readonly prefixOracleEndpoint: string,
         public readonly prefixOracleAxiosParams: AxiosClientBuilderParams,
         public readonly prefixOracleCacheTtlMs: number,
-        public readonly amountDecimalPlaces: number
+        public readonly amountDecimalPlaces: number,
+        public readonly strictAmountType: boolean,
     ) {
     }
 }

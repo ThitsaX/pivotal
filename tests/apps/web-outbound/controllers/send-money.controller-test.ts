@@ -9,6 +9,9 @@ import {
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
 import {SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
+import { Test, TestingModule } from '@nestjs/testing';
+import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
+import { useContainer } from 'class-validator';
 
 async function validateRequest(body: Record<string, unknown>): Promise<{
     request: PutSendMoneyRequest;
@@ -20,10 +23,20 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
     return {request, errors};
 }
 
-async function validateSendMoneyRequest(body: Record<string, unknown>): Promise<{
+async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false): Promise<{
     request: SendMoneyRequest;
     errors:  ValidationError[];
 }> {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+        providers: [
+            {
+                provide: AmountTypeConstraint,
+                useValue: new AmountTypeConstraint(strictAmountType),
+            },
+        ],
+    }).compile();
+    useContainer(moduleRef, { fallbackOnErrors: true });
+
     const request = plainToInstance(SendMoneyRequest, body);
     const errors = await validate(request, {whitelist: true});
 
@@ -250,7 +263,7 @@ describe('SendMoneyRequest', () => {
         body.subScenario = 'PERSON_TO_PERSON';
         body.amountType = 'SEND'
 
-        const {errors} = await validateSendMoneyRequest(body);
+        const {errors} = await validateSendMoneyRequest(body, true);
 
         assert.ok(messages(errors).includes('Invalid amountType value'));
     })
@@ -261,18 +274,18 @@ describe('SendMoneyRequest', () => {
         body.subScenario = 'PERSON_TO_BUSINESS';
         body.amountType = 'RECEIVE'
 
-        const {errors} = await validateSendMoneyRequest(body);
+        const {errors} = await validateSendMoneyRequest(body, true);
 
         assert.ok(messages(errors).includes('Invalid amountType value'));
     })
 
     it('does not validate amountType if STRICT_AMOUNT_TYPE is set to false', async () => {
-        process.env["STRICT_AMOUNT_TYPE"] = 'false';
+        const STRICT_AMOUNT_TYPE = false;
         const body = sendMoneyBody('wallet1', 'wallet2');
         body.subScenario = 'PERSON_TO_BUSINESS';
         body.amountType = 'RECEIVE'
 
-        const {errors} = await validateSendMoneyRequest(body);
+        const {errors} = await validateSendMoneyRequest(body, STRICT_AMOUNT_TYPE);
 
         assert.deepEqual(errors, []);
     })

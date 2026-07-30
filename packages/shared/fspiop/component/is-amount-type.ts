@@ -12,12 +12,17 @@ import { SubScenario, AmountType } from '@shared/fspiop/dto';
 
 @ValidatorConstraint({name: 'isAmountType', async: false})
 export class AmountTypeConstraint implements ValidatorConstraintInterface {
+    constructor(private readonly strictAmountType = false) {}
+
     validate(value: unknown, args: ValidationArguments): boolean {
         // This validator should only work if STRICT_AMOUNT_TYPE env is true
+        if (!this.strictAmountType) {
+            return true;
+        }
+        
+        const reqBody = args.object as { subScenario: string };
         // PERSON_TO_PERSON > RECEIVE
         // PERSON_TO_BUSINESS > SEND
-        const reqBody = args.object as { subScenario: string };
-
         return (reqBody.subScenario === SubScenario.personToPerson && value === AmountType.Receive) || 
             (reqBody.subScenario === SubScenario.personToBusiness && value === AmountType.Send);
     }

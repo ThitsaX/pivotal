@@ -24,7 +24,6 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @IsEnum(AmountType)
-    @ValidateIf(() => process.env['STRICT_AMOUNT_TYPE']?.toLowerCase() === 'true')
     @IsAmountType()
     amountType!: AmountType;
 

@@ -12,6 +12,7 @@ import { FspiopHeaders, FspiopUserMessages, PivotalLogger } from '@shared/fspiop
 import { AccessGuard, OutboundExceptionFilter } from './component';
 import { WebOutboundAppModule } from './app.module';
 import { createOutboundValidationException } from './component/outbound-validation-error';
+import { useContainer } from 'class-validator';
 
 const ROOT_ENV_LOCATION = '.env';
 const MODULE_ENV_LOCATION = 'packages/apps/web-outbound/.env';
@@ -66,6 +67,9 @@ const bootstrap = async (): Promise<void> => {
 
     const app = await NestFactory.create(WebOutboundAppModule, {
         logger: new PivotalLogger(),
+    });
+    useContainer(app.select(WebOutboundAppModule), {
+        fallbackOnErrors: true,
     });
     app.enableShutdownHooks();
     app.use(json({ type: ['application/json', 'application/*+json'] }));
