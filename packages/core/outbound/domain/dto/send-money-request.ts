@@ -2,9 +2,8 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Transform, Type } from 'class-transformer';
 import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario } from '@shared/fspiop';
+import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario, IsAmountType } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
-import { IsAmountType } from '@shared/fspiop';
 
 export class SendMoneyRequest {
     @IsNotEmpty()
