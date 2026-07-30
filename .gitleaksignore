@@ -1,0 +1,11 @@
+# Historical false positives: the detector matched the variable name
+# FSPIOP_MTLS_CLIENT_KEY in commented sample configuration.
+234a1d7d48f07b55cd4273ee752b0d84eb13b971:packages/samples/wallet3-connector/.env:generic-api-key:33
+39d2b702800bd426a04336120d449af382c56f07:packages/samples/wallet2-connector/.env:generic-api-key:33
+
+# Historical false positives: intentionally incomplete PEM documentation
+# placeholders that cannot be parsed as private keys.
+f911efac62be5d6ca17b8c10a8c42f069e63d62c:packages/shared/security/.required.env:private-key:35
+c6c9dbe283598a835ff91ac959331ae0e0374c55:packages/shared/security/.required.env:private-key:35
+c6c9dbe283598a835ff91ac959331ae0e0374c55:packages/shared/security/.required.env:private-key:52
+c6c9dbe283598a835ff91ac959331ae0e0374c55:packages/shared/security/.required.env:private-key:117
