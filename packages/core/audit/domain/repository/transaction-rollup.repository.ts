@@ -64,6 +64,7 @@ export class TransactionRollupRepository {
                 payer_fsp                                                       AS payer_fsp,
                 payee_fsp                                                       AS payee_fsp,
                 COALESCE(transfer_currency, quoting_currency, 'XXX')            AS currency,
+                COALESCE(NULLIF(sub_scenario, ''), 'UNSPECIFIED')               AS sub_scenario,
                 COUNT(*)                                                        AS txn_count,
                 SUM(error)                                                      AS error_count,
                 SUM(possible_dispute)                                           AS dispute_count,
@@ -81,7 +82,7 @@ export class TransactionRollupRepository {
              FROM transactions
              WHERE transaction_started_at >= ?
                AND transaction_started_at <  ?
-             GROUP BY bucket_hour, payer_fsp, payee_fsp, currency`,
+             GROUP BY bucket_hour, payer_fsp, payee_fsp, currency, sub_scenario`,
             [windowStart, windowEnd],
         );
 
@@ -109,7 +110,7 @@ export class TransactionRollupRepository {
             }
 
             const now = new Date();
-            const placeholders = rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+            const placeholders = rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
             const values: unknown[] = [];
 
             for (const row of rows) {
@@ -118,6 +119,7 @@ export class TransactionRollupRepository {
                     row.payer_fsp,
                     row.payee_fsp,
                     row.currency,
+                    row.sub_scenario,
                     Number(row.txn_count),
                     Number(row.error_count ?? 0),
                     Number(row.dispute_count ?? 0),
@@ -135,7 +137,7 @@ export class TransactionRollupRepository {
 
             await manager.query(
                 `INSERT INTO transaction_hourly_rollup
-                    (bucket_hour, payer_fsp, payee_fsp, currency,
+                    (bucket_hour, payer_fsp, payee_fsp, currency, sub_scenario,
                      txn_count, error_count, dispute_count,
                      parties_error_count, quotes_error_count, transfers_error_count, patch_error_count,
                      committed_amount, committed_count, latency_count, sum_latency_ms, updated_at)
@@ -189,11 +191,12 @@ export class TransactionRollupRepository {
         // no-currency placeholder for pre-financial failures (e.g. party-lookup) — never money.
         const rows = await this.readRepository.query(
             `SELECT currency,
+                    sub_scenario,
                     COALESCE(SUM(committed_amount), 0) AS total_amount,
                     COALESCE(SUM(committed_count), 0)  AS txn_count
              FROM transaction_hourly_rollup
              WHERE bucket_hour >= ? AND bucket_hour < ? AND currency <> 'XXX'${scope.clause}
-             GROUP BY currency
+             GROUP BY currency, sub_scenario
              HAVING txn_count > 0
              ORDER BY total_amount DESC`,
             [from, to, ...scope.params],
@@ -201,6 +204,7 @@ export class TransactionRollupRepository {
 
         return rows.map((row: Record<string, unknown>) => ({
             currency: String(row.currency),
+            useCase: String(row.sub_scenario),
             totalAmount: String(row.total_amount ?? '0'),   // keep DECIMAL precision as string
             txnCount: Number(row.txn_count ?? 0),
         }));
@@ -269,6 +273,24 @@ export class TransactionRollupRepository {
         const value = rows[0]?.last_updated;
 
         return value == null ? null : new Date(value as string);
+    }
+
+    async isBackfillRequired(): Promise<boolean> {
+        const rows = await this.writeRepository.query(
+            `SELECT backfill_required
+             FROM transaction_rollup_state
+             WHERE state_key = 'dashboard'`,
+        );
+
+        return Number(rows[0]?.backfill_required ?? 0) === 1;
+    }
+
+    async markBackfillComplete(): Promise<void> {
+        await this.writeRepository.query(
+            `UPDATE transaction_rollup_state
+             SET backfill_required = FALSE, updated_at = NOW(6)
+             WHERE state_key = 'dashboard'`,
+        );
     }
 
     // ─── Live tier (near-real-time) ─────────────────────────────────────────────────────────
@@ -401,6 +423,7 @@ export namespace TransactionRollupRepository {
         payer_fsp: string;
         payee_fsp: string;
         currency: string;
+        sub_scenario: string;
         txn_count: number | string;
         error_count: number | string | null;
         dispute_count: number | string | null;
@@ -422,7 +445,7 @@ export namespace TransactionRollupRepository {
 
     export type StageCount = {stage: string; count: number};
 
-    export type CurrencyValue = {currency: string; totalAmount: string; txnCount: number};
+    export type CurrencyValue = {currency: string; useCase: string; totalAmount: string; txnCount: number};
 
     export type FspCount = {fspId: string; count: number};
 

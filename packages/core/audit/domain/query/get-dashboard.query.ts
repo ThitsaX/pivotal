@@ -42,7 +42,12 @@ export namespace GetDashboardQuery {
 
     export type StageCount = {stage: string; count: number};
 
-    export type CurrencyValue = {currency: string; totalAmount: string; txnCount: number};
+    export type CurrencyValue = {
+        currency: string;
+        useCase: string;
+        totalAmount: string;
+        txnCount: number;
+    };
 
     export type FspCount = {fspId: string; count: number};
 

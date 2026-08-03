@@ -13,7 +13,7 @@ describe('GetDashboardHandler', () => {
                 return [{stage: 'Parties', count: 1}];
             },
             async getValueByCurrency() {
-                return [{currency: 'USD', totalAmount: '40', txnCount: 4}];
+                return [{currency: 'USD', useCase: 'PERSON_TO_PERSON', totalAmount: '40', txnCount: 4}];
             },
             async getTopFsps(_scope: string | undefined, leg: string) {
                 return [{fspId: leg, count: 5}];
@@ -69,7 +69,7 @@ describe('GetDashboardHandler', () => {
         assert.deepEqual(output.hourlyProfile[23], {hour: 23, count: 3, errorCount: 0});
         assert.deepEqual(output.latencyTrend, [{date: '2026-08-02', avgLatencyMs: 250}]);
         assert.deepEqual(output.valueByCurrency, [
-            {currency: 'USD', totalAmount: '40', txnCount: 4},
+            {currency: 'USD', useCase: 'PERSON_TO_PERSON', totalAmount: '40', txnCount: 4},
         ]);
         assert.ok(calls.every((call) =>
             call.from.toISOString() === range.from.toISOString()

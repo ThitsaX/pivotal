@@ -15,6 +15,7 @@ export interface DashboardStageCount {
 
 export interface DashboardCurrencyValue {
     currency:    string;
+    useCase:     string;
     totalAmount: string;   // DECIMAL kept as string to preserve precision
     txnCount:    number;
 }

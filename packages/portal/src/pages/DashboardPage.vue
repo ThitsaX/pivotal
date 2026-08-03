@@ -178,6 +178,20 @@ function formatAmount(value: string): string {
     return `${intPart}.${dec}`;
 }
 
+function formatUseCase(value: string): string {
+    if (value === 'UNSPECIFIED') {
+        return 'Unspecified';
+    }
+
+    const title = (segment: string): string => segment
+        .toLowerCase()
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+
+    return value.split('_TO_').map(title).join(' to ');
+}
+
 function formatShortDate(iso: string): string {
     try {
         return new Intl.DateTimeFormat('en-US', {month: 'short', day: 'numeric', timeZone: 'UTC'})
@@ -657,13 +671,15 @@ watch(
                                 <thead>
                                     <tr class="text-left uppercase tracking-wide text-slate-400">
                                         <th class="pb-1 font-semibold">Currency</th>
+                                        <th class="pb-1 font-semibold">Use Case</th>
                                         <th class="pb-1 text-right font-semibold">Amount</th>
                                         <th class="pb-1 text-right font-semibold">Count</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in data.valueByCurrency" :key="row.currency" class="border-t border-slate-100">
+                                    <tr v-for="row in data.valueByCurrency" :key="`${row.currency}-${row.useCase}`" class="border-t border-slate-100">
                                         <td class="py-1 font-medium text-ink">{{ row.currency }}</td>
+                                        <td class="py-1 text-slate-600">{{ formatUseCase(row.useCase) }}</td>
                                         <td class="py-1 text-right tabular-nums text-ink">{{ formatAmount(row.totalAmount) }}</td>
                                         <td class="py-1 text-right tabular-nums text-slate-500">{{ formatNumber(row.txnCount) }}</td>
                                     </tr>
