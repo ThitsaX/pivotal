@@ -16,7 +16,7 @@ describe('GetDashboardHandler', () => {
                 return [{currency: 'USD', useCase: 'PERSON_TO_PERSON', totalAmount: '40', txnCount: 4}];
             },
             async getTopFsps(_scope: string | undefined, leg: string) {
-                return [{fspId: leg, count: 5}];
+                return [{fspId: leg, count: 5, amounts: [{currency: 'USD', totalAmount: '40'}]}];
             },
             async getTimeBuckets() {
                 return [

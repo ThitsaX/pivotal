@@ -49,7 +49,9 @@ export namespace GetDashboardQuery {
         txnCount: number;
     };
 
-    export type FspCount = {fspId: string; count: number};
+    export type CurrencyAmount = {currency: string; totalAmount: string};
+
+    export type FspCount = {fspId: string; count: number; amounts: CurrencyAmount[]};
 
     export type DailyCount = {date: string; count: number; errorCount: number; disputeCount: number};
 

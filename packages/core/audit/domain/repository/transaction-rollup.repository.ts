@@ -219,20 +219,38 @@ export class TransactionRollupRepository {
     ): Promise<TransactionRollupRepository.FspCount[]> {
         const scope = TransactionRollupRepository.scopeClause(scopeFspId);
         // `leg` is a fixed enum literal (never user input), safe to interpolate as a column.
+        // Keep amounts separated by currency; summing unlike currencies would be misleading.
         const rows = await this.readRepository.query(
-            `SELECT ${leg} AS fsp_id, COALESCE(SUM(txn_count), 0) AS count
+            `SELECT ${leg} AS fsp_id,
+                    currency,
+                    COALESCE(SUM(txn_count), 0) AS count,
+                    COALESCE(SUM(committed_amount), 0) AS total_amount
              FROM transaction_hourly_rollup
              WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
-             GROUP BY ${leg}
-             ORDER BY count DESC
-             LIMIT ?`,
-            [from, to, ...scope.params, limit],
+             GROUP BY ${leg}, currency`,
+            [from, to, ...scope.params],
         );
 
-        return rows.map((row: Record<string, unknown>) => ({
-            fspId: String(row.fsp_id),
-            count: Number(row.count ?? 0),
-        }));
+        const byFsp = new Map<string, TransactionRollupRepository.FspCount>();
+
+        for (const row of rows as Record<string, unknown>[]) {
+            const fspId = String(row.fsp_id);
+            const entry = byFsp.get(fspId) ?? {fspId, count: 0, amounts: []};
+            const currency = String(row.currency);
+
+            entry.count += Number(row.count ?? 0);
+            if (currency !== 'XXX') {
+                entry.amounts.push({
+                    currency,
+                    totalAmount: String(row.total_amount ?? '0'),
+                });
+            }
+            byFsp.set(fspId, entry);
+        }
+
+        return [...byFsp.values()]
+            .sort((left, right) => right.count - left.count || left.fspId.localeCompare(right.fspId))
+            .slice(0, limit);
     }
 
     async getTimeBuckets(
@@ -447,7 +465,9 @@ export namespace TransactionRollupRepository {
 
     export type CurrencyValue = {currency: string; useCase: string; totalAmount: string; txnCount: number};
 
-    export type FspCount = {fspId: string; count: number};
+    export type CurrencyAmount = {currency: string; totalAmount: string};
+
+    export type FspCount = {fspId: string; count: number; amounts: CurrencyAmount[]};
 
     export type DailyCount = {date: string; count: number; errorCount: number; disputeCount: number};
 

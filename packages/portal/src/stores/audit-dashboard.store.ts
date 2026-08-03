@@ -23,6 +23,7 @@ export interface DashboardCurrencyValue {
 export interface DashboardFspCount {
     fspId: string;
     count: number;
+    amounts: Array<{currency: string; totalAmount: string}>;
 }
 
 export interface DashboardDailyCount {

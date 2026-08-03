@@ -399,7 +399,11 @@ const latencyOptions = computed<ApexOptions>(() => ({
 }));
 
 // ── top FSPs (horizontal bars) ──────────────────────────────────────────────────────
-type FspRow = {fspId: string; count: number};
+type FspRow = {
+    fspId: string;
+    count: number;
+    amounts: ReadonlyArray<{currency: string; totalAmount: string}>;
+};
 
 function fspSeries(rows: ReadonlyArray<FspRow>) {
     return [{name: 'Transactions', data: rows.map((r) => r.count)}];
@@ -416,6 +420,18 @@ function fspOptions(rows: ReadonlyArray<FspRow>, color: string, toColor: string)
         yaxis: {labels: {style: {colors: COLOR.ink, fontWeight: 600}}},
         legend: {show: false},
         grid: baseGrid,
+        tooltip: {
+            y: {
+                formatter: (value: number, context?: {dataPointIndex?: number}): string => {
+                    const amounts = rows[context?.dataPointIndex ?? -1]?.amounts ?? [];
+                    const amountLabel = amounts.length === 0
+                        ? 'No committed value'
+                        : amounts.map((amount) => `${amount.currency} ${formatAmount(amount.totalAmount)}`).join(' · ');
+
+                    return `${formatNumber(value)} transactions · ${amountLabel}`;
+                },
+            },
+        },
     };
 }
 
