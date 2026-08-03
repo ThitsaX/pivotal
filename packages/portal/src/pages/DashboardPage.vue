@@ -405,11 +405,19 @@ type FspRow = {
     amounts: ReadonlyArray<{currency: string; totalAmount: string}>;
 };
 
+type FspLeg = 'payer' | 'payee';
+
 function fspSeries(rows: ReadonlyArray<FspRow>) {
     return [{name: 'Transactions', data: rows.map((r) => r.count)}];
 }
 
-function fspOptions(rows: ReadonlyArray<FspRow>, color: string, toColor: string): ApexOptions {
+function fspRows(leg: FspLeg): ReadonlyArray<FspRow> {
+    return leg === 'payer' ? (data.value?.topPayerFsps ?? []) : (data.value?.topPayeeFsps ?? []);
+}
+
+function fspOptions(leg: FspLeg, color: string, toColor: string): ApexOptions {
+    const rows = fspRows(leg);
+
     return {
         chart: baseChart('bar'),
         colors: [color],
@@ -423,7 +431,9 @@ function fspOptions(rows: ReadonlyArray<FspRow>, color: string, toColor: string)
         tooltip: {
             y: {
                 formatter: (value: number, context?: {dataPointIndex?: number}): string => {
-                    const amounts = rows[context?.dataPointIndex ?? -1]?.amounts ?? [];
+                    // ApexCharts may retain this formatter while updating the series/options.
+                    // Resolve current rows at hover time instead of closing over the initial range.
+                    const amounts = fspRows(leg)[context?.dataPointIndex ?? -1]?.amounts ?? [];
                     const amountLabel = amounts.length === 0
                         ? 'No committed value'
                         : amounts.map((amount) => `${amount.currency} ${formatAmount(amount.totalAmount)}`).join(' · ');
@@ -438,9 +448,9 @@ function fspOptions(rows: ReadonlyArray<FspRow>, color: string, toColor: string)
 const hasPayer = computed((): boolean => (data.value?.topPayerFsps.length ?? 0) > 0);
 const hasPayee = computed((): boolean => (data.value?.topPayeeFsps.length ?? 0) > 0);
 const payerSeries = computed(() => fspSeries(data.value?.topPayerFsps ?? []));
-const payerOptions = computed(() => fspOptions(data.value?.topPayerFsps ?? [], COLOR.accent, COLOR.accentTo));
+const payerOptions = computed(() => fspOptions('payer', COLOR.accent, COLOR.accentTo));
 const payeeSeries = computed(() => fspSeries(data.value?.topPayeeFsps ?? []));
-const payeeOptions = computed(() => fspOptions(data.value?.topPayeeFsps ?? [], COLOR.committed, COLOR.committedTo));
+const payeeOptions = computed(() => fspOptions('payee', COLOR.committed, COLOR.committedTo));
 
 function isCurrentUtcDay(from: string, to: string): boolean {
     const now = new Date();
@@ -682,7 +692,7 @@ watch(
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Value Transferred</p>
                         <p class="text-[10px] text-slate-400">committed &amp; disputed transfers · excludes failed</p>
                         <div v-if="!hasCurrency" class="mt-1 text-sm text-slate-500">No value moved in this range.</div>
-                        <div v-else class="mt-1 max-h-[150px] overflow-auto">
+                        <div v-else class="portal-scrollbar mt-1 max-h-[150px] overflow-y-auto overflow-x-hidden pr-2">
                             <table class="w-full text-xs">
                                 <thead>
                                     <tr class="text-left uppercase tracking-wide text-slate-400">
