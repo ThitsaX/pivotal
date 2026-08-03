@@ -44,6 +44,15 @@ function parseCsvRecord(record: string): string[] {
     return fields;
 }
 
+function xlsxSheet(report: {bytes: Buffer}): string {
+    const reportZip = new AdmZip(report.bytes);
+    const xlsxEntry = reportZip.getEntry('TransactionReport-1001-Part1.xlsx');
+
+    assert.notEqual(xlsxEntry, null);
+
+    return new AdmZip(xlsxEntry!.getData()).readAsText('xl/worksheets/sheet1.xml');
+}
+
 describe('CreateTransactionReportHandler', () => {
 
     it('round-trips home transaction ID filters through report parameters', () => {
@@ -235,6 +244,71 @@ describe('CreateTransactionReportHandler', () => {
         assert.match(sheet, /wallet2/);
         assert.match(sheet, /2769100001/);
         assert.match(sheet, /2769200001/);
+    });
+
+    it('sanitizes XML-invalid controls while preserving valid Unicode in XLSX reports', async () => {
+        const forbiddenControls = [
+            ...Array.from({length: 9}, (_, codePoint) => String.fromCodePoint(codePoint)),
+            String.fromCodePoint(0x0B),
+            String.fromCodePoint(0x0C),
+            ...Array.from({length: 18}, (_, index) => String.fromCodePoint(index + 0x0E)),
+            String.fromCodePoint(0xFFFE),
+            String.fromCodePoint(0xFFFF),
+        ].join('');
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:         '1',
+                    transferId: 'transfer-production-control-character',
+                    payerId:    `\u0003 /bin/sleep 4 \r${forbiddenControls} Unicode ငွေ 😀 & <safe>`,
+                },
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const sheet = xlsxSheet(await generator.generate(reportRequest('xlsx'), {}));
+        const xmlInvalidCharacters = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
+
+        assert.doesNotMatch(sheet, xmlInvalidCharacters);
+        assert.match(sheet, /� \/bin\/sleep 4 \r/);
+        assert.match(sheet, /Unicode ငွေ 😀 &amp; &lt;safe&gt;/);
+    });
+
+    it('limits XLSX cells without splitting supplementary Unicode', async () => {
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {id: '1', transferId: 'ascii-limit', payerId: 'x'.repeat(40_000)},
+                {id: '2', transferId: 'unicode-limit', payerId: '😀'.repeat(20_000)},
+            ]),
+            new ReportDownloadSettings(),
+        );
+
+        const sheet = xlsxSheet(await generator.generate(reportRequest('xlsx'), {}));
+        const asciiValue = /<c r="F2"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
+        const unicodeValue = /<c r="F3"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
+
+        assert.equal(asciiValue?.length, 32_767);
+        assert.equal(unicodeValue?.length, 32_766);
+        assert.equal(Array.from(unicodeValue ?? '').length, 16_383);
+        assert.doesNotMatch(unicodeValue ?? '', /�/);
+    });
+
+    it('generates a valid maximum-size XLSX report', async () => {
+        const rows = Array.from({length: ReportDownloadSettings.MAX_DOWNLOAD_ROWS}, (_, index) => ({
+            id:         String(index + 1),
+            transferId: `transfer-${index + 1}`,
+            payerId:    index === 12_421 ? '\u0003 /bin/sleep 0 \r' : 'Unicode ငွေ & <safe>',
+        }));
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository(rows),
+            new ReportDownloadSettings(),
+        );
+
+        const sheet = xlsxSheet(await generator.generate(reportRequest('xlsx'), {}));
+
+        assert.equal((sheet.match(/<row r="/g) ?? []).length, ReportDownloadSettings.MAX_DOWNLOAD_ROWS + 1);
+        assert.doesNotMatch(sheet, /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/);
+        assert.match(sheet, /Unicode ငွေ &amp; &lt;safe&gt;/);
     });
 
     it('includes the initiated timestamp in CSV reports', async () => {
