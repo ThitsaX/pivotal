@@ -150,36 +150,6 @@ export class TransactionRollupRepository {
     // table). `scopeFspId` applies DFSP row-scoping: a transaction is exactly one rollup row,
     // so `(payer_fsp = fsp OR payee_fsp = fsp)` counts each once with no double-counting.
 
-    async getTotals(
-        scopeFspId: string | undefined,
-        ranges: TransactionRollupRepository.Ranges,
-    ): Promise<TransactionRollupRepository.Totals> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
-        const rows = await this.readRepository.query(
-            `SELECT
-                COALESCE(SUM(CASE WHEN bucket_hour >= ? THEN txn_count END), 0)     AS today,
-                COALESCE(SUM(CASE WHEN bucket_hour >= ? THEN txn_count END), 0)     AS last7d,
-                COALESCE(SUM(txn_count), 0)                                         AS last30d,
-                COALESCE(SUM(CASE WHEN bucket_hour >= ? THEN dispute_count END), 0) AS disputes_today,
-                COALESCE(SUM(CASE WHEN bucket_hour >= ? THEN error_count END), 0)   AS errors_today
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`,
-            [
-                ranges.todayFrom, ranges.sevenFrom, ranges.todayFrom, ranges.todayFrom,
-                ranges.thirtyFrom, ranges.to, ...scope.params,
-            ],
-        );
-        const row = rows[0] ?? {};
-
-        return {
-            today: Number(row.today ?? 0),
-            last7d: Number(row.last7d ?? 0),
-            last30d: Number(row.last30d ?? 0),
-            disputesToday: Number(row.disputes_today ?? 0),
-            errorsToday: Number(row.errors_today ?? 0),
-        };
-    }
-
     /**
      * Errors attributed by the pipeline stage that failed, over `[from, to)`. Always returns the
      * four stages in pipeline order (zero-count stages included) so the chart axis is stable.
@@ -261,110 +231,34 @@ export class TransactionRollupRepository {
         }));
     }
 
-    async getAvgLatencyMs(
+    async getTimeBuckets(
         scopeFspId: string | undefined,
         from: Date,
         to: Date,
-    ): Promise<number | null> {
+    ): Promise<TransactionRollupRepository.TimeBucket[]> {
         const scope = TransactionRollupRepository.scopeClause(scopeFspId);
         const rows = await this.readRepository.query(
-            `SELECT SUM(sum_latency_ms) AS sum_latency, SUM(latency_count) AS latency_count
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`,
-            [from, to, ...scope.params],
-        );
-        const row = rows[0] ?? {};
-        const sumLatency = row.sum_latency == null ? null : Number(row.sum_latency);
-        const latencyCount = Number(row.latency_count ?? 0);
-
-        if (sumLatency == null || latencyCount === 0) {
-            return null;
-        }
-
-        return sumLatency / latencyCount;
-    }
-
-    async getDailyTrend(
-        scopeFspId: string | undefined,
-        from: Date,
-        to: Date,
-    ): Promise<TransactionRollupRepository.DailyCount[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
-        const rows = await this.readRepository.query(
-            `SELECT DATE(bucket_hour)                  AS day,
+            `SELECT bucket_hour,
                     COALESCE(SUM(txn_count), 0)        AS count,
                     COALESCE(SUM(error_count), 0)      AS error_count,
-                    COALESCE(SUM(dispute_count), 0)    AS dispute_count
+                    COALESCE(SUM(dispute_count), 0)    AS dispute_count,
+                    SUM(sum_latency_ms)                AS sum_latency,
+                    COALESCE(SUM(latency_count), 0)    AS latency_count
              FROM transaction_hourly_rollup
              WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
-             GROUP BY day
-             ORDER BY day ASC`,
+             GROUP BY bucket_hour
+             ORDER BY bucket_hour ASC`,
             [from, to, ...scope.params],
         );
 
         return rows.map((row: Record<string, unknown>) => ({
-            date: TransactionRollupRepository.toIsoDate(row.day),
+            bucketHour: TransactionRollupRepository.toIsoTimestamp(row.bucket_hour),
             count: Number(row.count ?? 0),
             errorCount: Number(row.error_count ?? 0),
             disputeCount: Number(row.dispute_count ?? 0),
+            sumLatencyMs: row.sum_latency == null ? null : Number(row.sum_latency),
+            latencyCount: Number(row.latency_count ?? 0),
         }));
-    }
-
-    /**
-     * Today's intraday profile — one row per UTC hour that has data in `[from, to)`.
-     * Hours with no transactions are simply absent; the caller pads to a full 0..23 axis.
-     */
-    async getHourlyToday(
-        scopeFspId: string | undefined,
-        from: Date,
-        to: Date,
-    ): Promise<TransactionRollupRepository.HourlyCount[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
-        const rows = await this.readRepository.query(
-            `SELECT HOUR(bucket_hour)               AS hour,
-                    COALESCE(SUM(txn_count), 0)     AS count,
-                    COALESCE(SUM(error_count), 0)   AS error_count
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
-             GROUP BY hour
-             ORDER BY hour ASC`,
-            [from, to, ...scope.params],
-        );
-
-        return rows.map((row: Record<string, unknown>) => ({
-            hour: Number(row.hour ?? 0),
-            count: Number(row.count ?? 0),
-            errorCount: Number(row.error_count ?? 0),
-        }));
-    }
-
-    /** Per-day average latency (ms) over `[from, to)`; days with no completed transfers are absent. */
-    async getDailyLatency(
-        scopeFspId: string | undefined,
-        from: Date,
-        to: Date,
-    ): Promise<TransactionRollupRepository.LatencyPoint[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
-        const rows = await this.readRepository.query(
-            `SELECT DATE(bucket_hour)        AS day,
-                    SUM(sum_latency_ms)      AS sum_latency,
-                    SUM(latency_count)       AS latency_count
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
-             GROUP BY day
-             ORDER BY day ASC`,
-            [from, to, ...scope.params],
-        );
-
-        return rows.map((row: Record<string, unknown>) => {
-            const sumLatency = row.sum_latency == null ? null : Number(row.sum_latency);
-            const latencyCount = Number(row.latency_count ?? 0);
-
-            return {
-                date: TransactionRollupRepository.toIsoDate(row.day),
-                avgLatencyMs: sumLatency == null || latencyCount === 0 ? null : sumLatency / latencyCount,
-            };
-        });
     }
 
     /** Rollup freshness — the most recent refresh time, used as the dashboard `asOf` stamp. */
@@ -490,12 +384,13 @@ export class TransactionRollupRepository {
         return {clause: ' AND (payer_fsp = ? OR payee_fsp = ?)', params: [scopeFspId, scopeFspId]};
     }
 
-    private static toIsoDate(value: unknown): string {
+    private static toIsoTimestamp(value: unknown): string {
         if (value instanceof Date) {
-            return value.toISOString().slice(0, 10);
+            return value.toISOString();
         }
 
-        return String(value).slice(0, 10);
+        const normalized = String(value).replace(' ', 'T');
+        return new Date(normalized.endsWith('Z') ? normalized : `${normalized}Z`).toISOString();
     }
 }
 
@@ -523,22 +418,6 @@ export namespace TransactionRollupRepository {
         bucketsWritten: number;
     };
 
-    /** Pre-computed UTC range boundaries for the dashboard reads. */
-    export type Ranges = {
-        todayFrom: Date;    // start of the current UTC day
-        sevenFrom: Date;    // start of the day 6 days before today (today + 6 prior = 7 days)
-        thirtyFrom: Date;   // start of the day 29 days before today
-        to: Date;           // exclusive upper bound (start of the next hour)
-    };
-
-    export type Totals = {
-        today: number;
-        last7d: number;
-        last30d: number;
-        disputesToday: number;
-        errorsToday: number;
-    };
-
     export type StateCount = {state: string; count: number};
 
     export type StageCount = {stage: string; count: number};
@@ -552,6 +431,15 @@ export namespace TransactionRollupRepository {
     export type HourlyCount = {hour: number; count: number; errorCount: number};
 
     export type LatencyPoint = {date: string; avgLatencyMs: number | null};
+
+    export type TimeBucket = {
+        bucketHour: string;
+        count: number;
+        errorCount: number;
+        disputeCount: number;
+        sumLatencyMs: number | null;
+        latencyCount: number;
+    };
 
     export type FspLeg = 'payer_fsp' | 'payee_fsp';
 
