@@ -194,6 +194,41 @@ describe('SendMoneyRequest', () => {
         assert.deepEqual(errors, []);
     });
 
+    it('accepts letters, numbers, underscores, and hyphens in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'BUSINESS_123-ABC',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'LBR-MER_00012345',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'business.example',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'merchant alias',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue for BUSINESS or ALIAS must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
+    });
+
     it('rejects control characters in payer and payee idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
         (body.from as Record<string, unknown>).idValue = '\u0003 /bin/sleep 4 \r';

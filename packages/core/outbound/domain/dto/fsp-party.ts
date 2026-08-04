@@ -1,11 +1,41 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Type} from 'class-transformer';
-import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, ValidateNested} from 'class-validator';
+import {
+    IsArray,
+    IsDefined,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Matches,
+    MaxLength,
+    Validate,
+    ValidateNested,
+    ValidationArguments,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
 import {Extension, PartyIdType, TransactionInitiatorType} from '@shared/fspiop';
 
 const SAFE_IDENTIFIER_TEXT = /^[^\p{Cc}\p{Cf}\p{Cs}]+$/u;
-const FSP_ID = /^[A-Za-z0-9_-]+$/;
+const SIMPLE_IDENTIFIER = /^[A-Za-z0-9_-]+$/;
+
+@ValidatorConstraint({name: 'isBusinessOrAliasId', async: false})
+class BusinessOrAliasIdConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown, args: ValidationArguments): boolean {
+        const {idType} = args.object as FspParty;
+        if (idType !== PartyIdType.Business && idType !== PartyIdType.Alias) {
+            return true;
+        }
+
+        return typeof value === 'string' && SIMPLE_IDENTIFIER.test(value);
+    }
+
+    defaultMessage(): string {
+        return 'idValue for BUSINESS or ALIAS must contain only letters, numbers, underscores, or hyphens';
+    }
+}
 
 export class FspParty {
     @IsOptional()
@@ -20,6 +50,7 @@ export class FspParty {
     @IsString()
     @MaxLength(128, {message: 'idValue must not exceed 128 characters'})
     @Matches(SAFE_IDENTIFIER_TEXT, {message: 'idValue must not contain control or formatting characters'})
+    @Validate(BusinessOrAliasIdConstraint)
     idValue!: string;
 
     @IsOptional()
@@ -59,7 +90,7 @@ export class FspParty {
     @IsNotEmpty()
     @IsString()
     @MaxLength(32, {message: 'fspId must not exceed 32 characters'})
-    @Matches(FSP_ID, {message: 'fspId must contain only letters, numbers, underscores, or hyphens'})
+    @Matches(SIMPLE_IDENTIFIER, {message: 'fspId must contain only letters, numbers, underscores, or hyphens'})
     fspId!: string;
 
     @IsOptional()
