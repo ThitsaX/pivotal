@@ -142,6 +142,21 @@ describe('SendMoneyRequest', () => {
         assert.deepEqual(errors, []);
     });
 
+    it('accepts underscores and hyphens in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer_fsp-1', 'payee_fsp-2'));
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer.fsp', 'payee fsp'));
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'fspId must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
+    });
+
     it('rejects a 33-character payer FSP ID', async () => {
         const {errors} = await validateSendMoneyRequest(sendMoneyBody('f'.repeat(33), 'wallet2'));
 
@@ -161,6 +176,35 @@ describe('SendMoneyRequest', () => {
         const {errors} = await validateSendMoneyRequest(body);
 
         assert.deepEqual(errors, []);
+    });
+
+    it('accepts visible Mojaloop party identifier formats', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'MSISDN',
+            idValue: '+224621234567',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'EMAIL',
+            idValue: 'person+tag@example.com',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects control characters in payer and payee idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '\u0003 /bin/sleep 4 \r';
+        (body.to as Record<string, unknown>).idValue = '2769\u200B200001';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue must not contain control or formatting characters').length,
+            2,
+        );
     });
 
     it('rejects a 129-character payer idValue (the payer_id overflow that jammed the audit consumer)', async () => {

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Type} from 'class-transformer';
-import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested} from 'class-validator';
+import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, ValidateNested} from 'class-validator';
 import {Extension, PartyIdType, TransactionInitiatorType} from '@shared/fspiop';
+
+const SAFE_IDENTIFIER_TEXT = /^[^\p{Cc}\p{Cf}\p{Cs}]+$/u;
+const FSP_ID = /^[A-Za-z0-9_-]+$/;
 
 export class FspParty {
     @IsOptional()
@@ -16,6 +19,7 @@ export class FspParty {
     @IsNotEmpty()
     @IsString()
     @MaxLength(128, {message: 'idValue must not exceed 128 characters'})
+    @Matches(SAFE_IDENTIFIER_TEXT, {message: 'idValue must not contain control or formatting characters'})
     idValue!: string;
 
     @IsOptional()
@@ -55,6 +59,7 @@ export class FspParty {
     @IsNotEmpty()
     @IsString()
     @MaxLength(32, {message: 'fspId must not exceed 32 characters'})
+    @Matches(FSP_ID, {message: 'fspId must contain only letters, numbers, underscores, or hyphens'})
     fspId!: string;
 
     @IsOptional()
