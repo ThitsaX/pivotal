@@ -171,11 +171,45 @@ describe('SendMoneyRequest', () => {
 
     it('accepts a 128-character payer idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(128);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(128),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
         assert.deepEqual(errors, []);
+    });
+
+    it('accepts international and leading-zero local MSISDN values', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '+224621234567';
+        (body.to as Record<string, unknown>).idValue = '09980702315';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects malformed and formatted MSISDN values', async () => {
+        const invalidValues = [
+            '+224 621 234 567',
+            '224-621-234-567',
+            '+09980702315',
+            '1234567890123456',
+        ];
+
+        for (const idValue of invalidValues) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.to as Record<string, unknown>).idValue = idValue;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.ok(
+                messages(errors).includes('idValue for MSISDN must contain 2 to 15 digits, with an optional leading plus sign for international numbers'),
+                `expected MSISDN validation error for ${idValue}`,
+            );
+        }
     });
 
     it('accepts visible Mojaloop party identifier formats', async () => {
@@ -244,7 +278,10 @@ describe('SendMoneyRequest', () => {
 
     it('rejects a 129-character payer idValue (the payer_id overflow that jammed the audit consumer)', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
@@ -253,7 +290,10 @@ describe('SendMoneyRequest', () => {
 
     it('rejects a 129-character payee idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.to as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
