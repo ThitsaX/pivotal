@@ -7,14 +7,18 @@ import CustomDropdown from './CustomDropdown.vue';
 
 type RangeMode = 'today' | 'last24' | 'custom';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     label: string;
     selectedTimeZone: string;
     mode?: string;
     startValue: string;
     endValue: string;
     disabled?: boolean;
-}>();
+    compactModeSelector?: boolean;
+    showLast24?: boolean;
+}>(), {
+    showLast24: true,
+});
 
 const emit = defineEmits<{
     (event: 'update:startValue', value: string): void;
@@ -30,6 +34,12 @@ const RANGE_OPTIONS: Array<{label: string; value: string}> = [
     {label: 'Last 24 Hours', value: 'last24'},
     {label: 'Custom Range', value: 'custom'},
 ];
+
+const visibleRangeOptions = computed((): Array<{label: string; value: string}> =>
+    props.showLast24 === false
+        ? RANGE_OPTIONS.filter((option) => option.value !== 'last24')
+        : RANGE_OPTIONS,
+);
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -455,14 +465,21 @@ watch(
             <span class="text-sm font-semibold text-ink">{{ label }}</span>
         </div>
 
-        <CustomDropdown
-            :model-value="selectedMode"
-            :options="RANGE_OPTIONS"
-            placeholder="Select Range"
-            button-class="!py-2.5 !text-sm !rounded-xl"
-            :disabled="props.disabled === true"
-            @update:model-value="onModeSelected"
-        />
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div :class="props.compactModeSelector === true ? 'w-full sm:w-48' : 'w-full'">
+                <CustomDropdown
+                    :model-value="selectedMode"
+                    :options="visibleRangeOptions"
+                    placeholder="Select Range"
+                    button-class="!py-2.5 !text-sm !rounded-xl"
+                    :disabled="props.disabled === true"
+                    @update:model-value="onModeSelected"
+                />
+            </div>
+            <div v-if="selectedMode !== 'custom' && $slots.action" class="shrink-0">
+                <slot name="action" />
+            </div>
+        </div>
 
         <Transition
             enter-active-class="transition-all duration-250 ease-out"
@@ -631,6 +648,10 @@ watch(
                     </svg>
                     {{ rangeError }}
                 </p>
+
+                <div v-if="$slots.action" class="mt-3 flex justify-end">
+                    <slot name="action" />
+                </div>
             </div>
         </Transition>
     </div>

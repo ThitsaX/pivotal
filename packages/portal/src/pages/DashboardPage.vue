@@ -565,28 +565,32 @@ watch(
             v-if="canView"
             class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
         >
-            <div class="grid items-end gap-4 lg:grid-cols-[minmax(20rem,1fr)_auto]">
-                <TimeRangeSelector
-                    label="Dashboard time range"
-                    :selected-time-zone="selectedTimeZone"
-                    :mode="rangeMode"
-                    :start-value="rangeStart"
-                    :end-value="rangeEnd"
-                    :disabled="loading"
-                    @update:mode="rangeMode = $event as RangeMode"
-                    @update:start-value="rangeStart = $event"
-                    @update:end-value="rangeEnd = $event"
-                    @update:invalid="rangeInvalid = $event"
-                />
-                <button
-                    type="button"
-                    class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
-                    @click="applyRange"
-                >
-                    {{ loading ? 'Applying…' : 'Apply range' }}
-                </button>
-            </div>
+            <TimeRangeSelector
+                label="Dashboard time range"
+                :selected-time-zone="selectedTimeZone"
+                :mode="rangeMode"
+                :start-value="rangeStart"
+                :end-value="rangeEnd"
+                :disabled="loading"
+                compact-mode-selector
+                :show-last24="false"
+                :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
+                @update:mode="rangeMode = $event as RangeMode"
+                @update:start-value="rangeStart = $event"
+                @update:end-value="rangeEnd = $event"
+                @update:invalid="rangeInvalid = $event"
+            >
+                <template #action>
+                    <button
+                        type="button"
+                        class="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
+                        @click="applyRange"
+                    >
+                        {{ loading ? 'Applying…' : 'Apply range' }}
+                    </button>
+                </template>
+            </TimeRangeSelector>
             <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
                 Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
                 {{ appliedRangeLabel }} ({{ selectedTimeZone }})
