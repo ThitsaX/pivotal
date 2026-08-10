@@ -72,7 +72,8 @@ export class WebOutboundSettings
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
             this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
-            this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0
+            this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
+            this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
         );
     }
 

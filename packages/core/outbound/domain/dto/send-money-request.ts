@@ -2,7 +2,7 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Transform, Type } from 'class-transformer';
 import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario } from '@shared/fspiop';
+import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario, IsAmountType } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
 
 export class SendMoneyRequest {
@@ -23,6 +23,7 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @IsEnum(AmountType)
+    @IsAmountType()
     amountType!: AmountType;
 
     @IsDefined()

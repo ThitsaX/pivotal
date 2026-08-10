@@ -7,6 +7,7 @@ import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningIntercept
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
 import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
+import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
@@ -72,6 +73,12 @@ export class OutboundDomainModule {
                 provide: AmountDecimalValidator,
                 useFactory: (outboundSettings: OutboundSettings): AmountDecimalValidator =>
                     new AmountDecimalValidator(outboundSettings.amountDecimalPlaces),
+                inject: [OutboundSettings],
+            },
+            {                                                                                                                                                                       
+                provide: AmountTypeConstraint,                                                                                                                                      
+                useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 
+                    new AmountTypeConstraint(outboundSettings.strictAmountType), 
                 inject: [OutboundSettings],
             },
             {
