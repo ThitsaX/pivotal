@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ExtensionList, FspiopException, FspiopStatusTranslator, FspiopUserMessages, ErrorMessageLanguage } from '@shared/fspiop';
-import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error'
+import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error';
+import { SendMoneyRequest } from '@core/outbound/domain';
 
 export class OutboundErrorInformation {
     statusCode!: string;
@@ -23,15 +24,23 @@ export class OutboundExceptionFilter implements ExceptionFilter {
         private readonly language: ErrorMessageLanguage = FspiopUserMessages.DEFAULT_LANGUAGE,
     ) { }
     catch(exception: unknown, host: ArgumentsHost): void {
-        const response = host.switchToHttp().getResponse<Response>();
+        const http = host.switchToHttp();
+        const response = http.getResponse<Response>();
 
         const validationError = OutboundExceptionFilter.getValidationErrorResponse(exception);
 
         if (validationError != null) {
-            response
-                .status(400)
-                .json(validationError);
+            const request = http.getRequest<Request>();
+            const body = request.body as SendMoneyRequest;
 
+            if (body) {
+                this.logger.log(`Post SendMoney Request for from.idValue ${body.from?.idValue} to.idValue ${body.to?.idValue} 
+                    : ${JSON.stringify(body)}`);
+                this.logger.error(`Post SendMoney Error Response for from.idValue ${body.from?.idValue} to.idValue ${body.to?.idValue} 
+                    : ${JSON.stringify(validationError)}`);
+            }
+
+            response.status(400).json(validationError);
             return;
         }
 
