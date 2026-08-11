@@ -4,7 +4,7 @@ import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OutboundDomainModule } from '@core/outbound/domain';
 import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
-import { AccessGuard, JwtPolicy } from './component';
+import { AccessGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
 import { DfspListController, SendMoneyController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
@@ -75,8 +75,8 @@ export class WebOutboundModule {
                     return new AccessGuard(accessKeyStore, settings.jwtPolicy(), reflector);
                 },
                 inject: [AccessKeyStore, REQUIRED_SETTINGS, Reflector],
-            }
-
+            },
+            SendMoneyLogInterceptor,
         ];
     }
 

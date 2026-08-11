@@ -4,7 +4,7 @@ import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } fr
 import { Request, Response } from 'express';
 import { ExtensionList, FspiopException, FspiopStatusTranslator, FspiopUserMessages, ErrorMessageLanguage } from '@shared/fspiop';
 import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error';
-import { SendMoneyRequest } from '@core/outbound/domain';
+import { LoggableErrorResponse, formatSendMoneyErrorResponseLog } from './send-money-log';
 
 export class OutboundErrorInformation {
     statusCode!: string;
@@ -19,6 +19,8 @@ export class OutboundErrorInformation {
 @Catch()
 export class OutboundExceptionFilter implements ExceptionFilter {
 
+    private static readonly SEND_MONEY_PATH = '/secured/sendmoney';
+
     private readonly logger = new Logger(OutboundExceptionFilter.name);
     constructor(
         private readonly language: ErrorMessageLanguage = FspiopUserMessages.DEFAULT_LANGUAGE,
@@ -26,19 +28,12 @@ export class OutboundExceptionFilter implements ExceptionFilter {
     catch(exception: unknown, host: ArgumentsHost): void {
         const http = host.switchToHttp();
         const response = http.getResponse<Response>();
+        const request = http.getRequest<Request>();
 
         const validationError = OutboundExceptionFilter.getValidationErrorResponse(exception);
 
         if (validationError != null) {
-            const request = http.getRequest<Request>();
-            const body = request.body as SendMoneyRequest;
-
-            if (body) {
-                this.logger.log(`Post SendMoney Request for from.idValue ${body.from?.idValue} to.idValue ${body.to?.idValue} 
-                    : ${JSON.stringify(body)}`);
-                this.logger.error(`Post SendMoney Error Response for from.idValue ${body.from?.idValue} to.idValue ${body.to?.idValue} 
-                    : ${JSON.stringify(validationError)}`);
-            }
+            this.logSendMoneyErrorResponse(request, validationError);
 
             response.status(400).json(validationError);
             return;
@@ -46,7 +41,11 @@ export class OutboundExceptionFilter implements ExceptionFilter {
 
         const fspiopException = OutboundExceptionFilter.toFspiopException(exception);
         const status = FspiopStatusTranslator.toHttpStatus(fspiopException);
+        const errorInformation = this.toErrorInformation(fspiopException);
 
+        // Diagnostics only: an unexpected failure is worth a stack trace, a deliberate
+        // FspiopException is not. This condition must never gate the audit log below -
+        // that is what previously dropped every non-ValidationPipe error response.
         if (fspiopException.originalError != null || !(exception instanceof FspiopException)) {
             this.logger.error(
                 fspiopException.message,
@@ -54,10 +53,44 @@ export class OutboundExceptionFilter implements ExceptionFilter {
             );
         }
 
+        this.logSendMoneyErrorResponse(request, errorInformation);
+
         response
             .status(status)
-            // .json(OutboundExceptionFilter.toErrorInformation(fspiopException))
-            .json(this.toErrorInformation(fspiopException));
+            .json(errorInformation);
+    }
+
+    /**
+     * Writes the Post Send Money error-response line at ERROR level, on every error path.
+     *
+     * Deliberately code-agnostic. The set of reachable error codes is open-ended because
+     * post-send-money.handler.ts#toFspiopException adopts whatever code the peer DFSP
+     * returned, so filtering on any particular code here would silently drop the rest.
+     */
+    private logSendMoneyErrorResponse(
+        request: Request | undefined,
+        errorResponse: LoggableErrorResponse,
+    ): void {
+        if (!OutboundExceptionFilter.isPostSendMoney(request)) {
+            return;
+        }
+
+        this.logger.error(formatSendMoneyErrorResponseLog(request?.body, errorResponse));
+    }
+
+    /**
+     * The filter is global, so it also sees PUT sendmoney and the dfsp-list routes.
+     * Without this check their failures would be logged as Send Money lines carrying
+     * undefined identifiers, polluting the exact search this log exists to serve.
+     */
+    private static isPostSendMoney(request: Request | undefined): boolean {
+        if (request?.method !== 'POST') {
+            return false;
+        }
+
+        const path = request.route?.path ?? request.path;
+
+        return path === OutboundExceptionFilter.SEND_MONEY_PATH;
     }
 
     private static toFspiopException(exception: unknown): FspiopException {
