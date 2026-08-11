@@ -4,6 +4,9 @@
   "description": "Pivotal : The multi-tenant payment adapter for Mojaloop",
   "private": true,
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "build": "nest build",
     "build:core-inbound-domain": "nest build core-inbound-domain",
