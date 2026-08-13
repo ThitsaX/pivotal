@@ -155,6 +155,21 @@ describe('SendMoneyRequest', () => {
         assert.deepEqual(errors, []);
     });
 
+    it('accepts underscores and hyphens in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer_fsp-1', 'payee_fsp-2'));
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer.fsp', 'payee fsp'));
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'fspId must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
+    });
+
     it('rejects a 33-character payer FSP ID', async () => {
         const {errors} = await validateSendMoneyRequest(sendMoneyBody('f'.repeat(33), 'wallet2'));
 
@@ -169,16 +184,117 @@ describe('SendMoneyRequest', () => {
 
     it('accepts a 128-character payer idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(128);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(128),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
         assert.deepEqual(errors, []);
     });
 
+    it('accepts international and leading-zero local MSISDN values', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '+224621234567';
+        (body.to as Record<string, unknown>).idValue = '09980702315';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects malformed and formatted MSISDN values', async () => {
+        const invalidValues = [
+            '+224 621 234 567',
+            '224-621-234-567',
+            '+09980702315',
+            '1234567890123456',
+        ];
+
+        for (const idValue of invalidValues) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.to as Record<string, unknown>).idValue = idValue;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.ok(
+                messages(errors).includes('idValue for MSISDN must contain 2 to 15 digits, with an optional leading plus sign for international numbers'),
+                `expected MSISDN validation error for ${idValue}`,
+            );
+        }
+    });
+
+    it('accepts visible Mojaloop party identifier formats', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'MSISDN',
+            idValue: '+224621234567',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'EMAIL',
+            idValue: 'person+tag@example.com',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('accepts letters, numbers, underscores, and hyphens in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'BUSINESS_123-ABC',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'LBR-MER_00012345',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'business.example',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'merchant alias',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue for BUSINESS or ALIAS must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
+    });
+
+    it('rejects control characters in payer and payee idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '\u0003 /bin/sleep 4 \r';
+        (body.to as Record<string, unknown>).idValue = '2769\u200B200001';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue must not contain control or formatting characters').length,
+            2,
+        );
+    });
+
     it('rejects a 129-character payer idValue (the payer_id overflow that jammed the audit consumer)', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
@@ -187,7 +303,10 @@ describe('SendMoneyRequest', () => {
 
     it('rejects a 129-character payee idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.to as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 

@@ -22,6 +22,7 @@ export class TransactionReportGenerator {
     private static readonly LOGGER = new Logger(TransactionReportGenerator.name);
     private static readonly XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     private static readonly XLSX_MAX_DATA_ROWS_PER_SHEET = 1_048_575;
+    private static readonly XLSX_MAX_CELL_TEXT_LENGTH = 32_767;
 
     private static readonly COLUMNS: readonly ReportColumn[] = [
         {header: 'Transfer ID', key: 'transferId'},
@@ -387,8 +388,39 @@ export class TransactionReportGenerator {
         }
 
         return `<c r="${reference}" t="inlineStr"><is><t>${TransactionReportGenerator.xmlValue(
-            TransactionReportGenerator.safeTextValue(value),
+            TransactionReportGenerator.xlsxTextValue(value),
         )}</t></is></c>`;
+    }
+
+    private static xlsxTextValue(value: unknown): string {
+        const normalized = TransactionReportGenerator.safeTextValue(value);
+        let result = '';
+
+        // XML 1.0 excludes most control characters and UTF-16 surrogate code units. Iterate by
+        // code point so valid supplementary Unicode is retained and never split at Excel's limit.
+        for (const character of normalized) {
+            const codePoint = character.codePointAt(0)!;
+            const safeCharacter = TransactionReportGenerator.isValidXmlCharacter(codePoint)
+                ? character
+                : '\uFFFD';
+
+            if (result.length + safeCharacter.length > TransactionReportGenerator.XLSX_MAX_CELL_TEXT_LENGTH) {
+                break;
+            }
+
+            result += safeCharacter;
+        }
+
+        return result;
+    }
+
+    private static isValidXmlCharacter(codePoint: number): boolean {
+        return codePoint === 0x09
+            || codePoint === 0x0A
+            || codePoint === 0x0D
+            || (codePoint >= 0x20 && codePoint <= 0xD7FF)
+            || (codePoint >= 0xE000 && codePoint <= 0xFFFD)
+            || (codePoint >= 0x10000 && codePoint <= 0x10FFFF);
     }
 
     private static safeTextValue(value: unknown): string {

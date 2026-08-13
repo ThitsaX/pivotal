@@ -1,8 +1,50 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Type} from 'class-transformer';
-import {IsArray, IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested} from 'class-validator';
+import {
+    IsArray,
+    IsDefined,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Matches,
+    MaxLength,
+    Validate,
+    ValidateNested,
+    ValidationArguments,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
 import {Extension, PartyIdType, TransactionInitiatorType} from '@shared/fspiop';
+
+const SAFE_IDENTIFIER_TEXT = /^[^\p{Cc}\p{Cf}\p{Cs}]+$/u;
+const SIMPLE_IDENTIFIER = /^[A-Za-z0-9_-]+$/;
+const MSISDN = /^(?:\+?[1-9][0-9]{1,14}|0[0-9]{1,14})$/;
+
+@ValidatorConstraint({name: 'isPartyIdValue', async: false})
+class PartyIdValueConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown, args: ValidationArguments): boolean {
+        const {idType} = args.object as FspParty;
+        if (idType === PartyIdType.Msisdn) {
+            return typeof value === 'string' && MSISDN.test(value);
+        }
+        if (idType === PartyIdType.Business || idType === PartyIdType.Alias) {
+            return typeof value === 'string' && SIMPLE_IDENTIFIER.test(value);
+        }
+
+        return true;
+    }
+
+    defaultMessage(args: ValidationArguments): string {
+        const {idType} = args.object as FspParty;
+        if (idType === PartyIdType.Msisdn) {
+            return 'idValue for MSISDN must contain 2 to 15 digits, with an optional leading plus sign for international numbers';
+        }
+
+        return 'idValue for BUSINESS or ALIAS must contain only letters, numbers, underscores, or hyphens';
+    }
+}
 
 export class FspParty {
     @IsOptional()
@@ -16,6 +58,8 @@ export class FspParty {
     @IsNotEmpty()
     @IsString()
     @MaxLength(128, {message: 'idValue must not exceed 128 characters'})
+    @Matches(SAFE_IDENTIFIER_TEXT, {message: 'idValue must not contain control or formatting characters'})
+    @Validate(PartyIdValueConstraint)
     idValue!: string;
 
     @IsOptional()
@@ -55,6 +99,7 @@ export class FspParty {
     @IsNotEmpty()
     @IsString()
     @MaxLength(32, {message: 'fspId must not exceed 32 characters'})
+    @Matches(SIMPLE_IDENTIFIER, {message: 'fspId must contain only letters, numbers, underscores, or hyphens'})
     fspId!: string;
 
     @IsOptional()
