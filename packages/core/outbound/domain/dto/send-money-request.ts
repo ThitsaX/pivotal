@@ -1,9 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Transform, Type } from 'class-transformer';
-import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import {
+    IsDefined,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    MaxLength,
+    Validate,
+    ValidateNested,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
 import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario, IsAmountType } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
+
+@ValidatorConstraint({name: 'hasPayerFspId', async: false})
+class HasPayerFspIdConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        const fspId = (value as FspParty | undefined)?.fspId;
+        return typeof fspId === 'string' && fspId.length > 0;
+    }
+
+    defaultMessage(): string {
+        return 'from.fspId is required';
+    }
+}
 
 export class SendMoneyRequest {
     @IsNotEmpty()
@@ -13,6 +36,7 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @ValidateNested()
+    @Validate(HasPayerFspIdConstraint)
     @Type(() => FspParty)
     from!: FspParty;
 

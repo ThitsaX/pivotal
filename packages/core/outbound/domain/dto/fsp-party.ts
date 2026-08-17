@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Type} from 'class-transformer';
+import {Transform, Type} from 'class-transformer';
 import {
     IsArray,
     IsDefined,
@@ -96,11 +96,12 @@ export class FspParty {
     @MaxLength(4, {message: 'merchantClassificationCode must not exceed 4 characters'})
     merchantClassificationCode?: string;
 
-    @IsNotEmpty()
+    @Transform(({value}) => typeof value === 'string' && value.trim().length === 0 ? undefined : value)
+    @IsOptional()
     @IsString()
     @MaxLength(32, {message: 'fspId must not exceed 32 characters'})
     @Matches(SIMPLE_IDENTIFIER, {message: 'fspId must contain only letters, numbers, underscores, or hyphens'})
-    fspId!: string;
+    fspId?: string;
 
     @IsOptional()
     @IsArray()

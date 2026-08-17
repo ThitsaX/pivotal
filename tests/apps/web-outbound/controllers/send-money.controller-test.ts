@@ -155,6 +155,41 @@ describe('SendMoneyRequest', () => {
         assert.deepEqual(errors, []);
     });
 
+    it('accepts a missing payee FSP ID for oracle-based resolution', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        delete (body.to as Record<string, unknown>).fspId;
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'merchant-123',
+        });
+
+        const {request, errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.to.fspId, undefined);
+    });
+
+    it('normalizes an empty payee FSP ID to undefined', async () => {
+        const body = sendMoneyBody('wallet1', '');
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'merchant-123',
+        });
+
+        const {request, errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.to.fspId, undefined);
+    });
+
+    it('still requires the payer FSP ID', async () => {
+        const body = sendMoneyBody('', 'wallet2');
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('from.fspId is required'));
+    });
+
     it('accepts underscores and hyphens in FSP IDs', async () => {
         const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer_fsp-1', 'payee_fsp-2'));
 
