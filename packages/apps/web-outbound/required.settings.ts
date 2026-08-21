@@ -49,6 +49,10 @@ export class WebOutboundSettings
             socketTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_SOCKET_TIMEOUT_MS'),
             connectionTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_CONNECTION_TIMEOUT_MS'),
         };
+        const centralRegistryOracleAxiosParams = {
+            socketTimeoutMs: this.readPositiveInteger('CENTRAL_REGISTRY_ORACLE_SOCKET_TIMEOUT_MS'),
+            connectionTimeoutMs: this.readPositiveInteger('CENTRAL_REGISTRY_ORACLE_CONNECTION_TIMEOUT_MS'),
+        };
 
         const fspiopAxiosParams: FspiopAxiosParams = {
             socketTimeoutMs,
@@ -72,6 +76,8 @@ export class WebOutboundSettings
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
             this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
+            this.readRequiredString('CENTRAL_REGISTRY_ORACLE_ENDPOINT'),
+            centralRegistryOracleAxiosParams,
             this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
         );

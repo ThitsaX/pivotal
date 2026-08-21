@@ -5,7 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { OutboundDomainModule } from '@core/outbound/domain';
 import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
 import { AccessGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
-import { DfspListController, SendMoneyController } from './controllers';
+import { CentralRegistryController, DfspListController, SendMoneyController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
 import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
@@ -48,7 +48,7 @@ export class WebOutboundModule {
                 outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [SendMoneyController, DfspListController],
+            controllers: [SendMoneyController, DfspListController, CentralRegistryController],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],

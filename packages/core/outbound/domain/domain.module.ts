@@ -4,15 +4,20 @@ import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuditProducerModule } from '@core/audit/producer';
 import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
-import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
+import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
-import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
+import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
 import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
-const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
+const CommandHandlers = [
+    PostSendMoneyHandler,
+    PutAcceptPartyHandler,
+    PutAcceptQuoteHandler,
+    RegisterMsisdnHandler,
+];
 const QueryHandlers = [
     GetDfspListByUsecaseHandler,
     GetDfspListHandler,
@@ -92,6 +97,16 @@ export class OutboundDomainModule {
                     );
                 },
                 inject: [OutboundSettings, RedisClient],
+            },
+            {
+                provide: OracleCentralRegistryClient,
+                useFactory: (outboundSettings: OutboundSettings): OracleCentralRegistryClient => {
+                    return new OracleCentralRegistryClient(
+                        outboundSettings.centralRegistryOracleEndpoint,
+                        outboundSettings.centralRegistryOracleAxiosParams,
+                    );
+                },
+                inject: [OutboundSettings],
             },
             ...(asyncOptions.providers ?? []),
             {
