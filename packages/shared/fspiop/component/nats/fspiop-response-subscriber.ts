@@ -6,6 +6,7 @@ import {NatsClientService} from '@shared/nats';
 import {ErrorInformationObject} from '../../dto';
 import {FspiopErrors} from '../../exception/fspiop-errors';
 import {FspiopException} from '../../exception/fspiop-exception';
+import {FspiopPubSubSubjects} from '../fspiop-pub-sub-subjects';
 import {
     FSPIOP_RESPONSE_STREAM_SUBJECT,
     resolveFspiopResponseStream,
@@ -24,6 +25,11 @@ type RecentEntry = {
     readonly subject: string;
     readonly payload: unknown;
     readonly expiresAt: number;
+};
+
+type RecentMatch = {
+    readonly entry: RecentEntry;
+    readonly matchedSubject: string;
 };
 
 /**
@@ -132,10 +138,10 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
 
         if (cached != null) {
             return FspiopResponseSubscriber.guard(
-                cached.subject === successSubject
-                    ? Promise.resolve(cached.payload as T)
+                cached.matchedSubject === successSubject
+                    ? Promise.resolve(cached.entry.payload as T)
                     : Promise.reject(FspiopResponseSubscriber.toFspiopException(
-                        cached.payload as ErrorInformationObject,
+                        cached.entry.payload as ErrorInformationObject,
                     )),
             );
         }
@@ -228,14 +234,23 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
     private dispatch(msg: JsMsg): void {
         const subject = msg.subject;
         const payload = this.nats.codec.decode(msg.data);
-        const entry = this.pending.get(subject);
+        let matchedSubject = subject;
+        let entry = this.pending.get(matchedSubject);
+
+        if (entry == null) {
+            const anyPayeeSubject = FspiopPubSubSubjects.Parties.toAnyPayeeSubject(subject);
+            if (anyPayeeSubject != null) {
+                matchedSubject = anyPayeeSubject;
+                entry = this.pending.get(matchedSubject);
+            }
+        }
 
         if (entry == null) {
             this.addToRecent(subject, payload);
             return;
         }
 
-        const isSuccess = subject === entry.successSubject;
+        const isSuccess = matchedSubject === entry.successSubject;
         this.cancel(entry.successSubject);
 
         if (isSuccess) {
@@ -266,7 +281,7 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
         successSubject: string,
         errorSubject: string,
         hubErrorSubject: string | undefined,
-    ): RecentEntry | null {
+    ): RecentMatch | null {
         this.evictExpiredRecent();
 
         const candidates = hubErrorSubject != null
@@ -277,7 +292,15 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
             const entry = this.recent.get(subject);
             if (entry != null) {
                 this.recent.delete(subject);
-                return entry;
+                return {entry, matchedSubject: subject};
+            }
+        }
+
+        for (const [subject, entry] of this.recent) {
+            const anyPayeeSubject = FspiopPubSubSubjects.Parties.toAnyPayeeSubject(subject);
+            if (anyPayeeSubject != null && candidates.includes(anyPayeeSubject)) {
+                this.recent.delete(subject);
+                return {entry, matchedSubject: anyPayeeSubject};
             }
         }
 

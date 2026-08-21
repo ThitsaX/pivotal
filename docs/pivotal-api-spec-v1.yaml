@@ -585,11 +585,10 @@ Allowed values:
 
       type: string
       description: A Mojaloop API transfer identifier (ULID).
-    FspParty:
+    FspPartyBase:
       required:
       - idType
       - idValue
-      - fspId
       type: object
       properties:
         type:
@@ -612,10 +611,35 @@ Allowed values:
           $ref: '#/components/schemas/dateOfBirth'
         merchantClassificationCode:
           $ref: '#/components/schemas/merchantClassificationCode'
-        fspId:
-          $ref: '#/components/schemas/fspId'
         extensionList:
           $ref: '#/components/schemas/extensionList'
+    FspParty:
+      description: A party with a known FSP. The `fspId` is required for payer requests and resolved response data.
+      allOf:
+      - $ref: '#/components/schemas/FspPartyBase'
+      - type: object
+        required:
+        - fspId
+        properties:
+          fspId:
+            $ref: '#/components/schemas/fspId'
+    PayeeFspPartyRequest:
+      description: |
+        The payee party to look up. `fspId` may be omitted or blank when the
+        payee DFSP is unknown. In that case, Pivotal sends an undirected party
+        lookup and uses the `fspId` returned by the Hub/Oracle for the quote and
+        transfer stages. If supplied, `fspId` continues to direct the lookup to
+        that DFSP.
+      allOf:
+      - $ref: '#/components/schemas/FspPartyBase'
+      - type: object
+        properties:
+          fspId:
+            description: Optional payee FSP identifier. An empty string is treated as omitted.
+            oneOf:
+            - $ref: '#/components/schemas/fspId'
+            - type: string
+              maxLength: 0
     postSendMoneyRequest:
       required:
       - amount
@@ -633,7 +657,7 @@ Allowed values:
         from:
           $ref: '#/components/schemas/FspParty'
         to:
-          $ref: '#/components/schemas/FspParty'
+          $ref: '#/components/schemas/PayeeFspPartyRequest'
         amountType:
           $ref: '#/components/schemas/amountType'
         currency:
