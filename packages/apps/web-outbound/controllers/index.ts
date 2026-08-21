@@ -2,3 +2,4 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 export * from './send-money.controller';
 export * from './dfsp-list.controller';
+export * from './central-registry.controller';
