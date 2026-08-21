@@ -18,16 +18,18 @@ export class OracleCentralRegistryClient {
     private static readonly REGISTER_MSISDN_PATH = '/iips/v1/registry/msisdn';
 
     private readonly logger = new Logger(OracleCentralRegistryClient.name);
-    private readonly endpoint: string;
+    private readonly endpoint: string | undefined;
     private readonly client: AxiosInstance;
 
     constructor(
-        endpoint: string,
+        endpoint: string | undefined,
         params: OracleCentralRegistryAxiosParams = {},
     ) {
-        this.endpoint = endpoint.endsWith('/')
-            ? endpoint.slice(0, -1)
-            : endpoint;
+        this.endpoint = endpoint == null || endpoint.trim().length === 0
+            ? undefined
+            : endpoint.endsWith('/')
+                ? endpoint.slice(0, -1)
+                : endpoint;
 
         this.client = AxiosClientBuilder.newBuilder()
             .withParams(params)
@@ -38,9 +40,22 @@ export class OracleCentralRegistryClient {
         source: string,
         request: RegisterMsisdnRequest,
     ): Promise<OracleCentralRegistryResult> {
+        const endpoint = this.endpoint;
+
+        if (endpoint == null) {
+            this.logger.error(
+                'CENTRAL_REGISTRY_ORACLE_ENDPOINT is not configured; the Central Registry endpoint is disabled.',
+            );
+
+            throw new FspiopException(
+                FspiopErrors.NOT_IMPLEMENTED,
+                'Central Registry integration is not configured on this deployment.',
+            );
+        }
+
         try {
             const response = await this.client.post<unknown>(
-                `${this.endpoint}${OracleCentralRegistryClient.REGISTER_MSISDN_PATH}`,
+                `${endpoint}${OracleCentralRegistryClient.REGISTER_MSISDN_PATH}`,
                 request,
                 {
                     headers: {

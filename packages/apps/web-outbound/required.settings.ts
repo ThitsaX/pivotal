@@ -76,7 +76,7 @@ export class WebOutboundSettings
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
             this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
-            this.readRequiredString('CENTRAL_REGISTRY_ORACLE_ENDPOINT'),
+            this.readOptionalString('CENTRAL_REGISTRY_ORACLE_ENDPOINT'),
             centralRegistryOracleAxiosParams,
             this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
@@ -163,6 +163,15 @@ export class WebOutboundSettings
         }
 
         return parsed;
+    }
+
+    private readOptionalString(name: string): string | undefined {
+        const value = this.configService.get<string>(name);
+        if (value == null || value.trim().length === 0) {
+            return undefined;
+        }
+
+        return value;
     }
 
     private readOptionalBoolean(name: string): boolean | undefined {
