@@ -26,15 +26,77 @@ So the same key is used by two different processes:
 In a DFSP-A → DFSP-B transfer, two keys are in play because two FSPs are: web-outbound signs with
 A's, B's connector signs with B's.
 
-**Algorithm: ES256 (ECDSA P-256).** At 200 TPS with roughly six signatures per transaction, signing
-runs at 600–1,200/sec at 200 TPS, and around 300/sec at 50 TPS — comfortably inside a CloudHSM
-cluster, whose capacity scales by adding HSMs. ES256 is roughly an order of magnitude cheaper to sign than RS256, and
-Mojaloop's validator accepts `['RS256', 'ES256']`. The reference signer infers the algorithm from the
-key type (`config.signingKey.includes('BEGIN EC ') ? 'ES256' : 'RS256'`), so **registering an EC key
-*is* choosing ES256** — there is no separate field to negotiate.
+**Algorithm: RS256 (RSA-2048).** This **reverses an earlier ES256 decision**, and the reason is the
+agreed volume rather than a change of view about the cryptography.
 
-Two consequences: HSM key type is fixed at creation, so this must be decided before keys exist; and `Jwt.sign`/`Jwt.verify` currently hardcode `RS256`, which blocks ES256 everywhere until
-changed.
+At the agreed **80–100 TPS**, with roughly six signatures per transaction, signing runs at
+**480–600/sec**. RS256 clears that comfortably on either backend — RSA-2048 signing is ~1,000–1,500/sec
+per core in software, and well inside a two-HSM CloudHSM cluster. ES256 was selected when the working
+figure was 200 TPS (600–1,200/sec), where its order-of-magnitude signing advantage mattered. At
+480–600/sec it does not.
+
+With the performance case gone, what remains is compatibility, and it points the other way:
+
+- **ES256 depends on every peer's `sdk-standard-components` version.** `SIGNATURE_ALGORITHMS =
+  ['RS256','ES256']` is confirmed in v19.11.2 and v19.18.9, but each peer's installed version is
+  outside Pivotal's control. RS256 is accepted by every version ever shipped.
+- **ES256 makes MCM flag every Pivotal key `INVALID`** — its validator is RSA-only (see below). RSA
+  keys parse cleanly, so MCM's own validation signal stays usable.
+
+Both were live external unknowns; RS256 removes them. **RSA-2048** is the Mojaloop norm and the size
+peers will have tested against.
+
+Two consequences carry forward unchanged:
+
+- **Key type is fixed at creation.** Under `pkcs11` an HSM key's type cannot change after
+  `C_GenerateKeyPair`, so this is decided before any key exists — and after phase 4's first MCM
+  publish, changing it is a coordinated break per FSP (§A3.1).
+- **`Jwt.sign`/`Jwt.verify` hardcode `RS256`** — which, now that **both legs are RS256**, is no longer
+  a blocker. The `jwt.ts` work shrinks to the **protected header** (§A2), which is wrong
+  independently of algorithm. Still resolve the algorithm **per key** from
+  `participant_key.algorithm` rather than relying on the constant, so an individual DFSP can move
+  later without a flag day — and do **not** substitute a permissive `['RS256','ES256']` list, which
+  is the algorithm-confusion shape.
+
+**Both legs now use RS256**, so the two-algorithm coexistence an earlier draft had to design around
+no longer arises — see [`dfsp-facing-leg.md`](./dfsp-facing-leg.md) §1.
+
+### MCM's RSA-only validator — why RS256 keeps a signal ES256 would have lost
+
+MCM v3.8.0 stores each JWS public key as bare PEM — `createDfspJWSCerts` persists `body.publicKey`,
+despite the endpoint being named `jwscerts`. It validates that PEM with
+`forge.pki.publicKeyFromPem` (`PKIEngine.js:76`), and **node-forge is RSA-only**: an EC P-256 key
+throws `Cannot read public key. Unknown OID.` and the record is stored with
+`validationState: "INVALID"`.
+
+**Under RS256 this does not arise** — RSA keys parse cleanly and register `VALID`. The analysis below
+is retained because it was the decisive input into settled decision 3, and because it defines what
+breaks if anyone revisits ES256 later.
+
+**Nothing acts on the flag**, verified on both sides of the wire:
+
+| | Behaviour with `validationState: INVALID` |
+| --- | --- |
+| MCM server | `setDFSPJWSCerts` writes the record regardless; `getAllDFSPJWSCerts` serves it unfiltered. The only `INVALID` gate in the codebase covers `dfspCA`, not JWS |
+| PM4ML peer client | `compareAndUpdateJWS` diffs on `dfspId` and `createdAt` only, then builds `peerJWSKeys` as `{dfspId: publicKey}`. The field is carried for a log line and the UI, nothing else |
+| Peer verification | `sdk-standard-components` declares `SIGNATURE_ALGORITHMS = ['RS256', 'ES256']` — confirmed in both v19.11.2 and v19.18.9 |
+
+The visible effect is a red row per Pivotal-fronted DFSP in the MCM console. Expect it, and do not
+treat it as a failed registration. The upstream fix is a one-line swap to Node's
+`crypto.createPublicKey`, which handles RSA and EC alike.
+
+**Two consequences that are not cosmetic**, and both are handled outside MCM rather than by patching
+it:
+
+- **MCM's validation is no longer a usable signal.** With every Pivotal-fronted key permanently
+  `INVALID`, a genuinely malformed registration is indistinguishable from the expected state. Replace
+  it with a stronger check under Pivotal's own control: **after every publish, read back
+  `GET /dfsps/{dfspId}/jwscerts` and assert the returned PEM is byte-identical to what was sent.**
+  That catches truncation, a failed write, the wrong tenant and later drift — none of which MCM's
+  parse-only validator would have caught even for an RSA key.
+- **A future MCM release could begin filtering on the flag.** Nothing today does, but the behaviour
+  relied on here is incidental rather than contractual. Make an EC key round-trip — `POST`, then
+  `GET /dfsps/jwscerts` — a standing regression check after any MCM version bump.
 
 ## A2. Protected header — normative
 
@@ -100,11 +162,17 @@ structural mismatch.
 
 ## A3. Signing paths
 
-Both signers build the protected header with the same logic and delegate the cryptography to Vault.
-Neither ever holds key material.
+Both signers build the protected header with the same logic and delegate the cryptography to
+**CloudHSM over PKCS#11**. Neither ever holds key material, and **Vault is not on the signing path** —
+it supplies the `keyRef` and the HSM credentials, nothing more.
 
-- **web-outbound** signs for *every* payer tenant, so its Vault policy spans all keys.
-- **each connector** signs for *one* tenant, so its policy is scoped to that key alone.
+- **web-outbound** signs for *every* payer tenant, so its crypto user reaches all tenant keys.
+- **each connector** signs for *one* tenant, so its crypto user owns that key alone.
+
+Isolation here is **CloudHSM crypto-user key ownership**, not a Vault policy — CloudHSM authenticates
+crypto users with a username and password rather than IAM, so per-key scoping comes from ownership
+and sharing between CUs. That is what makes "a compromised connector signs as one DFSP" true, and it
+is open decision **O**.
 
 ### Connector signing
 
@@ -142,8 +210,8 @@ sequenceDiagram
     C->>C: serialize the body ONCE — these bytes are final
     C->>C: build protected header — alg, FSPIOP-URI, FSPIOP-HTTP-Method, FSPIOP-Source, FSPIOP-Destination, Date
     C->>C: signingInput = b64url(header) + "." + b64url(body)
-    C->>HSM: C_Sign over SHA-256 digest, CKM_ECDSA
-    HSM-->>C: raw R and S, already JOSE-shaped
+    C->>HSM: C_Sign over SHA-256 digest, CKM_SHA256_RSA_PKCS
+    HSM-->>C: PKCS#1 v1.5 signature, already JOSE-shaped
     C->>H: PUT /quotes/{id} — SAME bytes, plus fspiop-uri, fspiop-http-method, fspiop-signature
     alt Hub accepts
         H-->>C: 200 OK
@@ -167,9 +235,10 @@ sequenceDiagram
 
 Four details that matter:
 
-- **PKCS#11 returns raw R‖S already**, each padded to the curve order, so the output is JOSE-shaped
-  with no conversion. No ASN.1/DER unpacking and no Vault-Transit marshaling flag. The DER problem
-  returns only for a tenant signing through their own cloud KMS.
+- **RS256 needs no signature re-encoding at all.** A PKCS#1 v1.5 signature is a single integer of
+  fixed length, so PKCS#11, Node `crypto` and the JOSE wire format already agree. This is one of the
+  quieter simplifications RS256 buys: the ECDSA R‖S-versus-DER question that would have differed per
+  backend simply does not arise.
 - **Sign the digest, not the message.** Compute SHA-256 in the application and pass it to `C_Sign`.
 - **Serialize once.** The bytes hashed must be byte-identical to the bytes on the wire.
 - **Ack after the PUT.** This is what gives JetStream-backed retry. Today the connector throws
@@ -197,8 +266,38 @@ Two rules follow, and they apply to every signing provider:
   → allow peer propagation → *then* advance the pinned version and nudge. Reversing these two steps
   is an outage.
 
+Concretely, with `keyRef` authoritative in Vault KV
+([`architecture.md`](./architecture.md) §5.1), rotation is four ordered steps:
+
+| | Step | Effect |
+| --- | --- | --- |
+| 1 | Generate the new keypair in the HSM | inert — nothing references it |
+| 2 | Write the new public key to `participant_key` | inert — a `self` public key has no local reader |
+| 3 | Publish it to MCM, allow peer propagation | peers can now verify the new key |
+| 4 | **Switch `keyRef` in Vault KV**, then nudge | **the commit point** — signing changes here, for every signer at once |
+
+Steps 1–3 are idempotent and safe to retry. Only step 4 changes behaviour, it is a single write to a
+single store, and it is last — which is what makes "publish before switching" structural rather than
+a rule someone has to remember.
+
 Disable automatic rotation on FSPIOP signing keys wherever the backend offers it. Backends that do
 not auto-rotate asymmetric keys are **safer** here, not less capable.
+
+#### The migration to fresh keys must complete before the first MCM publish
+
+[`implementation-plan.md`](../implementation/implementation-plan.md) §2 does not migrate the existing RSA private
+keys — fresh EC keys are generated in CloudHSM and re-published. Combined with the rule above, that
+creates a **one-way door**, and the phase order depends on it:
+
+- **Before** the first publish to MCM, no peer holds any Pivotal key. Generating fresh keys for every
+  tenant is free — there is nothing to break, which is exactly why phase 1 can do it unilaterally.
+- **After** it, every key change is a coordinated break for that FSP, subject to the publish-then-
+  switch sequence above.
+
+So **all tenants must be on their final generated key before phase 4 runs.** Phase 1 precedes phase 4
+today, but the reason is not otherwise recorded anywhere, and a resequencing would convert a free
+operation into N coordinated outages. The phase-4 verification step is: no `participant_key` row with
+`key_type = jws` remains at `source = legacy` before the first MCM publish.
 
 The invalidation path covers provider and algorithm changes cleanly. What it does **not** yet specify
 is a `revoke` nudge for the connector's own tenant — refuse the message and let JetStream redeliver,
@@ -210,11 +309,16 @@ The NATS messages already carry everything needed — every publisher message in
 
 ## A4. Verification
 
-Only **web-inbound** verifies, and it needs two classes of public key:
+Only **web-inbound** verifies, and it needs three classes of public key:
 
 - **peer keys**, because the Hub forwards messages with the *originator's* signature intact. The Hub
   signs only what it originates: `fspiopSourceToSign: this.hubName`, and every signing site is gated
   on `fspiop-source === hubName`. Relayed traffic is not re-signed.
+- **Pivotal's own tenants' keys** — `role = self`. When two Pivotal-fronted tenants transact, the Hub
+  relays the payer's request back to Pivotal with `fspiop-source` naming one of our own tenants, so
+  web-inbound verifies a signature web-outbound produced. In a deployment where most or all
+  participants are Pivotal-fronted, this is the **common** case rather than an edge one, and it is
+  the reason the inbound guard reads `participant_key` at both roles rather than filtering to peers.
 - **the Hub's own key**, for Hub-generated errors arriving as `fspiop-source: hub`.
 
 Two prerequisites the current code does not meet:
@@ -247,8 +351,9 @@ The validators are the **peer DFSPs**, via `sdk-scheme-adapter` / PM4ML
 
 1. **You control the rollout.** Pivotal can start signing unilaterally — signatures are ignored until
    each peer is configured to verify. No flag day.
-2. **ES256 acceptability depends on the peers**, not the Hub. Confirm their installed
-   `sdk-standard-components` version.
+2. **Algorithm acceptability depends on the peers**, not the Hub — which is exactly why settled
+   decision 3 chose RS256. Every shipped `sdk-standard-components` accepts it, so no peer version
+   check is required. Re-open this only if ES256 is ever revisited.
 3. If you want a scheme rule on algorithms to be *enforceable*, it needs a validation point — adding
    JWS validation at the Hub ingress would also give you a conformance gate at onboarding.
 
@@ -311,15 +416,17 @@ sharing one leaf: no shared secret, and one workload can be revoked without touc
 
 **One public CA certificate. Nothing else, ever.** No CSR, no private key, no leaf.
 
-What gets registered is the **root** certificate, whose private key lives in CloudHSM
-([`architecture.md`](./architecture.md) §4.2) and signs the intermediate exactly once. Vault PKI holds
-the intermediate and issues the leaves. Registering the root rather than the intermediate means an
-intermediate can be replaced without re-registering anything with MCM.
+What gets registered is the **root** certificate, whose private key lives in CloudHSM (HSM-backed,
+[`architecture.md`](./architecture.md) §4.2) or in AWS KMS (KMS-backed, §4.8), and which
+signs the intermediate exactly once. **Vault PKI holds the intermediate and issues the leaves in both
+profiles.** Registering the root rather than the intermediate means an intermediate can be replaced
+without re-registering anything with MCM.
 
 The root certificate is produced by the one-time ceremony script described in
-[`implementation-plan.md`](./implementation-plan.md) §1.3 — the root keypair is generated in CloudHSM
-over PKCS#11, self-signed there, and exported as `pivotal-hub-client-ca.pem`. **Only the certificate
-leaves the HSM. The private key never does.**
+[`implementation-plan.md`](../implementation/implementation-plan.md) §1.3 — the root keypair is generated in CloudHSM
+over PKCS#11 (HSM-backed) or via `kms:Sign` on a non-exportable KMS key (KMS-backed), self-signed there, and
+exported as `pivotal-hub-client-ca.pem`. **Only the certificate leaves. The private key never does**,
+under either profile.
 
 ```http
 # once per tenant
@@ -351,7 +458,7 @@ client certificates are presented but never checked.
 ```mermaid
 sequenceDiagram
     autonumber
-    participant V as pki-hub-client<br/>issuing CA
+    participant V as Vault PKI<br/>pki-hub-client intermediate
     participant TM as trust-manager
     participant CM as cert-manager
     participant MCM as connection-manager-api
@@ -435,4 +542,4 @@ pattern, so **pulling all peer keys needs one credential and one token**, not N.
 credentials are exercised only on onboarding and rotation.
 
 At a 5-minute token lifetime that is under two token requests per minute — five orders of magnitude
-below the data plane. **The real capacity question is CloudHSM signing throughput, not Keycloak.**
+below the data plane. **The real capacity question is JWS signing throughput, not Keycloak** — CloudHSM `C_Sign` under HSM-backed, CPU under KMS-backed.

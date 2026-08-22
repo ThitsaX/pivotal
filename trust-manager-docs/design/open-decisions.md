@@ -3,12 +3,13 @@
 Everything not yet settled in the trust-manager design, with a recommendation for each.
 
 **How to use this file.** Each entry has a **Resolution** line, blank until decided. When one is
-answered, fill it in, move a one-line summary into the Settled table in [`README.md`](./README.md),
+answered, fill it in, move a one-line summary into the Settled table in [`README.md`](../README.md),
 and update whichever document the decision touches. Letters are stable identifiers — other documents
 reference them inline, so **do not renumber**.
 
-Decisions **A** and **M** are resolved and now live in the README as settled decisions — A in favour
-of the design (12), M by project requirement (10).
+Decisions **A**, **M** and **D** are resolved and now live in the README as settled decisions — A in
+favour of the design (12), M by project requirement (10), D against its own earlier recommendation
+(19). D's entry is retained below in full, because the reasoning that reversed it is worth keeping.
 
 ---
 
@@ -17,7 +18,7 @@ of the design (12), M by project requirement (10).
 | Tier | | Items | Nature |
 | --- | --- | --- | --- |
 | **1** | Blocking — documents cannot be completed | **K** | structural |
-| **2** | Security behaviour — must be specified before build | **D, G, E, B, C, F** | policy |
+| **2** | Security behaviour — must be specified before build | **G, E, B, C, F** | policy |
 | **3** | Fact checks | **N, H, I** | lookup |
 | **4** | Confirm with the client | **L, O** | confirmation |
 | — | Deferred, with reason | **J** | optional capability |
@@ -41,7 +42,7 @@ That is defensible with DFSP-scoped IAM and step-up authentication, and reckless
 Settle together with **F** — they are the same authorization question.
 
 **Blocks.** Whether the portal and DFSP-scoped IAM are in this phase. Also leaking into
-[`dfsp-integration-impact.md`](./dfsp-integration-impact.md), which currently hedges *"through the
+[`dfsp-integration-impact.md`](../external/dfsp-integration-impact.md), which currently hedges *"through the
 portal, or to the hub operator where enrollment is operator-mediated"* — that hedge must resolve
 before the document goes to external parties.
 
@@ -51,22 +52,52 @@ before the document goes to external parties.
 
 # Tier 2 — security behaviour
 
-## D. Cache-miss behaviour — fail open or closed
+## D. Cache-miss behaviour — fail open or closed — **RESOLVED: fail closed**
 
 **Question.** A request arrives, and the certificate or key is not in the in-memory cache. Reject, or
 allow?
 
-**Why it is open.** The two failure modes are not symmetric. Failing closed on a cold cache turns a
-pod restart into an outage. Failing open on a revoked credential defeats revocation.
+**Why it was open.** The two failure modes look asymmetric: failing closed on a cold cache appears to
+turn a pod restart into an outage, while failing open on a revoked credential defeats revocation. An
+earlier draft recommended failing *open* on cache-cold or unknown, with an alarm.
 
-**Recommendation.** **Fail open on cache-cold or unknown, with an alarm. Fail closed on
-known-and-revoked.** Availability where you have no information, safety where you do. The alarm
-matters as much as the rule — a silent fail-open is indistinguishable from working.
+**That recommendation was wrong, for two reasons.**
 
-**Blocks.** The runtime check sequence in [`dfsp-facing-leg.md`](./dfsp-facing-leg.md) §4, and the
-Phase 6 verification step.
+**It is not a security trade — it disables the control entirely.** Every check in
+[`dfsp-facing-leg.md`](./dfsp-facing-leg.md) §4 needs the row: status comes from it, and the binding
+rule compares `row.fsp_id` against `FSPIOP-Source`. With no row those checks are not relaxed, they
+are *unrunnable* — which reproduces precisely the attack §3 exists to prevent: a leaked accessKey for
+DFSP-B plus any CA-issued certificate transacts as DFSP-B. On the accessKey side it is worse still:
+"fail open" there means accepting a request whose signature cannot be verified at all.
 
-**Resolution.** *(pending)*
+**The dilemma was false.** It only exists if a cold pod receives traffic. Gate readiness on the
+initial cache load and Kubernetes routes nothing to a cold replica, so failing closed costs no
+availability and there is nothing left to trade. The cold-cache problem is startup sequencing, not
+authorization, and was being solved in the wrong layer.
+
+"Unknown" is also rarely benign. Envoy has already rejected anything not chaining to Pivotal's CA, so
+a zero-row lookup means a cold or partially-loaded cache, a purged row, an out-of-band issuance, a
+**fingerprint-format mismatch** (open decision **I** — which would make every lookup miss, silently,
+forever), or **mis-issuance from the software-held intermediate**. Fail-open is wrong for all of
+them, and for the last two it hands the decision back to chain validation — the exact thing the
+database check was added not to rely on.
+
+**Resolution — four rules:**
+
+| Condition | Behaviour |
+| --- | --- |
+| Row found, `status ∈ {active, retiring}` | proceed to the binding check |
+| Row found, `status = revoked` | **reject** — a known answer, always closed |
+| **No row after a bounded synchronous re-read** | **reject** |
+| **Cache not yet loaded** | **report unready** — receive no traffic at all, rather than answering |
+
+The synchronous re-read is the escape hatch for a genuinely new credential whose nudge has not
+landed: on a miss, query the authoritative store once under a tight timeout before rejecting. It is
+safe against abuse because Envoy has already bounded the space of presentable certificates to those
+Pivotal's CA actually issued.
+
+**Blocks — now unblocked.** The runtime check sequence in
+[`dfsp-facing-leg.md`](./dfsp-facing-leg.md) §4, and the Phase 6 verification step.
 
 ---
 
@@ -162,26 +193,17 @@ register its own replacement key?
 
 # Tier 3 — fact checks
 
-## N. Can a KMS custom key store hold `ECC_NIST_P256`?
+## N. Can a KMS custom key store hold `ECC_NIST_P256`? — **RESOLVED, moot**
 
-**Question.** Do AWS KMS custom key stores support asymmetric EC keys?
+**Closed by settled decision 3.** The question only mattered while FSPIOP JWS was ES256 and there was
+a chance the KMS custom key store might have to carry the signing keys. Both premises are gone:
 
-**Why it matters.** The project requirement names *AWS CloudHSM integrated with an AWS KMS custom key
-store*.
-Custom key stores have historically been limited to **symmetric** keys. If that still holds, the
-prescribed mechanism cannot hold the per-DFSP JWS signing keys at all, and **PKCS#11-direct to the
-same cluster becomes the only working path** — not merely the cheaper one.
+- signing is **RS256 (RSA-2048)**, so no EC key exists to store;
+- the custom key store backs the **Vault seal** only (a symmetric key), never signing — settled
+  decision 14 — and only in the HSM-backed profile.
 
-Either way the in-HSM requirement is satisfied: CloudHSM is a cloud-hosted dedicated HSM and
-operations are performed within it. The custom key store wording is a narrowing that may simply not
-fit asymmetric signing.
+Nothing in either profile depends on the answer. Retained as a record of why it was asked.
 
-**Action.** Verify against current AWS documentation early, and carry the answer into the
-application-layer-key discussion with the client.
-
-**Resolution.** *(pending)*
-
----
 
 ## H. Which CA chain the DFSP downloads
 
@@ -193,7 +215,7 @@ Pivotal's *server* certificate may be nothing at all, if the DFSP-facing gateway
 publicly-trusted issuer.
 
 **Action.** Confirm the DFSP-facing gateway's server-certificate issuer, then disambiguate the two in
-[`dfsp-integration-impact.md`](./dfsp-integration-impact.md), which currently mentions only
+[`dfsp-integration-impact.md`](../external/dfsp-integration-impact.md), which currently mentions only
 `chain.pem` without saying which.
 
 **Resolution.** *(pending)*
@@ -245,13 +267,34 @@ design changes.
 **Question.** How are crypto users created, scoped and rotated?
 
 **Why it is open.** CloudHSM authenticates with a **username and password per crypto user**, not with
-IAM policy. Per-key isolation comes from key ownership and sharing between crypto users. The claim in
-[`architecture.md`](./architecture.md) §3 — *a compromised connector signs as one DFSP* — is only
-true if each connector has **its own** crypto user owning only its tenant's key.
+IAM policy, and those credentials are static. The claim in [`architecture.md`](./architecture.md) §3 —
+*a compromised connector signs as one DFSP* — is only true if each connector has **its own** crypto
+user owning only its tenant's key.
 
-**Recommendation.** One CU per connector plus one for web-outbound, credentials delivered through
-Vault KV alongside the `keyRef`. Rotation is an operational procedure, since the credentials do not
-expire on their own.
+**Settled by the product's own model, not open:** the *ownership matrix*. Creation confers ownership
+permanently, there is no transfer operation, and an owner always retains use rights — so each key is
+generated as the tenant's own CU and then shared to web-outbound. See
+[`architecture.md`](./architecture.md) §4.3, which also states the residual privilege this leaves
+trust-manager. An earlier draft of that section described a "transfer ownership" step that does not
+exist in CloudHSM; it has been corrected.
+
+**Still open, and narrower than it was:** provisioning mechanics and rotation.
+
+**Recommendation.** One CU per DFSP (owner, held by that tenant's connector), one for web-outbound
+(owner of nothing, every key shared to it), and one for trust-manager (owner of nothing). Credentials
+delivered through Vault KV at the paths in [`implementation-plan.md`](../implementation/implementation-plan.md)
+§1.2.1 — note that web-outbound needs **one** credential and *N* references, so credential and
+`keyRef` do not share a path.
+
+Two things to settle before build:
+
+- **Rotation procedure.** CU passwords do not expire on their own, so rotation is an operational
+  runbook rather than a schedule. Decide the cadence and who executes it.
+- **Whether the residual privilege is acceptable.** Because onboarding is a single portal action,
+  trust-manager sets each tenant CU's password and can therefore re-authenticate as it. §4.3 accepts
+  this and compensates with an alarm on any `C_Sign` by `cu-trust-manager` — legitimately always
+  zero. The alternative is a two-party onboarding step where an operator holds the CU secret out of
+  band; it costs a manual step per DFSP and closes only one of two impersonation paths.
 
 **Blocks.** Nothing structurally, but retrofitting per-tenant crypto users across every connector
 later is painful, so agree it before build.
