@@ -1,0 +1,245 @@
+{
+  "$comment": [
+    "FSPIOP JWS conformance vectors \u2014 shared by the TypeScript monorepo and the Java connectors.",
+    "Language-neutral on purpose: both implementations execute this file, so drift between them",
+    "shows up as a failing test rather than as a rejected signature at a peer months later.",
+    "",
+    "'expected.protectedHeader' and 'expected.fspiopUri' are the contract, hand-written from the",
+    "reference implementation quoted in trust-manager-docs/design/hub-facing-leg.md section A2.",
+    "The remaining 'expected' fields are mechanical encodings of those two, not independent claims.",
+    "",
+    "Signatures are deliberately absent: RS256 over a fixed input is deterministic, but pinning one",
+    "would pin a key too. Implementations sign these inputs with their own key and verify round-trip."
+  ],
+  "algorithm": "RS256",
+  "vectors": [
+    {
+      "name": "put-quotes-with-destination",
+      "note": "The common case. Note content-type is NOT in the protected header.",
+      "request": {
+        "method": "PUT",
+        "url": "https://hub.example.com/quotes/abc-123",
+        "headers": {
+          "content-type": "application/vnd.interoperability.quotes+json;version=2.0",
+          "date": "Tue, 23 Aug 2026 09:15:00 GMT",
+          "fspiop-source": "payeefsp",
+          "fspiop-destination": "payerfsp"
+        },
+        "body": {
+          "transferAmount": {
+            "currency": "MMK",
+            "amount": "1000"
+          },
+          "expiration": "2026-08-23T09:30:00.000Z"
+        }
+      },
+      "expected": {
+        "fspiopUri": "/quotes/abc-123",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/quotes/abc-123",
+          "FSPIOP-HTTP-Method": "PUT",
+          "FSPIOP-Source": "payeefsp",
+          "FSPIOP-Destination": "payerfsp",
+          "Date": "Tue, 23 Aug 2026 09:15:00 GMT"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/quotes/abc-123\",\"FSPIOP-HTTP-Method\":\"PUT\",\"FSPIOP-Source\":\"payeefsp\",\"FSPIOP-Destination\":\"payerfsp\",\"Date\":\"Tue, 23 Aug 2026 09:15:00 GMT\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzL2FiYy0xMjMiLCJGU1BJT1AtSFRUUC1NZXRob2QiOiJQVVQiLCJGU1BJT1AtU291cmNlIjoicGF5ZWVmc3AiLCJGU1BJT1AtRGVzdGluYXRpb24iOiJwYXllcmZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE1OjAwIEdNVCJ9",
+        "payloadJson": "{\"transferAmount\":{\"currency\":\"MMK\",\"amount\":\"1000\"},\"expiration\":\"2026-08-23T09:30:00.000Z\"}",
+        "payloadB64": "eyJ0cmFuc2ZlckFtb3VudCI6eyJjdXJyZW5jeSI6Ik1NSyIsImFtb3VudCI6IjEwMDAifSwiZXhwaXJhdGlvbiI6IjIwMjYtMDgtMjNUMDk6MzA6MDAuMDAwWiJ9",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzL2FiYy0xMjMiLCJGU1BJT1AtSFRUUC1NZXRob2QiOiJQVVQiLCJGU1BJT1AtU291cmNlIjoicGF5ZWVmc3AiLCJGU1BJT1AtRGVzdGluYXRpb24iOiJwYXllcmZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE1OjAwIEdNVCJ9.eyJ0cmFuc2ZlckFtb3VudCI6eyJjdXJyZW5jeSI6Ik1NSyIsImFtb3VudCI6IjEwMDAifSwiZXhwaXJhdGlvbiI6IjIwMjYtMDgtMjNUMDk6MzA6MDAuMDAwWiJ9"
+      }
+    },
+    {
+      "name": "put-transfers-error-no-destination",
+      "note": "FSPIOP-Destination is omitted entirely when the header is absent, not set to null or empty.",
+      "request": {
+        "method": "PUT",
+        "url": "https://hub.example.com/transfers/t-1/error",
+        "headers": {
+          "date": "Tue, 23 Aug 2026 09:16:00 GMT",
+          "fspiop-source": "payeefsp"
+        },
+        "body": {
+          "errorInformation": {
+            "errorCode": "3100",
+            "errorDescription": "Generic validation error"
+          }
+        }
+      },
+      "expected": {
+        "fspiopUri": "/transfers/t-1/error",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/transfers/t-1/error",
+          "FSPIOP-HTTP-Method": "PUT",
+          "FSPIOP-Source": "payeefsp",
+          "Date": "Tue, 23 Aug 2026 09:16:00 GMT"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/transfers/t-1/error\",\"FSPIOP-HTTP-Method\":\"PUT\",\"FSPIOP-Source\":\"payeefsp\",\"Date\":\"Tue, 23 Aug 2026 09:16:00 GMT\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvdHJhbnNmZXJzL3QtMS9lcnJvciIsIkZTUElPUC1IVFRQLU1ldGhvZCI6IlBVVCIsIkZTUElPUC1Tb3VyY2UiOiJwYXllZWZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE2OjAwIEdNVCJ9",
+        "payloadJson": "{\"errorInformation\":{\"errorCode\":\"3100\",\"errorDescription\":\"Generic validation error\"}}",
+        "payloadB64": "eyJlcnJvckluZm9ybWF0aW9uIjp7ImVycm9yQ29kZSI6IjMxMDAiLCJlcnJvckRlc2NyaXB0aW9uIjoiR2VuZXJpYyB2YWxpZGF0aW9uIGVycm9yIn19",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvdHJhbnNmZXJzL3QtMS9lcnJvciIsIkZTUElPUC1IVFRQLU1ldGhvZCI6IlBVVCIsIkZTUElPUC1Tb3VyY2UiOiJwYXllZWZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE2OjAwIEdNVCJ9.eyJlcnJvckluZm9ybWF0aW9uIjp7ImVycm9yQ29kZSI6IjMxMDAiLCJlcnJvckRlc2NyaXB0aW9uIjoiR2VuZXJpYyB2YWxpZGF0aW9uIGVycm9yIn19"
+      }
+    },
+    {
+      "name": "put-parties-base-path-stripped",
+      "note": "A base-path prefix before the resource name is stripped, so the value is independent of how the peer's base URL is configured.",
+      "request": {
+        "method": "PUT",
+        "url": "https://gateway.example.com/fspiop/v2/parties/MSISDN/959123456",
+        "headers": {
+          "date": "Tue, 23 Aug 2026 09:17:00 GMT",
+          "fspiop-source": "payeefsp",
+          "fspiop-destination": "payerfsp"
+        },
+        "body": {
+          "party": {
+            "partyIdInfo": {
+              "partyIdType": "MSISDN",
+              "partyIdentifier": "959123456",
+              "fspId": "payeefsp"
+            }
+          }
+        }
+      },
+      "expected": {
+        "fspiopUri": "/parties/MSISDN/959123456",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/parties/MSISDN/959123456",
+          "FSPIOP-HTTP-Method": "PUT",
+          "FSPIOP-Source": "payeefsp",
+          "FSPIOP-Destination": "payerfsp",
+          "Date": "Tue, 23 Aug 2026 09:17:00 GMT"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/parties/MSISDN/959123456\",\"FSPIOP-HTTP-Method\":\"PUT\",\"FSPIOP-Source\":\"payeefsp\",\"FSPIOP-Destination\":\"payerfsp\",\"Date\":\"Tue, 23 Aug 2026 09:17:00 GMT\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcGFydGllcy9NU0lTRE4vOTU5MTIzNDU2IiwiRlNQSU9QLUhUVFAtTWV0aG9kIjoiUFVUIiwiRlNQSU9QLVNvdXJjZSI6InBheWVlZnNwIiwiRlNQSU9QLURlc3RpbmF0aW9uIjoicGF5ZXJmc3AiLCJEYXRlIjoiVHVlLCAyMyBBdWcgMjAyNiAwOToxNzowMCBHTVQifQ",
+        "payloadJson": "{\"party\":{\"partyIdInfo\":{\"partyIdType\":\"MSISDN\",\"partyIdentifier\":\"959123456\",\"fspId\":\"payeefsp\"}}}",
+        "payloadB64": "eyJwYXJ0eSI6eyJwYXJ0eUlkSW5mbyI6eyJwYXJ0eUlkVHlwZSI6Ik1TSVNETiIsInBhcnR5SWRlbnRpZmllciI6Ijk1OTEyMzQ1NiIsImZzcElkIjoicGF5ZWVmc3AifX19",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcGFydGllcy9NU0lTRE4vOTU5MTIzNDU2IiwiRlNQSU9QLUhUVFAtTWV0aG9kIjoiUFVUIiwiRlNQSU9QLVNvdXJjZSI6InBheWVlZnNwIiwiRlNQSU9QLURlc3RpbmF0aW9uIjoicGF5ZXJmc3AiLCJEYXRlIjoiVHVlLCAyMyBBdWcgMjAyNiAwOToxNzowMCBHTVQifQ.eyJwYXJ0eSI6eyJwYXJ0eUlkSW5mbyI6eyJwYXJ0eUlkVHlwZSI6Ik1TSVNETiIsInBhcnR5SWRlbnRpZmllciI6Ijk1OTEyMzQ1NiIsImZzcElkIjoicGF5ZWVmc3AifX19"
+      }
+    },
+    {
+      "name": "post-quotes-lowercase-method-normalised",
+      "note": "Method is upper-cased. A bare path with no host is accepted. A collection path with no id still resolves.",
+      "request": {
+        "method": "post",
+        "url": "/quotes",
+        "headers": {
+          "date": "Tue, 23 Aug 2026 09:18:00 GMT",
+          "fspiop-source": "payerfsp",
+          "fspiop-destination": "payeefsp"
+        },
+        "body": {
+          "quoteId": "q-1",
+          "transactionId": "t-1"
+        }
+      },
+      "expected": {
+        "fspiopUri": "/quotes",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/quotes",
+          "FSPIOP-HTTP-Method": "POST",
+          "FSPIOP-Source": "payerfsp",
+          "FSPIOP-Destination": "payeefsp",
+          "Date": "Tue, 23 Aug 2026 09:18:00 GMT"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/quotes\",\"FSPIOP-HTTP-Method\":\"POST\",\"FSPIOP-Source\":\"payerfsp\",\"FSPIOP-Destination\":\"payeefsp\",\"Date\":\"Tue, 23 Aug 2026 09:18:00 GMT\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzIiwiRlNQSU9QLUhUVFAtTWV0aG9kIjoiUE9TVCIsIkZTUElPUC1Tb3VyY2UiOiJwYXllcmZzcCIsIkZTUElPUC1EZXN0aW5hdGlvbiI6InBheWVlZnNwIiwiRGF0ZSI6IlR1ZSwgMjMgQXVnIDIwMjYgMDk6MTg6MDAgR01UIn0",
+        "payloadJson": "{\"quoteId\":\"q-1\",\"transactionId\":\"t-1\"}",
+        "payloadB64": "eyJxdW90ZUlkIjoicS0xIiwidHJhbnNhY3Rpb25JZCI6InQtMSJ9",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzIiwiRlNQSU9QLUhUVFAtTWV0aG9kIjoiUE9TVCIsIkZTUElPUC1Tb3VyY2UiOiJwYXllcmZzcCIsIkZTUElPUC1EZXN0aW5hdGlvbiI6InBheWVlZnNwIiwiRGF0ZSI6IlR1ZSwgMjMgQXVnIDIwMjYgMDk6MTg6MDAgR01UIn0.eyJxdW90ZUlkIjoicS0xIiwidHJhbnNhY3Rpb25JZCI6InQtMSJ9"
+      }
+    },
+    {
+      "name": "put-fx-quotes-camel-case-resource",
+      "note": "Resource names are matched case-sensitively; fxQuotes is camelCase in the FSPIOP API.",
+      "request": {
+        "method": "PUT",
+        "url": "https://hub.example.com/fxQuotes/fx-1",
+        "headers": {
+          "date": "Tue, 23 Aug 2026 09:19:00 GMT",
+          "fspiop-source": "fxpfsp",
+          "fspiop-destination": "payerfsp"
+        },
+        "body": {
+          "conversionTerms": {
+            "conversionId": "c-1"
+          }
+        }
+      },
+      "expected": {
+        "fspiopUri": "/fxQuotes/fx-1",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/fxQuotes/fx-1",
+          "FSPIOP-HTTP-Method": "PUT",
+          "FSPIOP-Source": "fxpfsp",
+          "FSPIOP-Destination": "payerfsp",
+          "Date": "Tue, 23 Aug 2026 09:19:00 GMT"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/fxQuotes/fx-1\",\"FSPIOP-HTTP-Method\":\"PUT\",\"FSPIOP-Source\":\"fxpfsp\",\"FSPIOP-Destination\":\"payerfsp\",\"Date\":\"Tue, 23 Aug 2026 09:19:00 GMT\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvZnhRdW90ZXMvZngtMSIsIkZTUElPUC1IVFRQLU1ldGhvZCI6IlBVVCIsIkZTUElPUC1Tb3VyY2UiOiJmeHBmc3AiLCJGU1BJT1AtRGVzdGluYXRpb24iOiJwYXllcmZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE5OjAwIEdNVCJ9",
+        "payloadJson": "{\"conversionTerms\":{\"conversionId\":\"c-1\"}}",
+        "payloadB64": "eyJjb252ZXJzaW9uVGVybXMiOnsiY29udmVyc2lvbklkIjoiYy0xIn19",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvZnhRdW90ZXMvZngtMSIsIkZTUElPUC1IVFRQLU1ldGhvZCI6IlBVVCIsIkZTUElPUC1Tb3VyY2UiOiJmeHBmc3AiLCJGU1BJT1AtRGVzdGluYXRpb24iOiJwYXllcmZzcCIsIkRhdGUiOiJUdWUsIDIzIEF1ZyAyMDI2IDA5OjE5OjAwIEdNVCJ9.eyJjb252ZXJzaW9uVGVybXMiOnsiY29udmVyc2lvbklkIjoiYy0xIn19"
+      }
+    },
+    {
+      "name": "put-quotes-no-date-header",
+      "note": "Date is conditional too. Both conditional fields absent is a valid header.",
+      "request": {
+        "method": "PUT",
+        "url": "https://hub.example.com/quotes/abc-999",
+        "headers": {
+          "fspiop-source": "payeefsp"
+        },
+        "body": {
+          "transferAmount": {
+            "currency": "MMK",
+            "amount": "5"
+          }
+        }
+      },
+      "expected": {
+        "fspiopUri": "/quotes/abc-999",
+        "protectedHeader": {
+          "alg": "RS256",
+          "FSPIOP-URI": "/quotes/abc-999",
+          "FSPIOP-HTTP-Method": "PUT",
+          "FSPIOP-Source": "payeefsp"
+        },
+        "protectedHeaderJson": "{\"alg\":\"RS256\",\"FSPIOP-URI\":\"/quotes/abc-999\",\"FSPIOP-HTTP-Method\":\"PUT\",\"FSPIOP-Source\":\"payeefsp\"}",
+        "protectedHeaderB64": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzL2FiYy05OTkiLCJGU1BJT1AtSFRUUC1NZXRob2QiOiJQVVQiLCJGU1BJT1AtU291cmNlIjoicGF5ZWVmc3AifQ",
+        "payloadJson": "{\"transferAmount\":{\"currency\":\"MMK\",\"amount\":\"5\"}}",
+        "payloadB64": "eyJ0cmFuc2ZlckFtb3VudCI6eyJjdXJyZW5jeSI6Ik1NSyIsImFtb3VudCI6IjUifX0",
+        "signingInput": "eyJhbGciOiJSUzI1NiIsIkZTUElPUC1VUkkiOiIvcXVvdGVzL2FiYy05OTkiLCJGU1BJT1AtSFRUUC1NZXRob2QiOiJQVVQiLCJGU1BJT1AtU291cmNlIjoicGF5ZWVmc3AifQ.eyJ0cmFuc2ZlckFtb3VudCI6eyJjdXJyZW5jeSI6Ik1NSyIsImFtb3VudCI6IjUifX0"
+      }
+    }
+  ],
+  "rejects": [
+    {
+      "name": "unknown-resource",
+      "url": "https://hub.example.com/healthz",
+      "reason": "No FSPIOP resource name in the path. Must throw, never degrade to the raw path."
+    },
+    {
+      "name": "resource-name-wrong-case",
+      "url": "https://hub.example.com/Quotes/abc-123",
+      "reason": "Resource matching is case-sensitive; 'Quotes' is not 'quotes'."
+    },
+    {
+      "name": "resource-as-substring-only",
+      "url": "https://hub.example.com/myquotes/abc-123",
+      "reason": "'myquotes' contains 'quotes' but is not a resource segment; the match is anchored on a path separator."
+    },
+    {
+      "name": "empty-url",
+      "url": "",
+      "reason": "Nothing to derive a URI from."
+    }
+  ]
+}

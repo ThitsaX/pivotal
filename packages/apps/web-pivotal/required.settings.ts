@@ -4,6 +4,7 @@ import {ConfigService} from '@nestjs/config';
 import {ReportDownloadSettings} from '@core/audit/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {KeyProvider, VaultSettings} from '@shared/vault';
 import type {WebPivotalModule} from './web-pivotal.module';
 
 export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
@@ -218,4 +219,26 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
         throw new Error(`Invalid environment variable ${name}: expected true/false.`);
     }
+
+    /**
+     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
+     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
+     * a typo must not silently decide where private keys live.
+     */
+    keyProvider(): KeyProvider {
+        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+        );
+    }
+
 }

@@ -38,13 +38,15 @@ trust-manager-docs/
 
 ### implementation/ — build
 
-**This is the working set.** If you are writing code, these two plus the leg specs above are what you
-need; `architecture.md` is reference-when-stuck rather than a daily read.
+**This is the working set.** If you are writing code, these three plus the leg specs above are what
+you need; `architecture.md` is reference-when-stuck rather than a daily read. Start at
+[`status.md`](./implementation/status.md) — it names the five legs and says where each one stands.
 
 | Document | Contents |
 | --- | --- |
 | [`implementation-plan.md`](./implementation/implementation-plan.md) | The spine — platform requirements, schema, per-service changes, phasing, verification |
 | [`pki-issuance-flows.md`](./implementation/pki-issuance-flows.md) | Certificate mechanics — the root ceremony, the Vault PKI intermediate, both leaf-issuance paths, and where the material is stored |
+| [`status.md`](./implementation/status.md) | **What is built and what is left**, leg by leg — the single source of truth for progress |
 
 ### runbooks/ — run
 
@@ -106,7 +108,7 @@ These hold everywhere in this design. Anything contradicting them is a bug in th
 | 1 | **`connector → payee FSP` is out of scope** | The FSP is its own CA, provisioning is manual, Pivotal holds no key material there |
 | 2 | **accessKey rotation uses try-both, not `kid`** | `kid` is a contract change for every DFSP and makes rotation *more* fragile client-side; the saving is ~50µs of local CPU |
 | 3 | **RS256 (RSA-2048) on both legs** — FSPIOP JWS *and* the accessKey | **Reverses an earlier ES256 decision.** ES256 was chosen for signing cost at 600–1,200 signs/sec; at the agreed **80–100 TPS** the load is 480–600/s, which RS256 clears on either backend, so the performance case evaporated. What remains is compatibility: ES256 depends on every peer's `sdk-standard-components` version and makes MCM flag every key `INVALID` (its validator is RSA-only). RS256 removes both external unknowns. RSA-2048 is the Mojaloop norm — `hub-facing-leg.md` §A1 |
-| 4 | **Connectors sign remotely via an opaque keyRef**, never holding key material | Key never leaves the HSM, no per-connector key migration, narrower NATS blast radius than the alternatives |
+| 4 | **A connector reaches exactly one tenant's key material, over Vault k8s auth, and signs it itself — it never calls another Pivotal service to sign** | *Amended 2026-08-24; the original wording — "signs remotely via an opaque keyRef, never holding key material" — held only in the HSM-backed profile.* **HSM-backed:** the connector holds a `keyRef` and `C_Sign` runs in CloudHSM, so no key material is present. **KMS-backed:** there is no HSM and therefore no non-exportable handle, so the connector holds the PEM in process memory; isolation comes from **per-tenant Vault path policy**, not from `keyRef` opacity. That is the stated lower assurance tier of decision 16, not an oversight. What is invariant across both: one connector reaches one tenant, and signing is in-process — delegating it to web-outbound would add a hop, make web-outbound a hard runtime dependency of every connector, and *widen* the blast radius this decision exists to narrow, since web-outbound reads every tenant's key |
 | 5 | **One Pivotal mTLS identity to the Hub, not per-DFSP** | FSP identity is carried by JWS; per-tenant certs would force per-tenant connection pools for no gain |
 | 6 | **Register the CA with MCM, not the leaf** | Leaf renewal then needs no MCM interaction, and any number of per-workload leaves become possible |
 | 7 | **Uniform enforcement, no per-tenant exception flag** | Enforcement stays at the transport layer (Envoy `MUTUAL` on the mTLS endpoint); migration is by parallel endpoint. `DFSP_FACING_MTLS` requires XFCC once migration is done — it does **not** gate the certificate checks, which key on XFCC presence per request. `architecture.md` §6.1 |

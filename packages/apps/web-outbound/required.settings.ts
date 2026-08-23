@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { OutboundSettings } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
+import { KeyProvider, VaultSettings } from '@shared/vault';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
@@ -182,4 +183,26 @@ export class WebOutboundSettings
 
         return parsed;
     }
+
+    /**
+     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
+     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
+     * a typo must not silently decide where private keys live.
+     */
+    keyProvider(): KeyProvider {
+        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+        );
+    }
+
 }

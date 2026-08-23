@@ -2,3 +2,4 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 export * from './pivotal-connection-name';
 export * from './participant.repository';
+export * from './participant-key.repository';

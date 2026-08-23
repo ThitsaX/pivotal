@@ -8,6 +8,7 @@ import {
     FspiopMtlsCaStore,
     FspiopMtlsClientCertStore,
     FspiopSettings,
+    FspiopVerifyMode,
 } from '@shared/fspiop';
 import {
     CaStore,
@@ -16,6 +17,7 @@ import {
     PublicKeyStore,
 } from '@shared/security';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {KeyProvider, VaultSettings} from '@shared/vault';
 import type {WebInboundModule} from './web-inbound.module';
 
 export class WebInboundSettings implements WebInboundModule.RequiredSettings {
@@ -78,7 +80,32 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
             this.readRequiredString('FSPIOP_TRANSFERS_URL'),
             this.readRequiredBoolean('FSPIOP_USE_JWS'),
             this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS'),
+            this.readVerifyMode('FSPIOP_JWS_VERIFY_MODE'),
         );
+    }
+
+    /**
+     * Default inbound verification mode. Optional: an absent value means `off`, which is the
+     * correct state for a deployment that has enabled signing but not yet verification.
+     *
+     * A *present but unrecognised* value throws rather than falling back — a typo here would
+     * silently disable verification across every source that has no row of its own.
+     */
+    private readVerifyMode(name: string): FspiopVerifyMode {
+        const value = this.configService.get<string>(name);
+
+        if (value == null || value.trim().length === 0) {
+            return FspiopVerifyMode.Off;
+        }
+
+        if (!FspiopVerifyMode.isValid(value)) {
+            throw new Error(
+                `Invalid ${name}: '${value}'. Expected one of `
+                + `${FspiopVerifyMode.Off}, ${FspiopVerifyMode.VerifyIfPresent}, ${FspiopVerifyMode.Require}.`,
+            );
+        }
+
+        return FspiopVerifyMode.parse(value);
     }
 
     publicKeyStore(): PublicKeyStore {
@@ -147,4 +174,26 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
         return parsed;
     }
+
+    /**
+     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
+     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
+     * a typo must not silently decide where private keys live.
+     */
+    keyProvider(): KeyProvider {
+        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+        );
+    }
+
 }

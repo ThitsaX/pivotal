@@ -482,7 +482,9 @@ compensating control.
 #### Mitigations that are cheap and should be mandatory
 
 - **Per-tenant KV paths and policies** — `secret/pivotal/jwskey/{fspId}`, so a connector's Vault
-  policy grants exactly one path. This is the same mechanism §1.2.1 of
+  policy grants exactly one path. In this profile that policy **is** the isolation boundary: with no
+  HSM there is no non-exportable handle, so settled decision 4 holds here by path scoping rather than
+  by the connector never seeing key material. Amended 2026-08-24. This is the same mechanism §1.2.1 of
   [`implementation-plan.md`](../implementation/implementation-plan.md) already specifies for `keyref` and `hsmcred`.
 - **Never environment variables.** They appear in `kubectl describe`, need a redeploy to rotate, and
   leave no record of who read them.
