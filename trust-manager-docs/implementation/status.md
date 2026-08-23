@@ -6,8 +6,50 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-23 · branch `MOJ-1211/trust-manager-implementation`
-(monorepo), `main` @ `16e3e83` (`pivotal-connector` v0.0.24).
+**Last verified against code:** 2026-08-24.
+
+---
+
+## Where the work actually sits — read this first
+
+Six commits' worth of change exists; **only one of them is committed.** Anything below describing a
+"commit" describes work that is written and verified, not work that is necessarily in git.
+
+| Repo | Branch | State |
+| --- | --- | --- |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | **committed and pushed** — `fa0a03e` |
+| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | **uncommitted** in the working tree |
+| `pivotal-thitsawallet-connector` | `main` — needs a branch | **uncommitted** in the working tree |
+
+### Pending actions, in order
+
+1. **Revert the three client forks.** `pivotal-gin-orange-java-connector`,
+   `pivotal-gin-kulu-java-connector` and `pivotal-gin-big-bank-java-connector` each carry 3 modified
+   files (22 insertions) that should never have been made — see the scope rule under *Connector
+   fleet*. `git checkout -- .` in each; kulu and big-bank also have an untracked
+   `implementation/mod_fspiop_interface/` from a local build that can be deleted.
+2. **Commit `pivotal-connector` and thitsawallet.** Stage explicitly, not `git add -A`:
+   thitsawallet tracks 34 build artifacts under `target/` which a local build churns, and
+   `pivotal-connector`'s `.github/CODEOWNERS` change is the repo owner's, not this work's.
+3. **Tag `v0.0.25` on `pivotal-connector`** when ready. 0.0.25 currently exists only in the local
+   Maven repository; the connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so
+   nothing is deployable until the publish workflow runs.
+
+### What to do next
+
+**Local development and end-to-end proof.** ~140 unit tests pass across both languages, the
+migration is verified against real MySQL 8.0.45, and cross-language signature interop is proven — but
+**nothing has ever run together.** No connector has signed a callback that web-inbound then verified
+using a key it fetched from Vault.
+
+The untested seams are exactly the agreements between the two codebases: the Kubernetes auth flow,
+the KV v2 response shape, the `privateKey` field name, and the `secret/pivotal/jwskey/<fspId>` path
+convention. Nothing currently exercises any of them; they hold because one author wrote both sides.
+
+Concretely: docker-compose with Vault in dev mode seeded with a test tenant, web-outbound → Hub stub
+→ web-inbound plus a connector, running with `KEY_PROVIDER=vault-kv` and `FSPIOP_USE_JWS=true`;
+SoftHSM2 alongside; `implementation-plan.md` §1.4 written; `runbooks/ceremony-local.md` refreshed —
+it still predates the profile rename. This also unblocks `pkcs11`, which is otherwise written blind.
 
 ---
 
@@ -233,19 +275,31 @@ kulu, big-bank). The current state is *unverified*, not *manually verified*. Wor
 
 The library fix history matters for rollout. `git tag --contains fc92ce6` → **v0.0.18+**.
 
-**Resolved in commit 5** — all four now pin **0.0.25**, which carries the audit-key fix (v0.0.18+)
-as well as the signing path.
+**Scope rule.** Only `pivotal-connector` (the library) and `pivotal-thitsawallet-connector` (the
+standard deployable that new DFSP connectors are copied from) are updated as part of this work. The
+client-specific forks — `pivotal-gin-orange-java-connector`, `-kulu-`, `-big-bank-` — track live
+deployments on their own release cadence and approval path, and are bumped separately by whoever
+owns them. Commit 5 initially changed all four; the three client forks were reverted.
 
-| Deployable | Was | Now | Audit key |
+| Deployable | Pinned | Audit key | Owner |
 | --- | --- | --- | --- |
-| `pivotal-thitsawallet-connector` | 0.0.24 | **0.0.25** | `payerFsp` ✅ |
-| `pivotal-gin-kulu-java-connector` | 0.0.17 | **0.0.25** | `payerFspId` ❌ → ✅ |
-| `pivotal-gin-orange-java-connector` | 0.0.15 | **0.0.25** | `payerFspId` ❌ → ✅ |
-| `pivotal-gin-big-bank-java-connector` | 0.0.15 | **0.0.25** | `payerFspId` ❌ → ✅ |
+| `pivotal-thitsawallet-connector` | 0.0.24 → **0.0.25** | `payerFsp` ✅ | this work |
+| `pivotal-gin-kulu-java-connector` | 0.0.17 | `payerFspId` ❌ | client fork |
+| `pivotal-gin-orange-java-connector` | 0.0.15 | `payerFspId` ❌ | client fork |
+| `pivotal-gin-big-bank-java-connector` | 0.0.15 | `payerFspId` ❌ | client fork |
 
-The jump was checked before being made, not after: `FspClientService` is byte-identical across
-v0.0.15, v0.0.17 and v0.0.24, and the `Settings` property set is unchanged, so nothing an older
-connector implements or configures moved. All four then built clean against 0.0.25.
+**What each client fork will need**, when its owner is ready — stated here rather than done:
+
+1. Bump `mod-pivotal-connector-api` to 0.0.25 or later. This alone fixes the `payerFspId` audit-key
+   regression (the fix landed in v0.0.18), so their PATCH-error audit messages stop being dropped as
+   NOT NULL poison.
+2. Add the seven JWS settings to `docker-entrypoint.sh` and the Dockerfile `ENV` block. Every one
+   carries a default, so a fork that skips this still boots and behaves exactly as today — the
+   settings are only needed to *enable* signing.
+
+The upgrade path was verified before the revert: `FspClientService` is byte-identical across
+v0.0.15, v0.0.17 and v0.0.24, the `Settings` property set is unchanged, and all four built clean
+against 0.0.25. So the bump is safe whenever each owner chooses to take it.
 
 ---
 
@@ -613,8 +667,9 @@ target.
 | Repo | Change |
 | --- | --- |
 | `pivotal-connector` | `<revision>` 0.0.24 → **0.0.25** (flattened POMs regenerate) |
-| all four deployables | seven `-D` settings in `docker-entrypoint.sh`, seven `ENV` defaults in the Dockerfile, `mod-pivotal-connector-api` → 0.0.25 |
-| `pivotal-thitsawallet-connector` | README config table extended; new **FSPIOP JWS signing** section |
+| `pivotal-thitsawallet-connector` | seven `-D` settings in `docker-entrypoint.sh`, seven `ENV` defaults in the Dockerfile, `mod-pivotal-connector-api` → 0.0.25, README config table extended, new **FSPIOP JWS signing** section |
+
+The three client forks were changed too and then reverted — see the scope rule above.
 
 **Verification:** all four build clean against 0.0.25. Each `docker-entrypoint.sh` was dry-run with a
 stub `java` and only the Dockerfile's own `ENV` values, confirming it execs with all seven new
