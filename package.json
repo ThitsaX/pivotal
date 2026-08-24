@@ -84,7 +84,8 @@
     "regenerate:fspiop-dto": "npm run clean:fspiop-dto && npm run generate:fspiop-dto",
     "regenerate:catalyst-dto": "npm run clean:catalyst-dto && npm run generate:catalyst-dto",
     "test:shared-vault": "node --test -r ts-node/register -r tsconfig-paths/register tests/shared/vault/component/*-test.ts",
-    "test:core-participant": "node --test -r ts-node/register -r tsconfig-paths/register tests/core/participant/domain/component/store/*-test.ts"
+    "test:core-participant": "node --test -r ts-node/register -r tsconfig-paths/register tests/core/participant/domain/component/store/*-test.ts",
+    "test:integration": "node --test -r ts-node/register -r tsconfig-paths/register tests/integration/*-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",

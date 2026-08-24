@@ -145,7 +145,8 @@ export class ParticipantDomainModule {
         if (vaultSettings == null || !vaultSettings.isConfigured()) {
             throw new Error(
                 `KEY_PROVIDER is '${KeyProvider.VaultKv}' but Vault is not configured. `
-                + 'Set VAULT_ADDRESS and VAULT_ROLE.',
+                + 'Set VAULT_ADDRESS, plus VAULT_ROLE for Kubernetes auth or VAULT_TOKEN when '
+                + 'VAULT_AUTH_METHOD=token.',
             );
         }
 

@@ -3,7 +3,7 @@
 import * as fs from 'node:fs/promises';
 import axios, {AxiosInstance} from 'axios';
 import {Logger} from '@nestjs/common';
-import {VaultSettings} from './vault-settings';
+import {VaultAuthMethod, VaultSettings} from './vault-settings';
 
 /**
  * A deliberately small Vault client: Kubernetes ServiceAccount login, and KV v2 reads.
@@ -42,6 +42,16 @@ export class VaultClient {
      * nothing to distribute, nothing to rotate, and the identity is already per-workload.
      */
     async login(): Promise<string> {
+
+        if (this.settings.authMethod === VaultAuthMethod.Token) {
+            // Local development and integration tests only — see VaultAuthMethod.Token.
+            this.logger.warn(
+                'Authenticating to Vault with a supplied token. This is a development path; '
+                + 'deployments must use Kubernetes ServiceAccount auth.',
+            );
+            this.token = this.settings.token;
+            return this.token;
+        }
 
         const serviceAccountToken = await this.readServiceAccountToken();
 

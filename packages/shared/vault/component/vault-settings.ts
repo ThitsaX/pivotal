@@ -58,6 +58,28 @@ export namespace KeyProvider {
 }
 
 /**
+ * How a workload proves its identity to Vault.
+ */
+export enum VaultAuthMethod {
+
+    /**
+     * The pod's projected ServiceAccount token is exchanged for a Vault token. The production
+     * method: nothing to distribute, nothing to rotate, and the identity is the pod's own.
+     */
+    Kubernetes = 'kubernetes',
+
+    /**
+     * A Vault token supplied directly.
+     *
+     * **For local development and integration tests.** There is no kubelet outside Kubernetes to
+     * project a ServiceAccount token, so this is the only way to reach a Vault running in Docker.
+     * It is a long-lived credential carried in configuration, which is exactly what the Kubernetes
+     * method exists to avoid — do not use it in a deployment.
+     */
+    Token = 'token',
+}
+
+/**
  * Connection and path settings for Vault.
  *
  * Vault is read at startup and on a rotation nudge — never on the signing path — so none of these
@@ -90,10 +112,22 @@ export class VaultSettings {
 
         /** Request timeout. Generous: this is startup, not the request path. */
         public readonly timeoutMs: number = 10_000,
+
+        public readonly authMethod: VaultAuthMethod = VaultAuthMethod.Kubernetes,
+
+        /** Only read when {@link authMethod} is {@link VaultAuthMethod.Token}. */
+        public readonly token: string = '',
     ) {
     }
 
     isConfigured(): boolean {
-        return this.address.trim().length > 0 && this.role.trim().length > 0;
+
+        if (this.address.trim().length === 0) {
+            return false;
+        }
+
+        return this.authMethod === VaultAuthMethod.Token
+            ? this.token.trim().length > 0
+            : this.role.trim().length > 0;
     }
 }

@@ -19,6 +19,23 @@ x-common-fspiop-env: &common_fspiop_env
   FSPIOP_MTLS_CA: ${FSPIOP_MTLS_CA:-}
   FSPIOP_MTLS_CLIENT_CERT: ${FSPIOP_MTLS_CLIENT_CERT:-}
   FSPIOP_MTLS_CLIENT_KEY: ${FSPIOP_MTLS_CLIENT_KEY:-}
+  # Inbound verification: off | verify-if-present | require. Per-participant rows in
+  # participant_key override this; it is only the default for a source with no row.
+  FSPIOP_JWS_VERIFY_MODE: ${FSPIOP_JWS_VERIFY_MODE:-off}
+
+x-common-key-env: &common_key_env
+  # database (legacy, plaintext in MySQL) | vault-kv | pkcs11 (not implemented)
+  KEY_PROVIDER: ${KEY_PROVIDER:-database}
+  VAULT_ADDRESS: ${VAULT_ADDRESS:-http://vault:8200}
+  VAULT_ROLE: ${VAULT_ROLE:-}
+  VAULT_KUBERNETES_AUTH_PATH: ${VAULT_KUBERNETES_AUTH_PATH:-kubernetes}
+  VAULT_KV_MOUNT: ${VAULT_KV_MOUNT:-secret}
+  VAULT_JWS_KEY_PATH_PREFIX: ${VAULT_JWS_KEY_PATH_PREFIX:-pivotal/jwskey}
+  VAULT_SERVICE_ACCOUNT_TOKEN_PATH: ${VAULT_SERVICE_ACCOUNT_TOKEN_PATH:-/var/run/secrets/kubernetes.io/serviceaccount/token}
+  # Development only. Outside Kubernetes there is no ServiceAccount token to exchange, so the
+  # local stack authenticates with a token instead. Deployments use VAULT_AUTH_METHOD=kubernetes.
+  VAULT_AUTH_METHOD: ${VAULT_AUTH_METHOD:-kubernetes}
+  VAULT_TOKEN: ${VAULT_TOKEN:-}
 
 x-common-db-env: &common_db_env
   DB_WRITE_HOST: ${DB_WRITE_HOST:-mysql}
@@ -84,6 +101,56 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  # Vault in dev mode, behind a profile so the default stack is unchanged.
+  #
+  # Dev mode is in-memory, unsealed, and reachable with a fixed root token — none of which is
+  # acceptable anywhere real. It exists so the Vault-backed key path can be exercised locally,
+  # where there is no kubelet to project a ServiceAccount token.
+  #
+  #   docker compose --profile vault up -d vault vault-seed
+  vault:
+    image: hashicorp/vault:1.17
+    profiles: ["vault"]
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:-root-dev}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "${VAULT_HOST_PORT:-8210}:8200"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+
+  # Generates a throwaway RSA-2048 keypair per tenant and writes the private half to the same KV
+  # path the services read. Stands in for trust-manager, which does not exist yet; in a deployment
+  # nothing writes these paths automatically.
+  vault-seed:
+    image: hashicorp/vault:1.17
+    profiles: ["vault"]
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-root-dev}
+      SEED_TENANTS: ${VAULT_SEED_TENANTS:-payerfsp,payeefsp}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        apk add --no-cache openssl >/dev/null 2>&1 || true
+        for fsp in $$(echo "$$SEED_TENANTS" | tr ',' ' '); do
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "/tmp/$$fsp.pem" 2>/dev/null
+          vault kv put "secret/pivotal/jwskey/$$fsp" privateKey=@/tmp/$$fsp.pem >/dev/null
+          echo "seeded secret/pivotal/jwskey/$$fsp"
+        done
+    restart: "no"
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     profiles: ["reports"]
@@ -137,7 +204,12 @@ services:
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
-      <<: [*common_db_env, *common_fspiop_env]
+      # Prefix oracle — required by web-outbound at startup; it throws without them.
+      PREFIX_ORACLE_ENDPOINT: ${PREFIX_ORACLE_ENDPOINT:-http://host.docker.internal:3001}
+      PREFIX_ORACLE_CACHE_TTL_MS: ${PREFIX_ORACLE_CACHE_TTL_MS:-180000}
+      PREFIX_ORACLE_SOCKET_TIMEOUT_MS: ${PREFIX_ORACLE_SOCKET_TIMEOUT_MS:-10000}
+      PREFIX_ORACLE_CONNECTION_TIMEOUT_MS: ${PREFIX_ORACLE_CONNECTION_TIMEOUT_MS:-10000}
+      <<: [*common_db_env, *common_fspiop_env, *common_key_env]
     ports:
       - "${WEB_OUTBOUND_HOST_PORT:-3200}:${WEB_OUTBOUND_PORT:-3200}"
     restart: unless-stopped
@@ -158,7 +230,12 @@ services:
       CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://host.docker.internal:3001}
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
-      <<: [*common_db_env, *common_fspiop_env]
+      # Prefix oracle — required by web-outbound at startup; it throws without them.
+      PREFIX_ORACLE_ENDPOINT: ${PREFIX_ORACLE_ENDPOINT:-http://host.docker.internal:3001}
+      PREFIX_ORACLE_CACHE_TTL_MS: ${PREFIX_ORACLE_CACHE_TTL_MS:-180000}
+      PREFIX_ORACLE_SOCKET_TIMEOUT_MS: ${PREFIX_ORACLE_SOCKET_TIMEOUT_MS:-10000}
+      PREFIX_ORACLE_CONNECTION_TIMEOUT_MS: ${PREFIX_ORACLE_CONNECTION_TIMEOUT_MS:-10000}
+      <<: [*common_db_env, *common_fspiop_env, *common_key_env]
     ports:
       - "${WEB_INBOUND_HOST_PORT:-3201}:${WEB_INBOUND_PORT:-3201}"
     restart: unless-stopped
@@ -175,6 +252,7 @@ services:
         condition: service_started
     environment:
       NATS_URL: ${NATS_URL:-nats://nats:4222}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PIVOTAL_AUDIT_STREAM_NAME: ${PIVOTAL_AUDIT_STREAM_NAME:-PIVOTAL_AUDIT}
       <<: *common_db_env
     restart: unless-stopped
@@ -193,7 +271,13 @@ services:
       CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ${CENTRAL_LEDGER_SOCKET_TIMEOUT_MS:-}
       CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ${CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS:-}
       REPORT_DOWNLOAD_WORKER_ENABLED: ${WEB_PIVOTAL_REPORT_DOWNLOAD_WORKER_ENABLED:-false}
-      <<: [*common_db_env, *report_storage_env]
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # IAM bootstrap. Development values: the seeded administrator is expected to change the
+      # temporary password on first sign-in, and the JWT secret must be replaced per deployment.
+      PIVOTAL_IAM_JWT_SECRET: ${PIVOTAL_IAM_JWT_SECRET:-local-development-secret-change-me}
+      PIVOTAL_IAM_ADMIN_SEED_EMAIL: ${PIVOTAL_IAM_ADMIN_SEED_EMAIL:-admin@example.com}
+      PIVOTAL_IAM_ADMIN_SEED_TEMP_PASSWORD: ${PIVOTAL_IAM_ADMIN_SEED_TEMP_PASSWORD:-ChangeMe123!}
+      <<: [*common_db_env, *report_storage_env, *common_key_env]
     ports:
       - "${WEB_PIVOTAL_HOST_PORT:-3202}:${WEB_PIVOTAL_PORT:-3202}"
     restart: unless-stopped

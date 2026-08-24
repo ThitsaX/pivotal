@@ -87,6 +87,18 @@ export class FspInboundGuard implements CanActivate {
         }
 
         const rawSignature = request.headers[FspiopHeaders.Names.FSPIOP_SIGNATURE];
+        const body = FspInboundGuard.resolveBody(request);
+
+        // A detached JWS signs the body, so a request without one cannot carry a signature —
+        // `GET /parties/{type}/{id}` above all. No implementation signs these: the reference
+        // refuses to, and so do we. Demanding a signature here would make `require` unsatisfiable
+        // for the whole of the parties lookup, and therefore unusable.
+        //
+        // A signature that is *present* on a bodyless request is still rejected below: it cannot
+        // have been produced over anything the receiver can reconstruct.
+        if (rawSignature == null && body == null) {
+            return true;
+        }
 
         // Under verify-if-present an unsigned request is accepted and counted. This is what keeps
         // the Hub reachable — it runs FSPIOP_USE_JWS=false and sends its errors unsigned — and
@@ -132,8 +144,6 @@ export class FspInboundGuard implements CanActivate {
         }
 
         // ── 4. Verify the signature over the received body ────────────────────
-        const body = FspInboundGuard.resolveBody(request);
-
         if (body == null) {
             throw new FspiopException(
                 FspiopErrors.INVALID_SIGNATURE,

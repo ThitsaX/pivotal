@@ -37,7 +37,13 @@ Six commits' worth of change exists; **only one of them is committed.** Anything
 
 ### What to do next
 
-**Local development and end-to-end proof.** ~140 unit tests pass across both languages, the
+**Local development — done for JWS (commits 7 and 9).** The JWS-over-Vault loop is now proven against a real
+Vault; see the change log. What remains: SoftHSM2 in the stack, `implementation-plan.md` §1.4, and a
+refreshed `runbooks/ceremony-local.md` (it still predates the profile rename). A full
+service-to-service run through the compose stack is also still untried — commit 7 proves the
+libraries interoperate, not that the deployed services do.
+
+*Superseded — kept for the reasoning:* **Local development and end-to-end proof.** ~140 unit tests pass across both languages, the
 migration is verified against real MySQL 8.0.45, and cross-language signature interop is proven — but
 **nothing has ever run together.** No connector has signed a callback that web-inbound then verified
 using a key it fetched from Vault.
@@ -733,3 +739,230 @@ three apps build.
 `vault kv put secret/pivotal/jwskey/<fspId> privateKey=@key.pem`. The same is true of the Java
 connector. This commit completes key *access*; key *lifecycle* — rotation, onboarding, revocation —
 remains unbuilt.
+
+### Commit 7 — the first integration proof · 2026-08-24
+
+Closes the largest evidence gap: until now every test mocked Vault, and the agreements between the
+two codebases were held together only by one author having written both sides.
+
+| File | Change |
+| --- | --- |
+| `packages/shared/vault/component/vault-settings.ts` | `VaultAuthMethod` — `kubernetes` (production) or `token` (development) |
+| `packages/shared/vault/component/vault-client.ts` | honours the token method, warning loudly when it does |
+| `tests/integration/jws-vault-loop-test.ts` | **new** — Vault → key → sign → verify, against a real Vault |
+| `docker/docker-compose.yml` | `vault` and `vault-seed` services behind a `vault` profile; `KEY_PROVIDER` / `VAULT_*` / `FSPIOP_JWS_VERIFY_MODE` env |
+| `docker/.env.example` | the same settings, documented |
+| `package.json` | `test:integration` |
+
+**What the integration test actually exercises**, none of which a unit test reaches: the real KV v2
+wire protocol and response envelope, the `privateKey` field name, the
+`<prefix>/<fspId>` path convention, PEM round-tripping through Vault, and then the loaded key
+signing a request that `FspInboundGuard` accepts in `require` mode. A third case replays a valid
+signature against a different resource and confirms the cross-check rejects it.
+
+**It skips, rather than fails, with no Vault running** — so it cannot break a machine or a CI job
+that has not started one. Verified both ways.
+
+**Reproduce:**
+
+```
+docker compose -f docker/docker-compose.yml --profile vault up -d vault vault-seed
+VAULT_IT_TOKEN=root-dev npm run test:integration
+```
+
+`vault-seed` generates a throwaway RSA-2048 keypair per tenant and writes the private half to the
+path the services read. It stands in for trust-manager, which does not exist — in a deployment
+nothing populates those paths automatically.
+
+**A development-only auth path was added, deliberately narrow.** Outside Kubernetes there is no
+kubelet to project a ServiceAccount token, so a Vault in Docker is unreachable by the production
+method. `VAULT_AUTH_METHOD=token` covers that and logs a warning whenever it is used; the default
+stays `kubernetes`. This is a credential in configuration, which is exactly what the Kubernetes
+method exists to avoid — it must not reach a deployment.
+
+**What this still does not prove.** The libraries interoperate; the *services* have not been run
+against each other. A full compose run — web-outbound signing a real transfer that web-inbound
+verifies, with `KEY_PROVIDER=vault-kv` — is the next increment, and the wiring for it is now in
+place.
+
+### Commit 8 — Vault auth wiring, and a blocked service-level run · 2026-08-24
+
+Attempted the full service-to-service JWS run. It surfaced one real bug and one environment
+constraint that the local-development story has to solve before it can proceed.
+
+**Bug fixed: `VAULT_AUTH_METHOD` and `VAULT_TOKEN` were never read.** Commit 7 added them to
+`docker-compose.yml` and `.env.example` but not to `required.settings.ts`, so `vaultSettings()` always
+built Kubernetes auth and `KEY_PROVIDER=vault-kv` failed at startup with *"Vault is not configured"*
+even when a token was supplied. Now wired in all three apps, with an unrecognised value throwing
+rather than silently defaulting. The error message also named only `VAULT_ROLE`; it now names the
+token path too.
+
+**Found by running the service, not by testing it.** Every unit test constructs `VaultSettings`
+directly and so never exercised the settings-reading path. This is the class of defect the
+integration work exists to catch.
+
+**Blocker: per-app `.env` overrides the process environment.**
+`packages/apps/*/main.ts` calls `loadDotEnv({path: moduleEnvPath, override: true})`, so a developer's
+`packages/apps/web-inbound/.env` wins over anything exported by a test harness. On this machine that
+file points at a local MySQL with different credentials, so the service silently connected there —
+`[::1]:3306` with `central_ledger` — while its own settings object correctly resolved the values that
+had been exported. Diagnosed by instrumenting the TypeORM factory; the probe was reverted.
+
+This is deliberate for local development and should not simply be removed. But it means **an
+environment-variable harness cannot drive these services**, and the local-development story has to
+account for it. Two workable paths:
+
+1. **Run the services from the compose stack under a separate project name**
+   (`docker compose -p pivotal-jws ...`), so they get their own volumes and images carry no
+   developer `.env`. Closest to how they actually run, and non-destructive to an existing stack.
+2. **Give the harness its own `.env`**, written and removed around the run. Faster, but mutates a
+   developer's working tree and leaves it wrong if the run crashes.
+
+Path 1 is the better basis for a repeatable local-development story. Neither has been done yet.
+
+**State:** unit and integration suites remain green — 88 fspiop, 6 vault, 11 participant, 3
+integration against a real Vault. No service-to-service run has been completed.
+
+### Commit 9 — the service-level loop, proven · 2026-08-24
+
+The gap that had been open since commit 1 is closed: **the deployed services interoperate**, not just
+the libraries.
+
+Run under an isolated compose project (`-p pivotal-jws`), which sidesteps the `.env` blocker from
+commit 8 — images carry no developer `.env`, and a separate project name means its own volumes,
+network and offset ports, so an existing stack is untouched.
+
+| File | Change |
+| --- | --- |
+| `scripts/verify-jws-service-loop.py` | **new** — drives signed and attack cases against a running web-inbound |
+| `docker/jws-loop.env.example` | **new** — the isolated project's settings, with run instructions |
+
+**What actually ran.** web-inbound in a container, `KEY_PROVIDER=vault-kv`, guard global,
+`FSPIOP_JWS_VERIFY_MODE=require`. Its signing key came from Vault; the verifying public key came from
+`participant_key` in MySQL — `jws_private_key` deliberately **NULL**, so the private half existed
+only in Vault.
+
+| Case | Result |
+| --- | --- |
+| Correctly signed | **HTTP 200** |
+| Unsigned | **417** · 3102 missing `fspiop-signature` |
+| Valid signature replayed at another resource | **401** · 3105 *"Signed FSPIOP-URI does not match"* |
+| Tampered body | **401** · 3105 verification failed |
+
+The third case is the one worth noting: it is the replay hole the protected-header cross-checks were
+added to close, and it is now demonstrated shut through real HTTP rather than argued from code.
+
+**The tri-state was proven live.** With `jws_verify_mode` switched to `verify-if-present` by a single
+`UPDATE`, an unsigned request was accepted within the 5-second cache refresh — no restart, no
+redeploy — and the guard logged *"Accepting unsigned FSPIOP requests from 'payerfsp' under
+verify-if-present."* That is the per-participant rollout mechanism working end to end.
+
+**Still not covered.** web-outbound was not exercised — the loop was driven by an external signer
+standing in for it, because a full send-money flow needs central-ledger and a Hub. The signing path
+it would use is the same interceptor already covered by unit tests and the vectors, but the
+*service* has not signed a live request.
+
+### Commit 10 — one stack, shared database, real tenant · 2026-08-24
+
+Commit 9 proved the loop in an isolated project with synthetic tenants. This runs it in the **single
+`pivotal-stack` project**, against the **existing** Mojaloop test-harness MySQL and a **real**
+participant.
+
+| File | Change |
+| --- | --- |
+| `docker/docker-compose.shared-db.yml` | **new** — overlay that drops the bundled MySQL and points services at the shared one |
+| `docker/jws-loop.env.example` | rewritten for the single-stack, shared-DB layout |
+| `scripts/verify-jws-service-loop.py` | defaults updated to that layout |
+
+**No second MySQL.** `ml-core-test-harness` already runs one holding the `pivotal` database. The
+overlay uses `!override` on `depends_on` to remove the bundled `mysql` while keeping the real
+dependencies — `nats`, `redis`, `web-inbound` — and points every service at
+`host.docker.internal:3306`.
+
+**V3 was applied to the real database through the application's own migration runner**, so the
+history row and hash are recorded exactly as a normal web-pivotal boot would record them. It
+validated the role inference against live data: `wallet1`, `wallet2` and `cofinagn` migrated as
+`self` because they hold private keys; `hub` was seeded as `peer`; every row landed with signing off
+and verification off, so the migration changed no behaviour.
+
+**A real tenant was migrated to Vault custody.** `wallet1`'s private key was moved from
+`participant_key` into `secret/pivotal/jwskey/wallet1`, and the column set to `NULL`. Its public key
+stayed in MySQL. The service then signed and verified using a key it read from Vault, with no
+plaintext key left in the database — the migration path a deployment would follow.
+
+**The per-source override was proven, not just the mode.** The deployment default was
+`FSPIOP_JWS_VERIFY_MODE=off`, while `wallet1`'s row said `require`. Unsigned requests from `wallet1`
+were rejected. Enforcement therefore came from the participant row, not the global setting, which is
+what makes per-participant rollout work.
+
+| Case | Result |
+| --- | --- |
+| Correctly signed, key from Vault | **HTTP 200** |
+| Unsigned | **417** · 3102 |
+| Replayed at another resource | **401** · 3105 |
+| Tampered body | **401** · 3105 |
+
+**Environment conventions now fixed:** one compose project (`pivotal-stack`) for Pivotal services;
+MySQL, Kafka and the hub's own Redis come from `ml-core-test-harness`; `mojaloop-demowallet` is
+available as the DFSP backend for the ThitsaWallet connector.
+
+**Left on the JWS story:** web-outbound has still not signed a live send-money flow. With the hub
+harness already running, that is now possible and is the last piece of JWS evidence.
+
+### Commit 11 — completing the compose environment · 2026-08-25
+
+`docker-compose.yml` did not supply every variable the services require at startup, so some of them
+could not run from the stack at all. Found when web-outbound failed on a missing
+`PREFIX_ORACLE_ENDPOINT`.
+
+Rather than fix one variable, the gap was measured across every service by diffing
+`readRequired*('…')` in each `required.settings.ts` against the rendered compose environment:
+
+| Service | Was missing |
+| --- | --- |
+| `web-outbound` | `PREFIX_ORACLE_ENDPOINT`, `PREFIX_ORACLE_CACHE_TTL_MS` (+ two optional timeouts) |
+| `web-pivotal` | `REDIS_URL`, `PIVOTAL_IAM_JWT_SECRET`, `PIVOTAL_IAM_ADMIN_SEED_EMAIL`, `PIVOTAL_IAM_ADMIN_SEED_TEMP_PASSWORD` |
+| `app-auditor` | `REDIS_URL` |
+
+All now supplied with development defaults; the IAM secret and seed password are marked as values a
+deployment must replace. Every service now passes the check.
+
+**A second failure had the same shape but a different cause.** web-outbound had also been started
+with `DB_WRITE_HOST=127.0.0.1` and credentials `root`/`admin123` — values present in no file in the
+repository. They came from **shell environment variables**, which outrank `--env-file` in Compose's
+precedence. Inside a container `127.0.0.1` is the container itself, so the connection could never
+succeed. Recreating with `env -i` fixed it.
+
+Worth remembering when a container's configuration looks impossible: `docker compose … config`
+renders what Compose resolved, and `docker inspect` shows what the container actually received. The
+two differing points at the shell.
+
+### Commit 12 — `require` was unsatisfiable for bodyless requests · 2026-08-25
+
+Found by a real transfer rather than a test. `account-lookup-service` logged:
+
+```
+max retries exceeded for HTTP request! Request failed with status code 417
+{"errorCode":"3102","errorDescription":"Missing mandatory header: fspiop-signature."}
+```
+
+**The chain.** web-outbound sends `GET /parties/{type}/{id}`, which is **unsigned by design** — a
+detached JWS signs the body and a GET has none, so no implementation signs one (decision **S6**;
+the reference throws *"Cannot sign with no body"*). ALS then forwards that GET to web-inbound
+**preserving the original `fspiop-source`**. The guard saw a source configured `require`, found no
+signature, and rejected.
+
+**So `require` could never be satisfied for the parties lookup** — by us or by any peer. A mode that
+cannot be turned on is not a mode.
+
+**Fix.** The guard now accepts an unsigned request that carries no body, in every mode. A signature
+that is *present* on a bodyless request is still rejected: it cannot have been produced over
+anything the receiver can reconstruct. Bodyless requests are also excluded from the
+unsigned-but-accepted counters — they are not evidence a source is behind on signing, and letting
+them inflate the telemetry would obscure the signal that decides when `require` is safe.
+
+Two regression tests added; 90 pass in `shared-fspiop`.
+
+**Worth drawing out:** every prior proof drove `PUT` traffic, so the entire GET path went unexercised
+until a real transfer ran through a real Hub. Neither the unit tests, the Vault integration test, nor
+the service-level loop could have caught this — the flaw was in what none of them thought to send.

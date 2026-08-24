@@ -182,6 +182,26 @@ describe('FspInboundGuard', () => {
 
     describe('bodyless requests', () => {
 
+        it('should accept an unsigned bodyless request even under require', () => {
+            // GET /parties carries no body, so no implementation signs it -- the reference
+            // refuses to. Demanding a signature would make `require` unsatisfiable for the whole
+            // parties lookup, which is how this was found: ALS forwards GET /parties preserving
+            // the original fspiop-source, and every one of them was rejected with 3102.
+            const guard = guardWith(new StaticJwsPolicyStore(false, FspiopVerifyMode.Require));
+
+            assert.equal(guard.canActivate(contextFor({ 'fspiop-source': SOURCE }, {}, 'GET')), true);
+        });
+
+        it('should not count a bodyless request as unsigned-but-accepted', () => {
+            // It is not evidence the source is behind on signing, so it must not appear in the
+            // telemetry that decides when `require` is safe.
+            const guard = guardWith(new StaticJwsPolicyStore(false, FspiopVerifyMode.VerifyIfPresent));
+
+            guard.canActivate(contextFor({ 'fspiop-source': SOURCE }, {}, 'GET'));
+
+            assert.equal(guard.unsignedAcceptedCounts().size, 0);
+        });
+
         it('should reject a signature on a request with no body', () => {
             const keyPair = RsaKeyPair.generate();
             const guard = guardWith(

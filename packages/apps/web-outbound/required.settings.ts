@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { OutboundSettings } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
-import { KeyProvider, VaultSettings } from '@shared/vault';
+import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
@@ -202,7 +202,34 @@ export class WebOutboundSettings
             this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
             this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
                 ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            10_000,
+            this.readVaultAuthMethod(),
+            this.configService.get<string>('VAULT_TOKEN') ?? '',
         );
+    }
+
+    /**
+     * How this workload authenticates to Vault. Defaults to Kubernetes ServiceAccount auth; the
+     * token method exists only so a Vault running outside Kubernetes can be reached during local
+     * development, where there is no kubelet to project a ServiceAccount token.
+     */
+    private readVaultAuthMethod(): VaultAuthMethod {
+        const value = this.configService.get<string>('VAULT_AUTH_METHOD');
+
+        if (value == null || value.trim().length === 0) {
+            return VaultAuthMethod.Kubernetes;
+        }
+
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized !== VaultAuthMethod.Kubernetes && normalized !== VaultAuthMethod.Token) {
+            throw new Error(
+                `Invalid VAULT_AUTH_METHOD: '${value}'. Expected `
+                + `${VaultAuthMethod.Kubernetes} or ${VaultAuthMethod.Token}.`,
+            );
+        }
+
+        return normalized as VaultAuthMethod;
     }
 
 }
