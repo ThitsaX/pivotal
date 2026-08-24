@@ -443,7 +443,8 @@ components:
       type: string
       description: FSP with which the party is associated.
     homeTransactionId:
-      maxLength: 255
+      maxLength: 128
+      minLength: 1
       type: string
       description: "Transaction ID from the DFSP backend, used to reconcile transactions between the Switch and the DFSP backend systems. In Mojaloop and Pivotal, this field is mandatory. However, most Core Banking Systems (CBS) generate the transaction ID only once the transaction stage is reached. Therefore, during the payer integration, the DFSP can provide a UUID in the initial call (e.g., KYC) and later override it with the actual transaction ID (homeTransactionId) in the subsequent transaction confirmation call."
     idSubValue:
@@ -579,6 +580,10 @@ Allowed values:
           enum:
           - true
           - false
+        homeTransactionId:
+          allOf:
+          - $ref: '#/components/schemas/homeTransactionId'
+          description: Optional final payer DFSP transaction ID. When supplied, it replaces the homeTransactionId from the initial POST /secured/sendmoney call. When omitted, the initial value is retained. The effective value is propagated to Mojaloop in POST /transfers extensionList using the homeTransactionId key.
         extensionList:
           $ref: '#/components/schemas/extensionList'
     transferId:

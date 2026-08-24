@@ -137,6 +137,28 @@ describe('PutSendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
     });
+
+    it('accepts and trims homeTransactionId with acceptQuote', async () => {
+        const {request, errors} = await validateRequest({
+            acceptQuote: true,
+            homeTransactionId: '  payer-home-final  ',
+        });
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.homeTransactionId, 'payer-home-final');
+    });
+
+    it('rejects a blank homeTransactionId with acceptQuote', async () => {
+        const {errors} = await validateRequest({acceptQuote: true, homeTransactionId: '   '});
+
+        assert.ok(messages(errors).includes('homeTransactionId should not be empty'));
+    });
+
+    it('rejects an over-length homeTransactionId with acceptQuote', async () => {
+        const {errors} = await validateRequest({acceptQuote: true, homeTransactionId: 'h'.repeat(129)});
+
+        assert.ok(messages(errors).includes('homeTransactionId must not exceed 128 characters'));
+    });
 });
 
 describe('SendMoneyRequest', () => {

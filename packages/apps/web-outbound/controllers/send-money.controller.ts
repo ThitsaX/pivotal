@@ -7,7 +7,7 @@ import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, Sen
 import { MdcContext } from '@shared/foundation';
 import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
-import { IsBoolean, IsOptional, ValidateIf } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
 
 export class PutSendMoneyRequest {
@@ -28,6 +28,13 @@ export class PutSendMoneyRequest {
     @Transform(({ value }) => value === true || value === 'true')
     @IsBoolean()
     acceptQuote?: boolean;
+
+    @IsOptional()
+    @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(128, {message: 'homeTransactionId must not exceed 128 characters'})
+    homeTransactionId?: string;
 }
 
 @Controller('secured/sendmoney')
@@ -138,6 +145,7 @@ export class SendMoneyController {
                             transferId,
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
+                            request.homeTransactionId,
                         ),
                     ),
                 );

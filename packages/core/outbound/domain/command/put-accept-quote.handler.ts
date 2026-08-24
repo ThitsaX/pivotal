@@ -33,6 +33,7 @@ export class PutAcceptQuoteHandler
     // for the whole window the winning replica is still talking to the Hub.
     // Released in finally; the TTL is only the crash backstop.
     private static readonly IN_FLIGHT_LOCK_TTL_MS = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS + 10_000;
+    private static readonly HOME_TRANSACTION_ID_EXTENSION_KEY = 'homeTransactionId';
 
     private readonly logger = new Logger(PutAcceptQuoteHandler.name);
 
@@ -86,13 +87,31 @@ export class PutAcceptQuoteHandler
         transfersPostRequest.ilpPacket = quotes.ilpPacket;
         transfersPostRequest.condition = quotes.condition;
         transfersPostRequest.expiration = quotes.expiration;
-        transfersPostRequest.extensionList = PutAcceptQuoteHandler.toExtensionList(quotes);
+        transfersPostRequest.extensionList = PutAcceptQuoteHandler.toExtensionList(
+            quotes,
+            transferRequest.homeTransactionId,
+        );
 
         return transfersPostRequest;
     }
 
-    private static toExtensionList(quotes: QuotesIDPutResponse): QuotesIDPutResponse['extensionList'] {
-        return quotes.extensionList;
+    private static toExtensionList(
+        quotes: QuotesIDPutResponse,
+        homeTransactionId: string | undefined,
+    ): QuotesIDPutResponse['extensionList'] {
+        const extension = (quotes.extensionList?.extension ?? [])
+            .filter((item) => item.key?.trim().toLowerCase()
+                !== PutAcceptQuoteHandler.HOME_TRANSACTION_ID_EXTENSION_KEY.toLowerCase())
+            .map((item) => ({...item}));
+
+        if (homeTransactionId != null && homeTransactionId.length > 0) {
+            extension.push({
+                key: PutAcceptQuoteHandler.HOME_TRANSACTION_ID_EXTENSION_KEY,
+                value: homeTransactionId,
+            });
+        }
+
+        return extension.length > 0 ? {extension} : undefined;
     }
 
     private static toResponse(
@@ -149,7 +168,7 @@ export class PutAcceptQuoteHandler
     }
 
     private async executeLocked(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
-        const { transferId, acceptQuote, requestSource } = command.input;
+        const { transferId, acceptQuote, requestSource, homeTransactionId } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
 
         // Idempotency guard (sequential duplicates): a successful acceptQuote deletes the
@@ -167,6 +186,12 @@ export class PutAcceptQuoteHandler
 
         const source = PutAcceptQuoteHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptQuoteHandler.assertSourceCanActForPayer(requestSource, source);
+
+        if (homeTransactionId != null) {
+            transferRequest.homeTransactionId = homeTransactionId;
+            await this.redisClient.set(transferId, transferRequest);
+        }
+
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
         const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
         const { transfersUrl } = this.fspiopAxios.settings;
