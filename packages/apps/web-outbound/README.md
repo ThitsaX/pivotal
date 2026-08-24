@@ -42,6 +42,7 @@ Swagger docs: `http://localhost:3200/v1.0.0/api-docs`.
 - `PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME`: must match `web-inbound`.
 - `ACCESS_JWT_ENABLED`: protects send-money API with payer JWTs.
 - `DECIMAL_PLACES`: amount scale validation.
+- `CHECK_PAYER_FEE_AS_MENDATORY`: requires the exact `schemeFee` and `payerProvidedFee` extension keys when accepting a party; their string or number values are normalized and checked against `DECIMAL_PLACES`; defaults to `false`.
 
 ## Debug Checklist
 

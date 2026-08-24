@@ -109,8 +109,8 @@ describe('PutSendMoneyRequest', () => {
     it('keeps extensionList when acceptParty is true', async () => {
         const extensionList = {
             extension: [
-                {key: 'payerFee', value: '1.23'},
-                {key: 'payerFeeCurrency', value: 'USD'},
+                {key: 'schemeFee', value: '10'},
+                {key: 'payerProvidedFee', value: '5'},
             ],
         };
         const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});

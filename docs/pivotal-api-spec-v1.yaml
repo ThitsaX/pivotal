@@ -102,6 +102,8 @@ paths:
           $ref: '#/components/responses/unauthorized'
         "403":
           $ref: '#/components/responses/forbidden'
+        "417":
+          $ref: '#/components/responses/payerFeeValidationError'
         "500":
           $ref: '#/components/responses/putAcceptPartyTransferServerError'
   /secured/sendmoney/{transferId} (Accept Quote):
@@ -437,6 +439,28 @@ components:
       items:
         $ref: '#/components/schemas/extensionItem'
 
+    fspiopExtensionItem:
+      type: object
+      properties:
+        key:
+          maxLength: 32
+          minLength: 1
+          type: string
+        value:
+          oneOf:
+          - type: string
+          - type: number
+
+    fspiopExtensionList:
+      type: object
+      required:
+      - extension
+      properties:
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/fspiopExtensionItem'
+
     fspId:
       maxLength: 32
       minLength: 1
@@ -568,7 +592,21 @@ Allowed values:
             Confirmed transfer amount, accepted as either a JSON string (canonical FSPIOP Amount, e.g. `"10"`) or a JSON number (e.g. `10`). The number of decimal places permitted is governed by the scheme's `DECIMAL_PLACES` configuration (see the `amount` schema) — for example, with Guinea's `DECIMAL_PLACES=0`, `"10"` and `10` are accepted but `"10.01"` is rejected.
           example: "10"
         extensionList:
-          $ref: '#/components/schemas/extensionList'
+          allOf:
+          - $ref: '#/components/schemas/fspiopExtensionList'
+          description: |
+            Deployment-specific extensions forwarded to the quote request. When
+            `CHECK_PAYER_FEE_AS_MENDATORY=true`, this
+            list must contain the exact, case-sensitive keys `schemeFee` and
+            `payerProvidedFee`. Each fee accepts a JSON string or number, is
+            normalized to a canonical FSPIOP Amount string, and must not exceed
+            the deployment's configured `DECIMAL_PLACES`.
+          example:
+            extension:
+            - key: schemeFee
+              value: "10"
+            - key: payerProvidedFee
+              value: 5
     acceptQuoteRequest:
       required:
       - acceptQuote
@@ -857,6 +895,17 @@ Allowed values:
             message: Generic validation error.
             localeMessage: Generic validation error.
             detailedDescription: "fspiop-source header or request.from.fspId is required."
+    payerFeeValidationError:
+      description: Required payer-provided fee extensions were not supplied.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/errorResponse'
+          example:
+            statusCode: "3107"
+            message: Please fill out the complete and correct information.
+            localeMessage: Please fill out the complete and correct information.
+            detailedDescription: Fee validation failed. Required fee information was not provided by the Payer DFSP.
     unauthorized:
       description: Authentication failed - the `Authorization` JWT is missing, malformed, or its signature/payload does not verify against the request body.
       content:
