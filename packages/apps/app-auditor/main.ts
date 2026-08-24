@@ -7,6 +7,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {DbMigration, DbMigrationSettings} from '@shared/dbmigration';
+import { LogLevelsResolver } from '@shared/foundation';
 
 const AUDIT_SQL_LOCATION = 'packages/core/audit/domain/sql';
 const PARTICIPANT_SQL_LOCATION = 'packages/core/participant/domain/sql';
@@ -92,6 +93,10 @@ const bootstrap = async (): Promise<void> => {
         loadDotEnv({path: moduleEnvPath, override: true});
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
+
+    // Override log level for all loggers
+    const logLevel = process.env['LOG_LEVEL'];
+    Logger.overrideLogger(LogLevelsResolver.resolveLogLevels(logLevel));
 
     const auditLocation = resolve(repoRoot, AUDIT_SQL_LOCATION);
     const participantLocation = resolve(repoRoot, PARTICIPANT_SQL_LOCATION);

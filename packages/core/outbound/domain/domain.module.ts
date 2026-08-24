@@ -76,7 +76,7 @@ export class OutboundDomainModule {
                 inject: [OutboundSettings],
             },
             {                                                                                                                                                                       
-                provide: AmountTypeConstraint,                                                                                                                                      
+                provide: AmountTypeConstraint,
                 useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 
                     new AmountTypeConstraint(outboundSettings.strictAmountType), 
                 inject: [OutboundSettings],
