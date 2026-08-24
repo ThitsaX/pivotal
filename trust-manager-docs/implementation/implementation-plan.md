@@ -361,6 +361,12 @@ reason.
 
 ## 5. Phasing
 
+> **Superseded in ordering, not in content — 2026-08-25.** The phases below remain the right units of
+> work, but delivery dates reorder them: the KMS-backed deployment ships first, so `pkcs11` moves out
+> of phase 1 and to the end. `implementation/status.md` carries the current order and what that
+> deferral costs. Read the phases here for *what each one contains*; read `status.md` for *when*.
+
+
 0. **Key store and CA bring-up.** *Differs by profile — this is the only phase that does.*
 
    **HSM-backed:** provision the CloudHSM cluster and the KMS custom key store, move Vault to auto-unseal
@@ -376,8 +382,10 @@ reason.
    no crypto users — the equivalent control is IAM policy plus Vault path policy, verified in phase 1.
 
    *Prerequisite for phases 1, 5 and 6 in both profiles.*
-1. **Custody + JWS correctness.** **Both** `Signer` implementations — the PKCS#11 one *with its
-   session pool*, and the `vault-kv` one — behind a single interface, exercised in CI. Per-DFSP
+1. **Custody + JWS correctness.** Both `Signer` implementations — the PKCS#11 one *with its
+   session pool*, and the `vault-kv` one — behind a single interface, exercised in CI. *(Ordering
+   superseded: only `vault-kv` was built, and `pkcs11` is deferred to the HSM-backed delivery. The
+   argument below still holds, and the risk it describes has been accepted rather than answered.)* Per-DFSP
    **RSA-2048** keys generated fresh (settled decision 21), `participant_key` with self/peer roles,
    seed the `hub` participant, fix the protected header, resolve the algorithm per key, write the
    conformance vectors. *Nothing external changes yet — signatures simply become correct.* **Every

@@ -12,7 +12,7 @@
 ### Phase 2 — TLS client certificate (new)
 
 1. The DFSP generates a **second, separate** keypair for TLS client authentication, distinct from the accessKey. This private key must never be sent to Pivotal, and Pivotal will never ask for it.
-2. The DFSP creates a Certificate Signing Request using its FSPIOP identifier as the Common Name — e.g. `CN=BIGBANKGN`. **The CN must match the `FSPIOP-Source` the DFSP sends**, or requests will be rejected.
+2. The DFSP creates a Certificate Signing Request using its FSPIOP identifier as the Common Name — e.g. `CN=EXAMPLEFSP`. **The CN must match the `FSPIOP-Source` the DFSP sends**, or requests will be rejected.
 3. The DFSP submits the CSR through the portal, or to the hub operator where enrollment is operator-mediated.
 4. Pivotal returns two artefacts for the DFSP to download: the **signed certificate** and the **issuing CA chain**.
 5. The DFSP installs the certificate, the chain, and the private key from step 1 into its HTTP client. The TLS handshake requires the DFSP to present the certificate *and* prove it holds the matching private key. Java and .NET stacks should bundle all three into a PKCS#12 keystore.
@@ -24,7 +24,7 @@ The DFSP ends up with three files: `dfsp-client.key` (its own, from step 1), `df
 openssl req -new -newkey rsa:2048 -nodes \
   -keyout dfsp-client.key \      # private key — never leaves the DFSP
   -out    dfsp-client.csr \      # this goes to Pivotal
-  -subj   "/CN=BIGBANKGN"
+  -subj   "/CN=EXAMPLEFSP"
 
 # Step 4 — Pivotal returns dfsp-client.crt and chain.pem
 

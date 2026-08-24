@@ -41,31 +41,35 @@ Vault-sourced key actually verified.
 
 ### What to do next
 
-JWS is done. What remains, in recommended order:
+JWS is done. The remaining work is scoped by which deployment ships first — see *Build order*.
 
-1. **`pkcs11`** — the HSM-backed profile, both repos. Needs SoftHSM2 locally. This is the profile
-   with the mandatory-HSM requirement behind it, and neither implementation has one yet.
-2. **trust-manager** — the control plane. Nothing writes keys into Vault today; provisioning is a
-   manual `vault kv put`. Rotation, onboarding, revocation and MCM registry sync all live here, and
-   none of it exists.
-3. **mTLS** — legs #2, #3 and #4. Left last because it is the only item gated on parties outside
-   the team: Hub CA exchange and MCM inbound enrollment.
+1. **Cluster bring-up** — Vault Kubernetes auth and cert-manager. Validates the production credential
+   path, which has never executed in either language, and is a hard prerequisite for certificate
+   issuance. A working reference already exists in the production gitops repositories.
+2. **CA ceremony** — KMS roots for `pki_hub_client` and `pki_dfsp`, Vault PKI intermediates. Runbook
+   written, not yet executed.
+3. **mTLS on legs #2, #3 and #4.** No external blocker: the same organisation operates the Hub, so
+   registering the CA, enabling client-certificate verification at the Hub edge and inbound
+   enrollment are all internal changes.
+4. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
+   operated by other institutions.
+5. **`pkcs11`** — deferred to the HSM-backed delivery.
 
-**Two gaps worth naming before they are forgotten:**
+**Enough of trust-manager to survive handover.** Manual key provisioning is tolerable while the
+people who built the system operate it. Certificate *renewal* is not — certificates expire on their
+own schedule regardless of who remembers. cert-manager covers leaf renewal, which is why step 1 must
+be real automation rather than a manual issuance. CA registration is closer to one-time, so the rest
+of trust-manager can stay deferred.
 
-**Vault Kubernetes auth has never run, in either language.** The TypeScript client has only ever used
-the development token path; the Java client's Kubernetes code has never been executed at all. It is
-the production credential path and it is unverified. A local k3d cluster would exercise it — best
-done when mTLS starts, since cert-manager and Istio need a cluster anyway.
-
-**The Java connector cannot sign outside Kubernetes.** Its `VaultClient` implements only
-ServiceAccount login, so with no kubelet to project a token it cannot read a key. Roughly thirty
-lines mirroring `VaultAuthMethod` on the TypeScript side would allow two-way signing locally — the
-two implementations verifying each other's output across a real Hub, which is a stronger test than
-either against shared vectors.
+**One gap worth naming before it is forgotten.** Vault Kubernetes auth is unverified in both
+languages: the TypeScript client has only ever used the development token path, and the Java client's
+Kubernetes code has never been executed. Step 1 is what closes it — and it removes the need for a
+development-only token shim in the Java connector, which would otherwise become permanent.
 
 **Local development notes.** SoftHSM2 in the stack, `implementation-plan.md` §1.4, and a refreshed
-`runbooks/ceremony-local.md` are still outstanding — the runbook predates the profile rename.
+`runbooks/ceremony-local.md` remain outstanding; the runbook predates the profile rename. SoftHSM2
+follows `pkcs11` in priority.
+
 
 ---
 
@@ -186,9 +190,9 @@ accept.** Treat #2/#4 as *correction* work, not greenfield.
 
 **Duty:** sign FSPIOP `PUT`/`PATCH` callbacks as the connector's own tenant.
 
-The connectors PUT **directly to Hub services** — confirmed in
-`prod-hub-guinea-gitops/apps/pivotal/values.yaml:61-63`
-(`moja-account-lookup-service`, `moja-quoting-service`, `moja-ml-api-adapter-service`). This is a
+The connectors PUT **directly to Hub services** — confirmed against a production gitops values file,
+where `FSPIOP_PARTIES_URL`, `FSPIOP_QUOTES_URL` and `FSPIOP_TRANSFERS_URL` resolve to
+`moja-account-lookup-service`, `moja-quoting-service` and `moja-ml-api-adapter-service`. This is a
 real hub-facing leg, not a call into web-outbound.
 
 ### Finished
@@ -213,9 +217,8 @@ The change surface, in `pivotal-connector` (the library — deployables inherit 
 
 ### Blockers specific to this leg
 
-- **`sharedOkHttpClient` is overridden by every deployable** — `PivotalConfiguration.java:127`
-  (thitsawallet), `OrangeMoneyConfiguration.java:135` (orange), and the same in kulu and big-bank.
-  Anything attached to the library's `OkHttpClient` bean is dead in production. The signing/mTLS must
+- **`sharedOkHttpClient` is overridden by every deployable** — each connector repository defines its
+  own, so anything attached to the library's `OkHttpClient` bean is dead in production. The signing/mTLS must
   ride on a separately-qualified client or an `Interceptor` that `FspiopCallbackService` installs
   itself. **Decide before writing code.**
 - **Config plumbing is manual and fails closed.** `docker-entrypoint.sh` runs `set -eu` with no
@@ -263,10 +266,9 @@ Excluded by `architecture.md` §106: the FSP owns the endpoint and the CA, provi
 Pivotal holds no key material.
 
 One correction to carry into the docs: `architecture.md` §116 asks "whether the connectors verify
-those backends' server certificates". **They do not.** All four connectors call
+those backends' server certificates". **They do not.** Every connector calls
 `withDisableSSLVerification()` — an all-trusting `X509TrustManager`, `hostnameVerifier -> true`, and
-`SSLContext.getInstance("SSL")` (`ThitsaWalletClientImpl.java:113,123` and the equivalents in orange,
-kulu, big-bank). The current state is *unverified*, not *manually verified*. Worth a sentence in
+`SSLContext.getInstance("SSL")`. The current state is *unverified*, not *manually verified*. Worth a sentence in
 `architecture.md`; not trust-manager work.
 
 ---
@@ -303,33 +305,57 @@ PATCH-error audit messages after a rename had broken the Pivotal consumer.
 
 ## Build order
 
+**Reordered 2026-08-25 by delivery date.** The KMS-backed deployment ships first; the HSM-backed one
+has roughly a month more. `pkcs11` serves only the HSM-backed profile, so it leaves the critical path
+entirely — building it now would spend the schedule on the deployment that is not waiting.
+
 ```
-    ┌─────────────────────────────────────────┐
- 1  │ protected-header contract + vectors     │  monorepo, no infra needed
-    │ fix #2 sign · fix #4 verify · test loop │
-    └────────────────────┬────────────────────┘
-                         │  vectors are the hand-off
-    ┌────────────────────▼────────────────────┐
- 2  │ #3 — Java signer against those vectors  │  pivotal-connector
-    └────────────────────┬────────────────────┘
-    ┌────────────────────▼────────────────────┐
- 3  │ key custody — vault-kv, then pkcs11     │  both repos
-    └────────────────────┬────────────────────┘
-    ┌────────────────────▼────────────────────┐
- 4  │ mTLS across #2, #3, #4                  │  needs Hub CA exchange
-    └────────────────────┬────────────────────┘
-    ┌────────────────────▼────────────────────┐
- 5  │ #1 DFSP-facing mTLS + enrollment        │  needs DFSP coordination
-    └─────────────────────────────────────────┘
+  DONE  ┌─────────────────────────────────────────┐
+    1   │ protected-header contract + vectors     │  monorepo
+        │ #2 sign · #4 verify · conformance loop  │
+        └────────────────────┬────────────────────┘
+  DONE  ┌────────────────────▼────────────────────┐
+    2   │ #3 — Java signer against those vectors  │  pivotal-connector
+        └────────────────────┬────────────────────┘
+  DONE  ┌────────────────────▼────────────────────┐
+    3   │ key custody — vault-kv, both languages  │  proven end to end
+        └────────────────────┬────────────────────┘
+  NEXT  ┌────────────────────▼────────────────────┐
+    4   │ cluster: Vault k8s auth + cert-manager  │  validates the production
+        │                                         │  credential path, unrun so far
+        └────────────────────┬────────────────────┘
+        ┌────────────────────▼────────────────────┐
+    5   │ CA ceremony — KMS roots, Vault PKI      │  needs cloud access
+        └────────────────────┬────────────────────┘
+        ┌────────────────────▼────────────────────┐
+    6   │ mTLS across #2, #3, #4                  │  no external blocker
+        └────────────────────┬────────────────────┘
+        ┌────────────────────▼────────────────────┐
+    7   │ #1 DFSP-facing mTLS + enrollment        │  DFSP coordination
+        └────────────────────┬────────────────────┘
+        ┌────────────────────▼────────────────────┐
+    8   │ pkcs11 — HSM-backed profile             │  deferred, both repos
+        └─────────────────────────────────────────┘
 ```
 
-**Why #2 and #4 first, together.** They form a closed loop — web-inbound already verifies Pivotal's
-own tenants (`architecture.md` §2), so signing and verification can be tested end-to-end inside
-Pivotal with no Hub, no CA, no Java, and no HSM. It also forces the protected-header contract to be
-pinned before anyone builds against it.
+**Why steps 1–3 came first.** #2 and #4 form a closed loop — web-inbound already verifies Pivotal's
+own tenants (`architecture.md` §2), so signing and verification were testable inside Pivotal with no
+Hub, no CA and no HSM. That also pinned the protected-header contract before anyone built against it.
 
-**Why mTLS is deliberately last.** JWS is application-level and can be flipped per participant; mTLS
-is a hard cutover on a shared listener. Entangling them makes both un-rollbackable.
+**Why mTLS follows rather than accompanies JWS.** JWS is application-level and flips per participant;
+mTLS is a hard cutover on a shared listener. Entangling them would make both un-rollbackable.
+
+**Why the cluster comes before the ceremony.** cert-manager issues the leaves and Vault Kubernetes
+auth is the production credential path — which has **never executed in either language**. Both are
+prerequisites for certificates, and the second is an unverified assumption sitting under work already
+shipped.
+
+**What deferring `pkcs11` costs.** `implementation-plan.md` §5 phase 1 argued for building both
+signers together, so that two implementations against one interface would prove the interface had not
+absorbed HSM assumptions. Deferring means the `KeyProvider` seam is validated by `vault-kv` alone and
+may quietly have taken on its shape. That is a real risk accepted for delivery, not an oversight —
+expect some interface rework when `pkcs11` lands.
+
 
 ---
 
@@ -637,7 +663,7 @@ Completes the JWS half of leg #3. Library only; the four deployables are untouch
 - **`FspiopJwsSigner` is a component-scanned `@Component`, not a `@Bean` on
   `CoreConnectorConfiguration`.** Deployables exclude that configuration and import their own; some
   extend it and inherit its beans (`PivotalConfiguration`), others do not
-  (`OrangeMoneyConfiguration`). A `@Bean` there would have reached part of the fleet only. Every
+  (others do not). A `@Bean` there would have reached part of the fleet only. Every
   deployable scans `com.thitsaworks.mojaloop.coreconnector`, so a component reaches every deployable
   without the deployable repo changing.
 - **`FspiopCallbackService` derives its own client** — `http.newBuilder().addInterceptor(...)`.
@@ -895,7 +921,7 @@ what makes per-participant rollout work.
 
 **Environment conventions now fixed:** one compose project (`pivotal-stack`) for Pivotal services;
 MySQL, Kafka and the hub's own Redis come from `ml-core-test-harness`; `mojaloop-demowallet` is
-available as the DFSP backend for the ThitsaWallet connector.
+available as the DFSP backend for the standard connector.
 
 **Left on the JWS story:** web-outbound has still not signed a live send-money flow. With the hub
 harness already running, that is now possible and is the last piece of JWS evidence.

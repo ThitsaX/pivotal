@@ -446,8 +446,8 @@ issued by the same `pki_hub_client` intermediate, under the same root A:
 
 ```
 leaf (web-outbound)      ─┐
-leaf (connector-bigbank) ─┼─► pki_hub_client intermediate ─► root A (CloudHSM)
-leaf (connector-orange)  ─┘         [Vault PKI]                    │
+leaf (connector-fspA)    ─┼─► pki_hub_client intermediate ─► root A (CloudHSM)
+leaf (connector-fspB)    ─┘         [Vault PKI]                    │
                                                                     ▼
                                             registered N× to MCM, installed once
                                             in the Hub FSPIOP ingress trust store

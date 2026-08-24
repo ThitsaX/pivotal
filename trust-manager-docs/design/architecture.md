@@ -444,8 +444,8 @@ be written down rather than discovered.
 **The compliance difference is the whole point of the distinction.** §4.0 rules the software profile
 out for a deployment bound by those requirements: *"'Performed within' rules out protecting a
 software keystore with an HSM-held key."* A KMS-backed Vault seal protects data **at rest** and is
-touched roughly once per Vault process start; it does not make signing an in-HSM operation. Cabo
-Verde is not bound by R1–R3, so this is a legitimate choice — but it should be a **stated and
+touched roughly once per Vault process start; it does not make signing an in-HSM operation. A
+deployment not bound by R1–R3 may legitimately choose this — but it should be a **stated and
 accepted** position, not an inference from a config value — **the absence of a stated requirement is
 not the same as agreement.**
 
