@@ -12,50 +12,60 @@ Design lives in [`design/`](../design/); the spine is
 
 ## Where the work actually sits — read this first
 
-Six commits' worth of change exists; **only one of them is committed.** Anything below describing a
-"commit" describes work that is written and verified, not work that is necessarily in git.
+**FSPIOP JWS is complete, committed across all three repositories, and proven end to end against a
+live Mojaloop hub.**
 
-| Repo | Branch | State |
+| Repo | Branch | Head |
 | --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | **committed and pushed** — `fa0a03e` |
-| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | **uncommitted** in the working tree |
-| `pivotal-thitsawallet-connector` | `main` — needs a branch | **uncommitted** in the working tree |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `a946c56` — Vault-backed key custody + verification harness |
+| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `429c174` — FSPIOP JWS signing for the hub-facing leg |
+| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2436743` — bump to 0.0.25 + JWS settings |
 
-### Pending actions, in order
+All three working trees are clean.
 
-1. **Revert the three client forks.** `pivotal-gin-orange-java-connector`,
-   `pivotal-gin-kulu-java-connector` and `pivotal-gin-big-bank-java-connector` each carry 3 modified
-   files (22 insertions) that should never have been made — see the scope rule under *Connector
-   fleet*. `git checkout -- .` in each; kulu and big-bank also have an untracked
-   `implementation/mod_fspiop_interface/` from a local build that can be deleted.
-2. **Commit `pivotal-connector` and thitsawallet.** Stage explicitly, not `git add -A`:
-   thitsawallet tracks 34 build artifacts under `target/` which a local build churns, and
-   `pivotal-connector`'s `.github/CODEOWNERS` change is the repo owner's, not this work's.
-3. **Tag `v0.0.25` on `pivotal-connector`** when ready. 0.0.25 currently exists only in the local
-   Maven repository; the connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so
-   nothing is deployable until the publish workflow runs.
+### Proven, not just tested
+
+A transfer reached **COMMITTED** through the full chain — Postman → web-outbound → Mojaloop hub
+(ALS, quoting-service, ml-api-adapter) → web-inbound → NATS → Java connector → DFSP backend — with
+the payer tenant at `jws_sign_enabled=1` and `jws_verify_mode=require`. The bodied requests relayed
+back through the Hub could only have passed if the signature web-outbound produced from a
+Vault-sourced key actually verified.
+
+### Pending actions
+
+1. **Tag `v0.0.25` on `pivotal-connector`** when ready. It currently exists only in the local Maven
+   repository; the connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so nothing
+   is deployable until the publish workflow runs.
+2. **`.gitignore` for `pivotal-thitsawallet-connector`.** It tracks 34 build artifacts under
+   `target/`, including `app.jar`, so every local build produces binary diffs.
 
 ### What to do next
 
-**Local development — done for JWS (commits 7 and 9).** The JWS-over-Vault loop is now proven against a real
-Vault; see the change log. What remains: SoftHSM2 in the stack, `implementation-plan.md` §1.4, and a
-refreshed `runbooks/ceremony-local.md` (it still predates the profile rename). A full
-service-to-service run through the compose stack is also still untried — commit 7 proves the
-libraries interoperate, not that the deployed services do.
+JWS is done. What remains, in recommended order:
 
-*Superseded — kept for the reasoning:* **Local development and end-to-end proof.** ~140 unit tests pass across both languages, the
-migration is verified against real MySQL 8.0.45, and cross-language signature interop is proven — but
-**nothing has ever run together.** No connector has signed a callback that web-inbound then verified
-using a key it fetched from Vault.
+1. **`pkcs11`** — the HSM-backed profile, both repos. Needs SoftHSM2 locally. This is the profile
+   with the mandatory-HSM requirement behind it, and neither implementation has one yet.
+2. **trust-manager** — the control plane. Nothing writes keys into Vault today; provisioning is a
+   manual `vault kv put`. Rotation, onboarding, revocation and MCM registry sync all live here, and
+   none of it exists.
+3. **mTLS** — legs #2, #3 and #4. Left last because it is the only item gated on parties outside
+   the team: Hub CA exchange and MCM inbound enrollment.
 
-The untested seams are exactly the agreements between the two codebases: the Kubernetes auth flow,
-the KV v2 response shape, the `privateKey` field name, and the `secret/pivotal/jwskey/<fspId>` path
-convention. Nothing currently exercises any of them; they hold because one author wrote both sides.
+**Two gaps worth naming before they are forgotten:**
 
-Concretely: docker-compose with Vault in dev mode seeded with a test tenant, web-outbound → Hub stub
-→ web-inbound plus a connector, running with `KEY_PROVIDER=vault-kv` and `FSPIOP_USE_JWS=true`;
-SoftHSM2 alongside; `implementation-plan.md` §1.4 written; `runbooks/ceremony-local.md` refreshed —
-it still predates the profile rename. This also unblocks `pkcs11`, which is otherwise written blind.
+**Vault Kubernetes auth has never run, in either language.** The TypeScript client has only ever used
+the development token path; the Java client's Kubernetes code has never been executed at all. It is
+the production credential path and it is unverified. A local k3d cluster would exercise it — best
+done when mTLS starts, since cert-manager and Istio need a cluster anyway.
+
+**The Java connector cannot sign outside Kubernetes.** Its `VaultClient` implements only
+ServiceAccount login, so with no kubelet to project a token it cannot read a key. Roughly thirty
+lines mirroring `VaultAuthMethod` on the TypeScript side would allow two-way signing locally — the
+two implementations verifying each other's output across a real Hub, which is a stronger test than
+either against shared vectors.
+
+**Local development notes.** SoftHSM2 in the stack, `implementation-plan.md` §1.4, and a refreshed
+`runbooks/ceremony-local.md` are still outstanding — the runbook predates the profile rename.
 
 ---
 
@@ -277,35 +287,17 @@ kulu, big-bank). The current state is *unverified*, not *manually verified*. Wor
 | Local dev environment | 🔴 | No CloudHSM/KMS on the dev machine. `runbooks/ceremony-local.md` is stale (pre-rename, single trust domain); `implementation-plan.md` §1.4 was never written |
 | `NatsPullListener` ack-after-PUT | 🔴 | `handle()` acks in `finally` even on failure, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners — bundle with #3 |
 
-### Connector fleet version skew
+### Connector scope
 
-The library fix history matters for rollout. `git tag --contains fc92ce6` → **v0.0.18+**.
+Two Java repositories are in scope:
 
-**Scope rule.** Only `pivotal-connector` (the library) and `pivotal-thitsawallet-connector` (the
-standard deployable that new DFSP connectors are copied from) are updated as part of this work. The
-client-specific forks — `pivotal-gin-orange-java-connector`, `-kulu-`, `-big-bank-` — track live
-deployments on their own release cadence and approval path, and are bumped separately by whoever
-owns them. Commit 5 initially changed all four; the three client forks were reverted.
+| Repo | Role | Version |
+| --- | --- | --- |
+| `pivotal-connector` | the shared library — all Mojaloop protocol handling | publishes **0.0.25** |
+| `pivotal-thitsawallet-connector` | the standard deployable, copied to create new DFSP connectors | 0.0.24 → **0.0.25** |
 
-| Deployable | Pinned | Audit key | Owner |
-| --- | --- | --- | --- |
-| `pivotal-thitsawallet-connector` | 0.0.24 → **0.0.25** | `payerFsp` ✅ | this work |
-| `pivotal-gin-kulu-java-connector` | 0.0.17 | `payerFspId` ❌ | client fork |
-| `pivotal-gin-orange-java-connector` | 0.0.15 | `payerFspId` ❌ | client fork |
-| `pivotal-gin-big-bank-java-connector` | 0.0.15 | `payerFspId` ❌ | client fork |
-
-**What each client fork will need**, when its owner is ready — stated here rather than done:
-
-1. Bump `mod-pivotal-connector-api` to 0.0.25 or later. This alone fixes the `payerFspId` audit-key
-   regression (the fix landed in v0.0.18), so their PATCH-error audit messages stop being dropped as
-   NOT NULL poison.
-2. Add the seven JWS settings to `docker-entrypoint.sh` and the Dockerfile `ENV` block. Every one
-   carries a default, so a fork that skips this still boots and behaves exactly as today — the
-   settings are only needed to *enable* signing.
-
-The upgrade path was verified before the revert: `FspClientService` is byte-identical across
-v0.0.15, v0.0.17 and v0.0.24, the `Settings` property set is unchanged, and all four built clean
-against 0.0.25. So the bump is safe whenever each owner chooses to take it.
+0.0.25 also carries the audit-key fix from v0.0.18, which restored `payerFsp`/`payeeFsp` in
+PATCH-error audit messages after a rename had broken the Pivotal consumer.
 
 ---
 
@@ -646,11 +638,11 @@ Completes the JWS half of leg #3. Library only; the four deployables are untouch
   `CoreConnectorConfiguration`.** Deployables exclude that configuration and import their own; some
   extend it and inherit its beans (`PivotalConfiguration`), others do not
   (`OrangeMoneyConfiguration`). A `@Bean` there would have reached part of the fleet only. Every
-  deployable scans `com.thitsaworks.mojaloop.coreconnector`, so a component reaches all four with no
-  deployable repo changing.
+  deployable scans `com.thitsaworks.mojaloop.coreconnector`, so a component reaches every deployable
+  without the deployable repo changing.
 - **`FspiopCallbackService` derives its own client** — `http.newBuilder().addInterceptor(...)`.
-  Relying on the injected client to carry signing would fail in production, where all four
-  deployables override `sharedOkHttpClient`. `newBuilder()` shares the connection pool and
+  Relying on the injected client to carry signing would fail in production, where deployables
+  override `sharedOkHttpClient`. `newBuilder()` shares the connection pool and
   dispatcher, so this costs nothing.
 
 **Enabling signing without Vault configured throws at startup**, rather than degrading to unsigned.
@@ -675,9 +667,8 @@ target.
 | `pivotal-connector` | `<revision>` 0.0.24 → **0.0.25** (flattened POMs regenerate) |
 | `pivotal-thitsawallet-connector` | seven `-D` settings in `docker-entrypoint.sh`, seven `ENV` defaults in the Dockerfile, `mod-pivotal-connector-api` → 0.0.25, README config table extended, new **FSPIOP JWS signing** section |
 
-The three client forks were changed too and then reverted — see the scope rule above.
 
-**Verification:** all four build clean against 0.0.25. Each `docker-entrypoint.sh` was dry-run with a
+**Verification:** the deployable builds clean against 0.0.25. Each `docker-entrypoint.sh` was dry-run with a
 stub `java` and only the Dockerfile's own `ENV` values, confirming it execs with all seven new
 arguments and still ends in `-jar app.jar`.
 
