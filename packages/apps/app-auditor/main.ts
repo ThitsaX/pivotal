@@ -94,9 +94,9 @@ const bootstrap = async (): Promise<void> => {
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
 
-    // Override log level for all loggers
-    const logLevel = process.env['LOG_LEVEL'];
-    Logger.overrideLogger(LogLevelsResolver.resolveLogLevels(logLevel));
+    const logLevels = LogLevelsResolver.resolveLogLevels(process.env['LOG_LEVEL']);
+    // Override log levels before Nest migration
+    Logger.overrideLogger(logLevels);
 
     const auditLocation = resolve(repoRoot, AUDIT_SQL_LOCATION);
     const participantLocation = resolve(repoRoot, PARTICIPANT_SQL_LOCATION);
@@ -122,7 +122,9 @@ const bootstrap = async (): Promise<void> => {
     );
 
     const {AuditConsumerAppModule} = await import('./app.module');
-    const app = await NestFactory.createApplicationContext(AuditConsumerAppModule);
+    const app = await NestFactory.createApplicationContext(AuditConsumerAppModule, {
+        logger: logLevels, // Configure log levels for Nest bootstrap
+    });
     app.enableShutdownHooks();
 
     Logger.log('Audit consumer is running.', 'Bootstrap');
