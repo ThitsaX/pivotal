@@ -13,3 +13,8 @@ export interface Dfsp {
     logoBase64?: string;
     name?: string;
 }
+
+export interface DfspListWithCountResponse {
+    totalNumberOfDfsp: number;
+    dfspList: Dfsp[];
+}

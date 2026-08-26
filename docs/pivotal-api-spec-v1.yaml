@@ -184,6 +184,38 @@ paths:
       responses:
         "200": 
           $ref: '#/components/responses/getDfspPrefixSuccess'
+  /dfsps-with-prefixes-and-count:
+    get:
+      tags:
+      - dfsps
+      summary: Retrieves registered DFSPs with prefixes and the total DFSP count.
+      description: |
+          The `GET /dfsps-with-prefixes-and-count` endpoint retrieves a complete list of
+          registered Digital Financial Service Providers (DFSPs), including their associated
+          dialing prefixes, wrapped with the total number of returned DFSPs.
+      responses:
+        "200":
+          $ref: '#/components/responses/getDfspPrefixWithCountSuccess'
+  /dfsps-with-prefixes-and-count/{usecase}:
+    get:
+      tags:
+      - dfsps
+      summary: Retrieves filtered DFSPs with prefixes and the total DFSP count for a use case.
+      description: |
+          The `GET /dfsps-with-prefixes-and-count/{usecase}` endpoint retrieves registered
+          Digital Financial Service Providers (DFSPs), including their associated dialing
+          prefixes, filtered by use case and wrapped with the total number of returned DFSPs.
+      parameters:
+      - name: usecase
+        in: path
+        description: Specific use case.
+        required: true
+        schema:
+          type: string
+          example: "PERSON_TO_PERSON"
+      responses:
+        "200":
+          $ref: '#/components/responses/getDfspPrefixWithCountSuccess'
 
 components:
   schemas:
@@ -720,6 +752,20 @@ Allowed values:
       items:
         $ref: '#/components/schemas/dfspList'
 
+    getDfspPrefixWithCountResponse:
+      type: object
+      required:
+      - totalNumberOfDfsp
+      - dfspList
+      properties:
+        totalNumberOfDfsp:
+          type: integer
+          example: 3
+        dfspList:
+          type: array
+          items:
+            $ref: '#/components/schemas/dfspList'
+
     postSendMoneyResponse:
       type: object
       properties:
@@ -958,6 +1004,26 @@ Allowed values:
         application/json:
           schema:
             $ref: '#/components/schemas/getDfspPrefixResponse'
+    getDfspPrefixWithCountSuccess:
+      description: DFSP prefix list and count retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/getDfspPrefixWithCountResponse'
+          example:
+            totalNumberOfDfsp: 3
+            dfspList:
+            - id: 2
+              prefix: 101
+              fspId: wallet2
+              createdAt: "2025-06-10T12:52:37.000Z"
+              status: active
+              localeName: Demo wallet2
+              dfspType: wallet
+              additionalInfo: "{\"employees\": 10000, \"country\": \"USD\" }"
+              logoDataType: ""
+              logoBase64: ""
+              name: Demo Wallet 2
 
     postTransferServerError:
       description: An error occurred processing the transfer
