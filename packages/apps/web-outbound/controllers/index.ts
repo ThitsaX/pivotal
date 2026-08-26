@@ -3,3 +3,4 @@
 export * from './send-money.controller';
 export * from './dfsp-list.controller';
 export * from './central-registry.controller';
+export * from './transfer-status.controller';

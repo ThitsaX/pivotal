@@ -2,11 +2,14 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
+import { TypeOrmModule as NestJsTypeOrmModule } from '@nestjs/typeorm';
 import { AuditProducerModule } from '@core/audit/producer';
+import { Transaction } from '@core/audit/domain/model';
+import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
 import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
-import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
-import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient } from './component';
+import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
+import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
 import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
@@ -21,6 +24,7 @@ const CommandHandlers = [
 const QueryHandlers = [
     GetDfspListByUsecaseHandler,
     GetDfspListHandler,
+    GetTransferStatusHandler,
 ];
 
 @Module({})
@@ -41,6 +45,7 @@ export class OutboundDomainModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                NestJsTypeOrmModule.forFeature([Transaction], PIVOTAL_DB_READ_CONNECTION_NAME),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [
@@ -89,9 +94,10 @@ export class OutboundDomainModule {
                     new PayerProvidedFeesValidator(
                         outboundSettings.checkPayerFeeAsMandatory,
                         amountDecimalValidator,
-                    ),
+                ),
                 inject: [OutboundSettings, AmountDecimalValidator],
             },
+            TransferStatusRepository,
             {                                                                                                                                                                       
                 provide: AmountTypeConstraint,                                                                                                                                      
                 useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 

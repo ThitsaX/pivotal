@@ -6,6 +6,7 @@
 
 - Exposes `POST /secured/sendmoney` to start party lookup.
 - Exposes `PUT /secured/sendmoney/{transferId}` for `acceptParty` and `acceptQuote`.
+- Exposes `GET /secured/transferStatus/{transferId}` to payer/payee DFSPs for audited transfer recovery.
 - Calls Hub `GET /parties`, `POST /quotes`, and `POST /transfers`.
 - Subscribes to the FSPIOP response stream published by `web-inbound`.
 - Uses Redis for in-flight transfer state and callback timeout tracking.
@@ -21,6 +22,15 @@ npm run start:apps-web-outbound:dev
 Default port: `3200`.
 
 Swagger docs: `http://localhost:3200/v1.0.0/api-docs`.
+
+For a transfer-status GET, sign an empty `{}` payload with RS256. The protected
+header must contain the exact request `uri`, `method: GET`, the byte-identical
+RFC 7231 `date` header, and a fresh unique `nonce`. Pivotal rejects dates outside
+the five-minute clock window and rejects nonce reuse through Redis. This stronger
+check is mandatory for this endpoint even when `ACCESS_JWT_ENABLED=false`.
+
+The `fspiop-source` must match the transfer's payer or payee FSP. Status is read
+from the MySQL `transactions` table, not the TTL-bound Redis transfer cache.
 
 ## Required Dependencies
 

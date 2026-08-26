@@ -5,3 +5,4 @@ export * from './send-money-request';
 export * from './send-money-response';
 export * from './dfsp';
 export * from './register-msisdn';
+export * from './transfer-status';

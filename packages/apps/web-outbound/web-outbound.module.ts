@@ -2,10 +2,10 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { OutboundDomainModule } from '@core/outbound/domain';
+import {OutboundDomainModule, RedisClient} from '@core/outbound/domain';
 import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
 import { AccessGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
-import { CentralRegistryController, DfspListController, SendMoneyController } from './controllers';
+import { CentralRegistryController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
 import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
@@ -48,7 +48,7 @@ export class WebOutboundModule {
                 outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [SendMoneyController, DfspListController, CentralRegistryController],
+            controllers: [SendMoneyController, DfspListController, CentralRegistryController, TransferStatusController],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],
@@ -71,10 +71,15 @@ export class WebOutboundModule {
             },
             {
                 provide: AccessGuard,
-                useFactory: (accessKeyStore: AccessKeyStore, settings: WebOutboundModule.RequiredSettings, reflector: Reflector): AccessGuard => {
-                    return new AccessGuard(accessKeyStore, settings.jwtPolicy(), reflector);
+                useFactory: (
+                    accessKeyStore: AccessKeyStore,
+                    settings: WebOutboundModule.RequiredSettings,
+                    reflector: Reflector,
+                    redisClient: RedisClient,
+                ): AccessGuard => {
+                    return new AccessGuard(accessKeyStore, settings.jwtPolicy(), reflector, redisClient);
                 },
-                inject: [AccessKeyStore, REQUIRED_SETTINGS, Reflector],
+                inject: [AccessKeyStore, REQUIRED_SETTINGS, Reflector, RedisClient],
             },
             SendMoneyLogInterceptor,
         ];
@@ -109,7 +114,9 @@ export class WebOutboundModule {
 
 export namespace WebOutboundModule {
 
-    export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings, OutboundDomainModule.RequiredSettings {
+    export interface RequiredSettings
+        extends ParticipantDomainModule.RequiredSettings,
+            OutboundDomainModule.RequiredSettings {
         jwtPolicy(): JwtPolicy;
     }
 

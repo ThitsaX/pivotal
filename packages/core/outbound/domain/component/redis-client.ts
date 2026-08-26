@@ -115,6 +115,19 @@ export class RedisClient implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Reserves a namespaced key until its TTL expires. Unlike a lock, a successful
+     * reservation is intentionally not released; this is used for replay prevention.
+     */
+    async reserve(key: string, ttlMs: number): Promise<boolean> {
+        const result = await this.client.set(key, '1', {
+            NX: true,
+            PX: ttlMs,
+        });
+
+        return result === 'OK';
+    }
+
+    /**
      * Acquire a single-holder distributed lock for `key`. Returns an opaque token
      * when the lock was taken, or undefined when another holder already owns it.
      *

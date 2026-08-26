@@ -211,6 +211,8 @@ export class AuditTransactionConsumer implements OnModuleInit {
                             content.request ?? null,
                             content.payerHomeTransactionId ?? null,
                             AuditTransactionConsumer.toOccurredAt(content.occurredAt),
+                            content.quotingCurrency ?? null,
+                            content.quotingAmount ?? null,
                         ),
                     ),
                 );

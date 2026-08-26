@@ -6,3 +6,4 @@ export * from './outbound-exception.filter';
 export * from './public.decorator';
 export * from './send-money-log';
 export * from './send-money-log.interceptor';
+export * from './signed-transfer-status.decorator';

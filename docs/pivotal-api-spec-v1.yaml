@@ -152,6 +152,62 @@ paths:
           $ref: '#/components/responses/forbidden'
         "500":
           $ref: '#/components/responses/putAcceptQuoteTransferServerError'
+  /secured/transferStatus/{transferId}:
+    get:
+      tags:
+      - transfers
+      summary: Retrieves transfer status for the payer or payee DFSP
+      description: |
+        Read-only transfer recovery from the `transactions` table for the recorded
+        payer or payee. Requests use an RS256 JWS with an empty `{}` payload, signed
+        request metadata, a date within five minutes, and a one-time nonce.
+      operationId: getTransferStatusByTransferId
+      parameters:
+      - name: transferId
+        in: path
+        description: The 26-character ULID returned by `POST /secured/sendmoney`.
+        required: true
+        schema:
+          type: string
+          minLength: 26
+          maxLength: 26
+          pattern: "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+      - name: authorization
+        in: header
+        description: Raw compact RS256 JWS with protected request metadata and `{}` payload. Do not use a Bearer prefix.
+        required: true
+        schema:
+          type: string
+      - name: date
+        in: header
+        description: RFC 7231 HTTP-date signed byte-for-byte into the protected header. Must be within five minutes of server time.
+        required: true
+        schema:
+          type: string
+          example: Mon, 25 Aug 2026 09:12:44 GMT
+      - name: fspiop-source
+        in: header
+        description: Calling DFSP. It must be the recorded payer or payee and have a registered access public key.
+        required: true
+        schema:
+          $ref: '#/components/schemas/fspId'
+      responses:
+        "200":
+          $ref: '#/components/responses/getTransferStatusSuccess'
+        "401":
+          $ref: '#/components/responses/unauthorized'
+        "417":
+          description: A mandatory header is missing, the token/transfer ID is malformed, or the transfer is unknown/out of scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
+        "500":
+          description: Internal error reading the transaction or reserving the nonce.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
   /dfsp-list-with-prefixes:
     get:
       tags:
@@ -773,13 +829,52 @@ Allowed values:
         Below are the allowed values for the enumeration.
         - WAITING_FOR_PARTY_ACCEPTANCE `AUTO_ACCEPT_PARTY` is set to "false" and party information has been returned, waiting to be accepted by the Payer DFSP using a `PUT /sendmoney/{transferId}` request.
         - WAITING_FOR_QUOTE_ACCEPTANCE `AUTO_ACCEPT_QUOTE` is set to "false" and quote information has been returned, waiting to be accepted by the Payer DFSP using a `PUT /sendmoney/{transferId}` request.
+        - PENDING The transaction is actively progressing through quote or transfer processing.
         - COMPLETED The transfer has completed successfully.
         - ABORTED The transfer has been ABORTED.
       enum:
       - WAITING_FOR_PARTY_ACCEPTANCE
       - WAITING_FOR_QUOTE_ACCEPTANCE
+      - PENDING
       - ABORTED
       - COMPLETED
+
+    transferStatusResponse:
+      type: object
+      required:
+      - transferId
+      - homeTransactionId
+      - currentState
+      - possibleDispute
+      - amount
+      - currency
+      - initiatedTimestamp
+      - errorInformation
+      properties:
+        transferId:
+          $ref: '#/components/schemas/transferId'
+        homeTransactionId:
+          type: string
+          nullable: true
+          description: The payer or payee home reference selected according to the calling DFSP.
+        currentState:
+          $ref: '#/components/schemas/transferStatus'
+        possibleDispute:
+          type: boolean
+        amount:
+          type: string
+          nullable: true
+          description: Original transaction amount, serialized as a decimal string.
+        currency:
+          allOf:
+          - $ref: '#/components/schemas/currency'
+          nullable: true
+        initiatedTimestamp:
+          $ref: '#/components/schemas/initiatedTimestamp'
+        errorInformation:
+          allOf:
+          - $ref: '#/components/schemas/errorResponse'
+          nullable: true
 
     acceptPartyResponse:
       type: object
@@ -912,15 +1007,15 @@ Allowed values:
             localeMessage: Please fill out the complete and correct information.
             detailedDescription: Fee validation failed. Required fee information was not provided by the Payer DFSP.
     unauthorized:
-      description: Authentication failed - the `Authorization` JWT is missing, malformed, or its signature/payload does not verify against the request body.
+      description: Authentication failed because the signature or signed request metadata is invalid.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/errorResponse'
           example:
-            statusCode: "3100"
-            message: Authentication error.
-            localeMessage: Authentication error.
+            statusCode: "3105"
+            message: Payment is not successful. Please contact your service provider.
+            localeMessage: Payment is not successful. Please contact your service provider.
             detailedDescription: "Authorization signature verification failed."
     forbidden:
       description: The caller is not authorized to act for the specified payer FSP.
@@ -958,6 +1053,22 @@ Allowed values:
         application/json:
           schema:
             $ref: '#/components/schemas/getDfspPrefixResponse'
+
+    getTransferStatusSuccess:
+      description: Transfer status retrieved successfully from the audit transaction record.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/transferStatusResponse'
+          example:
+            transferId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+            homeTransactionId: TXN-2026-08-25-000417
+            currentState: COMPLETED
+            possibleDispute: false
+            amount: "10000"
+            currency: LRD
+            initiatedTimestamp: "2026-08-25T09:12:31.204Z"
+            errorInformation: null
 
     postTransferServerError:
       description: An error occurred processing the transfer

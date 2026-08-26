@@ -51,6 +51,8 @@ export class AuditTransactionMapper {
             transactionInitiatorType: input.transactionInitiatorType,
             transactionType: input.transactionType,
             subScenario: input.subScenario,
+            quotingCurrency: input.quotingCurrency,
+            quotingAmount: AuditTransactionMapper.toNumber(input.quotingAmount),
             payerHomeTransactionId: input.payerHomeTransactionId ?? null,
             error: false,
             partiesRequestedAt: occurredAt,
