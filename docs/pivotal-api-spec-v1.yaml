@@ -596,7 +596,7 @@ Allowed values:
           - $ref: '#/components/schemas/fspiopExtensionList'
           description: |
             Deployment-specific extensions forwarded to the quote request. When
-            `CHECK_PAYER_FEE_AS_MENDATORY=true`, this
+            `CHECK_PAYER_FEE_AS_MANDATORY=true`, this
             list must contain the exact, case-sensitive keys `schemeFee` and
             `payerProvidedFee`. Each fee accepts a JSON string or number, is
             normalized to a canonical FSPIOP Amount string, and must not exceed

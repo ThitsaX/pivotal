@@ -80,7 +80,7 @@ export class WebOutboundSettings
             centralRegistryOracleAxiosParams,
             this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
-            this.readBoolean('CHECK_PAYER_FEE_AS_MENDATORY', false),
+            this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
         );
     }
 

@@ -33,7 +33,7 @@ describe('WebOutboundSettings payer fee validation', () => {
 
     it('reads the mandatory flag', () => {
         const outboundSettings = settings({
-            CHECK_PAYER_FEE_AS_MENDATORY: 'true',
+            CHECK_PAYER_FEE_AS_MANDATORY: 'true',
         }).outboundSettings();
 
         assert.equal(outboundSettings.checkPayerFeeAsMandatory, true);
@@ -41,8 +41,8 @@ describe('WebOutboundSettings payer fee validation', () => {
 
     it('rejects an invalid mandatory flag instead of silently disabling validation', () => {
         assert.throws(
-            () => settings({CHECK_PAYER_FEE_AS_MENDATORY: 'ture'}).outboundSettings(),
-            /Invalid environment variable CHECK_PAYER_FEE_AS_MENDATORY/,
+            () => settings({CHECK_PAYER_FEE_AS_MANDATORY: 'ture'}).outboundSettings(),
+            /Invalid environment variable CHECK_PAYER_FEE_AS_MANDATORY/,
         );
     });
 });
