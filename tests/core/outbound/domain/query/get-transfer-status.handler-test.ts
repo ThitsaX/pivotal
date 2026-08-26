@@ -63,7 +63,7 @@ describe('GetTransferStatusHandler', () => {
             homeTransactionId: 'payer-home-1',
             currentState: StateEnum.Completed,
             possibleDispute: false,
-            amount: '10000.0000',
+            amount: '10000',
             currency: Currency.Usd,
             initiatedTimestamp: STARTED_AT.toISOString(),
             errorInformation: null,
@@ -92,7 +92,7 @@ describe('GetTransferStatusHandler', () => {
         })).execute(query());
 
         assert.equal(output.currentState, StateEnum.Aborted);
-        assert.equal(output.amount, '10.0000');
+        assert.equal(output.amount, '10');
         assert.equal(output.errorInformation?.statusCode, '3204');
         assert.equal(
             output.errorInformation?.detailedDescription,
@@ -170,5 +170,28 @@ describe('GetTransferStatusHandler', () => {
         })).execute(query());
 
         assert.equal(output.errorInformation?.statusCode, FspiopErrors.GENERIC_SERVER_ERROR.errorType.code);
+    });
+
+    // The raw DECIMAL(34,4) column is what the DFSP reconciles against the amount it
+    // sent on POST /sendmoney, so the trailing scale has to come off without a Number
+    // round trip - 30 integer digits do not survive one.
+    it('normalizes the raw DECIMAL column back to the amount the payer sent', async () => {
+        const cases: Array<[unknown, string | null]> = [
+            ['10000.0000', '10000'],
+            ['150.5000', '150.5'],
+            ['150.5500', '150.55'],
+            ['0.0001', '0.0001'],
+            ['0.0000', '0'],
+            ['123456789012345678901234567890.1200', '123456789012345678901234567890.12'],
+            [10000, '10000'],
+            [null, null],
+            ['not-a-number', null],
+            [Number.NaN, null],
+        ];
+
+        for (const [quotingAmount, expected] of cases) {
+            const output = await handlerFor(baseRecord({quotingAmount})).execute(query());
+            assert.equal(output.amount, expected, `quotingAmount ${String(quotingAmount)}`);
+        }
     });
 });

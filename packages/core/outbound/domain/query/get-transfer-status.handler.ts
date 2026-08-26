@@ -7,6 +7,7 @@ import {
     ErrorMessageLanguage,
     FspiopErrors,
     FspiopException,
+    FspiopMoney,
     FspiopUserMessages,
     TransferState,
 } from '@shared/fspiop';
@@ -17,6 +18,8 @@ import {GetTransferStatusQuery} from './get-transfer-status.query';
 @QueryHandler(GetTransferStatusQuery)
 export class GetTransferStatusHandler
     implements IQueryHandler<GetTransferStatusQuery, GetTransferStatusQuery.Output> {
+
+    private static readonly DECIMAL_PATTERN = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
 
     constructor(
         @Inject(TransferStatusRepository)
@@ -120,19 +123,26 @@ export class GetTransferStatusHandler
         return error;
     }
 
+    /**
+     * `getRawOne` bypasses the entity's decimal transformer, so mysql2 hands back the
+     * DECIMAL(34,4) column verbatim - "10000.0000" for an amount the payer sent as
+     * "10000". Normalizing through the same helper that normalized the payer's
+     * `POST /sendmoney` amount is what lets a DFSP reconcile the two by string
+     * comparison, which is the whole point of this endpoint.
+     *
+     * Kept textual on purpose: DECIMAL(34,4) holds 30 integer digits, so a round trip
+     * through Number would lose precision and emit exponent notation.
+     */
     private static toDecimalString(value: unknown): string | null {
-        if (typeof value === 'number') {
-            return Number.isFinite(value) ? String(value) : null;
-        }
+        const text = typeof value === 'number'
+            ? (Number.isFinite(value) ? value.toString() : '')
+            : typeof value === 'string' ? value.trim() : '';
 
-        if (typeof value !== 'string') {
+        if (!GetTransferStatusHandler.DECIMAL_PATTERN.test(text)) {
             return null;
         }
 
-        const normalized = value.trim();
-        return /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(normalized)
-            ? normalized
-            : null;
+        return FspiopMoney.normalizeAmount(text);
     }
 
     private static toCurrency(value: unknown): Currency | null {
