@@ -234,6 +234,10 @@ export class AuditTransactionMapper {
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
             transferAmount: AuditTransactionMapper.toNumber(request?.amount?.amount),
+            payerHomeTransactionId: AuditTransactionMapper.findExtensionValue(
+                request?.extensionList,
+                'homeTransactionId',
+            ) ?? null,
             transactionStartedAt: occurredAt,
             error: false,
             transfersRequestedAt: occurredAt,
@@ -257,6 +261,10 @@ export class AuditTransactionMapper {
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
             transferAmount: AuditTransactionMapper.toNumber(request?.amount?.amount),
+            payerHomeTransactionId: AuditTransactionMapper.findExtensionValue(
+                request?.extensionList,
+                'homeTransactionId',
+            ) ?? null,
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             transferState: response?.transferState ?? null,
@@ -283,6 +291,10 @@ export class AuditTransactionMapper {
             payeeFsp: request?.payeeFsp ?? input.payeeFsp,
             transferCurrency: request?.amount?.currency ?? null,
             transferAmount: AuditTransactionMapper.toNumber(request?.amount?.amount),
+            payerHomeTransactionId: AuditTransactionMapper.findExtensionValue(
+                request?.extensionList,
+                'homeTransactionId',
+            ) ?? null,
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,

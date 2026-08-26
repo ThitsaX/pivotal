@@ -15,6 +15,7 @@ export namespace PutAcceptQuoteCommand {
             public readonly transferId: string,
             public readonly acceptQuote: boolean,
             public readonly requestSource?: string,
+            public readonly homeTransactionId?: string,
         ) {
         }
     }

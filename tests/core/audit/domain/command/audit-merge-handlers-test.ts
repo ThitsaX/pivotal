@@ -164,7 +164,15 @@ describe('Audit transaction handlers', () => {
         const repository = createTransactionRepositoryStub();
         const handler = new AuditTransfersErrorHandler(repository.repository as never);
         const occurredAt = new Date('2026-02-01T00:00:09.000Z');
-        const request = {transferId: 'tx-1', payerFsp: 'payerfsp', payeeFsp: 'payeefsp', amount: {amount: '12', currency: 'USD'}} as const;
+        const request = {
+            transferId: 'tx-1',
+            payerFsp: 'payerfsp',
+            payeeFsp: 'payeefsp',
+            amount: {amount: '12', currency: 'USD'},
+            extensionList: {
+                extension: [{key: 'homeTransactionId', value: 'payer-home-final'}],
+            },
+        } as const;
         const error = {errorInformation: {errorCode: '3200'}} as const;
 
         await handler.execute(new AuditTransfersErrorCommand(
@@ -185,6 +193,7 @@ describe('Audit transaction handlers', () => {
             payeeFsp: 'payeefsp',
             transferCurrency: 'USD',
             transferAmount: 12,
+            payerHomeTransactionId: 'payer-home-final',
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,
