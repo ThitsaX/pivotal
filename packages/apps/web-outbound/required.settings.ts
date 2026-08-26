@@ -80,6 +80,7 @@ export class WebOutboundSettings
             centralRegistryOracleAxiosParams,
             this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
+            this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
         );
     }
 
@@ -183,6 +184,20 @@ export class WebOutboundSettings
         if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
         if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
         return undefined;
+    }
+
+    private readBoolean(name: string, defaultValue: boolean): boolean {
+        const value = this.configService.get<string>(name);
+
+        if (value == null || value.trim().length === 0) {
+            return defaultValue;
+        }
+
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+        if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+
+        throw new Error(`Invalid environment variable ${name}: expected a boolean value.`);
     }
 
     private readPositiveInteger(name: string): number | undefined {

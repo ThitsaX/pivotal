@@ -19,12 +19,17 @@ after(() => {
 
 interface CapturedResponse {
     status: number | null;
-    body:   {statusCode?: string} | null;
+    body:   {
+        statusCode?: string;
+        message?: string;
+        localeMessage?: string;
+        detailedDescription?: string;
+    } | null;
 }
 
 interface FakeResponse {
     status: (code: number) => FakeResponse;
-    json:   (payload: {statusCode?: string}) => FakeResponse;
+    json:   (payload: NonNullable<CapturedResponse['body']>) => FakeResponse;
 }
 
 const SEND_MONEY_BODY = {
@@ -47,7 +52,7 @@ function makeHost(
             captured.status = code;
             return response;
         },
-        json(payload: {statusCode?: string}): FakeResponse {
+        json(payload: NonNullable<CapturedResponse['body']>): FakeResponse {
             captured.body = payload;
             return response;
         },
@@ -154,6 +159,27 @@ describe('OutboundExceptionFilter - Post Send Money error logging', () => {
         );
 
         assert.deepEqual(sendMoneyErrorLines(logged), []);
+    });
+
+    it('returns the payer fee validation error in the normal outbound response shape', () => {
+        const captured: CapturedResponse = {status: null, body: null};
+        const description =
+            'Fee validation failed. Required fee information was not provided by the Payer DFSP.';
+
+        new OutboundExceptionFilter().catch(
+            new FspiopException(FspiopErrors.MISSING_EXTENSION_PARAMETER, description),
+            makeHost(captured, {
+                method: 'PUT',
+                path: '/secured/sendmoney/01HX',
+                body: {acceptParty: true},
+            }),
+        );
+
+        assert.equal(captured.status, 417);
+        assert.equal(captured.body?.statusCode, '3107');
+        assert.equal(captured.body?.message, 'Please fill out the complete and correct information.');
+        assert.equal(captured.body?.localeMessage, 'Please fill out the complete and correct information.');
+        assert.equal(captured.body?.detailedDescription, description);
     });
 
     it('still logs when the body never parsed into party identifiers', () => {

@@ -6,7 +6,7 @@ import { AuditProducerModule } from '@core/audit/producer';
 import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
-import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
+import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient } from './component';
 import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
@@ -79,6 +79,18 @@ export class OutboundDomainModule {
                 useFactory: (outboundSettings: OutboundSettings): AmountDecimalValidator =>
                     new AmountDecimalValidator(outboundSettings.amountDecimalPlaces),
                 inject: [OutboundSettings],
+            },
+            {
+                provide: PayerProvidedFeesValidator,
+                useFactory: (
+                    outboundSettings: OutboundSettings,
+                    amountDecimalValidator: AmountDecimalValidator,
+                ): PayerProvidedFeesValidator =>
+                    new PayerProvidedFeesValidator(
+                        outboundSettings.checkPayerFeeAsMandatory,
+                        amountDecimalValidator,
+                    ),
+                inject: [OutboundSettings, AmountDecimalValidator],
             },
             {                                                                                                                                                                       
                 provide: AmountTypeConstraint,                                                                                                                                      

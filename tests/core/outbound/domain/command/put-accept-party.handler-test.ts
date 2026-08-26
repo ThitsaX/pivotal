@@ -4,6 +4,7 @@ import {TransactionMessage} from '../../../../../packages/core/audit/common';
 import {TransferRequest} from '../../../../../packages/core/outbound/domain/cache';
 import {PutAcceptPartyCommand} from '../../../../../packages/core/outbound/domain/command/put-accept-party.command';
 import {PutAcceptPartyHandler} from '../../../../../packages/core/outbound/domain/command/put-accept-party.handler';
+import {AmountDecimalValidator, PayerProvidedFeesValidator} from '../../../../../packages/core/outbound/domain/component';
 import {FspParty} from '../../../../../packages/core/outbound/domain/dto';
 import {
     AmountType,
@@ -77,8 +78,8 @@ describe('PutAcceptPartyHandler', () => {
         let savedRequest: TransferRequest | undefined;
         const extensionList: ExtensionList = {
             extension: [
-                {key: 'payerFee', value: '1.23'},
-                {key: 'payerFeeCurrency', value: 'USD'},
+                {key: 'schemeFee', value: '1.23'},
+                {key: 'payerProvidedFee', value: '2.34'},
             ],
         };
 
@@ -107,6 +108,11 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
+                async acquireLock(): Promise<string> {
+                    return 'lock-token';
+                },
+                async releaseLock(): Promise<void> {
+                },
                 async get(): Promise<TransferRequest> {
                     return cachedRequest;
                 },
@@ -125,6 +131,7 @@ describe('PutAcceptPartyHandler', () => {
                 validate(): void {
                 },
             } as never,
+            new PayerProvidedFeesValidator(true, new AmountDecimalValidator(2)),
         );
 
         const output = await handler.execute(
@@ -156,6 +163,11 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
+                async acquireLock(): Promise<string> {
+                    return 'lock-token';
+                },
+                async releaseLock(): Promise<void> {
+                },
                 async get(): Promise<TransferRequest> {
                     return cachedRequest;
                 },
@@ -173,6 +185,7 @@ describe('PutAcceptPartyHandler', () => {
                 validate(): void {
                 },
             } as never,
+            new PayerProvidedFeesValidator(false, new AmountDecimalValidator(2)),
         );
 
         await assert.rejects(
