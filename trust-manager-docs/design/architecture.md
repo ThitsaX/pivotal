@@ -251,8 +251,9 @@ add a per-request meter on top of hardware already paid for, and stacks KMS API 
 capacity. Keeping the custom key store in genuine use for the seal satisfies **R3** literally while
 the metered path stays off the hot path.
 
-*Depends on confirming whether a custom key store can hold `ECC_NIST_P256` at all — if it cannot,
-PKCS#11-direct is the only mechanism that works — see open decision **N**.*
+*Open decision **N** asked whether a custom key store can hold `ECC_NIST_P256`. It is **resolved as
+moot**: signing is RS256 (decision 3), so no EC key exists, and the custom key store backs only the
+Vault seal (decision 14).*
 
 ### 4.3 Who talks to what
 

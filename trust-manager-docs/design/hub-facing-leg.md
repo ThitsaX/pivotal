@@ -286,7 +286,8 @@ not auto-rotate asymmetric keys are **safer** here, not less capable.
 #### The migration to fresh keys must complete before the first MCM publish
 
 [`implementation-plan.md`](../implementation/implementation-plan.md) §2 does not migrate the existing RSA private
-keys — fresh EC keys are generated in CloudHSM and re-published. Combined with the rule above, that
+keys — fresh **RSA-2048** keys are generated and re-published (settled decisions 3 and 21; this
+sentence said "EC" until 2026-08-27, left over from the ES256 draft). Combined with the rule above, that
 creates a **one-way door**, and the phase order depends on it:
 
 - **Before** the first publish to MCM, no peer holds any Pivotal key. Generating fresh keys for every

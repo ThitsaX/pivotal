@@ -18,6 +18,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-inbound
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webInbound "default" "web-inbound") }}
       containers:
         - name: web-inbound
           image: "{{ .Values.webInbound.image.repository }}:{{ .Values.webInbound.image.tag }}"
@@ -70,6 +71,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-outbound
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webOutbound "default" "web-outbound") }}
       containers:
         - name: web-outbound
           image: "{{ .Values.webOutbound.image.repository }}:{{ .Values.webOutbound.image.tag }}"
@@ -122,6 +124,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: app-auditor
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.appAuditor "default" "app-auditor") }}
       containers:
         - name: app-auditor
           image: "{{ .Values.appAuditor.image.repository }}:{{ .Values.appAuditor.image.tag }}"
@@ -151,6 +154,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: report-worker
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.reportWorker "default" "report-worker") }}
       containers:
         - name: report-worker
           image: "{{ .Values.reportWorker.image.repository }}:{{ .Values.reportWorker.image.tag }}"
@@ -180,6 +184,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-pivotal
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webPivotal "default" "web-pivotal") }}
       containers:
         - name: web-pivotal
           image: "{{ .Values.webPivotal.image.repository }}:{{ .Values.webPivotal.image.tag }}"
@@ -231,6 +236,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: portal
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.portal "default" "portal") }}
       containers:
         - name: portal
           image: "{{ .Values.portal.image.repository }}:{{ .Values.portal.image.tag }}"
@@ -279,6 +285,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet1-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet1Connector "default" "wallet1-connector") }}
       containers:
         - name: wallet1-connector
           image: "{{ .Values.wallet1Connector.image.repository }}:{{ .Values.wallet1Connector.image.tag }}"
@@ -308,6 +315,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet2-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet2Connector "default" "wallet2-connector") }}
       containers:
         - name: wallet2-connector
           image: "{{ .Values.wallet2Connector.image.repository }}:{{ .Values.wallet2Connector.image.tag }}"
@@ -337,6 +345,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet3-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet3Connector "default" "wallet3-connector") }}
       containers:
         - name: wallet3-connector
           image: "{{ .Values.wallet3Connector.image.repository }}:{{ .Values.wallet3Connector.image.tag }}"

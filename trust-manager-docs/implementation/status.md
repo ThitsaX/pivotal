@@ -6,54 +6,85 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-24.
+**Last verified against code:** 2026-08-27.
 
 ---
 
 ## Where the work actually sits — read this first
 
-**FSPIOP JWS is complete, committed across all three repositories, and proven end to end against a
-live Mojaloop hub.**
+**FSPIOP JWS is complete across all three repositories, and — as of 2026-08-27 — the production
+Vault credential path is proven in both languages.** JWS signing and key custody are done. What
+remains on legs #2, #3 and #4 is mTLS; leg #1 additionally has replay defence (**G**) and accessKey
+revocation (**E**) unspecified.
 
-| Repo | Branch | Head |
-| --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | `a946c56` — Vault-backed key custody + verification harness |
-| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `429c174` — FSPIOP JWS signing for the hub-facing leg |
-| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2436743` — bump to 0.0.25 + JWS settings |
+| Repo | Branch | Head | Tree |
+| --- | --- | --- | --- |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `1d2ef22` — docs + status | **7 uncommitted** — helm ServiceAccounts, k3d overlay, two scripts |
+| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `429c174` — FSPIOP JWS signing for the hub-facing leg | clean |
+| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2436743` — bump to 0.0.25 + JWS settings | **8 uncommitted** — `Dockerfile.local`, `deploy/`, and 6 tracked `target/` artifacts |
 
-All three working trees are clean.
+The cluster work listed above is **not yet committed**. See *Cluster bring-up* in the change log.
 
 ### Proven, not just tested
 
-A transfer reached **COMMITTED** through the full chain — Postman → web-outbound → Mojaloop hub
-(ALS, quoting-service, ml-api-adapter) → web-inbound → NATS → Java connector → DFSP backend — with
-the payer tenant at `jws_sign_enabled=1` and `jws_verify_mode=require`. The bodied requests relayed
-back through the Hub could only have passed if the signature web-outbound produced from a
-Vault-sourced key actually verified.
+Two independent proofs now stand, and the second subsumes the first.
+
+**Compose, 2026-08-24.** A transfer reached **COMMITTED** through the full chain — Postman →
+web-outbound → Mojaloop hub (ALS, quoting-service, ml-api-adapter) → web-inbound → NATS → Java
+connector → DFSP backend — with the payer tenant at `jws_sign_enabled=1` and
+`jws_verify_mode=require`.
+
+**Kubernetes, 2026-08-27.** The same three-call flow reached **COMPLETED** with web-outbound,
+web-inbound and the Java connector running as pods. The two signers authenticated to Vault with their
+own **Kubernetes ServiceAccounts** — no development token anywhere; web-inbound ran
+`KEY_PROVIDER=database` with no Vault role at all, since it only verifies (`architecture.md` §8).
+`wallet1 → wallet2`, USD 10, DemoWallet balance 12767.94 → 12777.94.
+
+Both signers signed live, from Vault-sourced keys:
+
+| Signer | Evidence |
+| --- | --- |
+| **web-outbound** (axios) | `fspiop-signature` on `POST /quotes` and `POST /transfers`, with matching `fspiop-uri` and `fspiop-http-method` headers |
+| **Java connector** (`user-agent: okhttp/4.10.0`) | quoting-service logged an inbound `PUT /quotes/{id}` from `wallet2` **carrying `fspiop-signature`** — leg #3 confirmed at the Hub, not from our own logs |
+
+`GET /parties` went out **unsigned**, as commit 12 requires: a detached JWS has no body to sign.
 
 ### Pending actions
 
-1. **Tag `v0.0.25` on `pivotal-connector`** when ready. It currently exists only in the local Maven
+1. **Commit the cluster work.** Seven files in `pivotal` and two in
+   `pivotal-thitsawallet-connector` (plus six unwanted `target/` diffs — see 3).
+2. **Tag `v0.0.25` on `pivotal-connector`** when ready. It currently exists only in the local Maven
    repository; the connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so nothing
-   is deployable until the publish workflow runs.
-2. **`.gitignore` for `pivotal-thitsawallet-connector`.** It tracks 34 build artifacts under
-   `target/`, including `app.jar`, so every local build produces binary diffs.
+   is deployable until the publish workflow runs. `pivotal-thitsawallet-connector/Dockerfile.local`
+   exists **only** to work around this and should be deleted once the publish workflow has run.
+3. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
+   `mvn package` during cluster bring-up produced binary diffs on six tracked `target/` artifacts
+   including `app.jar`.
 
 ### What to do next
 
-JWS is done. The remaining work is scoped by which deployment ships first — see *Build order*.
+JWS and key custody are done. The remaining work is scoped by which deployment ships first — see
+*Build order*.
 
-1. **Cluster bring-up** — Vault Kubernetes auth and cert-manager. Validates the production credential
-   path, which has never executed in either language, and is a hard prerequisite for certificate
-   issuance. A working reference already exists in the production gitops repositories.
-2. **CA ceremony** — KMS roots for `pki_hub_client` and `pki_dfsp`, Vault PKI intermediates. Runbook
-   written, not yet executed.
-3. **mTLS on legs #2, #3 and #4.** No external blocker: the same organisation operates the Hub, so
+1. ~~**Vault Kubernetes auth**~~ — **done 2026-08-27**, both languages, with per-tenant isolation
+   verified. See *Cluster bring-up* in the change log.
+2. **cert-manager** — the other half of cluster bring-up, and the hard prerequisite for every
+   certificate in steps 3–5. It is what makes leaf *renewal* automatic, which is the part that must
+   survive handover. A working reference exists at
+   `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml`: ServiceAccount, the
+   `serviceaccounts/token` RBAC Role, a `KubernetesAuthEngineRole`, and a `ClusterIssuer` that
+   already uses `pki-hub/sign/...` — note **`sign`**, the correction §5 of
+   [`pki-issuance-flows.md`](./pki-issuance-flows.md) says the leg doc still gets wrong.
+3. **CA ceremony** — KMS roots for `pki_hub_client` and `pki_dfsp`, Vault PKI intermediates. Runbook
+   written, not yet executed. Note production already runs a `pki-hub` mount, so this adds two new
+   trust domains beside a pattern that works rather than inventing one.
+4. **mTLS on legs #2, #3 and #4.** No external blocker: the same organisation operates the Hub, so
    registering the CA, enabling client-certificate verification at the Hub edge and inbound
-   enrollment are all internal changes.
-4. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
+   enrollment are all internal changes. **Blocked on one undecided item**: how the Hub CA trust
+   bundle reaches the data plane — [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.4.
+5. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
    operated by other institutions.
-5. **`pkcs11`** — deferred to the HSM-backed delivery.
+6. **`pkcs11`** — deferred to the HSM-backed delivery.
 
 **Enough of trust-manager to survive handover.** Manual key provisioning is tolerable while the
 people who built the system operate it. Certificate *renewal* is not — certificates expire on their
@@ -61,10 +92,10 @@ own schedule regardless of who remembers. cert-manager covers leaf renewal, whic
 be real automation rather than a manual issuance. CA registration is closer to one-time, so the rest
 of trust-manager can stay deferred.
 
-**One gap worth naming before it is forgotten.** Vault Kubernetes auth is unverified in both
-languages: the TypeScript client has only ever used the development token path, and the Java client's
-Kubernetes code has never been executed. Step 1 is what closes it — and it removes the need for a
-development-only token shim in the Java connector, which would otherwise become permanent.
+**The gap this section used to name is closed.** Vault Kubernetes auth was unverified in both
+languages — the TypeScript client had only ever used the development token path, and the Java
+client's Kubernetes code had never executed. Both now run against a real API server, so the
+development-only token shim is no longer on any path to production.
 
 **Local development notes.** SoftHSM2 in the stack, `implementation-plan.md` §1.4, and a refreshed
 `runbooks/ceremony-local.md` remain outstanding; the runbook predates the profile rename. SoftHSM2
@@ -101,7 +132,7 @@ Two things people get wrong about this table:
 
 | # | JWS | mTLS | Overall |
 | --- | --- | --- | --- |
-| 1 | 🟡 works, key custody insecure | 🔴 not started (VPN today) | **partial** |
+| 1 | 🟡 works; accessKey custody unchanged (DFSP-held) | 🔴 not started (VPN today) | **partial** |
 | 2 | 🟢 **conformant + per-participant** | 🔴 not started (plaintext HTTP) | **JWS done** |
 | 3 | 🟢 **JWS complete** — signer, vectors, callback wiring, Vault key access | 🔴 not started | **JWS done** |
 | 4 | 🟢 **verify + cross-checks + tri-state** | 🔴 not started | **JWS done** |
@@ -109,9 +140,13 @@ Two things people get wrong about this table:
 
 🟢 done · 🟡 partial · 🔴 not started · ⚪ out of scope
 
-No leg is finished. The yellow cells are the important nuance: **a JWS mechanism already exists and
-is wired end-to-end — it is simply disabled and produces a protected header Mojaloop will not
-accept.** Treat #2/#4 as *correction* work, not greenfield.
+No leg is finished — **every remaining item on #2, #3 and #4 is mTLS.** JWS on those three is
+conformant, per-participant, running from Vault-held keys under Kubernetes ServiceAccount auth, and
+confirmed against a live Hub (see *Proven, not just tested*).
+
+The paragraph that used to sit here said the JWS mechanism was "simply disabled and produces a
+protected header Mojaloop will not accept". That was true through commit 1 and is kept only to
+explain why #2/#4 were *correction* work rather than greenfield.
 
 ---
 
@@ -174,15 +209,22 @@ accept.** Treat #2/#4 as *correction* work, not greenfield.
 
 ### Left
 
-- `FSPIOP_USE_JWS=false` everywhere (`docker/.env.example:51`, `docker/docker-compose.yml:8`).
-- Nothing. JWS signing for this leg is complete; what remains on #2 is mTLS.
-- **mTLS not started** — plain in-cluster HTTP to the Hub.
-- Key custody: **resolved in commit 6**. `KEY_PROVIDER=vault-kv` reads each signing tenant's key
-  from `secret/pivotal/jwskey/<fspId>` over Kubernetes ServiceAccount auth. The plaintext-MySQL path
-  survives as `KEY_PROVIDER=database`, explicitly labelled legacy, so the change is not breaking.
+**JWS signing on this leg is complete.** What remains is mTLS.
+
+- **mTLS not started** — plain in-cluster HTTP to the Hub. Note `FspiopMtlsClientCertStore.load()`
+  runs **once at startup**, so a cert-manager renewal needs a pod restart until that is addressed
+  (`pki-issuance-flows.md` §3.3).
+- Key custody: **resolved in commit 6**, and the Kubernetes half proven 2026-08-27.
+  `KEY_PROVIDER=vault-kv` reads each signing tenant's key from `secret/pivotal/jwskey/<fspId>` over
+  Kubernetes ServiceAccount auth. The plaintext-MySQL path survives as `KEY_PROVIDER=database`,
+  explicitly labelled legacy, so the change is not breaking.
 - **Schema prerequisites** (**S2**) — *done in commit 2*: `V3__create_participant_key_table.sql`
   creates `participant_key` with `role = self | peer`, migrates existing identities, and seeds the
   `hub` peer row.
+- Rollout state: `FSPIOP_USE_JWS` is still `false` in the Compose defaults
+  (`docker/.env.example:51`, `docker/docker-compose.yml:8`); the k3d overlay
+  (`helm/values-local-k3d.yaml`) sets it `true`. Per-participant `jws_sign_enabled` is what actually
+  gates signing, so the deployment default is a floor, not a switch.
 
 ---
 
@@ -206,21 +248,31 @@ real hub-facing leg, not a call into web-outbound.
 
 ### Left
 
-The change surface, in `pivotal-connector` (the library — deployables inherit it):
+**JWS on this leg is done** — commits 3 and 4 built the signer, the Vault key provider and the
+interceptor, and 2026-08-27 confirmed it against a real Hub: quoting-service logged an inbound
+`PUT /quotes/{id}` from `wallet2` carrying `fspiop-signature`, `user-agent: okhttp/4.10.0`.
+
+Two rows of the original change surface turned out to be unnecessary and are recorded so nobody
+rebuilds them: `FspiopCallbackService`'s six `putX` methods **did not** need path-splitting
+(`FspiopUri.extract` already strips scheme, host and base path from the outgoing OkHttp URL), and the
+`keyRef`/HSM-credential settings belong to `pkcs11`, which is deferred.
+
+What remains on #3 is mTLS:
 
 | Where | Change |
 | --- | --- |
-| `mod_pivotal_connector_api/…/listeners/FspiopCallbackService.java` | Add `fspiop-signature` to `headers()`. Split the request **path** out of `baseUrl + "/quotes/" + id` so `FSPIOP-URI` can be populated — currently the six `putX`/`putXError` methods pre-concatenate and only the full URL reaches `put()`. `FSPIOP-HTTP-Method` is always `PUT` here. |
-| `mod_component/…/fspiop/jws/` **(new)** | The signer: protected-header builder, RS256 detached JWS, `KeyProvider` interface with `vault-kv` and `pkcs11` implementations. Belongs in `mod_component` because that is the published artifact `hub-facing-leg.md` §363 calls for. |
-| `mod_pivotal_connector_api/…/CoreConnectorConfiguration.java` | `Settings` gains `keyProvider`, Vault address/auth, `keyRef`, HSM credential refs. |
 | `mod_component/…/retrofit/RetrofitServiceBuilder.java` | Lift the `SSLContext` construction out of `withMutualTLS()` into a reusable helper. **Do not** carry over its `hostnameVerifier -> true`. |
+| `mod_component/…/fspiop/jws/` | `KeyProvider`: add the `pkcs11` implementation alongside `vault-kv`. HSM-backed profile only, deferred |
+| — | **No client-certificate path exists at all** in the Java connectors: `sharedOkHttpClient()` sets timeouts only — no `sslSocketFactory`, no trust manager, no client cert. `implementation-plan.md` §3's connector row does not list certificate wiring either. `pki-issuance-flows.md` §3.3 |
 
 ### Blockers specific to this leg
 
 - **`sharedOkHttpClient` is overridden by every deployable** — each connector repository defines its
-  own, so anything attached to the library's `OkHttpClient` bean is dead in production. The signing/mTLS must
-  ride on a separately-qualified client or an `Interceptor` that `FspiopCallbackService` installs
-  itself. **Decide before writing code.**
+  own, so anything attached to the library's `OkHttpClient` bean is dead in production. *Solved for
+  JWS in commit 4*: `FspiopCallbackService` derives its own client with
+  `http.newBuilder().addInterceptor(...)`, which shares the connection pool and dispatcher. **The same
+  decision has to be made again for mTLS**, where the requirement is an `SSLSocketFactory` on the
+  client rather than an interceptor.
 - **Config plumbing is manual and fails closed.** `docker-entrypoint.sh` runs `set -eu` with no
   defaults, so every new property needs an entry in the entrypoint *and* the Dockerfile `ENV` block
   *and* the README table, in **each** connector repo, or the container exits on an unbound variable.
@@ -275,19 +327,25 @@ those backends' server certificates". **They do not.** Every connector calls
 
 ## Cross-cutting
 
+Three rows here were stale and contradicted the rest of this file; corrected 2026-08-27.
+
 | Item | Status | Note |
 | --- | --- | --- |
-| Protected-header contract + conformance vectors | 🔴 | Gates #2, #3, #4. Do first. |
+| Protected-header contract + conformance vectors | 🟢 | Commit 1. Vectors are byte-identical across repos (same SHA-256); 90 tests pass in `shared-fspiop` |
 | Key custody — `vault-kv` provider | 🟢 | Done both sides: Java commit 4, TypeScript commit 6 |
-| Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only |
-| Vault auth for the Java connector | 🔴 | Method not chosen — see open questions |
-| Regenerate `participant.jws_private_key` | 🔴 | Decision **D21**: regenerate, never migrate |
+| **Vault Kubernetes auth — both languages** | 🟢 | **Proven 2026-08-27 in k3d.** Was the last unverified assumption under shipped work |
+| **Per-tenant Vault path isolation** | 🟢 | `connector-wallet2` reads its own key, **denied wallet1 and cofinagn (403)**; web-outbound reads all three |
+| **ServiceAccounts in the helm chart** | 🟢 | Chart had **none** — all 9 pods ran as `default`, which makes per-tenant scoping impossible. Uncommitted |
+| Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only; deferred |
+| Regenerate `participant.jws_private_key` | 🟡 | Local only: `wallet1` regenerated, `wallet2`/`cofinagn` migrated in place. **D21 still applies to any real deployment** |
+| **cert-manager** | 🔴 | Second half of cluster bring-up. Reference: `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml` |
 | `pki_dfsp` CA (leg #1) | 🔴 | Ceremony runbook exists; not executed |
 | `pki_hub_client` CA (legs #2, #3) | 🔴 | Ceremony runbook exists; not executed |
 | MCM registration of the Pivotal CA | 🔴 | `hub-facing-leg.md` B2 |
 | MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs |
-| Local dev environment | 🔴 | No CloudHSM/KMS on the dev machine. `runbooks/ceremony-local.md` is stale (pre-rename, single trust domain); `implementation-plan.md` §1.4 was never written |
-| `NatsPullListener` ack-after-PUT | 🔴 | `handle()` acks in `finally` even on failure, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners — bundle with #3 |
+| **Hub CA trust-bundle delivery** | 🔴 | Mechanism undefined; **blocks phase 5** — `pki-issuance-flows.md` §3.4 |
+| Local dev environment | 🟡 | k3d cluster + Vault + scripts now exist (see *Cluster bring-up*). Still missing: SoftHSM2, `implementation-plan.md` §1.4, and `runbooks/ceremony-local.md` is stale (pre-rename, single trust domain) |
+| `NatsPullListener` ack-after-PUT | 🔴 | **Re-confirmed 2026-08-27**: `handle()` still acks in `finally` even on failure (`NatsPullListener.java:162`), logging *"failed - acking to avoid requeue"*, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners |
 
 ### Connector scope
 
@@ -320,9 +378,13 @@ entirely — building it now would spend the schedule on the deployment that is 
   DONE  ┌────────────────────▼────────────────────┐
     3   │ key custody — vault-kv, both languages  │  proven end to end
         └────────────────────┬────────────────────┘
+  PART  ┌────────────────────▼────────────────────┐
+   4a   │ cluster: Vault Kubernetes auth      DONE│  proven both languages,
+        │                                         │  per-tenant isolation verified
+        └────────────────────┬────────────────────┘
   NEXT  ┌────────────────────▼────────────────────┐
-    4   │ cluster: Vault k8s auth + cert-manager  │  validates the production
-        │                                         │  credential path, unrun so far
+   4b   │ cluster: cert-manager + Vault PKI       │  gates every certificate
+        │                                         │  in steps 5-7
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
     5   │ CA ceremony — KMS roots, Vault PKI      │  needs cloud access
@@ -346,9 +408,10 @@ Hub, no CA and no HSM. That also pinned the protected-header contract before any
 mTLS is a hard cutover on a shared listener. Entangling them would make both un-rollbackable.
 
 **Why the cluster comes before the ceremony.** cert-manager issues the leaves and Vault Kubernetes
-auth is the production credential path — which has **never executed in either language**. Both are
-prerequisites for certificates, and the second is an unverified assumption sitting under work already
-shipped.
+auth is the production credential path. The second half of that reasoning is now spent: Kubernetes
+auth **has** executed, in both languages, and the assumption it was carrying is discharged. What
+remains of step 4 is cert-manager, which is a prerequisite for certificates rather than a risk to
+retire.
 
 **What deferring `pkcs11` costs.** `implementation-plan.md` §5 phase 1 argued for building both
 signers together, so that two implementations against one interface would prove the interface had not
@@ -509,6 +572,79 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### Cluster bring-up — Vault Kubernetes auth, both languages · 2026-08-27
+
+**Uncommitted at time of writing.** Closes the last unverified assumption sitting under shipped
+work: the production Vault credential path had never executed in either language.
+
+| Repo | File | Change |
+| --- | --- | --- |
+| `pivotal` | `helm/templates/serviceaccounts.yaml` | **new** — one ServiceAccount per component |
+| `pivotal` | `helm/templates/_helpers.tpl` | `pivotal-stack.serviceAccountName` helper |
+| `pivotal` | `helm/templates/apps.yaml` | `serviceAccountName:` on all 9 Deployments |
+| `pivotal` | `helm/values.yaml` | per-component `serviceAccount.{create,name}`; Vault env for web-outbound |
+| `pivotal` | `helm/values-local-k3d.yaml` | **new** — dev overlay; infra stays in Compose |
+| `pivotal` | `scripts/refresh-compose-dns.sh` | **new** — CoreDNS records for Compose networks |
+| `pivotal` | `scripts/seed-vault-jwskeys.sh` | **new** — stands in for trust-manager |
+| `pivotal-thitsawallet-connector` | `Dockerfile.local` | **new, temporary** — see pending action 2 |
+| `pivotal-thitsawallet-connector` | `deploy/local-k3d.yaml` | **new** — SA + Deployment |
+
+**The chart defined no ServiceAccounts at all.** All nine Deployments ran as `default`. Vault's
+Kubernetes auth binds a role to `bound_service_account_names` + `bound_service_account_namespaces`,
+so per-tenant scoping of private keys was not merely unconfigured — it was **impossible**. This is
+the single most consequential line of the change.
+
+**Topology: hybrid, deliberately.** Only Pivotal services and Vault run in k3d; Mojaloop, MySQL,
+NATS, Redis and DemoWallet stay in Compose and are reached by container name. Full Mojaloop in a
+local cluster needs ~14–19 GB and proves nothing the Compose stack had not already proven — step 4
+is about the *credential* path, not the payment path.
+
+**Verified — the isolation matrix, from inside the pods:**
+
+| | wallet1 | wallet2 | cofinagn |
+| --- | --- | --- | --- |
+| `web-outbound` | read | read | read |
+| `connector-wallet1` | read | **403** | — |
+| `connector-wallet2` | **403** | read | **403** |
+
+That is `architecture.md` §3 — *a compromised connector signs as one DFSP, a compromised web-outbound
+as all of them* — demonstrated rather than asserted. In the KMS-backed profile this policy **is** the
+isolation boundary, per the 2026-08-24 amendment to decision 4.
+
+Then a full three-call send-money reached **COMPLETED** with all three services as pods. See *Proven,
+not just tested*.
+
+#### Four things that cost time, recorded so they do not again
+
+- **`coredns-custom` crash-loops CoreDNS.** k3d scans only the one `--network` it is created with, so
+  other Docker networks need host records. The obvious injection point — a `*.override` file using the
+  `hosts` plugin — fails: k3d's Corefile already uses `hosts` for `NodeHosts`, and CoreDNS permits that
+  plugin **once per server block**. Entries must merge into `NodeHosts` itself.
+- **A bare `vault` resolves to the wrong Vault.** Those same host records make `vault` point at the
+  *Compose* container. From any other namespace the cluster search domains fall through to it. Always
+  use `http://vault.vault.svc.cluster.local:8200`.
+- **The Hub reaches web-inbound only through a port-forward.** Every `participantEndpoint` row points
+  at `http://host.docker.internal:3201`. Do **not** rewrite them; run
+  `kubectl port-forward -n pivotal svc/web-inbound 3201:3201 --address 0.0.0.0` — `0.0.0.0` is
+  required, and it dies with the pod. Symptom: ALS logs *"Destination communication error - Failed to
+  send HTTP request to host"* and send-money times out with 2004.
+- **Only one connector per tenant may run.** The `connector-consumer-*-<fsp>` durables are a queue
+  group, so an IDE-launched connector and a pod split messages non-deterministically.
+
+#### Two naming traps
+
+- The Java connector reads **`VAULT_URL`**; the TypeScript apps read **`VAULT_ADDRESS`**. Same concept,
+  different name across the two codebases.
+- `PUT /secured/sendmoney/{id}` with `acceptParty` also requires **`amount`**, or it returns 400/3102
+  `[ amount is required ]`.
+
+#### Dev-mode Vault loses every key on restart
+
+The local Vault runs `storage: inmem`. A Docker Desktop restart had already wiped `wallet1`'s private
+key, leaving `jws_sign_enabled=1` with the public half in MySQL and no private half anywhere.
+`scripts/seed-vault-jwskeys.sh` is the recovery: it migrates a key still in MySQL, or regenerates and
+updates the DB public key to match. Re-run it after any Vault pod restart.
 
 ### Commit 1 — the signing contract · 2026-08-23
 

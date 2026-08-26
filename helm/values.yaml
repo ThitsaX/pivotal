@@ -88,6 +88,11 @@ redis:
 
 webOutbound:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-outbound
   replicaCount: 1
   image:
     repository: pivotal-web-outbound
@@ -104,9 +109,24 @@ webOutbound:
     CENTRAL_LEDGER_URL: http://host.docker.internal:3001
     CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
+    # Private-key custody. `database` is the legacy plaintext-MySQL path; `vault-kv`
+    # is the KMS-backed profile. Use the in-cluster FQDN: a bare "vault" can resolve to
+    # a Docker-Compose Vault via CoreDNS host records in a local dev cluster.
+    KEY_PROVIDER: vault-kv
+    VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    VAULT_AUTH_METHOD: kubernetes
+    VAULT_KUBERNETES_AUTH_PATH: kubernetes
+    VAULT_KV_MOUNT: secret
+    VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
+    VAULT_ROLE: web-outbound
 
 webInbound:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-inbound
   replicaCount: 1
   image:
     repository: pivotal-web-inbound
@@ -123,6 +143,11 @@ webInbound:
 
 appAuditor:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: app-auditor
   replicaCount: 1
   image:
     repository: pivotal-app-auditor
@@ -133,6 +158,11 @@ appAuditor:
 
 reportWorker:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: report-worker
   replicaCount: 1
   image:
     repository: pivotal-report-worker
@@ -157,6 +187,11 @@ reportWorker:
 
 webPivotal:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-pivotal
   replicaCount: 1
   image:
     repository: pivotal-web-pivotal
@@ -182,6 +217,11 @@ webPivotal:
 
 portal:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: portal
   replicaCount: 1
   image:
     repository: pivotal-portal
@@ -192,6 +232,11 @@ portal:
 
 wallet1Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet1-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet1-connector
@@ -207,6 +252,11 @@ wallet1Connector:
 
 wallet2Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet2-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet2-connector
@@ -222,6 +272,11 @@ wallet2Connector:
 
 wallet3Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet3-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet3-connector

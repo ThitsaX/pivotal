@@ -32,3 +32,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ $value | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+ServiceAccount name for a component.
+
+Takes a dict: "component" (the component's values block) and "default" (the name
+used when the component declares none). Vault's Kubernetes auth binds a role to
+specific ServiceAccount names, so this is what makes per-tenant key isolation
+possible -- a pod running as "default" can authenticate as nothing.
+*/}}
+{{- define "pivotal-stack.serviceAccountName" -}}
+{{- $component := .component | default dict -}}
+{{- $serviceAccount := $component.serviceAccount | default dict -}}
+{{- $serviceAccount.name | default .default -}}
+{{- end -}}

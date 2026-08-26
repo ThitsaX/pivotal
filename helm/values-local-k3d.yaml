@@ -1,0 +1,101 @@
+# Local k3d overlay for the Vault-Kubernetes-auth work (trust-manager step 4).
+#
+# The cluster runs ONLY the Pivotal services under test. Mojaloop, MySQL, NATS,
+# Redis and the DemoWallet backend stay in their Docker Compose stacks and are
+# reached by container name -- see scripts/refresh-compose-dns.sh, which teaches
+# CoreDNS about the networks k3d did not scan at create time.
+#
+# Re-run that script after any `docker compose up`: container IPs move.
+
+# Infrastructure comes from Compose, not from this chart.
+mysql:
+  enabled: false
+nats:
+  enabled: false
+redis:
+  enabled: false
+
+# Only the two services being proven in this stage.
+appAuditor:      { enabled: false }
+reportWorker:    { enabled: false }
+webPivotal:      { enabled: false }
+portal:          { enabled: false }
+wallet1Connector: { enabled: false }
+wallet2Connector: { enabled: false }
+wallet3Connector: { enabled: false }
+
+global:
+  imagePullPolicy: Never   # images are side-loaded with `k3d image import`
+
+  commonDbEnv:
+    DB_WRITE_HOST: mysql
+    DB_WRITE_PORT: "3306"
+    DB_WRITE_USERNAME: central_ledger
+    DB_WRITE_PASSWORD: password
+    DB_WRITE_NAME: pivotal
+    DB_READ_HOST: mysql
+    DB_READ_PORT: "3306"
+    DB_READ_USERNAME: central_ledger
+    DB_READ_PASSWORD: password
+    DB_READ_NAME: pivotal
+
+  commonFspiopEnv:
+    # Connectors and web-outbound call Hub services directly, so these are the
+    # Hub's own endpoints -- not web-inbound.
+    FSPIOP_PARTIES_URL: http://account-lookup-service:4002
+    FSPIOP_QUOTES_URL: http://quoting-service:3002
+    FSPIOP_TRANSFERS_URL: http://ml-api-adapter:3000
+    FSPIOP_SWITCH_ID: hub
+    FSPIOP_USE_JWS: "true"
+    FSPIOP_USE_MUTUAL_TLS: "false"
+    FSPIOP_SOCKET_TIMEOUT_MS: "30000"
+    FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
+    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
+    FSPIOP_TLS_VERIFY_DOMAIN: "false"
+    # Deployment default only. Per-participant rows in participant_key override
+    # it, which is what makes rollout per tenant rather than a flag day.
+    FSPIOP_JWS_VERIFY_MODE: "off"
+    # No key material in env: KEY_PROVIDER=vault-kv is the whole point here.
+    FSPIOP_JWS_PRIVATE_KEY: ""
+    FSPIOP_JWS_PUBLIC_KEY: ""
+    FSPIOP_MTLS_CA: ""
+    FSPIOP_MTLS_CLIENT_CERT: ""
+    FSPIOP_MTLS_CLIENT_KEY: ""
+
+webOutbound:
+  env:
+    WEB_OUTBOUND_PORT: "3200"
+    PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: "5"
+    NATS_URL: nats://nats:4222
+    REDIS_URL: redis://pivotal-redis:6379
+    REDIS_CACHE_ITEM_TIMEOUT_MS: "900000"
+    CENTRAL_LEDGER_URL: http://central-ledger:3001
+    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: "30000"
+    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: "5000"
+    PREFIX_ORACLE_ENDPOINT: http://central-ledger:3001
+    PREFIX_ORACLE_SOCKET_TIMEOUT_MS: "10000"
+    PREFIX_ORACLE_CONNECTION_TIMEOUT_MS: "10000"
+    PREFIX_ORACLE_CACHE_TTL_MS: "180000"
+    PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME: PIVOTAL_FSPIOP_RESPONSE
+    PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS: "60000"
+    ACCESS_JWT_ENABLED: "false"
+    ERROR_MESSAGE_LANGUAGE: en_US
+    KEY_PROVIDER: vault-kv
+    VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    VAULT_AUTH_METHOD: kubernetes
+    VAULT_ROLE: web-outbound
+    VAULT_KUBERNETES_AUTH_PATH: kubernetes
+    VAULT_KV_MOUNT: secret
+    VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
+
+webInbound:
+  env:
+    WEB_INBOUND_PORT: "3201"
+    NATS_URL: nats://nats:4222
+    CENTRAL_LEDGER_URL: http://central-ledger:3001
+    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: "30000"
+    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: "5000"
+    ERROR_MESSAGE_LANGUAGE: en_US
+    # web-inbound only VERIFIES, so it needs public keys from MySQL and no Vault
+    # access at all -- no role, no crypto user. architecture.md section 8.
+    KEY_PROVIDER: database
