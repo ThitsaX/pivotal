@@ -760,7 +760,7 @@ Allowed values:
       properties:
         totalNumberOfDfsp:
           type: integer
-          example: 3
+          example: 1
         dfspList:
           type: array
           items:
@@ -1011,7 +1011,7 @@ Allowed values:
           schema:
             $ref: '#/components/schemas/getDfspPrefixWithCountResponse'
           example:
-            totalNumberOfDfsp: 3
+            totalNumberOfDfsp: 1
             dfspList:
             - id: 2
               prefix: 101
