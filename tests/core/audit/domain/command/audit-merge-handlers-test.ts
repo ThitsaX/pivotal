@@ -9,7 +9,7 @@ import {AuditTransfersErrorCommand} from '../../../../../packages/core/audit/dom
 import {AuditTransfersErrorHandler} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.handler';
 import {DisputeTransactionCommand} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.command';
 import {DisputeTransactionHandler} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.handler';
-import {PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
+import {Currency, PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
 
 function createTransactionRepositoryStub() {
     let upsertInput: unknown = null;
@@ -66,6 +66,8 @@ describe('Audit transaction handlers', () => {
                 {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
                 'payer-home-1',
                 occurredAt,
+                Currency.Usd,
+                '10.00',
             ),
         ));
 
@@ -83,6 +85,8 @@ describe('Audit transaction handlers', () => {
             transactionInitiatorType: TransactionInitiatorType.Consumer,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            quotingCurrency: Currency.Usd,
+            quotingAmount: 10,
             payerHomeTransactionId: 'payer-home-1',
             error: false,
             partiesRequestedAt: occurredAt,

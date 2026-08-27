@@ -220,6 +220,8 @@ export class PostSendMoneyHandler
                         transactionType: request.transactionType,
                         subScenario: request.subScenario,
                         payerHomeTransactionId: request.homeTransactionId ?? null,
+                        quotingCurrency: request.currency,
+                        quotingAmount: request.amount,
                         request: {
                             partyIdType: type,
                             partyId: id,

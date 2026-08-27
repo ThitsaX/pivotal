@@ -71,6 +71,7 @@
     "test:core-audit-consumer": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/audit/consumer/**/*-test.ts\"",
     "test:core-outbound-domain:command": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/outbound/domain/command/**/*-test.ts\"",
     "test:core-outbound-domain:component": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/outbound/domain/component/**/*-test.ts\"",
+    "test:core-outbound-domain:query": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/core/outbound/domain/query/**/*-test.ts\"",
     "test:core-audit-producer:publishers": "node --test -r ts-node/register -r tsconfig-paths/register -r ./tests/core/audit/producer/publishers/env-setup.ts \"tests/core/audit/producer/publishers/**/*-test.ts\"",
     "test:shared-security:jwt": "node --test -r ts-node/register tests/shared/security/component/jwt/jwt-test.ts",
     "test:shared-security": "node --test -r ts-node/register \"tests/shared/security/**/*-test.ts\"",
