@@ -32,6 +32,9 @@ jobs:
           npm run build:apps-web-pivotal
           npm run build:apps-report-worker
 
+      - name: Test shared foundation
+        run: npm run test:shared-foundation
+
       - name: Install portal dependencies
         run: npm ci --prefix packages/portal
 
