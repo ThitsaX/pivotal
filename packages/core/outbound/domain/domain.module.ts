@@ -99,7 +99,7 @@ export class OutboundDomainModule {
             },
             TransferStatusRepository,
             {                                                                                                                                                                       
-                provide: AmountTypeConstraint,                                                                                                                                      
+                provide: AmountTypeConstraint,
                 useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 
                     new AmountTypeConstraint(outboundSettings.strictAmountType), 
                 inject: [OutboundSettings],

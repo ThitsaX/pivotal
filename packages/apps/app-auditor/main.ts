@@ -7,6 +7,7 @@ import {Logger} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {DbMigration, DbMigrationSettings} from '@shared/dbmigration';
+import { LogLevelsResolver } from '@shared/foundation';
 
 const AUDIT_SQL_LOCATION = 'packages/core/audit/domain/sql';
 const PARTICIPANT_SQL_LOCATION = 'packages/core/participant/domain/sql';
@@ -93,6 +94,10 @@ const bootstrap = async (): Promise<void> => {
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
 
+    const logLevels = LogLevelsResolver.resolveLogLevels(process.env['LOG_LEVEL']);
+    // Override log levels before Nest migration
+    Logger.overrideLogger(logLevels);
+
     const auditLocation = resolve(repoRoot, AUDIT_SQL_LOCATION);
     const participantLocation = resolve(repoRoot, PARTICIPANT_SQL_LOCATION);
 
@@ -117,7 +122,9 @@ const bootstrap = async (): Promise<void> => {
     );
 
     const {AuditConsumerAppModule} = await import('./app.module');
-    const app = await NestFactory.createApplicationContext(AuditConsumerAppModule);
+    const app = await NestFactory.createApplicationContext(AuditConsumerAppModule, {
+        logger: logLevels, // Configure log levels for Nest bootstrap
+    });
     app.enableShutdownHooks();
 
     Logger.log('Audit consumer is running.', 'Bootstrap');

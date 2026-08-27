@@ -133,6 +133,7 @@ appAuditor:
     repository: pivotal-app-auditor
     tag: local
   env:
+    LOG_LEVEL: log
     NATS_URL: nats://nats:4222
     PIVOTAL_AUDIT_STREAM_NAME: PIVOTAL_AUDIT
 
