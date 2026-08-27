@@ -72,11 +72,16 @@ export class GetTransferStatusHandler
 
         const flow = typeof record.flow === 'string' ? Number(record.flow) : record.flow;
 
-        if (flow === 2 && record.transfersRequestedAt == null) {
+        // `flow` is stamped when the stage is *requested*, so it alone cannot tell a
+        // callback still in flight at the Hub from one that has landed. The responded-at
+        // timestamps make that distinction: a WAITING_* state is only true once the
+        // callback arrived and the next move is genuinely the payer's. Without this,
+        // a DFSP polling mid-quote is told to send PUT acceptQuote a second time.
+        if (flow === 2 && record.quotesRespondedAt != null && record.transfersRequestedAt == null) {
             return StateEnum.WaitingForQuoteAcceptance;
         }
 
-        if (flow === 1 && record.quotesRequestedAt == null) {
+        if (flow === 1 && record.partiesRespondedAt != null && record.quotesRequestedAt == null) {
             return StateEnum.WaitingForPartyAcceptance;
         }
 

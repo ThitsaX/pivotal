@@ -19,7 +19,9 @@ export interface TransferStatusRecord {
     possibleDispute: boolean | number;
     error: boolean | number;
     partiesError: unknown | null;
+    partiesRespondedAt: Date | string | null;
     quotesRequestedAt: Date | string | null;
+    quotesRespondedAt: Date | string | null;
     quotesError: unknown | null;
     transfersRequestedAt: Date | string | null;
     transfersError: unknown | null;
@@ -49,7 +51,9 @@ export class TransferStatusRepository {
             .addSelect('transaction.possibleDispute', 'possibleDispute')
             .addSelect('transaction.error', 'error')
             .addSelect('transaction.partiesError', 'partiesError')
+            .addSelect('transaction.partiesRespondedAt', 'partiesRespondedAt')
             .addSelect('transaction.quotesRequestedAt', 'quotesRequestedAt')
+            .addSelect('transaction.quotesRespondedAt', 'quotesRespondedAt')
             .addSelect('transaction.quotesError', 'quotesError')
             .addSelect('transaction.transfersRequestedAt', 'transfersRequestedAt')
             .addSelect('transaction.transfersError', 'transfersError')

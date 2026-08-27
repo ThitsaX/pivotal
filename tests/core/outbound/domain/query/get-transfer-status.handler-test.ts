@@ -41,7 +41,9 @@ function baseRecord(overrides: Record<string, unknown> = {}): Record<string, unk
         error: false,
         possibleDispute: false,
         partiesError: null,
+        partiesRespondedAt: null,
         quotesRequestedAt: null,
+        quotesRespondedAt: null,
         quotesError: null,
         transfersRequestedAt: null,
         transfersError: null,
@@ -101,19 +103,26 @@ describe('GetTransferStatusHandler', () => {
     });
 
     it('derives waiting and pending states from flow progress', async () => {
+        const respondedAt = new Date();
         const cases: Array<[Record<string, unknown>, StateEnum]> = [
-            [{flow: 1}, StateEnum.WaitingForPartyAcceptance],
-            [{flow: '1'}, StateEnum.WaitingForPartyAcceptance],
-            [{flow: 2}, StateEnum.WaitingForQuoteAcceptance],
-            [{flow: 1, quotesRequestedAt: new Date()}, StateEnum.Pending],
-            [{flow: 2, transfersRequestedAt: new Date()}, StateEnum.Pending],
+            // A WAITING_* state is only true once the callback has landed and the
+            // next move is genuinely the payer's.
+            [{flow: 1, partiesRespondedAt: respondedAt}, StateEnum.WaitingForPartyAcceptance],
+            [{flow: '1', partiesRespondedAt: respondedAt}, StateEnum.WaitingForPartyAcceptance],
+            [{flow: 2, quotesRespondedAt: respondedAt}, StateEnum.WaitingForQuoteAcceptance],
+            // Mid-lookup and mid-quote: stage requested, no callback yet.
+            [{flow: 1}, StateEnum.Pending],
+            [{flow: 2, quotesRequestedAt: respondedAt}, StateEnum.Pending],
+            // The next stage is already dispatched, so nothing waits on the payer.
+            [{flow: 1, partiesRespondedAt: respondedAt, quotesRequestedAt: respondedAt}, StateEnum.Pending],
+            [{flow: 2, quotesRespondedAt: respondedAt, transfersRequestedAt: respondedAt}, StateEnum.Pending],
             [{flow: 3}, StateEnum.Pending],
             [{flow: null}, StateEnum.Pending],
         ];
 
         for (const [record, expected] of cases) {
             const output = await handlerFor(baseRecord(record)).execute(query());
-            assert.equal(output.currentState, expected);
+            assert.equal(output.currentState, expected, JSON.stringify(record));
         }
     });
 
