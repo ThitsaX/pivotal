@@ -6,7 +6,7 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-30.
+**Last verified against code:** 2026-08-30 (4b).
 
 ---
 
@@ -67,9 +67,9 @@ JWS and key custody are done. The remaining work is scoped by which deployment s
 
 1. ~~**Vault Kubernetes auth**~~ — **done 2026-08-27**, both languages, with per-tenant isolation
    verified. See *Cluster bring-up* in the change log.
-2. **cert-manager** — the other half of cluster bring-up, and the hard prerequisite for every
-   certificate in steps 3–5. It is what makes leaf *renewal* automatic, which is the part that must
-   survive handover. A working reference exists at
+2. ~~**cert-manager**~~ — **done 2026-08-30.** Installed, both ClusterIssuers Ready, a leaf issued
+   from `pki_hub_client` and scheduled to renew at 60 of its 90 days with no MCM interaction. Built
+   from the reference at
    `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml`: ServiceAccount, the
    `serviceaccounts/token` RBAC Role, a `KubernetesAuthEngineRole`, and a `ClusterIssuer` that
    already uses `pki-hub/sign/...` — note **`sign`**, the correction §5 of
@@ -337,9 +337,9 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | **ServiceAccounts in the helm chart** | 🟢 | Chart had **none** — all 9 pods ran as `default`, which makes per-tenant scoping impossible. Uncommitted |
 | Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only; deferred |
 | Regenerate `participant.jws_private_key` | 🟡 | `wallet1` regenerated and Vault-only. `wallet2`/`cofinagn` still hold plaintext PEM in the column — **legacy rows, unsupported per S9**, to be cleared by a migration script rather than carried forward. The column is retained deliberately |
-| **cert-manager** | 🔴 | Second half of cluster bring-up. Reference: `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml` |
-| `pki_dfsp` CA (leg #1) | 🔴 | Ceremony runbook exists; not executed |
-| `pki_hub_client` CA (legs #2, #3) | 🔴 | Ceremony runbook exists; not executed |
+| **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
+| `pki_dfsp` CA (leg #1) | 🟡 | **Local mounts up** (`pki_dfsp_root` + `pki_dfsp`, role `dfsp-client`). The real ceremony — a **KMS-held root** — is still step 5; locally the root is generated inside Vault |
+| `pki_hub_client` CA (legs #2, #3) | 🟡 | **Local mounts up** (`pki_hub_client_root` + `pki_hub_client`, role `pivotal-client`). Same caveat: KMS root is step 5 |
 | MCM registration of the Pivotal CA | 🔴 | `hub-facing-leg.md` B2 |
 | MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs |
 | **Hub CA trust-bundle delivery** | 🔴 | Mechanism undefined; **blocks phase 5** — `pki-issuance-flows.md` §3.4 |
@@ -381,9 +381,9 @@ entirely — building it now would spend the schedule on the deployment that is 
    4a   │ cluster: Vault Kubernetes auth      DONE│  proven both languages,
         │                                         │  per-tenant isolation verified
         └────────────────────┬────────────────────┘
-  NEXT  ┌────────────────────▼────────────────────┐
-   4b   │ cluster: cert-manager + Vault PKI       │  gates every certificate
-        │                                         │  in steps 5-7
+  DONE  ┌────────────────────▼────────────────────┐
+   4b   │ cluster: cert-manager + Vault PKI   DONE │  both trust domains up,
+        │                                         │  leaf issued + auto-renewing
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
     5   │ CA ceremony — KMS roots, Vault PKI      │  needs cloud access
@@ -572,6 +572,60 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### cert-manager and Vault PKI — step 4b · 2026-08-30
+
+Closes cluster bring-up. Leaf *renewal* is now automatic, which is the part that had to be real
+automation rather than manual issuance: certificates expire on their own schedule regardless of who
+remembers, and manual key provisioning is only tolerable while the people who built the system
+operate it.
+
+| File | Change |
+| --- | --- |
+| `pivotal/scripts/setup-vault-pki.sh` | **new** — both trust domains, issuing roles, cert-manager's Vault policy and auth role. Idempotent; re-run after a Vault pod restart |
+| `pivotal/helm/cert-manager-issuers.yaml` | **new** — `vault-issuer` ServiceAccount, the `serviceaccounts/token` RBAC, and one `ClusterIssuer` per trust domain |
+
+Built from `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml`, which already runs this
+pattern. Production declares it through `vault-config-operator` CRDs; locally the same objects are
+created with the Vault CLI, so no operator is needed.
+
+**Two trust domains, four mounts.** Each domain has a root and an intermediate, which is the
+structure the design specifies:
+
+| Mount | Role | Purpose |
+| --- | --- | --- |
+| `pki_hub_client_root` + `pki_hub_client` | `pivotal-client` | Hub-facing client leaves — web-outbound and each connector |
+| `pki_dfsp_root` + `pki_dfsp` | `dfsp-client` | client certs issued **to** DFSPs |
+
+**Verified, including the negative control.** A leaf issued from `pki_hub_client` chains
+leaf → intermediate → root (`openssl verify` OK), carries **TLS Web Client Authentication only**, and
+**fails** to verify against `pki_dfsp`'s root. That last check is the one that matters: merging the
+two domains would make a DFSP's client certificate trusted by the Hub (`architecture.md` §4.7).
+
+**Renewal is scheduled, not just configured.** The test leaf: issued 2026-08-30, `renewalTime`
+2026-10-29, expiry 2026-11-28 — 60 of 90 days, and no MCM interaction, because what MCM registers is
+the CA and not the leaf (settled decision 6).
+
+**Roles use `sign`, never `issue`.** `issue` makes Vault generate the keypair; cert-manager creates
+the private key in-cluster and sends only a CSR. The secret holds `tls.key` alongside `tls.crt`, and
+Vault never sees it. This is the correction §5 of `pki-issuance-flows.md` records against
+`dfsp-facing-leg.md` §2.
+
+#### One deviation from the design, and it is the whole of step 5
+
+The roots here are **generated inside Vault**. In production the root is a non-exportable **AWS KMS**
+key (KMS-backed) or a CloudHSM key (HSM-backed), signing its intermediate exactly once in a ceremony.
+Everything below the root — intermediates, roles, cert-manager, issuance, renewal — is identical
+under both, so step 5 replaces three ceremony steps and touches nothing else.
+
+#### Worth knowing
+
+- `ca.crt` in the secret is the **root**; `tls.crt` is **leaf + intermediate**. A verification that
+  passes `ca.crt` as `-untrusted` fails with *"unable to get local issuer certificate"* and looks
+  like a broken chain when nothing is wrong.
+- The `vault-issuer` ServiceAccount holds no token of its own. cert-manager mints one through the
+  TokenRequest API, which is what the `serviceaccounts/token` Role grants. Without that Role every
+  issuance fails 403 and the ClusterIssuer never goes Ready.
 
 ### Cluster bring-up — Vault Kubernetes auth, both languages · 2026-08-27
 
