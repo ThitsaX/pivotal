@@ -5,15 +5,16 @@
 # The local Vault runs in dev mode (storage: inmem), so every Vault pod restart
 # loses all keys. Re-run this after one. It is idempotent.
 #
-# Per tenant with role='self':
-#   - private key still in MySQL  -> copy it to Vault, leave the DB column alone
-#     (the stored public key keeps pairing, nothing else has to change)
-#   - private key already NULL    -> generate a fresh RSA-2048 pair, write the
-#     private half to Vault and UPDATE the DB public key to match
+# Every tenant with role='self' gets a FRESH RSA-2048 pair: the private half is
+# written to Vault and the DB public key is updated to match.
 #
-# Decision 21 says regenerate rather than migrate; that applies to production keys
-# sitting in plaintext MySQL. Locally, preserving a working pair avoids breaking a
-# tenant mid-test, and regeneration is free until the first MCM publish.
+# It never copies a key out of participant.jws_private_key. Decision D21 and S9:
+# any value in that column is plaintext PEM and must be treated as compromised, so
+# migrating it would carry the exposure forward. Regeneration is free until the
+# first MCM publish -- after that, every key change is a coordinated break per FSP.
+#
+# The column is deliberately NOT cleared here. Retiring those legacy rows is a
+# migration script's job, and it needs to be able to find them.
 set -euo pipefail
 
 NS=${VAULT_NS:-vault}
@@ -33,15 +34,13 @@ echo "SELECT fsp_id FROM pivotal.participant_key WHERE role='self' ORDER BY id;"
   [ -z "$fsp" ] && continue
   has_priv=$(echo "SELECT jws_private_key IS NOT NULL FROM pivotal.participant_key WHERE fsp_id='$fsp';" | sql)
 
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp/$fsp.key" 2>/dev/null
+  openssl rsa -in "$tmp/$fsp.key" -pubout -out "$tmp/$fsp.pub" 2>/dev/null
+  pub=$(cat "$tmp/$fsp.pub")
+  printf "UPDATE pivotal.participant_key SET jws_public_key='%s' WHERE fsp_id='%s';\n" "$pub" "$fsp" | sql
+  note="regenerated, DB public key updated"
   if [ "$has_priv" = "1" ]; then
-    echo "SELECT jws_private_key FROM pivotal.participant_key WHERE fsp_id='$fsp';" | sql | unesc > "$tmp/$fsp.key"
-    note="migrated from MySQL"
-  else
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmp/$fsp.key" 2>/dev/null
-    openssl rsa -in "$tmp/$fsp.key" -pubout -out "$tmp/$fsp.pub" 2>/dev/null
-    pub=$(cat "$tmp/$fsp.pub")
-    printf "UPDATE pivotal.participant_key SET jws_public_key='%s' WHERE fsp_id='%s';\n" "$pub" "$fsp" | sql
-    note="generated fresh, DB public key updated"
+    note="$note; LEGACY plaintext key still in the column (S9)"
   fi
 
   openssl rsa -in "$tmp/$fsp.key" -noout -check >/dev/null 2>&1 || { echo "  $fsp: INVALID KEY, skipped" >&2; continue; }

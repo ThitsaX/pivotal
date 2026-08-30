@@ -6,7 +6,7 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-27.
+**Last verified against code:** 2026-08-30.
 
 ---
 
@@ -19,11 +19,11 @@ revocation (**E**) unspecified.
 
 | Repo | Branch | Head | Tree |
 | --- | --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | `1d2ef22` — docs + status | **7 uncommitted** — helm ServiceAccounts, k3d overlay, two scripts |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `de1d666` — helm ServiceAccounts for Vault Kubernetes auth | clean |
 | `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `429c174` — FSPIOP JWS signing for the hub-facing leg | clean |
-| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2436743` — bump to 0.0.25 + JWS settings | **8 uncommitted** — `Dockerfile.local`, `deploy/`, and 6 tracked `target/` artifacts |
+| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `1e9b3a3` — local-build image and k3d manifest | clean |
 
-The cluster work listed above is **not yet committed**. See *Cluster bring-up* in the change log.
+All three working trees are clean and the cluster work is committed.
 
 ### Proven, not just tested
 
@@ -51,15 +51,14 @@ Both signers signed live, from Vault-sourced keys:
 
 ### Pending actions
 
-1. **Commit the cluster work.** Seven files in `pivotal` and two in
-   `pivotal-thitsawallet-connector` (plus six unwanted `target/` diffs — see 3).
-2. **Tag `v0.0.25` on `pivotal-connector`** when ready. It currently exists only in the local Maven
-   repository; the connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so nothing
-   is deployable until the publish workflow runs. `pivotal-thitsawallet-connector/Dockerfile.local`
-   exists **only** to work around this and should be deleted once the publish workflow has run.
-3. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
-   `mvn package` during cluster bring-up produced binary diffs on six tracked `target/` artifacts
-   including `app.jar`.
+1. **Tag `v0.0.25` on `pivotal-connector`.** *The one action that blocks deployment.* Verified
+   2026-08-30: the newest tag is **`v0.0.24`**, so 0.0.25 exists only in the local Maven repository.
+   The connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so **no connector build
+   off this machine can succeed**. `pivotal-thitsawallet-connector/Dockerfile.local` exists only to
+   work around this and should be deleted once the publish workflow has run.
+2. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
+   `mvn package` during cluster bring-up produced binary diffs on tracked `target/` artifacts
+   including `app.jar`. **35 files under `target/` are tracked** as of 2026-08-30.
 
 ### What to do next
 
@@ -337,7 +336,7 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | **Per-tenant Vault path isolation** | 🟢 | `connector-wallet2` reads its own key, **denied wallet1 and cofinagn (403)**; web-outbound reads all three |
 | **ServiceAccounts in the helm chart** | 🟢 | Chart had **none** — all 9 pods ran as `default`, which makes per-tenant scoping impossible. Uncommitted |
 | Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only; deferred |
-| Regenerate `participant.jws_private_key` | 🟡 | Local only: `wallet1` regenerated, `wallet2`/`cofinagn` migrated in place. **D21 still applies to any real deployment** |
+| Regenerate `participant.jws_private_key` | 🟡 | `wallet1` regenerated and Vault-only. `wallet2`/`cofinagn` still hold plaintext PEM in the column — **legacy rows, unsupported per S9**, to be cleared by a migration script rather than carried forward. The column is retained deliberately |
 | **cert-manager** | 🔴 | Second half of cluster bring-up. Reference: `prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml` |
 | `pki_dfsp` CA (leg #1) | 🔴 | Ceremony runbook exists; not executed |
 | `pki_hub_client` CA (legs #2, #3) | 🔴 | Ceremony runbook exists; not executed |
@@ -429,7 +428,7 @@ Settled 2026-08-23. These scope the first build step; they do **not** revisit th
 
 | # | Decision | Reasoning |
 | --- | --- | --- |
-| **S1** | **Build against the existing `participant.jws_private_key` column, behind a `KeyProvider` interface.** | No JWS runs in production on any leg, so the column has never held a key used for a real transaction. Decision **D21** (regenerate, never migrate) is therefore a **non-event** here — nothing to compromise, nothing to rotate. Keeps #2/#4 infra-free; `vault-kv` and `pkcs11` slot in behind the same interface, which is also what #3 needs. |
+| **S1** | **Build against the existing `participant.jws_private_key` column, behind a `KeyProvider` interface.** | No JWS runs in production on any leg, so the column has never held a key used for a real transaction. Decision **D21** (regenerate, never migrate) is therefore a **non-event** here — nothing to compromise, nothing to rotate. Keeps #2/#4 infra-free; `vault-kv` and `pkcs11` slot in behind the same interface, which is also what #3 needs. **Superseded: retired by commit 6, and refined by S9 — the column is now a legacy read path only, and D21 is no longer a non-event because real keys have since been written to it.** |
 | **S2** | **Signing is enabled per participant; verification is the tri-state already specified in `architecture.md` §6.2.** | Corrected — see below. An earlier draft of this file proposed two booleans on `participant`; that contradicted the design on both counts. |
 | **S3** | **No `@mojaloop/sdk-standard-components` dependency.** Own implementation, structures referenced from the source quoted in `hub-facing-leg.md` §A2. | Explicit instruction. Consistent with `hub-facing-leg.md` §A6, which already calls for shared vectors executed by both languages in CI. |
 | **S5** | **`FSPIOP-URI` extraction mirrors the reference: throw on an unrecognised resource name, never degrade to the raw path.** | A degraded URI is signed and sent successfully today, because no peer verifies yet. It surfaces months later, in production, as "a peer broke us" — a signature mismatch several layers from the cause. Throwing turns that into a CI stack trace on the line that built the request. Accepted cost: the resource list must be maintained, and a new FSPIOP resource breaks signing rather than degrading. A request we cannot sign correctly is one we should not send. |
@@ -437,6 +436,7 @@ Settled 2026-08-23. These scope the first build step; they do **not** revisit th
 | **S7** | **`PUT /parties` is always signed, and always verified. No `jwsSignPutParties` equivalent.** | The reference gates PUT-parties signing on a separate flag (`baseRequests.js:290`), defaulting to `jwsSign` but independently disablable. Pivotal does not reproduce that opt-out on its own traffic. The **peer**-side quirk remains real and is absorbed by the inbound tri-state — see the rollout hazard below. |
 | **S8** | **A connector reads one tenant's key from Vault over k8s ServiceAccount auth and signs in-process. It never delegates signing, and never touches MySQL.** | Closes open questions 1 and 2. Amends **D4**, which held only in the HSM-backed profile — see below. |
 | **S4** | **No Hub-registered keypair exists**, so throwaway RSA-2048 keys are generated for the test loop. | Closes the #2↔#4 loop locally. See *Residual risk* for why a Hub round-trip would not have helped anyway. |
+| **S9** | **The plaintext keys in `participant.jws_private_key` are a previous design mistake and are not supported. The column stays.** | *Owner decision, 2026-08-30.* Every value ever written to that column is plaintext PEM and must be treated as compromised (**D21**), so no existing tenant's key is carried forward — `wallet2` and `cofinagn` are **not** migrated, they are regenerated like any other. The **column itself is retained**, because a migration script has to be able to find and clear the keys it is retiring; a dropped column leaves nothing to migrate *from*. `KEY_PROVIDER=database` therefore survives as a read path for legacy rows, not as a supported mode for new ones. |
 
 ### S2 — corrected
 
@@ -575,8 +575,9 @@ this file listed it in error. These remain open for the later steps:
 
 ### Cluster bring-up — Vault Kubernetes auth, both languages · 2026-08-27
 
-**Uncommitted at time of writing.** Closes the last unverified assumption sitting under shipped
-work: the production Vault credential path had never executed in either language.
+**Committed 2026-08-28** as `de1d666` (`pivotal`) and `1e9b3a3` (`pivotal-thitsawallet-connector`).
+Closes the last unverified assumption sitting under shipped work: the production Vault credential
+path had never executed in either language.
 
 | Repo | File | Change |
 | --- | --- | --- |
@@ -1038,10 +1039,15 @@ validated the role inference against live data: `wallet1`, `wallet2` and `cofina
 `self` because they hold private keys; `hub` was seeded as `peer`; every row landed with signing off
 and verification off, so the migration changed no behaviour.
 
-**A real tenant was migrated to Vault custody.** `wallet1`'s private key was moved from
+**A real tenant was moved to Vault custody.** `wallet1`'s private key was moved from
 `participant_key` into `secret/pivotal/jwskey/wallet1`, and the column set to `NULL`. Its public key
 stayed in MySQL. The service then signed and verified using a key it read from Vault, with no
-plaintext key left in the database — the migration path a deployment would follow.
+plaintext key left in the database.
+
+> **Superseded by S9 (2026-08-30).** Moving the existing key is *not* the path a deployment follows.
+> Any value that has sat in that column is compromised, so a deployment **regenerates**. What this
+> run proved is still valid — the service signs from a Vault-held key with the column `NULL` — but do
+> not read it as a migration recipe.
 
 **The per-source override was proven, not just the mode.** The deployment default was
 `FSPIOP_JWS_VERIFY_MODE=off`, while `wallet1`'s row said `require`. Unsigned requests from `wallet1`

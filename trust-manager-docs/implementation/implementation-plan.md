@@ -279,8 +279,10 @@ silent failure that surfaces as TLS rejections for exactly one tenant.
 
 ### Changed — `participant`
 
-Stop writing `jws_private_key`. Existing values are **not migrated** — fresh EC keys are generated in
-CloudHSM and re-published — then drop the column.
+Stop writing `jws_private_key`. Existing values are **not migrated** — fresh **RSA-2048** keys are
+generated and re-published. **Retain the column**: a migration script has to be able to find and
+clear the legacy rows it is retiring, and a dropped column leaves nothing to migrate *from*
+(`status.md` **S9**). Corrected 2026-08-30; this sentence said "EC keys" and "then drop the column".
 **Seed a `hub` participant** — none exists, and without it every Hub-originated error fails with
 3105 once JWS is enabled.
 
