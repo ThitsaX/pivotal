@@ -3,12 +3,6 @@
 import {reactive, readonly} from 'vue';
 import {apiClient} from '../api/client';
 
-export interface DashboardTotals {
-    today:   number;
-    last7d:  number;
-    last30d: number;
-}
-
 export interface DashboardStateCount {
     state: string;
     count: number;
@@ -21,6 +15,7 @@ export interface DashboardStageCount {
 
 export interface DashboardCurrencyValue {
     currency:    string;
+    useCase:     string;
     totalAmount: string;   // DECIMAL kept as string to preserve precision
     txnCount:    number;
 }
@@ -28,6 +23,7 @@ export interface DashboardCurrencyValue {
 export interface DashboardFspCount {
     fspId: string;
     count: number;
+    amounts: Array<{currency: string; totalAmount: string}>;
 }
 
 export interface DashboardDailyCount {
@@ -52,18 +48,19 @@ export interface DashboardLatencyPoint {
 export interface DashboardData {
     asOf:             string | null;
     generatedAt:      string;
-    totals:           DashboardTotals;
-    errorsToday:      number;
-    disputesToday:    number;
-    successRateToday: number | null;
+    range:             {from: string; to: string; timeZone: string};
+    total:             number;
+    errors:            number;
+    disputes:          number;
+    successRate:       number | null;
     byState:          DashboardStateCount[];
     errorByStage:     DashboardStageCount[];
     valueByCurrency:  DashboardCurrencyValue[];
     topPayerFsps:     DashboardFspCount[];
     topPayeeFsps:     DashboardFspCount[];
-    avgLatencyMsToday: number | null;
+    avgLatencyMs:      number | null;
     dailyTrend:       DashboardDailyCount[];
-    hourlyToday:      DashboardHourlyCount[];
+    hourlyProfile:    DashboardHourlyCount[];
     latencyTrend:     DashboardLatencyPoint[];
 }
 
@@ -107,13 +104,14 @@ export const auditDashboardStore = {
 
     state: readonly(state),
 
-    async load(): Promise<void> {
+    async load(params: {from: string; to: string; timeZone: string}): Promise<void> {
 
         state.loading = true;
         state.loadError = null;
 
         try {
-            state.data = await apiClient.get<DashboardData>('/audit/dashboard');
+            const query = new URLSearchParams(params);
+            state.data = await apiClient.get<DashboardData>(`/audit/dashboard?${query.toString()}`);
         } catch (error) {
             state.loadError = describeError(error);
             state.data = null;

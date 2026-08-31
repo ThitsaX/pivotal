@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Controller, Get, Inject} from '@nestjs/common';
+import {BadRequestException, Controller, Get, Inject, Query} from '@nestjs/common';
 import {QueryBus} from '@nestjs/cqrs';
 import {AccessTokenClaims, PermissionKey, RequiresPermission} from '@core/auth/domain';
 import {GetDashboardQuery, LiveStatsStore, toLiveKpi} from '@core/audit/domain';
 import {AuthUser} from '../../decorators';
+import {QueryParamsUtil} from '../query-params.util';
 
 /** Near-real-time KPI snapshot for the dashboard's headline tiles (polled by the portal). */
 export type LiveStatsDto = {
@@ -32,11 +33,16 @@ export class DashboardAuditController {
     @RequiresPermission(PermissionKey.AUDIT_DASHBOARD_VIEW)
     async getDashboard(
         @AuthUser() claims: AccessTokenClaims | undefined,
+        @Query('from') fromValue?: string,
+        @Query('to') toValue?: string,
+        @Query('timeZone') timeZoneValue?: string,
     ): Promise<GetDashboardQuery.Output> {
         const accessScope = DashboardAuditController.resolveAccessScope(claims);
+        const range = DashboardAuditController.parseRange(fromValue, toValue);
+        const timeZone = DashboardAuditController.parseTimeZone(timeZoneValue);
 
         return this.queryBus.execute(
-            new GetDashboardQuery(new GetDashboardQuery.Input(accessScope)),
+            new GetDashboardQuery(new GetDashboardQuery.Input(accessScope, range, timeZone)),
         );
     }
 
@@ -71,5 +77,39 @@ export class DashboardAuditController {
         }
 
         return new GetDashboardQuery.AccessScope(claims.fspId);
+    }
+
+    private static parseRange(
+        fromValue: string | undefined,
+        toValue: string | undefined,
+    ): GetDashboardQuery.DateRange | undefined {
+        const from = QueryParamsUtil.toOptionalDate(fromValue, 'from');
+        const to = QueryParamsUtil.toOptionalDate(toValue, 'to');
+
+        if (from == null && to == null) {
+            return undefined;
+        }
+
+        if (from == null || to == null) {
+            throw new BadRequestException('from and to must be provided together.');
+        }
+
+        if (from >= to) {
+            throw new BadRequestException('from must be before to.');
+        }
+
+        return new GetDashboardQuery.DateRange(from, to);
+    }
+
+    private static parseTimeZone(value: string | undefined): string {
+        const timeZone = QueryParamsUtil.toOptionalString(value) ?? 'UTC';
+
+        try {
+            new Intl.DateTimeFormat('en-US', {timeZone}).format(new Date());
+        } catch {
+            throw new BadRequestException('timeZone must be a valid IANA time zone.');
+        }
+
+        return timeZone;
     }
 }

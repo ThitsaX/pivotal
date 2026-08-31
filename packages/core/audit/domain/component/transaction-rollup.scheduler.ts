@@ -75,13 +75,12 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
     }
 
     /**
-     * One-time startup sequence: backfill the retention window if the rollup is empty, THEN settle
-     * into the periodic incremental cadence. Backfill must precede the first tick so the empty
-     * check isn't defeated by the tick having just written the trailing window.
+     * One-time startup sequence: backfill the retention window when the rollup is empty or a
+     * migration marked it stale, THEN settle into the periodic incremental cadence.
      */
     private async bootstrap(): Promise<void> {
         try {
-            await this.backfillIfEmpty();
+            await this.backfillIfRequired();
         } catch (error) {
             this.logger.error(
                 `Rollup backfill failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -102,13 +101,13 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
     }
 
     /**
-     * Backfills {@link BACKFILL_DAYS} of history, day by day, but only when the rollup is empty —
-     * i.e. a fresh table (first deploy) or one just recreated by a migration. A populated rollup is
-     * kept current by the incremental ticks, so this no-ops on a normal restart. Lock-guarded so
+     * Backfills {@link BACKFILL_DAYS} of history, day by day, when the rollup is empty or a schema
+     * migration explicitly requests it. The marker handles rolling deployments where an old pod
+     * may write a few recent buckets after a migration clears the table. Lock-guarded so
      * only one replica backfills; idempotent (replace-window) so a lock timeout that lets two run
      * is harmless. Chunked per day to keep each write transaction bounded on large datasets.
      */
-    private async backfillIfEmpty(): Promise<void> {
+    private async backfillIfRequired(): Promise<void> {
         const token = await this.lock.acquire(TransactionRollupScheduler.BACKFILL_LOCK_TTL_MS);
 
         if (token === null) {
@@ -117,7 +116,8 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
         }
 
         try {
-            if (await this.repository.getLastUpdatedAt() !== null) {
+            const migrationRequiresBackfill = await this.repository.isBackfillRequired();
+            if (!migrationRequiresBackfill && await this.repository.getLastUpdatedAt() !== null) {
                 this.logger.debug('Rollup already populated; backfill not needed.');
                 return;
             }
@@ -143,6 +143,7 @@ export class TransactionRollupScheduler implements OnModuleInit, OnModuleDestroy
             // Seed today's live counters from the freshly backfilled rollup so the live tier
             // starts consistent rather than from zero.
             await this.reconcileLive(new Date());
+            await this.repository.markBackfillComplete();
         } finally {
             await this.lock.release(token);
         }

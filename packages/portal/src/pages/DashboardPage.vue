@@ -2,9 +2,10 @@
 <!-- Copyright 2024-2026 ThitsaWorks Pte. Ltd. -->
 
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted} from 'vue';
+import {computed, nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
 import type {ApexChart, ApexFill, ApexGrid, ApexLegend, ApexOptions, ApexYAxis} from 'apexcharts';
 import VueApexCharts from 'vue3-apexcharts';
+import TimeRangeSelector from '../components/TimeRangeSelector.vue';
 import TimeZoneSelector from '../components/TimeZoneSelector.vue';
 import type {MenuGroup} from '../stores/menu.store';
 import {authStore} from '../stores/auth.store';
@@ -32,6 +33,80 @@ const loadError = computed((): string | null => auditDashboardStore.state.loadEr
 // Near-real-time KPIs (polled). When present, the headline tiles read from these instead of
 // the 5-minute snapshot; charts always stay on the snapshot.
 const live = computed(() => auditDashboardStore.state.live);
+
+type RangeMode = 'today' | 'last24' | 'custom';
+
+function offsetMinutesForTimeZone(date: Date, timeZone: string): number {
+    const offset = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        timeZoneName: 'shortOffset',
+    }).formatToParts(date).find((part) => part.type === 'timeZoneName')?.value ?? 'GMT';
+    const match = offset.match(/GMT([+\-])(\d{1,2})(?::?(\d{2}))?/i);
+
+    if (match == null) {
+        return 0;
+    }
+
+    const sign = match[1] === '-' ? -1 : 1;
+    return sign * (Number(match[2]) * 60 + Number(match[3] ?? 0));
+}
+
+function localMidnightUtc(year: number, month: number, day: number, timeZone: string): string {
+    const guess = Date.UTC(year, month - 1, day);
+    const first = guess - offsetMinutesForTimeZone(new Date(guess), timeZone) * 60_000;
+    const resolved = guess - offsetMinutesForTimeZone(new Date(first), timeZone) * 60_000;
+
+    return new Date(resolved).toISOString();
+}
+
+function todayRange(timeZone: string): {from: string; to: string} {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(new Date());
+    const value = (type: Intl.DateTimeFormatPartTypes): number =>
+        Number(parts.find((part) => part.type === type)?.value ?? 0);
+    const year = value('year');
+    const month = value('month');
+    const day = value('day');
+    const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
+
+    return {
+        from: localMidnightUtc(year, month, day, timeZone),
+        to: localMidnightUtc(
+            tomorrow.getUTCFullYear(),
+            tomorrow.getUTCMonth() + 1,
+            tomorrow.getUTCDate(),
+            timeZone,
+        ),
+    };
+}
+
+const initialRange = todayRange(props.selectedTimeZone);
+const rangeMode = ref<RangeMode>('today');
+const rangeStart = ref(initialRange.from);
+const rangeEnd = ref(initialRange.to);
+const rangeInvalid = ref(false);
+const appliedMode = ref<RangeMode>('today');
+const appliedRange = ref({...initialRange});
+
+const rangeModeLabel = computed((): string => ({
+    today: 'Today',
+    last24: 'Last 24 Hours',
+    custom: 'Custom Range',
+})[appliedMode.value]);
+
+const appliedRangeLabel = computed((): string => {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: props.selectedTimeZone,
+    });
+
+    return `${formatter.format(new Date(appliedRange.value.from))} – ${formatter.format(new Date(appliedRange.value.to))}`;
+});
 
 // ── palette (modern, cohesive; ApexCharts needs explicit hex) ─────────────────────
 // Each hue has a lighter "…To" companion used as the gradient end for a fresher look.
@@ -101,6 +176,20 @@ function formatAmount(value: string): string {
     const dec = `${decRaw}00`.slice(0, 2);
 
     return `${intPart}.${dec}`;
+}
+
+function formatUseCase(value: string): string {
+    if (value === 'UNSPECIFIED') {
+        return 'Unspecified';
+    }
+
+    const title = (segment: string): string => segment
+        .toLowerCase()
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+
+    return value.split('_TO_').map(title).join(' to ');
 }
 
 function formatShortDate(iso: string): string {
@@ -246,10 +335,10 @@ const errorStageOptions = computed<ApexOptions>(() => ({
 
 // ── today by hour (stacked column) ──────────────────────────────────────────────────
 const HOUR_LABELS = Array.from({length: 24}, (_unused, h) => `${String(h).padStart(2, '0')}:00`);
-const hasHourly = computed((): boolean => (data.value?.hourlyToday ?? []).some((h) => h.count > 0));
+const hasHourly = computed((): boolean => (data.value?.hourlyProfile ?? []).some((h) => h.count > 0));
 
 const hourlySeries = computed(() => {
-    const hours = data.value?.hourlyToday ?? [];
+    const hours = data.value?.hourlyProfile ?? [];
     return [
         {name: 'Successful', data: hours.map((h) => Math.max(h.count - h.errorCount, 0))},
         {name: 'Errors',     data: hours.map((h) => h.errorCount)},
@@ -310,11 +399,25 @@ const latencyOptions = computed<ApexOptions>(() => ({
 }));
 
 // ── top FSPs (horizontal bars) ──────────────────────────────────────────────────────
-function fspSeries(rows: ReadonlyArray<{fspId: string; count: number}>) {
+type FspRow = {
+    fspId: string;
+    count: number;
+    amounts: ReadonlyArray<{currency: string; totalAmount: string}>;
+};
+
+type FspLeg = 'payer' | 'payee';
+
+function fspSeries(rows: ReadonlyArray<FspRow>) {
     return [{name: 'Transactions', data: rows.map((r) => r.count)}];
 }
 
-function fspOptions(rows: ReadonlyArray<{fspId: string; count: number}>, color: string, toColor: string): ApexOptions {
+function fspRows(leg: FspLeg): ReadonlyArray<FspRow> {
+    return leg === 'payer' ? (data.value?.topPayerFsps ?? []) : (data.value?.topPayeeFsps ?? []);
+}
+
+function fspOptions(leg: FspLeg, color: string, toColor: string): ApexOptions {
+    const rows = fspRows(leg);
+
     return {
         chart: baseChart('bar'),
         colors: [color],
@@ -325,30 +428,96 @@ function fspOptions(rows: ReadonlyArray<{fspId: string; count: number}>, color: 
         yaxis: {labels: {style: {colors: COLOR.ink, fontWeight: 600}}},
         legend: {show: false},
         grid: baseGrid,
+        tooltip: {
+            y: {
+                formatter: (value: number, context?: {dataPointIndex?: number}): string => {
+                    // ApexCharts may retain this formatter while updating the series/options.
+                    // Resolve current rows at hover time instead of closing over the initial range.
+                    const amounts = fspRows(leg)[context?.dataPointIndex ?? -1]?.amounts ?? [];
+                    const amountLabel = amounts.length === 0
+                        ? 'No committed value'
+                        : amounts.map((amount) => `${amount.currency} ${formatAmount(amount.totalAmount)}`).join(' · ');
+
+                    return `${formatNumber(value)} transactions · ${amountLabel}`;
+                },
+            },
+        },
     };
 }
 
 const hasPayer = computed((): boolean => (data.value?.topPayerFsps.length ?? 0) > 0);
 const hasPayee = computed((): boolean => (data.value?.topPayeeFsps.length ?? 0) > 0);
 const payerSeries = computed(() => fspSeries(data.value?.topPayerFsps ?? []));
-const payerOptions = computed(() => fspOptions(data.value?.topPayerFsps ?? [], COLOR.accent, COLOR.accentTo));
+const payerOptions = computed(() => fspOptions('payer', COLOR.accent, COLOR.accentTo));
 const payeeSeries = computed(() => fspSeries(data.value?.topPayeeFsps ?? []));
-const payeeOptions = computed(() => fspOptions(data.value?.topPayeeFsps ?? [], COLOR.committed, COLOR.committedTo));
+const payeeOptions = computed(() => fspOptions('payee', COLOR.committed, COLOR.committedTo));
+
+function isCurrentUtcDay(from: string, to: string): boolean {
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+    return from === start.toISOString() && to === end.toISOString();
+}
+
+function syncLivePolling(): void {
+    if (isCurrentUtcDay(appliedRange.value.from, appliedRange.value.to)) {
+        auditDashboardStore.startLivePolling();
+    } else {
+        auditDashboardStore.stopLivePolling();
+    }
+}
+
+function loadAppliedRange(): void {
+    void auditDashboardStore.load({
+        from: appliedRange.value.from,
+        to: appliedRange.value.to,
+        timeZone: props.selectedTimeZone,
+    });
+    syncLivePolling();
+}
+
+function applyRange(): void {
+    if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value) {
+        return;
+    }
+
+    appliedMode.value = rangeMode.value;
+    appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
+    loadAppliedRange();
+}
 
 function refresh(): void {
-    void auditDashboardStore.load();
+    loadAppliedRange();
 }
 
 onMounted((): void => {
     if (canView.value) {
-        void auditDashboardStore.load();
-        auditDashboardStore.startLivePolling();
+        loadAppliedRange();
     }
 });
 
 onUnmounted((): void => {
     auditDashboardStore.stopLivePolling();
 });
+
+watch(
+    () => props.selectedTimeZone,
+    async (): Promise<void> => {
+        if (rangeMode.value === 'today') {
+            const range = todayRange(props.selectedTimeZone);
+            rangeStart.value = range.from;
+            rangeEnd.value = range.to;
+        } else if (rangeMode.value === 'last24') {
+            const to = new Date();
+            rangeEnd.value = to.toISOString();
+            rangeStart.value = new Date(to.getTime() - 24 * 60 * 60 * 1000).toISOString();
+        }
+
+        await nextTick();
+        applyRange();
+    },
+);
 </script>
 
 <template>
@@ -361,7 +530,7 @@ onUnmounted((): void => {
                         FSP <span class="font-semibold text-ink">{{ scopedFspId }}</span>
                     </template>
                     <template v-else>Hub-wide · all FSPs</template>
-                    <span class="text-slate-400">· UTC day boundaries</span>
+                    <span class="text-slate-400">· {{ rangeModeLabel }} · {{ selectedTimeZone }}</span>
                 </p>
                 <span
                     v-if="live"
@@ -392,6 +561,42 @@ onUnmounted((): void => {
             </div>
         </div>
 
+        <article
+            v-if="canView"
+            class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
+        >
+            <TimeRangeSelector
+                label="Dashboard time range"
+                :selected-time-zone="selectedTimeZone"
+                :mode="rangeMode"
+                :start-value="rangeStart"
+                :end-value="rangeEnd"
+                :disabled="loading"
+                compact-mode-selector
+                :show-last24="false"
+                :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
+                @update:mode="rangeMode = $event as RangeMode"
+                @update:start-value="rangeStart = $event"
+                @update:end-value="rangeEnd = $event"
+                @update:invalid="rangeInvalid = $event"
+            >
+                <template #action>
+                    <button
+                        type="button"
+                        class="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
+                        @click="applyRange"
+                    >
+                        {{ loading ? 'Applying…' : 'Apply range' }}
+                    </button>
+                </template>
+            </TimeRangeSelector>
+            <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
+                Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
+                {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+            </p>
+        </article>
+
         <!-- No permission -->
         <article
             v-if="!canView"
@@ -419,28 +624,35 @@ onUnmounted((): void => {
             </article>
 
             <template v-else-if="data !== null">
+                <div
+                    v-if="loading"
+                    class="flex items-center gap-2 border border-accent/20 bg-blue-50 px-3 py-2 text-xs font-semibold text-accent"
+                >
+                    <span class="h-3 w-3 animate-spin rounded-full border-2 border-accent/25 border-t-accent"></span>
+                    Refreshing dashboard for the selected range…
+                </div>
                 <!-- KPI strip -->
                 <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions Today</p>
-                        <p class="font-display text-xl leading-tight text-ink">{{ formatNumber(live ? live.today : data.totals.today) }}</p>
-                        <p class="text-[11px] text-slate-400">{{ formatNumber(data.totals.last7d) }} / 7d · {{ formatNumber(data.totals.last30d) }} / 30d</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions</p>
+                        <p class="font-display text-xl leading-tight text-ink">{{ formatNumber(live ? live.today : data.total) }}</p>
+                        <p class="text-[11px] text-slate-400">selected range</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Success Rate</p>
-                        <p class="font-display text-xl leading-tight text-emerald-600">{{ formatPercent(live ? live.successRateToday : data.successRateToday) }}</p>
-                        <p class="text-[11px] text-slate-400">committed ÷ total today</p>
+                        <p class="font-display text-xl leading-tight text-emerald-600">{{ formatPercent(live ? live.successRateToday : data.successRate) }}</p>
+                        <p class="text-[11px] text-slate-400">committed ÷ selected total</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Errors / Disputes</p>
                         <p class="font-display text-xl leading-tight text-rose-600">
-                            {{ formatNumber(live ? live.errorsToday : data.errorsToday) }}<span class="text-sm text-amber-600"> / {{ formatNumber(live ? live.disputesToday : data.disputesToday) }}</span>
+                            {{ formatNumber(live ? live.errorsToday : data.errors) }}<span class="text-sm text-amber-600"> / {{ formatNumber(live ? live.disputesToday : data.disputes) }}</span>
                         </p>
-                        <p class="text-[11px] text-slate-400">errors / disputes today</p>
+                        <p class="text-[11px] text-slate-400">errors / disputes in range</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency</p>
-                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(live ? live.avgLatencyMsToday : data.avgLatencyMsToday) }}</p>
+                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(live ? live.avgLatencyMsToday : data.avgLatencyMs) }}</p>
                         <p class="text-[11px] text-slate-400">as of {{ formatTimestamp(live ? live.asOf : data.asOf) }}</p>
                     </article>
                 </div>
@@ -448,13 +660,13 @@ onUnmounted((): void => {
                 <!-- Row 1: trend + outcome -->
                 <div class="grid gap-2 xl:grid-cols-3">
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft xl:col-span-2">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions — Last 30 Days</p>
-                        <div v-if="!hasTrend" class="mt-2 text-sm text-slate-500">No data for the last 30 days.</div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions — Selected Range</p>
+                        <div v-if="!hasTrend" class="mt-2 text-sm text-slate-500">No data for the selected range.</div>
                         <VueApexCharts v-else type="area" height="230" :options="trendOptions" :series="trendSeries" />
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Outcome (Today)</p>
-                        <div v-if="!hasState" class="mt-2 text-sm text-slate-500">No transactions today.</div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Outcome</p>
+                        <div v-if="!hasState" class="mt-2 text-sm text-slate-500">No transactions in this range.</div>
                         <VueApexCharts v-else type="donut" height="260" :options="stateOptions" :series="stateSeries" />
                     </article>
                 </div>
@@ -462,17 +674,17 @@ onUnmounted((): void => {
                 <!-- Row 2: intraday + errors-by-stage + latency -->
                 <div class="grid gap-2 xl:grid-cols-12">
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft xl:col-span-5">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Today by Hour (UTC)</p>
-                        <div v-if="!hasHourly" class="mt-2 text-sm text-slate-500">No transactions today.</div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Transactions by Hour ({{ selectedTimeZone }})</p>
+                        <div v-if="!hasHourly" class="mt-2 text-sm text-slate-500">No transactions in this range.</div>
                         <VueApexCharts v-else type="bar" height="195" :options="hourlyOptions" :series="hourlySeries" />
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft xl:col-span-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Errors by Stage (Today)</p>
-                        <div v-if="!hasErrorStage" class="mt-2 text-sm text-slate-500">No errors today.</div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Errors by Stage</p>
+                        <div v-if="!hasErrorStage" class="mt-2 text-sm text-slate-500">No errors in this range.</div>
                         <VueApexCharts v-else type="bar" height="195" :options="errorStageOptions" :series="errorStageSeries" />
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft xl:col-span-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency — 30 Days</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency — Selected Range</p>
                         <div v-if="!hasLatency" class="mt-2 text-sm text-slate-500">No completed transfers.</div>
                         <VueApexCharts v-else type="area" height="195" :options="latencyOptions" :series="latencySeries" />
                     </article>
@@ -481,21 +693,23 @@ onUnmounted((): void => {
                 <!-- Row 3: value + top payer + top payee -->
                 <div class="grid gap-2 xl:grid-cols-3">
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Value Transferred (Today)</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Value Transferred</p>
                         <p class="text-[10px] text-slate-400">committed &amp; disputed transfers · excludes failed</p>
-                        <div v-if="!hasCurrency" class="mt-1 text-sm text-slate-500">No value moved today.</div>
-                        <div v-else class="mt-1 max-h-[150px] overflow-auto">
+                        <div v-if="!hasCurrency" class="mt-1 text-sm text-slate-500">No value moved in this range.</div>
+                        <div v-else class="portal-scrollbar mt-1 max-h-[150px] overflow-y-auto overflow-x-hidden pr-2">
                             <table class="w-full text-xs">
                                 <thead>
                                     <tr class="text-left uppercase tracking-wide text-slate-400">
                                         <th class="pb-1 font-semibold">Currency</th>
+                                        <th class="pb-1 font-semibold">Use Case</th>
                                         <th class="pb-1 text-right font-semibold">Amount</th>
                                         <th class="pb-1 text-right font-semibold">Count</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in data.valueByCurrency" :key="row.currency" class="border-t border-slate-100">
+                                    <tr v-for="row in data.valueByCurrency" :key="`${row.currency}-${row.useCase}`" class="border-t border-slate-100">
                                         <td class="py-1 font-medium text-ink">{{ row.currency }}</td>
+                                        <td class="py-1 text-slate-600">{{ formatUseCase(row.useCase) }}</td>
                                         <td class="py-1 text-right tabular-nums text-ink">{{ formatAmount(row.totalAmount) }}</td>
                                         <td class="py-1 text-right tabular-nums text-slate-500">{{ formatNumber(row.txnCount) }}</td>
                                     </tr>
@@ -504,12 +718,12 @@ onUnmounted((): void => {
                         </div>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payer FSPs (Today)</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payer FSPs</p>
                         <div v-if="!hasPayer" class="mt-2 text-sm text-slate-500">No data.</div>
                         <VueApexCharts v-else type="bar" height="160" :options="payerOptions" :series="payerSeries" />
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payee FSPs (Today)</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payee FSPs</p>
                         <div v-if="!hasPayee" class="mt-2 text-sm text-slate-500">No data.</div>
                         <VueApexCharts v-else type="bar" height="160" :options="payeeOptions" :series="payeeSeries" />
                     </article>
