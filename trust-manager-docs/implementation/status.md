@@ -6,7 +6,7 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-30 (4b).
+**Last verified against code:** 2026-08-31 (5a).
 
 ---
 
@@ -338,12 +338,12 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only; deferred |
 | Regenerate `participant.jws_private_key` | 🟡 | `wallet1` regenerated and Vault-only. `wallet2`/`cofinagn` still hold plaintext PEM in the column — **legacy rows, unsupported per S9**, to be cleared by a migration script rather than carried forward. The column is retained deliberately |
 | **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
-| `pki_dfsp` CA (leg #1) | 🟡 | **Local mounts up** (`pki_dfsp_root` + `pki_dfsp`, role `dfsp-client`). The real ceremony — a **KMS-held root** — is still step 5; locally the root is generated inside Vault |
-| `pki_hub_client` CA (legs #2, #3) | 🟡 | **Local mounts up** (`pki_hub_client_root` + `pki_hub_client`, role `pivotal-client`). Same caveat: KMS root is step 5 |
+| `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
+| `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
 | MCM registration of the Pivotal CA | 🔴 | `hub-facing-leg.md` B2 |
 | MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs |
 | **Hub CA trust-bundle delivery** | 🔴 | Mechanism undefined; **blocks phase 5** — `pki-issuance-flows.md` §3.4 |
-| Local dev environment | 🟡 | k3d cluster + Vault + scripts now exist (see *Cluster bring-up*). Still missing: SoftHSM2, `implementation-plan.md` §1.4, and `runbooks/ceremony-local.md` is stale (pre-rename, single trust domain) |
+| Local dev environment | 🟢 | k3d + Vault + cert-manager + **SoftHSM2** all in place, each with a re-runnable script. `runbooks/ceremony-local.md` is now implemented by `scripts/ceremony-local.sh` — the runbook prose is still pre-rename and single-domain, but the script supersedes it |
 | `NatsPullListener` ack-after-PUT | 🔴 | **Re-confirmed 2026-08-27**: `handle()` still acks in `finally` even on failure (`NatsPullListener.java:162`), logging *"failed - acking to avoid requeue"*, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners |
 
 ### Connector scope
@@ -385,8 +385,11 @@ entirely — building it now would spend the schedule on the deployment that is 
    4b   │ cluster: cert-manager + Vault PKI   DONE │  both trust domains up,
         │                                         │  leaf issued + auto-renewing
         └────────────────────┬────────────────────┘
+  DONE  ┌────────────────────▼────────────────────┐
+   5a   │ CA ceremony rehearsal — SoftHSM2    DONE │  no cloud needed
+        └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
-    5   │ CA ceremony — KMS roots, Vault PKI      │  needs cloud access
+   5b   │ CA ceremony for real — KMS/HSM roots    │  needs cloud access
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
     6   │ mTLS across #2, #3, #4                  │  no external blocker
@@ -572,6 +575,62 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### CA ceremony rehearsed locally — step 5a · 2026-08-31
+
+The ceremony no longer needs cloud access to be exercised. `runbooks/ceremony-local.md` always
+intended this — *"locally test the same PKI ceremony used in production without AWS KMS or
+CloudHSM"* — and this implements it.
+
+| File | Change |
+| --- | --- |
+| `pivotal/scripts/ceremony-local.sh` | **new** — both root ceremonies against SoftHSM2, plus the root CRL |
+
+Requires `brew install softhsm opensc libp11`.
+
+**Why SoftHSM is a faithful stand-in, not a toy.** Neither CloudHSM nor KMS is a CA: both only sign a
+digest, and the ceremony script builds the X.509 itself (settled decision 13). So the script is the
+same under all three backends and only the signing call differs — PKCS#11 `C_Sign` to CloudHSM,
+`kms:Sign` to KMS, PKCS#11 `C_Sign` to SoftHSM2 here. Same interface, same code path
+(`architecture.md` §4.6).
+
+**Verified:**
+
+| Check | Result |
+| --- | --- |
+| Root generated **inside** the device, per trust domain | 2 tokens, `pivotal-hub-client` and `pivotal-dfsp` |
+| Root self-signed over PKCS#11 | `O=ThitsaWorks, CN=Pivotal Hub Client CA Root` |
+| Root signs the Vault intermediate — once | intermediate installed via `intermediate/set-signed` |
+| Leaf chains to the **HSM-held** root | `openssl verify`: OK |
+| **Negative control** — leaf vs the *other* domain's root | **verification failed**, as it must |
+| Root CRL signed by the HSM | rehearsed for both domains |
+| Root private key readable out | refused |
+
+The CRL is deliberately part of the ceremony rather than a later task: revoking an intermediate needs
+a root-signed CRL, and that is far easier to write while the tooling is open than to discover during
+an incident.
+
+**What this cannot prove**, and 5b still must: that a KMS key is genuinely non-exportable, IAM
+scoping, CloudTrail, and the zero-threshold `kms:Sign` alarm. The refusal above is `pkcs11-tool`
+declining to implement private-key export — suggestive, not the same guarantee. And PKCS#11 is a
+stable API but a loose contract: login models, session lifetime and available mechanisms vary by
+device, so *"SoftHSM in CI will not reproduce CloudHSM's behaviour on any of them"*. Budget an
+integration pass per real device.
+
+#### Three failures worth recording
+
+- **`--init-token --free` is not idempotent.** It takes a free slot and creates a *new* token each
+  run, so re-running silently produced three tokens labelled `pivotal-hub-client`. The engine then
+  matched ambiguously and reported `PKCS11_get_private_key returned NULL` — which reads as a missing
+  key when the key is present and the tokens are the problem. The script now initialises only if the
+  label is absent.
+- **Two env vars fail quietly.** `OPENSSL_ENGINES` must point at libp11's directory, which is not
+  this OpenSSL's `ENGINESDIR`; and `PKCS11_MODULE_PATH` selects the module the engine loads. Omitting
+  the second produces the identical `returned NULL` message.
+- **The ceremony destroys the issuing roles.** Re-signing an intermediate means
+  `vault secrets disable` then re-enable, which drops every role on the mount, and cert-manager then
+  fails with `unknown role: pivotal-client`. The ceremony now restores the role it removed. **Order
+  matters: ceremony first, then anything that depends on a role.**
 
 ### cert-manager and Vault PKI — step 4b · 2026-08-30
 
