@@ -578,6 +578,54 @@ this file listed it in error. These remain open for the later steps:
 
 ## Change log
 
+### JWS key publish — phase 4's registry sync complete · 2026-09-02
+
+trust-manager's fourth job. With this, everything MCM needs from Pivotal and
+everything Pivotal needs from MCM moves on a timer.
+
+| File | Change |
+| --- | --- |
+| `packages/core/trust/domain/component/jws-key-publish.scheduler.ts` | **new** |
+
+**The mirror image of the peer pull.** We fetch peers' public keys so inbound traffic
+can be verified; peers run the same fetch against MCM, so until our keys are
+registered there, every peer that turns on verification rejects everything Pivotal
+signs. Only the public half leaves — the private half stays where the signer reads
+it, and this is not the DFSP's accessKey, which the DFSP generates and MCM never sees.
+
+**It fills gaps and refuses to resolve disagreements.** The protected header carries
+no key identifier and MCM stores exactly one key per tenant, so a verifying peer holds
+one key and cannot try both. Publishing where MCM has **nothing** is safe: no peer
+holds an older key to break. Replacing a key MCM already holds is not, so the job
+warns and leaves it alone. `publish(fspId)` is the operator-driven path that does
+replace, for use once the rest of a rotation is sequenced.
+
+**Verified in-cluster, including the guard:**
+
+| | |
+| --- | --- |
+| gap filled | `1 published, 2 already correct, 0 diverged, 0 failed` |
+| divergence planted deliberately | `0 published, 2 already correct, **1 diverged**, 0 failed` — warned, did not overwrite |
+| after restoring | silent — all four jobs log only on change |
+
+**It also closed the drift the CA reconciler found.** `cofinagn` existed in Pivotal
+but not in MCM. Creating the tenant there let both jobs converge on the same tick —
+CA registered, key published — which is the whole point of writing them as
+converge-toward-intent loops rather than one-shot actions.
+
+#### Where phase 4 stands
+
+| Job | |
+| --- | --- |
+| Pull peer JWS keys | done |
+| Poll the Hub CA into the trust bundle | done |
+| Reconcile MCM CA registration | done |
+| Publish own JWS keys | done |
+
+What remains before inbound verification can move to `verify-if-present` in anger is
+not a trust-manager job: the Hub itself does not sign today, so Hub-originated errors
+arrive unsigned, and each peer starts signing on its own schedule.
+
 ### MCM CA registration reconcile · 2026-09-02
 
 trust-manager's third scheduled job, and the last of phase 4's registry-sync work

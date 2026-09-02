@@ -7,6 +7,7 @@ import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
 import {
     HubCaSyncScheduler,
+    JwsKeyPublishScheduler,
     KubernetesSecretWriter,
     McmCaRegistrationScheduler,
     PeerJwsSyncScheduler,
@@ -15,6 +16,7 @@ import {
 const REQUIRED_SETTINGS = Symbol('TrustDomainRequiredSettings');
 const HUB_CA_LOCK = Symbol('TrustDomainHubCaLock');
 const CA_REGISTRATION_LOCK = Symbol('TrustDomainCaRegistrationLock');
+const JWS_PUBLISH_LOCK = Symbol('TrustDomainJwsPublishLock');
 
 const Components: Provider[] = [
     {
@@ -85,6 +87,24 @@ const Components: Provider[] = [
         ),
         inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS],
     },
+    {
+        provide: JWS_PUBLISH_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:jws-key-publish'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        provide: JwsKeyPublishScheduler,
+        useFactory: (
+            mcm: McmAxios,
+            participantKeys: ParticipantKeyRepository,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): JwsKeyPublishScheduler => new JwsKeyPublishScheduler(
+            mcm, participantKeys, lock, settings.jwsKeyPublishIntervalMs(),
+        ),
+        inject: [McmAxios, ParticipantKeyRepository, JWS_PUBLISH_LOCK, REQUIRED_SETTINGS],
+    },
 ];
 
 @Module({})
@@ -109,7 +129,13 @@ export class TrustDomainModule {
                 },
                 ...Components,
             ],
-            exports: [McmAxios, PeerJwsSyncScheduler, HubCaSyncScheduler, McmCaRegistrationScheduler],
+            exports: [
+            McmAxios,
+            PeerJwsSyncScheduler,
+            HubCaSyncScheduler,
+            McmCaRegistrationScheduler,
+            JwsKeyPublishScheduler,
+        ],
         };
     }
 }
@@ -142,6 +168,8 @@ export namespace TrustDomainModule {
         pivotalCaUrl(): string;
 
         mcmCaReconcileIntervalMs(): number;
+
+        jwsKeyPublishIntervalMs(): number;
     }
 
     export interface AsyncOptions {
