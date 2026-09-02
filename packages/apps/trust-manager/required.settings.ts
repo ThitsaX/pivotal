@@ -68,8 +68,8 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
         return seconds * 1000;
     }
 
-    pivotalCaUrl(): string {
-        return this.readRequiredString('PIVOTAL_CA_URL');
+    pivotalCaPath(): string {
+        return this.readRequiredString('PIVOTAL_CA_PATH');
     }
 
     mcmCaReconcileIntervalMs(): number {

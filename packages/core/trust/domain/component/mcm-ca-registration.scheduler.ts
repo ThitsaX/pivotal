@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import axios, {AxiosInstance} from 'axios';
+import * as fs from 'node:fs/promises';
 import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantKeyRole} from '@core/participant/domain/model';
@@ -35,8 +35,6 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
 
     private readonly logger = new Logger(McmCaRegistrationScheduler.name);
 
-    private readonly http: AxiosInstance;
-
     private timer: NodeJS.Timeout | undefined;
     private running = false;
 
@@ -45,16 +43,16 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
         private readonly participantKeys: ParticipantKeyRepository,
         private readonly lock: RollupLock,
         /**
-         * Vault PKI's CA endpoint for the Hub-facing trust domain. Unauthenticated by
-         * design — a CA certificate is public, and Vault serves it so relying parties
-         * can fetch it without a credential.
+         * Where Pivotal's own Hub-facing root certificate is mounted.
+         *
+         * A file rather than a Vault path, because the root only lives in Vault in a
+         * local rehearsal. In a real deployment it is held in a key service with no
+         * export API, and what reaches the cluster is the certificate alone — written
+         * by the ceremony, not fetched from anywhere at runtime.
          */
-        private readonly caUrl: string,
+        private readonly caPath: string,
         private readonly intervalMs: number = McmCaRegistrationScheduler.DEFAULT_INTERVAL_MS,
-        http?: AxiosInstance,
-    ) {
-        this.http = http ?? axios.create({timeout: 10_000});
-    }
+    ) {}
 
     onModuleInit(): void {
         this.timer = setInterval(() => void this.tick(), this.intervalMs);
@@ -111,11 +109,10 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
     }
 
     private async readPivotalCa(): Promise<string> {
-        const response = await this.http.get<string>(this.caUrl, {responseType: 'text'});
-        const pem = String(response.data ?? '');
+        const pem = await fs.readFile(this.caPath, 'utf8');
 
         if (!pem.includes('BEGIN CERTIFICATE')) {
-            throw new Error(`No usable certificate at ${this.caUrl}.`);
+            throw new Error(`No usable certificate at ${this.caPath}.`);
         }
 
         return pem;

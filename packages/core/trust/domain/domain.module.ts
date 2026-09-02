@@ -85,7 +85,7 @@ const Components: Provider[] = [
             lock: RollupLock,
             settings: TrustDomainModule.RequiredSettings,
         ): McmCaRegistrationScheduler => new McmCaRegistrationScheduler(
-            mcm, participantKeys, lock, settings.pivotalCaUrl(), settings.mcmCaReconcileIntervalMs(),
+            mcm, participantKeys, lock, settings.pivotalCaPath(), settings.mcmCaReconcileIntervalMs(),
         ),
         inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS],
     },
@@ -189,10 +189,10 @@ export namespace TrustDomainModule {
         hubCaSyncIntervalMs(): number;
 
         /**
-         * Vault PKI's CA endpoint for the Hub-facing trust domain. Unauthenticated:
-         * a CA certificate is public, and Vault serves it without a credential.
+         * Where Pivotal's own Hub-facing root certificate is mounted. Written by the
+         * ceremony; the private half never reaches the cluster in any form.
          */
-        pivotalCaUrl(): string;
+        pivotalCaPath(): string;
 
         mcmCaReconcileIntervalMs(): number;
 

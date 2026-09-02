@@ -340,8 +340,8 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | Key custody — `pkcs11` provider | 🔴 | HSM-backed profile only; deferred |
 | Regenerate `participant.jws_private_key` | 🟡 | `wallet1` regenerated and Vault-only. `wallet2`/`cofinagn` still hold plaintext PEM in the column — **legacy rows, unsupported per S9**, to be cleared by a migration script rather than carried forward. The column is retained deliberately |
 | **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
-| `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
-| `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
+| `pki_dfsp` CA (leg #1) | 🟢 | **Rooted in AWS KMS 2026-09-02.** Root signs the Vault intermediate via `kms:Sign`; role `dfsp-client`; root CRL signed and verified. Rehearsal keys — production roots still to create |
+| `pki_hub_client` CA (legs #2, #3) | 🟢 | **Rooted in AWS KMS 2026-09-02.** Same shape via `kms:Sign`; leaf chains to it and MCM holds it for every tenant. Rehearsal keys — production roots still to create |
 | MCM registration of the Pivotal CA | 🟢 | **Automated 2026-09-02** — trust-manager reconciles the CA across all `self` tenants each tick, reading MCM back rather than keeping a mirror. Found real drift on first run |
 | MCM inbound enrollment (leg #4 server cert) | 🟢 | **Done 2026-09-02** — trust-manager enrols and renews it; verified chaining to the Hub CA with a matching private key |
 | **Hub CA trust-bundle delivery** | 🟢 | **Resolved 2026-09-02.** Authoritative in Secret `hub-ca-bundle`; `hub_trust` demoted to a mirror. Mounted and read by web-outbound, web-inbound and the connector |
@@ -364,6 +364,11 @@ PATCH-error audit messages after a rename had broken the Pivotal consumer.
 
 ## Build order
 
+**This diagram is the authority on sequence, and it renumbers**
+[`implementation-plan.md`](./implementation-plan.md) §5, so the two do not line up. That
+document's *phase 4* (MCM registry sync) is **5c** here, and its *phase 5* (Hub-facing mTLS)
+is **step 6**. Read the phases there for what each contains; read this for when.
+
 **Reordered 2026-08-25 by delivery date.** The KMS-backed deployment ships first; the HSM-backed one
 has roughly a month more. `pkcs11` serves only the HSM-backed profile, so it leaves the critical path
 entirely — building it now would spend the schedule on the deployment that is not waiting.
@@ -379,8 +384,8 @@ entirely — building it now would spend the schedule on the deployment that is 
   DONE  ┌────────────────────▼────────────────────┐
     3   │ key custody — vault-kv, both languages  │  proven end to end
         └────────────────────┬────────────────────┘
-  PART  ┌────────────────────▼────────────────────┐
-   4a   │ cluster: Vault Kubernetes auth      DONE│  proven both languages,
+  DONE  ┌────────────────────▼────────────────────┐
+   4a   │ cluster: Vault Kubernetes auth      DONE │  proven both languages,
         │                                         │  per-tenant isolation verified
         └────────────────────┬────────────────────┘
   DONE  ┌────────────────────▼────────────────────┐
@@ -390,10 +395,16 @@ entirely — building it now would spend the schedule on the deployment that is 
   DONE  ┌────────────────────▼────────────────────┐
    5a   │ CA ceremony rehearsal — SoftHSM2    DONE │  no cloud needed
         └────────────────────┬────────────────────┘
-        ┌────────────────────▼────────────────────┐
-   5b   │ CA ceremony for real — KMS/HSM roots    │  needs cloud access
+  DONE  ┌────────────────────▼────────────────────┐
+   5c   │ MCM registry sync                  DONE │  mcm-client plus four
+        │ peers · hub CA · CA reg · own keys ·    │  trust-manager jobs,
+        │ server-cert enrollment                  │  all proven in-cluster
         └────────────────────┬────────────────────┘
-        ┌────────────────────▼────────────────────┐
+  DONE  ┌────────────────────▼────────────────────┐
+   5b   │ CA ceremony — KMS roots            DONE │  rehearsal keys; prod
+        │                                         │  roots still to create
+        └────────────────────┬────────────────────┘
+  NEXT  ┌────────────────────▼────────────────────┐
     6   │ mTLS across #2, #3, #4                  │  no external blocker
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
@@ -577,6 +588,70 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### CA ceremony against real AWS KMS keys — 5b · 2026-09-02
+
+Both trust domains are now rooted in AWS KMS. The rehearsal keys sit in a trial
+account and are named `-rehearsal`; production roots must be created on the
+production account, with a witness, and are unrepeatable.
+
+| File | Change |
+| --- | --- |
+| `pivotal/scripts/ceremony-kms.js` | **new** — the ceremony, `kms:Sign` in place of PKCS#11 |
+| `.../component/mcm-ca-registration.scheduler.ts` | reads the CA from a mounted file, not from Vault |
+| `packages/apps/trust-manager/*` | `PIVOTAL_CA_PATH` replaces `PIVOTAL_CA_URL` |
+
+**Only one step differs from the SoftHSM rehearsal.** KMS is not a certificate
+authority: it signs a digest and nothing else. The script builds the X.509 itself, so
+steps 1, 2, 3 and 5 are byte-identical across backends and only the signing call
+changes — `kms:Sign` here, `C_Sign` there. That is what made the local rehearsal
+faithful, and it is why Vault needs no KMS integration of any kind.
+
+**Verified end to end:**
+
+| Check | |
+| --- | --- |
+| root self-signed by KMS | both domains, `openssl verify` OK |
+| intermediate signed by the root | chains OK, installed into Vault |
+| root CRL signed by KMS | both domains, signature verifies against the root |
+| cert-manager leaf → intermediate → KMS root | OK |
+| negative control — leaf vs the *other* domain's root | fails, as it must |
+| MCM | all three tenants hold the KMS-rooted CA |
+
+**Drift and convergence worked without intervention.** Replacing the roots invalidated
+the issued leaf and the registration MCM held. cert-manager reissued; the CA reconcile
+job noticed and re-registered on its next tick — `3 registered, 0 failed`. That is the
+behaviour the converge-toward-intent design exists to produce, and it is worth having
+seen before a real ceremony.
+
+#### A gap this exposed, and it was silent
+
+`pivotalCaUrl()` read Pivotal's own root from **Vault**. That is only true in a SoftHSM
+rehearsal: under KMS or CloudHSM the root is in a key service with no export API and is
+**not in Vault at all**. The reconcile job would therefore have registered a stale
+certificate with MCM and reported success. Nothing would have failed until a peer
+rejected a handshake, months later and far from the cause.
+
+Now `pivotalCaPath()`, reading a file the ceremony publishes into a `pivotal-ca-bundle`
+Secret. This works under every backend, and only the certificate ever reaches the
+cluster — never the key. Only the **hub-client** root is published; the DFSP-facing root
+is downloaded by DFSPs alongside their signed certificate and is not needed in-cluster.
+
+#### The CRL is hand-assembled
+
+`node-forge` has no CRL support, so `buildRootCrl` builds the `TBSCertList` directly,
+lifting the issuer and algorithm identifier out of the root's own DER rather than
+reconstructing them. Both CRLs verify. It is in the ceremony because revoking an
+intermediate needs a root-signed CRL, and that is far easier to write while the tooling
+is open than to work out during an incident.
+
+#### What a rehearsal still cannot prove
+
+The rehearsal exercised `kms:Sign`, IAM scoping — `kms:ListKeys` is correctly denied —
+and the full chain. It has not exercised a **CloudTrail alarm on `kms:Sign` at a zero
+threshold**, which the runbook says to create and test *before* the real ceremony.
+Legitimate use is roughly three signatures for the life of a deployment, so any
+occurrence is worth an alert.
 
 ### Hub server certificate enrollment — the last MCM call · 2026-09-02
 
