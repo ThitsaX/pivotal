@@ -7,9 +7,10 @@ answered, fill it in, move a one-line summary into the Settled table in [`README
 and update whichever document the decision touches. Letters are stable identifiers — other documents
 reference them inline, so **do not renumber**.
 
-Decisions **A**, **M** and **D** are resolved and now live in the README as settled decisions — A in
-favour of the design (12), M by project requirement (10), D against its own earlier recommendation
-(19). D's entry is retained below in full, because the reasoning that reversed it is worth keeping.
+Decisions **A**, **M**, **D**, **K** and **F** are resolved and now live in the README as settled
+decisions — A in favour of the design (12), M by project requirement (10), D against its own earlier
+recommendation (19), and K with F together (23). D's entry is retained below in full, because the
+reasoning that reversed it is worth keeping.
 
 ---
 
@@ -17,14 +18,15 @@ favour of the design (12), M by project requirement (10), D against its own earl
 
 | Tier | | Items | Nature |
 | --- | --- | --- | --- |
-| **1** | Blocking — documents cannot be completed | **K** | structural |
-| **2** | Security behaviour — must be specified before build | **G, E, B, C, F** | policy |
+| **1** | ~~Blocking~~ — resolved 2026-09-02 | ~~**K**~~ | structural |
+| **2** | Security behaviour — must be specified before build | **G, E, B, C** (~~F~~ resolved) | policy |
 | **3** | Fact checks | **N, H, I** | lookup |
 | **4** | Confirm with the client | **L, O** | confirmation |
 | — | Deferred, with reason | **J** | optional capability |
 
 **No open item can invalidate an architectural choice.** A was the only one that could, and it
-resolved in favour of the design. The design is structurally committed.
+resolved in favour of the design. With K settled, nothing blocks a document from being completed
+either — what remains is security behaviour and fact-checking.
 
 ---
 
@@ -41,12 +43,17 @@ That is defensible with DFSP-scoped IAM and step-up authentication, and reckless
 **Recommendation.** Operator-mediated for this phase, self-service once DFSP-scoped IAM exists.
 Settle together with **F** — they are the same authorization question.
 
-**Blocks.** Whether the portal and DFSP-scoped IAM are in this phase. Also leaking into
-[`dfsp-integration-impact.md`](../external/dfsp-integration-impact.md), which currently hedges *"through the
-portal, or to the hub operator where enrollment is operator-mediated"* — that hedge must resolve
-before the document goes to external parties.
+**Blocks — now unblocked.** The portal scope for this phase, and the hedge in
+[`dfsp-integration-impact.md`](../external/dfsp-integration-impact.md).
 
-**Resolution.** *(pending)*
+**Resolution — operator-mediated, 2026-09-02.** A DFSP sends its CSR to the hub operator, who
+uploads it and returns the signed certificate and chain. Self-service is a later phase, once
+DFSP-scoped IAM exists to carry it.
+
+The deciding argument is the one this entry opened with: self-service makes a portal login the root
+of trust for cryptographic identity, and DFSP-scoped IAM does not exist yet. Deferring costs an
+operator step per DFSP — enrollment happens once per DFSP and again at renewal, so the volume is
+low — and it removes the larger half of the phase.
 
 ---
 
@@ -185,9 +192,12 @@ register its own replacement key?
 
 **Recommendation.** Operator-mediated until DFSP-scoped IAM exists. Decide with **K**.
 
-**Blocks.** The RBAC permission set and the portal scope.
+**Blocks — now unblocked.** The RBAC permission set and the portal scope.
 
-**Resolution.** *(pending)*
+**Resolution — operator-mediated, 2026-09-02.** Settled with **K**, as this entry always required:
+they are the same authorization question. `participant.access-key.update` stays `HUB`-scoped. A DFSP
+supplies its new public key to the hub operator, who registers it; rotation remains zero-downtime
+for the DFSP either way, since the overlap is what makes that true, not who performs the upload.
 
 ---
 

@@ -127,6 +127,7 @@ These hold everywhere in this design. Anything contradicting them is a bug in th
 | 20 | **Vault Transit is not used, in either profile** | It is software custody *plus* an HTTP round trip per signature — slower than in-process signing and no more compliant than it. It would also make Vault a hard runtime dependency at `TPS × 6`, where today Vault is read once at startup and cached. `vault-kv` dominates it on performance, availability and simplicity alike — `architecture.md` §0, §4.6 |
 | 21 | **Existing `participant.jws_private_key` values are regenerated, not migrated** | RS256 makes migration *technically* possible for the first time — the existing keys are already RSA, so unlike the ES256 plan they could be moved rather than replaced. They are still regenerated, because **they have been sitting in plaintext in MySQL** and must be treated as compromised. Regeneration is free before phase 4's first MCM publish and a coordinated break after it, so this must complete in phase 1 — `hub-facing-leg.md` §A3.1 |
 | 22 | **The KMS-backed profile roots its CAs in a non-exportable AWS KMS key, not an air-gapped machine** | **Replaces an earlier offline-root decision.** The operational objection to an air-gapped machine is decisive: the root would be generated on someone's laptop and carried to production. A KMS key is created inside the service and has no export API, so no key material ever touches a human's machine — and it adds IAM scoping and a per-signature CloudTrail record, neither of which an offline machine has. What it gives up is **dedication**: KMS is multi-tenant, so this variant cannot be used where R1/R2 apply. Requires a separate key per trust domain, a third key for the Vault seal, and a zero-threshold `kms:Sign` alarm — `implementation-plan.md` §1.3 |
+| 23 | **Certificate enrollment and accessKey replacement are operator-mediated, not self-service** | Self-service would make a portal login the root of trust for cryptographic identity, and DFSP-scoped IAM does not exist to carry that. A DFSP sends its CSR and any new accessKey to the hub operator, who uploads them and returns the signed certificate and chain. The cost is one operator step per DFSP at enrollment and renewal — low volume — and it removes the larger half of the DFSP-facing phase. Self-service becomes a separable later phase once DFSP-scoped IAM exists. Resolves open decisions **K** and **F** together, which were always the same authorization question |
 
 **Consequence of 12:** Hub-facing mTLS is **additive**. The Hub performs no client-certificate
 verification today, so enabling it is a coordinated, out-of-band change by the Hub operator with a
@@ -139,12 +140,10 @@ lead time — see §B3.
 | B | **What does a connector do on `revoke` for its tenant?** | Refuse and let JetStream redeliver, fail loudly, or drain then stop |
 | C | **NATS authorization** — scope and approach | The request subjects are an injection path today, under every signing option |
 | E | **accessKey emergency revocation** | Certificates have a no-overlap emergency path; the accessKey does not |
-| F | **Who may replace an accessKey** | `participant.access-key.update` is `HUB`-scoped today; self-service makes a portal login the root of trust |
 | G | **Replay protection** | No nonce or timestamp is bound into the accessKey signature. `homeTransactionId` uniqueness is the zero-client-change alternative |
 | H | **Which CA chain the DFSP downloads** | Pivotal's gateways currently use a publicly-trusted issuer, so possibly nothing needs installing |
 | I | **Confirm the XFCC field** carries a usable fingerprint | Envoy exposes `Hash`, not a serial |
 | J | **Remote-signing tenants fall back to delegated signing?** | Keeps external cloud credentials in one service rather than in every connector |
-| K | **Self-service vs operator-mediated enrollment** | Determines whether portal and DFSP-scoped IAM are in this phase |
 | L | **Confirm that HSM custody of the CA *roots* is sufficient** | Pivotal's position, not yet confirmed with the client. If the **intermediate** must also be in the HSM, the fallback is step-ca via PKCS#11 or Vault Enterprise Managed Keys. Everything else is unaffected |
 
 | O | **CloudHSM crypto-user provisioning and rotation** | CU credentials are static, not IAM-scoped. One CU per connector is what keeps per-tenant isolation true |
@@ -154,11 +153,11 @@ Full context, options and a recommendation for each are in
 
 | Tier | Items | Nature |
 | --- | --- | --- |
-| **1** — blocking, documents cannot be completed | **K** enrollment model | structural |
-| **2** — security behaviour, specify before build | **G** replay · **E** accessKey revocation · **B** connector on revoke · **C** NATS authz · **F** accessKey authority | policy |
+| **2** — security behaviour, specify before build | **G** replay · **E** accessKey revocation · **B** connector on revoke · **C** NATS authz | policy |
 | **3** — fact checks | **H** DFSP CA chain · **I** gateway fingerprint field | lookup |
 | **confirm with the client** | **L** intermediate-in-HSM scope · **O** crypto-user model | confirmation |
 | deferred | **J** remote-signing fallback | optional |
 
 **No open item can now invalidate an architectural choice.** A — the only one that could — resolved
-in favour of the design (decision 12). The design is structurally committed.
+in favour of the design (decision 12). With K settled (decision 23) nothing blocks a document from
+being completed either. The design is structurally committed.

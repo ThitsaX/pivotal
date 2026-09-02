@@ -589,6 +589,40 @@ this file listed it in error. These remain open for the later steps:
 
 ## Change log
 
+### Enrollment model settled — operator-mediated · 2026-09-02
+
+Owner decision. The last blocking item in the register is closed, and with it the last
+thing preventing the DFSP-facing document from going to a DFSP.
+
+**A DFSP sends its CSR and any new accessKey to the hub operator**, who uploads them
+and returns the signed certificate and chain. Self-service through the portal is a
+later, separable phase.
+
+The argument is the one the decision opened with: self-service makes a portal login the
+root of trust for cryptographic identity, and DFSP-scoped IAM does not exist to carry
+that. The cost of deferring is one operator step per DFSP at enrollment and at renewal
+— low volume — and it removes the larger half of the DFSP-facing phase.
+
+Resolves **K** and **F** together, which were always the same authorization question.
+`participant.access-key.update` stays `HUB`-scoped.
+
+**What this sizes.** The DFSP-facing phase now needs hub-operator screens only — CSR
+upload, certificate and chain download, certificate status, accessKey registration,
+contact management — on top of the IAM that already exists. No DFSP-scoped IAM, no
+step-up authentication.
+
+**Two corrections to the external document, which can now go out:**
+
+- The hedge is gone. It said *"through the portal, or to the hub operator where
+  enrollment is operator-mediated"*, which told a DFSP nothing about what to actually do.
+- It claimed the FSPIOP signing key lives in a hardware security module. That describes
+  a profile this deployment is not running — the key is in a secrets manager, read into
+  process memory at startup. Sending that sentence to a DFSP would have overstated the
+  assurance level. It now names both possibilities and says to confirm which applies.
+
+**One consequence worth telling DFSPs plainly:** renewal now involves a human exchange,
+so the expiry alert is the trigger to *start*, not the deadline. Added to the document.
+
 ### CA ceremony against real AWS KMS keys — 5b · 2026-09-02
 
 Both trust domains are now rooted in AWS KMS. The rehearsal keys sit in a trial
