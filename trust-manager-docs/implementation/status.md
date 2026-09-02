@@ -578,6 +578,63 @@ this file listed it in error. These remain open for the later steps:
 
 ## Change log
 
+### Hub CA sync — the delivery loop closed · 2026-09-02
+
+trust-manager's second scheduled job. The `hub-ca-bundle` Secret was already mounted
+and read by all three consumers, but written by a script with a placeholder. This
+replaces the placeholder with the real certificate from MCM.
+
+| File | Change |
+| --- | --- |
+| `packages/core/trust/domain/component/hub-ca-sync.scheduler.ts` | **new** — pulls `GET /hub/ca`, writes the Secret when it changes |
+| `packages/core/trust/domain/component/kubernetes-secret-writer.ts` | **new** — one Secret, via the pod's ServiceAccount, no client library |
+| `helm/templates/trust-manager-rbac.yaml` | **new** — ServiceAccount, Role, RoleBinding |
+| `docker/trust-manager.Dockerfile` | **new** |
+
+**Proven in-cluster.** trust-manager ran as a pod, authenticated to MCM, and rewrote
+the Secret: `CN=Hub CA (stand-in)` → `CN=Hub Root CA, O=Hub Organization`. All three
+consumers now read the real certificate from `/etc/pivotal/hub-ca/hub-ca.pem`, the
+connector included. Peer sync ran in the same process: 8 added, 2 own tenants skipped.
+
+**Writes only on change.** One write across ~7 minutes of 60-second ticks. Rewriting
+an unchanged Secret bumps its resource version and makes everything watching it
+reload for nothing.
+
+**The RBAC is deliberately narrow** — `get` and `patch` on the one named Secret, plus
+`create`, which Kubernetes cannot restrict by name because the authorizer does not
+know the name until the object exists. Verified: `delete` denied, other Secrets
+denied, `list` denied. Whoever can write this bundle can insert their own CA and be
+trusted as the Hub, so the grant is scoped to the single object.
+
+#### Three problems found by running it
+
+- **The client was logging bearer tokens.** The shared axios builder attaches an HTTP
+  logger that writes response bodies, and the token endpoint's response body is an
+  access token — so every refresh wrote a usable credential to the log. The token
+  provider now builds a bare client. Verified: zero `access_token` strings in the log.
+- **A valid token MCM will not accept.** Fetching it from `http://keycloak:8080`
+  produced an issuer of `keycloak:8080`, while MCM had discovered
+  `keycloak.mcm.localhost`. Same key, same claims, right audience and groups — and a
+  bare `401 Authentication required`. Tokens must be fetched by the name MCM
+  discovered. The client's 401 message now names issuer mismatch alongside the claim
+  causes; it previously sent the reader after claims only, which is the wrong trail.
+- **The app's `outDir` did not follow the convention.** Apps build to `dist/packages`;
+  a per-app path put `main.js` where the container's `CMD` did not look.
+
+#### What this exposes
+
+The Secret file **does** update in place — the kubelet syncs it, which is why the
+mount is a directory rather than a `subPath`. But the consuming code reads its PEM
+once at startup, so the new bundle sits on disk unused until the pod restarts. The
+scheduler logs a warning saying exactly that whenever it rewrites the Secret. Fixing
+it properly is the reloadable-credentials work, currently deferred.
+
+#### DNS collision fixed in passing
+
+`refresh-compose-dns.sh` now deduplicates hostnames, first network wins. MCM's stack
+also aliases a container `vault`, and without this the last network scanned silently
+won — pointing `vault` at MCM's rather than the Pivotal one.
+
 ### `apps/trust-manager` exists — peer JWS sync · 2026-09-02
 
 The service the design has assumed all along now exists, with the first of its

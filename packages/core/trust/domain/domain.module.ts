@@ -5,9 +5,10 @@ import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
-import {PeerJwsSyncScheduler} from './component';
+import {HubCaSyncScheduler, KubernetesSecretWriter, PeerJwsSyncScheduler} from './component';
 
 const REQUIRED_SETTINGS = Symbol('TrustDomainRequiredSettings');
+const HUB_CA_LOCK = Symbol('TrustDomainHubCaLock');
 
 const Components: Provider[] = [
     {
@@ -36,6 +37,30 @@ const Components: Provider[] = [
         ),
         inject: [McmAxios, ParticipantKeyRepository, RollupLock, REQUIRED_SETTINGS],
     },
+    {
+        provide: KubernetesSecretWriter,
+        useFactory: (): KubernetesSecretWriter => new KubernetesSecretWriter(),
+    },
+    {
+        // A second lock, keyed separately: the two jobs run on very different
+        // cadences, and one holding the other's key would stall it for an hour.
+        provide: HUB_CA_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:hub-ca-sync'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        provide: HubCaSyncScheduler,
+        useFactory: (
+            mcm: McmAxios,
+            secrets: KubernetesSecretWriter,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): HubCaSyncScheduler => new HubCaSyncScheduler(
+            mcm, secrets, lock, settings.hubCaSecretName(), settings.hubCaSyncIntervalMs(),
+        ),
+        inject: [McmAxios, KubernetesSecretWriter, HUB_CA_LOCK, REQUIRED_SETTINGS],
+    },
 ];
 
 @Module({})
@@ -60,7 +85,7 @@ export class TrustDomainModule {
                 },
                 ...Components,
             ],
-            exports: [McmAxios, PeerJwsSyncScheduler],
+            exports: [McmAxios, PeerJwsSyncScheduler, HubCaSyncScheduler],
         };
     }
 }
@@ -79,6 +104,12 @@ export namespace TrustDomainModule {
 
         /** Freshness knob only — the sync is idempotent, so a missed tick costs nothing. */
         peerJwsSyncIntervalMs(): number;
+
+        /** The Secret that holds the Hub CA trust bundle. */
+        hubCaSecretName(): string;
+
+        /** The Hub CA rotates rarely, so this poll is a slow backstop. */
+        hubCaSyncIntervalMs(): number;
     }
 
     export interface AsyncOptions {

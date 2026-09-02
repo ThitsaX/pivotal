@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {AxiosInstance} from 'axios';
+import axios, {AxiosInstance} from 'axios';
 import {Logger} from '@nestjs/common';
 import {McmException} from '../exception';
 import {McmSettings} from './mcm-settings';
@@ -29,10 +29,19 @@ export class McmTokenProvider {
     private token: string | null = null;
     private expiresAt = 0;
 
+    private readonly client: AxiosInstance;
+
     constructor(
         private readonly settings: McmSettings,
-        private readonly client: AxiosInstance,
-    ) {}
+        client?: AxiosInstance,
+    ) {
+        // A bare axios instance, deliberately: the shared builder attaches an HTTP
+        // logger that writes response bodies, and this endpoint's response body is a
+        // bearer token. Nothing on this path should reach the log.
+        this.client = client ?? axios.create({
+            timeout: settings.connectionTimeoutMs,
+        });
+    }
 
     async accessToken(): Promise<string> {
         if (this.token != null && Date.now() < this.expiresAt) {

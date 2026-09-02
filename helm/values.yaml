@@ -220,6 +220,24 @@ webPivotal:
     REPORT_S3_PREFIX: reports/
     REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
 
+trustManager:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: pivotal-trust-manager
+    tag: local
+  # Own identity: it writes the Hub CA Secret, so it needs a name RBAC can bind to.
+  serviceAccount:
+    create: true
+    name: trust-manager
+  env:
+    PEER_JWS_SYNC_INTERVAL_SECONDS: "300"
+    HUB_CA_SYNC_INTERVAL_SECONDS: "3600"
+    MCM_BASE_URL: ""
+    MCM_TOKEN_URL: ""
+    MCM_CLIENT_ID: ""
+    MCM_CLIENT_SECRET: ""
+
 portal:
   enabled: true
   # Own Kubernetes identity. Vault binds its auth role to this name, so a shared

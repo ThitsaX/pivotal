@@ -12,10 +12,14 @@
 # cluster restart. Idempotent: it replaces its own previous entries.
 set -euo pipefail
 
-NETS=(pivotal-stack_default mojaloop-demowallet_default)
+NETS=(pivotal-stack_default mojaloop-demowallet_default connection-manager-api_default)
 MARK="# --- managed:compose-dns ---"
 
+# Names are deduplicated, first occurrence wins, so the order of NETS is the
+# priority order. That matters: more than one stack aliases a container `vault`,
+# and without this the last one scanned would silently win.
 new=""
+seen=" "
 for net in "${NETS[@]}"; do
   while read -r cname; do
     [ -z "$cname" ] && continue
@@ -23,7 +27,14 @@ for net in "${NETS[@]}"; do
     ip=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$net\").IPAddress}}" "$cname" 2>/dev/null || true)
     [ -z "$ip" ] && continue
     aliases=$(docker inspect -f "{{range (index .NetworkSettings.Networks \"$net\").Aliases}}{{.}} {{end}}" "$cname" 2>/dev/null || true)
-    new+="${ip} ${cname} ${aliases}"$'\n'
+    names=""
+    for n in $cname $aliases; do
+      case "$seen" in *" $n "*) continue ;; esac
+      seen="$seen$n "
+      names="$names $n"
+    done
+    [ -z "$names" ] && continue
+    new+="${ip}${names}"$'\n'
   done < <(docker network inspect "$net" -f '{{range .Containers}}{{.Name}}{{println}}{{end}}' 2>/dev/null || true)
 done
 

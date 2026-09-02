@@ -1,0 +1,54 @@
+{{/*
+trust-manager writes the Hub CA trust bundle as a Secret, so it needs its own
+Kubernetes identity and permission to do exactly that and nothing else.
+
+Deliberately narrow: one named Secret, one namespace, three verbs. Whoever can write
+this bundle can insert their own CA and be trusted as the Hub, so the grant is scoped
+to the single object rather than to Secrets in general.
+*/}}
+{{- if .Values.trustManager.enabled }}
+{{- $serviceAccount := .Values.trustManager.serviceAccount | default dict }}
+{{- $name := $serviceAccount.name | default "trust-manager" }}
+{{- if $serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-hub-ca
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.global.hubCaSecretName | quote }}]
+    verbs: ["get", "patch"]
+  # `create` cannot be restricted by resourceName: the name is not known to the
+  # authorizer until the object exists. Scoped to this namespace only.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-hub-ca
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-hub-ca
+{{- end }}

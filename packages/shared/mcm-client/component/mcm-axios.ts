@@ -43,7 +43,9 @@ export class McmAxios {
             })
             .withHttpLogger(true)
             .build();
-        this.tokens = tokens ?? new McmTokenProvider(settings, this.client);
+        // The token provider builds its own client rather than sharing this one: the
+        // shared builder logs response bodies, and its responses are bearer tokens.
+        this.tokens = tokens ?? new McmTokenProvider(settings);
     }
 
     // ── tenants ──────────────────────────────────────────────────────────────
@@ -204,8 +206,11 @@ export class McmAxios {
             // second case throws server-side rather than reporting an authz failure.
             return new McmException(
                 'MCM_UNAUTHORIZED',
-                `${method} ${path} was rejected. Check the token carries an audience of `
-                + "'connection-manager-api' and a 'groups' claim; MCM's stock service client has neither.",
+                `${method} ${path} was rejected. Three things make MCM answer this way: the token `
+                + "is missing an audience of 'connection-manager-api'; it is missing a 'groups' "
+                + 'claim; or its issuer does not match the one MCM discovered. The last is easy to '
+                + 'miss — a token is issued for the host it was requested from, so fetching it by a '
+                + 'different name than MCM expects produces a valid token MCM will not accept.',
             );
         }
 

@@ -10,6 +10,8 @@ import {KeyProvider, VaultSettings} from '@shared/vault';
 export class TrustManagerSettings implements TrustDomainModule.RequiredSettings {
 
     private static readonly DEFAULT_PEER_JWS_SYNC_INTERVAL_SECONDS = 300;
+    private static readonly DEFAULT_HUB_CA_SYNC_INTERVAL_SECONDS = 3600;
+    private static readonly DEFAULT_HUB_CA_SECRET_NAME = 'hub-ca-bundle';
 
     constructor(private readonly configService: ConfigService) {}
 
@@ -36,6 +38,27 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
 
         if (!Number.isInteger(seconds) || seconds <= 0) {
             throw new Error('Invalid PEER_JWS_SYNC_INTERVAL_SECONDS: expected a positive integer.');
+        }
+
+        return seconds * 1000;
+    }
+
+    hubCaSecretName(): string {
+        const configured = this.configService.get<string>('HUB_CA_SECRET_NAME');
+
+        return configured == null || configured.trim().length === 0
+            ? TrustManagerSettings.DEFAULT_HUB_CA_SECRET_NAME
+            : configured;
+    }
+
+    hubCaSyncIntervalMs(): number {
+        const configured = this.configService.get<string>('HUB_CA_SYNC_INTERVAL_SECONDS');
+        const seconds = configured == null || configured.trim().length === 0
+            ? TrustManagerSettings.DEFAULT_HUB_CA_SYNC_INTERVAL_SECONDS
+            : Number(configured);
+
+        if (!Number.isInteger(seconds) || seconds <= 0) {
+            throw new Error('Invalid HUB_CA_SYNC_INTERVAL_SECONDS: expected a positive integer.');
         }
 
         return seconds * 1000;
