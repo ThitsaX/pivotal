@@ -1,0 +1,21 @@
+# Build output must never be copied into an image. `COPY . .` would otherwise carry
+# the host's dist/ and its .tsbuildinfo, and TypeScript would then skip re-emitting
+# files it believes are already current — producing an image with .d.ts but no .js
+# for anything the host had built and later removed. The failure surfaces at runtime
+# as "Cannot find module", far from its cause.
+dist
+node_modules
+*.tsbuildinfo
+
+.git
+.github
+.idea
+.run
+coverage
+.nyc_output
+*.log
+
+# Never bake developer configuration or secrets into an image.
+.env
+**/.env
+**/.env.bak-*

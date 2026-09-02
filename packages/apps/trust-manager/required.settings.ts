@@ -14,6 +14,8 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
     private static readonly DEFAULT_HUB_CA_SECRET_NAME = 'hub-ca-bundle';
     private static readonly DEFAULT_MCM_CA_RECONCILE_INTERVAL_SECONDS = 3600;
     private static readonly DEFAULT_JWS_KEY_PUBLISH_INTERVAL_SECONDS = 3600;
+    private static readonly DEFAULT_HUB_SERVER_CERT_SECRET_NAME = 'hub-server-cert';
+    private static readonly DEFAULT_HUB_SERVER_CERT_CHECK_INTERVAL_SECONDS = 86400;
 
     constructor(private readonly configService: ConfigService) {}
 
@@ -91,6 +93,35 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
 
         if (!Number.isInteger(seconds) || seconds <= 0) {
             throw new Error('Invalid JWS_KEY_PUBLISH_INTERVAL_SECONDS: expected a positive integer.');
+        }
+
+        return seconds * 1000;
+    }
+
+    pivotalDfspId(): string {
+        return this.readRequiredString('PIVOTAL_DFSP_ID');
+    }
+
+    hubServerCertCommonName(): string {
+        return this.readRequiredString('HUB_SERVER_CERT_COMMON_NAME');
+    }
+
+    hubServerCertSecretName(): string {
+        const configured = this.configService.get<string>('HUB_SERVER_CERT_SECRET_NAME');
+
+        return configured == null || configured.trim().length === 0
+            ? TrustManagerSettings.DEFAULT_HUB_SERVER_CERT_SECRET_NAME
+            : configured;
+    }
+
+    hubServerCertCheckIntervalMs(): number {
+        const configured = this.configService.get<string>('HUB_SERVER_CERT_CHECK_INTERVAL_SECONDS');
+        const seconds = configured == null || configured.trim().length === 0
+            ? TrustManagerSettings.DEFAULT_HUB_SERVER_CERT_CHECK_INTERVAL_SECONDS
+            : Number(configured);
+
+        if (!Number.isInteger(seconds) || seconds <= 0) {
+            throw new Error('Invalid HUB_SERVER_CERT_CHECK_INTERVAL_SECONDS: expected a positive integer.');
         }
 
         return seconds * 1000;

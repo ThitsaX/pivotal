@@ -29,7 +29,9 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: [{{ .Values.global.hubCaSecretName | quote }}]
+    resourceNames:
+      - {{ .Values.global.hubCaSecretName | quote }}
+      - {{ .Values.global.hubServerCertSecretName | quote }}
     verbs: ["get", "patch"]
   # `create` cannot be restricted by resourceName: the name is not known to the
   # authorizer until the object exists. Scoped to this namespace only.

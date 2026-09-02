@@ -74,13 +74,29 @@ export class KubernetesSecretWriter {
         return true;
     }
 
+    /** One value out of a Secret, or null when the Secret or the key is absent. */
+    async read(name: string, key: string): Promise<string | null> {
+        const client = await this.connect();
+        const namespace = await this.readNamespace();
+
+        const response = await client.get(`/api/v1/namespaces/${namespace}/secrets/${name}`);
+
+        if (response.status === 404) {
+            return null;
+        }
+
+        const encoded = (response.data?.data ?? {})[key] as string | undefined;
+
+        return encoded == null ? null : Buffer.from(encoded, 'base64').toString('utf8');
+    }
+
     private async connect(): Promise<AxiosInstance> {
         if (this.client != null) {
             return this.client;
         }
 
-        const token = await this.read('token');
-        const certificateAuthority = await this.read('ca.crt');
+        const token = await this.readServiceAccountFile('token');
+        const certificateAuthority = await this.readServiceAccountFile('ca.crt');
 
         this.client = axios.create({
             baseURL: this.apiServer,
@@ -95,11 +111,11 @@ export class KubernetesSecretWriter {
     }
 
     private async readNamespace(): Promise<string> {
-        this.namespace ??= (await this.read('namespace')).trim();
+        this.namespace ??= (await this.readServiceAccountFile('namespace')).trim();
         return this.namespace;
     }
 
-    private async read(file: string): Promise<string> {
+    private async readServiceAccountFile(file: string): Promise<string> {
         return fs.readFile(`${this.serviceAccountDir}/${file}`, 'utf8');
     }
 }

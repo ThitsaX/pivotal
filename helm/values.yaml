@@ -9,6 +9,10 @@ global:
   # mTLS is what needs it, and mTLS is not on yet.
   hubCaSecretName: hub-ca-bundle
 
+  # The Hub-signed server certificate, obtained through MCM enrollment. Holds both
+  # tls.crt and tls.key, so it is the one Secret here that is genuinely secret.
+  hubServerCertSecretName: hub-server-cert
+
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
     FSPIOP_QUOTES_URL: http://web-inbound:3201

@@ -8,6 +8,7 @@ import {
     DfspCa,
     DfspCredentials,
     HubCa,
+    InboundEnrollment,
     JwsCert,
     McmDfsp,
     PostDfspCaRequest,
@@ -126,6 +127,36 @@ export class McmAxios {
         this.logger.log(`Published and verified the JWS public key for '${dfspId}'.`);
 
         return published;
+    }
+
+    // ── inbound enrollment ───────────────────────────────────────────────────
+
+    /**
+     * Submits a CSR for a certificate signed by the **Hub's** CA — the server
+     * certificate the Hub validates when it calls Pivotal.
+     *
+     * A different issuance path from every other certificate here, which come from
+     * Pivotal's own CA through Vault. Only the CSR is sent; the private key stays
+     * with whoever generated it.
+     *
+     * MCM requires a **4096-bit** key on this path. A 2048-bit CSR is still signed,
+     * but the enrollment is recorded `INVALID` on a `CSR_PUBLIC_KEY_LENGTH_4096`
+     * check, which throws away MCM's validation signal for no benefit.
+     */
+    async createInboundEnrollment(dfspId: string, csrPem: string): Promise<InboundEnrollment> {
+        return this.post(
+            `/dfsps/${McmAxios.encodePathSegment(dfspId)}/enrollments/inbound`,
+            {clientCSR: csrPem},
+        );
+    }
+
+    /** Asks the Hub CA to sign a submitted CSR. Returns the enrollment with its certificate. */
+    async signInboundEnrollment(dfspId: string, enrollmentId: number | string): Promise<InboundEnrollment> {
+        return this.post(
+            `/dfsps/${McmAxios.encodePathSegment(dfspId)}/enrollments/inbound/`
+            + `${McmAxios.encodePathSegment(String(enrollmentId))}/sign`,
+            {},
+        );
     }
 
     // ── credentials ──────────────────────────────────────────────────────────

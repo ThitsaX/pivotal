@@ -7,6 +7,7 @@ import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
 import {
     HubCaSyncScheduler,
+    HubServerCertEnroller,
     JwsKeyPublishScheduler,
     KubernetesSecretWriter,
     McmCaRegistrationScheduler,
@@ -17,6 +18,7 @@ const REQUIRED_SETTINGS = Symbol('TrustDomainRequiredSettings');
 const HUB_CA_LOCK = Symbol('TrustDomainHubCaLock');
 const CA_REGISTRATION_LOCK = Symbol('TrustDomainCaRegistrationLock');
 const JWS_PUBLISH_LOCK = Symbol('TrustDomainJwsPublishLock');
+const SERVER_CERT_LOCK = Symbol('TrustDomainServerCertLock');
 
 const Components: Provider[] = [
     {
@@ -105,6 +107,30 @@ const Components: Provider[] = [
         ),
         inject: [McmAxios, ParticipantKeyRepository, JWS_PUBLISH_LOCK, REQUIRED_SETTINGS],
     },
+    {
+        provide: SERVER_CERT_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:hub-server-cert'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        provide: HubServerCertEnroller,
+        useFactory: (
+            mcm: McmAxios,
+            secrets: KubernetesSecretWriter,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): HubServerCertEnroller => new HubServerCertEnroller(
+            mcm,
+            secrets,
+            lock,
+            settings.pivotalDfspId(),
+            settings.hubServerCertCommonName(),
+            settings.hubServerCertSecretName(),
+            settings.hubServerCertCheckIntervalMs(),
+        ),
+        inject: [McmAxios, KubernetesSecretWriter, SERVER_CERT_LOCK, REQUIRED_SETTINGS],
+    },
 ];
 
 @Module({})
@@ -135,6 +161,7 @@ export class TrustDomainModule {
             HubCaSyncScheduler,
             McmCaRegistrationScheduler,
             JwsKeyPublishScheduler,
+            HubServerCertEnroller,
         ],
         };
     }
@@ -170,6 +197,15 @@ export namespace TrustDomainModule {
         mcmCaReconcileIntervalMs(): number;
 
         jwsKeyPublishIntervalMs(): number;
+
+        /** The tenant Pivotal enrols as. One server certificate, not one per tenant. */
+        pivotalDfspId(): string;
+
+        hubServerCertCommonName(): string;
+
+        hubServerCertSecretName(): string;
+
+        hubServerCertCheckIntervalMs(): number;
     }
 
     export interface AsyncOptions {

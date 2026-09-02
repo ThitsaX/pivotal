@@ -343,7 +343,7 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
 | `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
 | MCM registration of the Pivotal CA | 🟢 | **Automated 2026-09-02** — trust-manager reconciles the CA across all `self` tenants each tick, reading MCM back rather than keeping a mirror. Found real drift on first run |
-| MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs; **not yet exercised** against the local MCM |
+| MCM inbound enrollment (leg #4 server cert) | 🟢 | **Done 2026-09-02** — trust-manager enrols and renews it; verified chaining to the Hub CA with a matching private key |
 | **Hub CA trust-bundle delivery** | 🟢 | **Resolved 2026-09-02.** Authoritative in Secret `hub-ca-bundle`; `hub_trust` demoted to a mirror. Mounted and read by web-outbound, web-inbound and the connector |
 | Local dev environment | 🟢 | k3d + Vault + cert-manager + **SoftHSM2** all in place, each with a re-runnable script. `runbooks/ceremony-local.md` is now implemented by `scripts/ceremony-local.sh` — the runbook prose is still pre-rename and single-domain, but the script supersedes it |
 | `NatsPullListener` ack-after-PUT | 🔴 | **Re-confirmed 2026-08-27**: `handle()` still acks in `finally` even on failure (`NatsPullListener.java:162`), logging *"failed - acking to avoid requeue"*, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners |
@@ -577,6 +577,64 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### Hub server certificate enrollment — the last MCM call · 2026-09-02
+
+Every MCM call the design needs is now exercised. This one yields the certificate the
+Hub validates when it calls Pivotal, and it is the only certificate here issued by the
+**Hub's** CA rather than Pivotal's — which is why it comes through enrollment rather
+than from Vault.
+
+| File | Change |
+| --- | --- |
+| `packages/core/trust/domain/component/hub-server-cert.enroller.ts` | **new** |
+| `packages/core/trust/domain/component/kubernetes-secret-writer.ts` | `read()`, for the expiry check |
+| `packages/shared/mcm-client` | `createInboundEnrollment`, `signInboundEnrollment`, DTO |
+| `pivotal/.dockerignore` | **new** — see below |
+| `package.json` | `node-forge` |
+
+**Verified in-cluster:**
+
+| | |
+| --- | --- |
+| subject | `CN=web-inbound.pivotal` |
+| issuer | `CN=Hub Root CA, O=Hub Organization` — the Hub's CA, not ours |
+| chain | `openssl verify` against the Hub CA bundle: **OK** |
+| key | 4096-bit, and the stored private key **matches** the certificate |
+| EKU | TLS Web Server Authentication |
+
+**MCM requires 4096-bit keys here**, which nothing in the design mentions. A 2048-bit
+CSR is still signed and the certificate works, but the enrollment is recorded
+`INVALID` on a `CSR_PUBLIC_KEY_LENGTH_4096` check — discarding MCM's validation signal
+for no benefit. This does not conflict with RSA-2048 for message signing: that is a
+signing key used hundreds of times a second, this is a TLS key generated once a year.
+
+**`node-forge` was added.** Node has no CSR support and the runtime image has no
+`openssl`, so a CSR cannot be produced without one of them. A library keeps the
+private key in process and out of any file; it is also what MCM itself uses.
+
+**Renewal is by overlap.** A new certificate is obtained 30 days before expiry and
+both are valid meanwhile, so nothing needs coordinating with the Hub. Certificate and
+key are written to the Secret together — a key written before its certificate leaves a
+window where the Secret holds a mismatched pair.
+
+#### A packaging defect that affects every image in this repo
+
+`.dockerignore` was **empty**, so `COPY . .` carried the host's `dist/` into the build,
+including `.tsbuildinfo`. TypeScript then trusted that cache and skipped re-emitting
+files it believed current — producing an image with `.d.ts` but no `.js` for anything
+the host had built and later removed. It surfaced as `Cannot find module` at runtime,
+nowhere near its cause, and it would hit any developer whose `dist/` differs from the
+build. Now excluded, along with `node_modules` and `.env` files, which were also being
+baked into images.
+
+#### Two smaller lessons
+
+- **`docker build -q` hid a compile failure.** The build had been failing on a
+  duplicate method name for two rounds while the old image kept being deployed. Do not
+  use `-q` when the build is the thing under test.
+- **`nest build` reported success on the same broken source**, because it reused a
+  cached artifact. The Docker build, starting clean, was the honest signal.
 
 ### JWS key publish — phase 4's registry sync complete · 2026-09-02
 

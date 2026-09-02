@@ -2,6 +2,7 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 export * from './dfsp-credentials';
 export * from './hub-ca';
+export * from './inbound-enrollment';
 export * from './jws-cert';
 export * from './mcm-dfsp';
 export * from './post-dfsp-ca-request';
