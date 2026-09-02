@@ -2,12 +2,11 @@
 # Writes the Hub CA trust bundle — the material Pivotal uses to decide whether it
 # is really talking to the Hub.
 #
-# The Secret is AUTHORITATIVE (pki-issuance-flows.md 3.4, resolved 2026-09-02).
-# It is not a projection of MySQL. `hub_ca` is read by web-outbound, the Gateway
-# and every connector, and connectors have no MySQL access by design — so by
-# architecture.md 5.1's own rule, "one authoritative store, chosen by who reads
-# it", MySQL cannot own this value. `hub_trust` keeps a mirror for expiry
-# alerting only, on the same terms as participant_key_ref.
+# The Secret is AUTHORITATIVE. It is not a projection of MySQL. The Hub CA is read
+# by web-outbound, the Gateway and every connector, and connectors have no MySQL
+# access by design -- so under the rule of one authoritative store chosen by who
+# reads it, MySQL cannot own this value. The hub_trust row keeps a mirror for
+# expiry alerting only.
 #
 # A Secret rather than Vault KV because Envoy decides it: the Gateway needs the
 # bundle as a client-cert trust store and reads Kubernetes Secrets over SDS, not
@@ -60,4 +59,4 @@ echo "  fingerprint: $fp"
 echo "  not_after:   $na"
 echo
 echo "Mirror into hub_trust is NOT written: that table does not exist yet"
-echo "(implementation-plan.md section 2 proposes it; no migration creates it)."
+echo "(it is proposed but no migration creates it yet)."

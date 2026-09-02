@@ -578,6 +578,57 @@ this file listed it in error. These remain open for the later steps:
 
 ## Change log
 
+### `apps/trust-manager` exists — peer JWS sync · 2026-09-02
+
+The service the design has assumed all along now exists, with the first of its
+scheduled operations (`architecture.md` §7).
+
+| File | Change |
+| --- | --- |
+| `packages/apps/trust-manager/` | **new** — app, settings, `.env.example` |
+| `packages/core/trust/domain/` | **new** — `TrustDomainModule`, `PeerJwsSyncScheduler` |
+| `nest-cli.json`, `package.json` | register both; `build:`/`start:apps-trust-manager` |
+
+**Why this job first.** web-inbound cannot verify a peer's signature without that
+peer's public key, and until now nothing fetched them. It is also the job that turns
+`shared/mcm-client` from a library into something used.
+
+**One MCM call per tick, not one per tenant** — `GET /dfsps/jwscerts` is an aggregate
+endpoint outside the `/dfsps/{dfspId}/` path, so one credential and one token cover
+every peer.
+
+**Own tenants are skipped, and this is the load-bearing rule.** Pivotal's own tenants
+come back in that aggregate list, because trust-manager published them. Writing one
+back as a `peer` would strip its `self` role and with it web-outbound's ability to
+find a signing key for that tenant. MCM is downstream of us for a `self` row, never
+upstream. Verified live: with `wallet1` and `wallet2` present in MCM, a sync reported
+`created: 6, skippedSelf: 2`, and both kept `role=self`, `jws_sign_enabled=1` and
+`jws_verify_mode=require`.
+
+**`jws_verify_mode` is never overwritten either.** It is a local rollout decision per
+source; MCM has no opinion about it, and clobbering it would silently undo an
+operator's cutover.
+
+**Verified against the live MCM and database:** first run
+`{total: 8, created: 6, skippedSelf: 2}`; second run
+`{created: 0, updated: 0, unchanged: 6, skippedSelf: 2}` — idempotent. Builds clean;
+`shared-fspiop` 90/90; `tsc` at the 11-error baseline.
+
+#### Two deliberate choices
+
+- **No migrations at startup.** `participant_key` belongs to the participant domain
+  and is migrated by web-pivotal and app-auditor. Two processes racing the same
+  history table on boot is a failure mode worth not having.
+- **No HTTP listener.** trust-manager is a control plane with a scheduler; the data
+  plane never calls it, so a control-plane outage cannot stop a transfer. The
+  operator-initiated REST surface in §7 comes later.
+
+#### Test hygiene fixed in passing
+
+The `mcm-client` integration test originally created tenants with a random suffix per
+run, which left a permanent tenant in MCM every execution and grew the aggregate pull
+without bound. It now uses fixed ids and tolerates re-creation.
+
 ### `shared/mcm-client` written and proven against a live MCM · 2026-09-02
 
 | File | Change |

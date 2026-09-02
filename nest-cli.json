@@ -292,6 +292,24 @@
       "compilerOptions": {
         "tsConfigPath": "packages/shared/mcm-client/tsconfig.app.json"
       }
+    },
+    "core-trust-domain": {
+      "type": "library",
+      "root": "packages/core/trust/domain",
+      "entryFile": "index",
+      "sourceRoot": "packages/core/trust/domain",
+      "compilerOptions": {
+        "tsConfigPath": "packages/core/trust/domain/tsconfig.app.json"
+      }
+    },
+    "apps-trust-manager": {
+      "type": "application",
+      "root": "packages/apps/trust-manager",
+      "entryFile": "main",
+      "sourceRoot": "packages/apps/trust-manager",
+      "compilerOptions": {
+        "tsConfigPath": "packages/apps/trust-manager/tsconfig.app.json"
+      }
     }
   }
 }

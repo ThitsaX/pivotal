@@ -2,8 +2,8 @@
 # Brings up the two NEW CA trust domains in the local k3d Vault, and wires
 # cert-manager to issue from them. Local stand-in for trust-manager step 4b.
 #
-# Trust domains (architecture.md section 4.7) -- these must NOT be merged, or a
-# DFSP's client certificate would be trusted by the Hub:
+# Trust domains -- these must NOT be merged, or a DFSP's client certificate would
+# be trusted by the Hub:
 #
 #   pki_hub_client   Pivotal's Hub-facing client leaves   trusted by the Hub via MCM
 #   pki_dfsp         client certs issued TO DFSPs         trusted by Pivotal only
@@ -13,11 +13,10 @@
 # (HSM-backed) and signs its intermediate exactly once, in a ceremony; the
 # INTERMEDIATE is software in Vault PKI under both profiles. Here the root is
 # generated inside Vault too -- the only local deviation, and the only thing the
-# real ceremony (step 5) changes. Everything below the root is identical.
+# real ceremony changes. Everything below the root is identical.
 #
 # Roles use pki/sign, never pki/issue: issue makes Vault generate the keypair,
-# which contradicts "the private key never leaves the requester"
-# (pki-issuance-flows.md section 5).
+# which contradicts "the private key never leaves the requester".
 #
 # Idempotent. Safe to re-run after a Vault pod restart.
 set -euo pipefail

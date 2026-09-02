@@ -5,7 +5,7 @@ import {ApiProperty} from '@nestjs/swagger';
 /**
  * The **root** certificate, posted unchanged under every tenant Pivotal fronts.
  * MCM applies no uniqueness constraint and no cross-DFSP comparison, which is what
- * makes settled decision 6 — register the CA, not the leaf — workable.
+ * makes registering the CA rather than each leaf workable.
  */
 export class PostDfspCaRequest {
 

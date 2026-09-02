@@ -10,7 +10,7 @@
 // claim; see trust-manager-docs/implementation/mcm-api-notes.md.
 import * as assert from 'node:assert/strict';
 import {before, describe, it} from 'node:test';
-import {generateKeyPairSync, randomUUID} from 'node:crypto';
+import {generateKeyPairSync} from 'node:crypto';
 import axios from 'axios';
 import {McmAxios, McmSettings, McmTokenProvider} from '@shared/mcm-client/component';
 
@@ -67,15 +67,22 @@ describe('McmAxios against a live Connection Manager', () => {
     it('registers one CA under two tenants, and publishes a key per tenant', async (t) => {
         if (!reachable) return t.skip('no MCM running');
 
-        const suffix = randomUUID().slice(0, 8);
-        const tenants = [`itest-a-${suffix}`, `itest-b-${suffix}`];
+        // Fixed ids, not random ones. MCM has no tenant cleanup in this flow, so a
+        // fresh id per run would leave a permanent tenant behind on every execution
+        // and grow the aggregate pull without bound.
+        const tenants = ['itest-peer-a', 'itest-peer-b'];
         const sharedCa = (await mcm.getHubCa()).rootCertificate;
 
         for (const dfspId of tenants) {
-            await mcm.createDfsp({dfspId, name: dfspId, email: `${dfspId}@example.test`});
+            try {
+                await mcm.createDfsp({dfspId, name: dfspId, email: `${dfspId}@example.test`});
+            } catch {
+                // Already present from an earlier run — the rest of the test is a
+                // re-registration, which is exactly what a re-sync does anyway.
+            }
 
             // The SAME certificate under both: MCM applies no uniqueness constraint,
-            // which is what settled decision 6 depends on.
+            // which is what lets one CA cover every tenant Pivotal fronts.
             await mcm.registerCa(dfspId, {rootCertificate: sharedCa});
         }
 

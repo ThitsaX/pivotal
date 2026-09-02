@@ -3,22 +3,21 @@
 #
 # Runs the SAME ceremony as production against SoftHSM2 instead of AWS KMS or
 # CloudHSM. That substitution is faithful because **neither KMS nor CloudHSM is a
-# CA**: both only sign a digest, and the ceremony script builds the X.509 itself
-# (settled decision 13). Only the signing call differs:
+# CA**: both only sign a digest, and the ceremony script builds the X.509
+# itself. Only the signing call differs:
 #
 #   HSM-backed (prod)   PKCS#11 C_Sign  -> CloudHSM
 #   KMS-backed (prod)   kms:Sign        -> AWS KMS
 #   here                PKCS#11 C_Sign  -> SoftHSM2
 #
 # SoftHSM speaks the same PKCS#11 interface, so this exercises the production
-# code path (architecture.md 4.6). What it CANNOT prove: non-exportability of a
+# code path. What it CANNOT prove: non-exportability of a
 # KMS key, IAM scoping, CloudTrail, or the kms:Sign alarm. And PKCS#11 is a loose
 # contract — login models and session handling vary by device, so budget an
 # integration pass per real device.
 #
 # Run twice over, once per trust domain. The roots MUST stay separate: merging
-# them would make a DFSP's client certificate trusted by the Hub
-# (architecture.md 4.7).
+# them would make a DFSP's client certificate trusted by the Hub.
 #
 # This REPLACES the Vault-generated roots from step 4b. The intermediates are
 # regenerated, so any leaf issued before this runs stops chaining and must be

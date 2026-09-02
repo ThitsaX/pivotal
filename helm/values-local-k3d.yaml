@@ -97,5 +97,5 @@ webInbound:
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: "5000"
     ERROR_MESSAGE_LANGUAGE: en_US
     # web-inbound only VERIFIES, so it needs public keys from MySQL and no Vault
-    # access at all -- no role, no crypto user. architecture.md section 8.
+    # access at all -- no role, no crypto user.
     KEY_PROVIDER: database

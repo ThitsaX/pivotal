@@ -8,10 +8,10 @@
 # Every tenant with role='self' gets a FRESH RSA-2048 pair: the private half is
 # written to Vault and the DB public key is updated to match.
 #
-# It never copies a key out of participant.jws_private_key. Decision D21 and S9:
-# any value in that column is plaintext PEM and must be treated as compromised, so
-# migrating it would carry the exposure forward. Regeneration is free until the
-# first MCM publish -- after that, every key change is a coordinated break per FSP.
+# It never copies a key out of participant.jws_private_key: any value in that column
+# is plaintext PEM and must be treated as compromised, so migrating it would carry
+# the exposure forward. Regeneration is free until the first MCM publish -- after
+# that, every key change is a coordinated break per FSP.
 #
 # The column is deliberately NOT cleared here. Retiring those legacy rows is a
 # migration script's job, and it needs to be able to find them.
@@ -40,7 +40,7 @@ echo "SELECT fsp_id FROM pivotal.participant_key WHERE role='self' ORDER BY id;"
   printf "UPDATE pivotal.participant_key SET jws_public_key='%s' WHERE fsp_id='%s';\n" "$pub" "$fsp" | sql
   note="regenerated, DB public key updated"
   if [ "$has_priv" = "1" ]; then
-    note="$note; LEGACY plaintext key still in the column (S9)"
+    note="$note; LEGACY plaintext key still in the column"
   fi
 
   openssl rsa -in "$tmp/$fsp.key" -noout -check >/dev/null 2>&1 || { echo "  $fsp: INVALID KEY, skipped" >&2; continue; }

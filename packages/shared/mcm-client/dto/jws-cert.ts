@@ -18,10 +18,9 @@ export class JwsCert {
     publicKey!: string;
 
     /**
-     * MCM validates the PEM with node-forge, which is RSA-only. Under RS256
-     * (settled decision 3) keys register `VALID`; an EC key would register
-     * `INVALID` and nothing downstream would act on it. Do not gate on this —
-     * compare the read-back instead.
+     * MCM validates the PEM with node-forge, which is RSA-only. RSA keys register
+     * `VALID`; an EC key registers `INVALID`, and nothing downstream acts on either.
+     * Do not gate on this — compare the read-back instead.
      */
     @ApiProperty({type: String, required: false})
     validationState?: string;
