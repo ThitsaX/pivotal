@@ -283,6 +283,15 @@
       "compilerOptions": {
         "tsConfigPath": "packages/samples/wallet3-connector/tsconfig.app.json"
       }
+    },
+    "shared-mcm-client": {
+      "type": "library",
+      "root": "packages/shared/mcm-client",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/mcm-client",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/mcm-client/tsconfig.app.json"
+      }
     }
   }
 }

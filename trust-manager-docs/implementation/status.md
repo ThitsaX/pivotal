@@ -342,7 +342,7 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
 | `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
 | `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
-| MCM registration of the Pivotal CA | 🟡 | **Proven against a local MCM 2026-09-02** — same CA under two tenants, both `VALID`. `shared/mcm-client` itself is still unwritten |
+| MCM registration of the Pivotal CA | 🟢 | **`shared/mcm-client` written and proven 2026-09-02** — same CA under two tenants, both `VALID`; publish/read-back/aggregate-pull all covered by integration tests |
 | MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs; **not yet exercised** against the local MCM |
 | **Hub CA trust-bundle delivery** | 🟢 | **Resolved 2026-09-02.** Authoritative in Secret `hub-ca-bundle`; `hub_trust` demoted to a mirror. Mounted and read by web-outbound, web-inbound and the connector |
 | Local dev environment | 🟢 | k3d + Vault + cert-manager + **SoftHSM2** all in place, each with a re-runnable script. `runbooks/ceremony-local.md` is now implemented by `scripts/ceremony-local.sh` — the runbook prose is still pre-rename and single-domain, but the script supersedes it |
@@ -577,6 +577,48 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### `shared/mcm-client` written and proven against a live MCM · 2026-09-02
+
+| File | Change |
+| --- | --- |
+| `packages/shared/mcm-client/` | **new** — `McmAxios`, `McmTokenProvider`, `McmSettings`, DTOs, `McmException` |
+| `tests/integration/mcm-client-test.ts` | **new** — 3 tests against a real Connection Manager, skipped when none is running |
+| `nest-cli.json`, `package.json` | register the library and `build:shared-mcm-client` |
+
+**Own client, not the upstream one.** `pm4ml/mcm-client` is single-tenant: one DFSP, one identity,
+one `ConnectionStateMachine`. Pivotal is one organisation fronting many, and MCM's own API shows the
+mismatch — it stores a CA per `dfspId`, so Pivotal posts **one certificate N times**. The reuse is
+model shapes, not machinery.
+
+**`publishAndVerifyJwsKey` is the method that matters.** It publishes, reads back, and throws unless
+the stored PEM is byte-identical. This *replaces* MCM's validation signal rather than supplementing
+it: MCM records a `validationState` that nothing anywhere acts on, and its validator is parse-only
+and RSA-only. A read-back catches truncation, a failed write, the wrong tenant and later drift —
+none of which a parse would notice even for a key it accepts (§A1).
+
+**A 401 retries once with a fresh token, then surfaces.** A cached token can expire between the
+check and the call. The resulting `McmException` names the actual cause, because MCM's own 401 says
+only `Authentication required` for what is usually a missing audience or `groups` claim.
+
+**Verified against MCM v3.8.0:** Hub CA pulled; one CA registered under two tenants; a key published,
+read back byte-identical, and found in the aggregate pull; a bad credential surfaces an
+`McmException` rather than a raw axios error. 3/3 pass. `shared-fspiop` still 90/90, and `tsc` holds
+at the 11-error pre-existing baseline.
+
+#### macOS will not resolve `mcm.localhost`
+
+Node's `getaddrinfo` does not special-case `*.localhost` subdomains; curl does, and Linux resolvers
+do. So `mcm.localhost` fails `ENOTFOUND` from Node while working fine from `curl`, which is a
+confusing pair of symptoms. The test reaches traefik on `127.0.0.1` with an explicit `Host` header
+instead, using the injected-client seam on `McmAxios`. Adding the names to `/etc/hosts` also works
+and is the tidier fix for interactive use.
+
+#### Still not exercised
+
+Inbound enrollment — `POST /dfsps/{id}/enrollments/inbound` then `/sign`, which yields web-inbound's
+server certificate. It is a different issuance path from every other certificate in this programme,
+and it is the one remaining MCM call phase 5 needs.
 
 ### MCM stood up locally, API surface validated · 2026-09-02
 

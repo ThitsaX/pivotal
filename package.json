@@ -43,6 +43,7 @@
     "build:shared-axios": "nest build shared-axios",
     "build:shared-catalyst": "nest build shared-catalyst",
     "build:shared-central-ledger": "nest build shared-central-ledger",
+    "build:shared-mcm-client": "nest build shared-mcm-client",
     "build:shared-fspiop": "nest build shared-fspiop",
     "build:shared-dbmigration": "nest build shared-dbmigration",
     "build:shared-snowflake": "nest build shared-snowflake",
