@@ -3,3 +3,4 @@
 export * from './pivotal-connection-name';
 export * from './participant.repository';
 export * from './participant-key.repository';
+export * from './participant-cert.repository';

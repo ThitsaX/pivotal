@@ -14,9 +14,10 @@ import {
     UpdateAccessKeyHandler,
     UpsertEndpointHandler,
 } from './command';
-import {Participant, ParticipantKey} from './model';
+import {Participant, ParticipantCert, ParticipantCertStatus, ParticipantKey} from './model';
 import {ListCentralLedgerParticipantsHandler} from './query';
 import {
+    ParticipantCertRepository,
     ParticipantKeyRepository,
     ParticipantRepository,
     PIVOTAL_DB_READ_CONNECTION_NAME,
@@ -28,17 +29,21 @@ import {
     JwsPrivateKeySource,
     VaultJwsPrivateKeySource,
 } from './component/store/jws-private-key-source';
+import {DfspCertificateIssuer} from './component/cert';
 
 const REQUIRED_SETTINGS = Symbol('ParticipantDomainRequiredSettings');
 
 const Entities = [
     Participant,
     ParticipantKey,
+    ParticipantCert,
+    ParticipantCertStatus,
 ];
 
 const Repositories = [
     ParticipantRepository,
     ParticipantKeyRepository,
+    ParticipantCertRepository,
 ];
 
 const Components: Provider[] = [
@@ -57,6 +62,18 @@ const Components: Provider[] = [
         ): ParticipantSigningKeysCache => new ParticipantSigningKeysCache(
             participantRepository, participantKeyRepository, privateKeySource),
         inject: [ParticipantRepository, ParticipantKeyRepository, JwsPrivateKeySource],
+    },
+    {
+        // Present only where the DFSP-facing CA is configured. A deployment that does not issue
+        // DFSP certificates resolves this to null rather than failing to start, and the operator
+        // paths that need it report that it is not configured.
+        provide: DfspCertificateIssuer,
+        useFactory: (
+            settings: ParticipantDomainModule.RequiredSettings,
+            certificates: ParticipantCertRepository,
+        ): DfspCertificateIssuer | null =>
+            ParticipantDomainModule.createCertificateIssuer(settings, certificates),
+        inject: [REQUIRED_SETTINGS, ParticipantCertRepository],
     },
 ];
 
@@ -153,6 +170,37 @@ export class ParticipantDomainModule {
         return new VaultJwsPrivateKeySource(new VaultClient(vaultSettings), vaultSettings);
     }
 
+    /**
+     * Builds the DFSP-facing issuer when a mount is configured.
+     *
+     * Returns null rather than throwing where it is absent: most deployments front no DFSPs of
+     * their own, and issuance is an operator action rather than something on a request path, so a
+     * missing configuration should surface when someone tries to enroll — not by refusing to boot
+     * every service that imports this module.
+     */
+    static createCertificateIssuer(
+        settings: ParticipantDomainModule.RequiredSettings,
+        certificates: ParticipantCertRepository,
+    ): DfspCertificateIssuer | null {
+
+        const issuerSettings = settings.dfspCertIssuerSettings?.();
+        const vaultSettings = settings.vaultSettings?.();
+
+        if (issuerSettings == null || issuerSettings.mount.length === 0) {
+            return null;
+        }
+
+        if (vaultSettings == null || !vaultSettings.isConfigured()) {
+            throw new Error(
+                'A DFSP certificate issuer is configured but Vault is not. '
+                + 'Set VAULT_ADDRESS, plus VAULT_ROLE for Kubernetes auth or VAULT_TOKEN when '
+                + 'VAULT_AUTH_METHOD=token.',
+            );
+        }
+
+        return new DfspCertificateIssuer(new VaultClient(vaultSettings), certificates, issuerSettings);
+    }
+
     private static createProviders(): Provider[] {
         return [
             {
@@ -187,6 +235,9 @@ export namespace ParticipantDomainModule {
 
         /** Required when {@link keyProvider} returns {@link KeyProvider.VaultKv}. */
         vaultSettings?(): VaultSettings;
+
+        /** Absent where the deployment issues no DFSP certificates. */
+        dfspCertIssuerSettings?(): DfspCertificateIssuer.Settings;
     }
 
     export type AsyncOptions = {

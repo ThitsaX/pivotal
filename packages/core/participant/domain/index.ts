@@ -6,3 +6,4 @@ export * from './component';
 export * from './query';
 export * from './model';
 export * from './repository';
+export * from './error';

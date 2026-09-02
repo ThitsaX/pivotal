@@ -6,10 +6,10 @@ import {Logger} from '@nestjs/common';
 import {VaultAuthMethod, VaultSettings} from './vault-settings';
 
 /**
- * A deliberately small Vault client: Kubernetes ServiceAccount login, and KV v2 reads.
+ * A deliberately small Vault client: Kubernetes ServiceAccount login, KV v2 reads, and PKI signing.
  *
- * No Vault SDK. The two calls needed are a POST and a GET, and an SDK would be a large transitive
- * surface for that — the same reasoning applied on the Java side, which keeps the two
+ * No Vault SDK. The calls needed are a handful of POSTs and a GET, and an SDK would be a large
+ * transitive surface for that — the same reasoning applied on the Java side, which keeps the two
  * implementations comparable.
  *
  * **Not on the signing path.** Callers read at startup and on a rotation nudge, then cache. Vault
@@ -99,6 +99,60 @@ export class VaultClient {
         return typeof value === 'string' && value.length > 0 ? value : undefined;
     }
 
+    /**
+     * Signs an externally supplied CSR against a PKI role.
+     *
+     * **`sign`, never `issue`.** `issue` has Vault generate the keypair and return the private key,
+     * which would contradict the guarantee the DFSP-facing leg is built on: the DFSP's private key
+     * never leaves the DFSP. Only the public key and the proof of possession inside the CSR cross
+     * the boundary.
+     *
+     * The common name is passed separately and Vault's role is configured to require it, so the
+     * caller decides the subject rather than the submitter. Nothing else from the CSR's subject is
+     * honoured.
+     */
+    async signCertificate(request: VaultClient.SignRequest): Promise<VaultClient.SignedCertificate> {
+
+        if (this.token == null) {
+            await this.login();
+        }
+
+        const response = await this.http.post(
+            `/v1/${request.mount}/sign/${request.role}`,
+            {
+                csr: request.csrPem,
+                common_name: request.commonName,
+                ...(request.ttl == null ? {} : {ttl: request.ttl}),
+                exclude_cn_from_sans: true,
+            },
+            {headers: {[VaultClient.VAULT_TOKEN_HEADER]: this.token}},
+        );
+
+        if (response.status === 404) {
+            throw new Error(
+                `Vault has no PKI role '${request.role}' on mount '${request.mount}'.`);
+        }
+
+        const data = response.data?.data;
+        const certificate = data?.certificate as string | undefined;
+
+        if (certificate == null || certificate.length === 0) {
+            throw new Error('Vault signed the request but returned no certificate.');
+        }
+
+        // ca_chain omits the leaf and is ordered issuer-first. Falling back to issuing_ca covers a
+        // mount whose intermediate is the only thing above the leaf.
+        const chain = (data?.ca_chain as string[] | undefined)
+            ?? (typeof data?.issuing_ca === 'string' ? [data.issuing_ca] : []);
+
+        return {
+            certificatePem: certificate,
+            caChainPem: chain.length === 0 ? undefined : chain.join('\n'),
+            serialNumber: (data?.serial_number as string | undefined) ?? '',
+            expiration: typeof data?.expiration === 'number' ? new Date(data.expiration * 1000) : undefined,
+        };
+    }
+
     /** Drops the cached token so the next read re-authenticates. */
     invalidateToken(): void {
         this.token = undefined;
@@ -116,5 +170,26 @@ export class VaultClient {
                 + `Cause: ${(error as Error).message}`,
             );
         }
+    }
+}
+
+export namespace VaultClient {
+
+    export interface SignRequest {
+        /** The PKI mount, for example `pki_dfsp`. */
+        mount: string;
+        role: string;
+        csrPem: string;
+        /** Enforced by the caller; the CSR's own subject is not honoured. */
+        commonName: string;
+        /** Vault's role default applies when omitted. */
+        ttl?: string;
+    }
+
+    export interface SignedCertificate {
+        certificatePem: string;
+        caChainPem?: string;
+        serialNumber: string;
+        expiration?: Date;
     }
 }
