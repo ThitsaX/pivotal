@@ -87,6 +87,14 @@ webOutbound:
     VAULT_KUBERNETES_AUTH_PATH: kubernetes
     VAULT_KV_MOUNT: secret
     VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
+    # Hub-facing mutual TLS is turned on here alone: web-inbound still terminates
+    # plain HTTP, and the connectors reach the Hub through this service.
+    FSPIOP_USE_MUTUAL_TLS: "true"
+    # Paths, not inline PEMs. cert-manager renews the certificate into the mounted
+    # Secret and the service reloads it, which inline values could never express.
+    FSPIOP_MTLS_CA_PATH: /etc/pivotal/hub-ca/hub-ca.pem
+    FSPIOP_MTLS_CLIENT_CERT_PATH: /etc/pivotal/hub-client-tls/tls.crt
+    FSPIOP_MTLS_CLIENT_KEY_PATH: /etc/pivotal/hub-client-tls/tls.key
 
 webInbound:
   env:

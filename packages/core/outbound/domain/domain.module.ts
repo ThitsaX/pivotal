@@ -3,12 +3,11 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuditProducerModule } from '@core/audit/producer';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
+import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
 import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
-import * as https from "node:https";
-import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
+import { PrivateKeyStore } from "@shared/security";
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
@@ -92,8 +91,6 @@ export class OutboundDomainModule {
                 useFactory: (
                     outboundSettings: OutboundSettings,
                     privateKeyStore: PrivateKeyStore,
-                    caStore: CaStore,
-                    clientCertStore: ClientCertStore,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
@@ -103,24 +100,34 @@ export class OutboundDomainModule {
                         fspiopSettings.useJws ? [new FspiopSigningInterceptor(privateKeyStore).build()]
                             : [];
 
-                    const httpsAgent =
-                        fspiopSettings.useMutualTls ?
-                            new https.Agent(
-                                {
-                                    ca: caStore.get()?.toBuffer(),
-                                    cert: clientCertStore.get()?.certBuffer(),
-                                    key: clientCertStore.get()?.keyBuffer(),
-                                    rejectUnauthorized: params.verifyServerCertificate,
-                                    timeout: params.connectionTimeoutMs,
-                                    ...(params.verifyDomain === false
-                                        ? { checkServerIdentity: () => undefined }
-                                        : {}),
-                                })
-                            : undefined;
+                    // Built through MutualTlsAgent so a renewed certificate takes effect
+                    // without a restart. cert-manager rewrites the mounted Secret every
+                    // few weeks; an agent constructed once would keep presenting the
+                    // certificate it started with until the pod was recycled.
+                    let mutualTls: MutualTlsAgent | null = null;
 
-                    return new FspiopAxios(fspiopSettings, params, interceptors, {}, httpsAgent);
+                    if (fspiopSettings.useMutualTls) {
+                        mutualTls = MutualTlsAgent.create({
+                            rejectUnauthorized: params.verifyServerCertificate ?? true,
+                            connectionTimeoutMs: params.connectionTimeoutMs,
+                            verifyDomain: params.verifyDomain,
+                        });
+
+                        // Refusing to start beats starting without a client certificate:
+                        // the request would otherwise leave unauthenticated and fail at
+                        // the peer as an opaque handshake error, far from the cause.
+                        if (mutualTls == null) {
+                            throw new Error(
+                                'Mutual TLS is enabled but no certificate or trust anchor is configured.');
+                        }
+
+                        mutualTls.start();
+                    }
+
+                    return new FspiopAxios(
+                        fspiopSettings, params, interceptors, {}, mutualTls?.httpsAgent());
                 },
-                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore],
+                inject: [OutboundSettings, PrivateKeyStore],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];

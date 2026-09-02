@@ -7,9 +7,8 @@ import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPriva
 import { AccessGuard, JwtPolicy } from './component';
 import { DfspListController, SendMoneyController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
-import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
+import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
 import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
-import { FspiopMtlsCaStore, FspiopMtlsClientCertStore } from "@shared/fspiop";
 
 const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 
@@ -88,20 +87,6 @@ export class WebOutboundModule {
                     return new ParticipantJwsPrivateKeyStore(cache);
                 },
                 inject: [ParticipantSigningKeysCache],
-            },
-            {
-                provide: CaStore,
-                useFactory: (): CaStore => {
-                    return new FspiopMtlsCaStore().load();
-                },
-                inject: [],
-            },
-            {
-                provide: ClientCertStore,
-                useFactory: (): ClientCertStore => {
-                    return new FspiopMtlsClientCertStore().load();
-                },
-                inject: [],
             },
         ];
     }

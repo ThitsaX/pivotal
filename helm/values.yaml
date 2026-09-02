@@ -12,6 +12,9 @@ global:
   # The Hub-signed server certificate, obtained through MCM enrollment. Holds both
   # tls.crt and tls.key, so it is the one Secret here that is genuinely secret.
   hubServerCertSecretName: hub-server-cert
+  # Client leaf web-outbound presents to the Hub, issued from the Pivotal
+  # client trust domain -- never the same material as the server cert above.
+  hubClientCertSecretName: web-outbound-hub-client-tls
 
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
