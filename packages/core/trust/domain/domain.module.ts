@@ -5,10 +5,16 @@ import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
-import {HubCaSyncScheduler, KubernetesSecretWriter, PeerJwsSyncScheduler} from './component';
+import {
+    HubCaSyncScheduler,
+    KubernetesSecretWriter,
+    McmCaRegistrationScheduler,
+    PeerJwsSyncScheduler,
+} from './component';
 
 const REQUIRED_SETTINGS = Symbol('TrustDomainRequiredSettings');
 const HUB_CA_LOCK = Symbol('TrustDomainHubCaLock');
+const CA_REGISTRATION_LOCK = Symbol('TrustDomainCaRegistrationLock');
 
 const Components: Provider[] = [
     {
@@ -61,6 +67,24 @@ const Components: Provider[] = [
         ),
         inject: [McmAxios, KubernetesSecretWriter, HUB_CA_LOCK, REQUIRED_SETTINGS],
     },
+    {
+        provide: CA_REGISTRATION_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:mcm-ca-registration'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        provide: McmCaRegistrationScheduler,
+        useFactory: (
+            mcm: McmAxios,
+            participantKeys: ParticipantKeyRepository,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): McmCaRegistrationScheduler => new McmCaRegistrationScheduler(
+            mcm, participantKeys, lock, settings.pivotalCaUrl(), settings.mcmCaReconcileIntervalMs(),
+        ),
+        inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS],
+    },
 ];
 
 @Module({})
@@ -85,7 +109,7 @@ export class TrustDomainModule {
                 },
                 ...Components,
             ],
-            exports: [McmAxios, PeerJwsSyncScheduler, HubCaSyncScheduler],
+            exports: [McmAxios, PeerJwsSyncScheduler, HubCaSyncScheduler, McmCaRegistrationScheduler],
         };
     }
 }
@@ -110,6 +134,14 @@ export namespace TrustDomainModule {
 
         /** The Hub CA rotates rarely, so this poll is a slow backstop. */
         hubCaSyncIntervalMs(): number;
+
+        /**
+         * Vault PKI's CA endpoint for the Hub-facing trust domain. Unauthenticated:
+         * a CA certificate is public, and Vault serves it without a credential.
+         */
+        pivotalCaUrl(): string;
+
+        mcmCaReconcileIntervalMs(): number;
     }
 
     export interface AsyncOptions {

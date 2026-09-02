@@ -13,3 +13,16 @@ export class HubCa {
     @ApiProperty({type: String, required: false})
     validationState?: string;
 }
+
+/** What MCM holds for one tenant. The same certificate appears under every tenant. */
+export class DfspCa {
+
+    @ApiProperty({type: String, required: false})
+    rootCertificate?: string;
+
+    @ApiProperty({type: String, required: false})
+    intermediateChain?: string;
+
+    @ApiProperty({type: String, required: false})
+    validationState?: string;
+}

@@ -342,7 +342,7 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
 | `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
 | `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
-| MCM registration of the Pivotal CA | 🟢 | **`shared/mcm-client` written and proven 2026-09-02** — same CA under two tenants, both `VALID`; publish/read-back/aggregate-pull all covered by integration tests |
+| MCM registration of the Pivotal CA | 🟢 | **Automated 2026-09-02** — trust-manager reconciles the CA across all `self` tenants each tick, reading MCM back rather than keeping a mirror. Found real drift on first run |
 | MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs; **not yet exercised** against the local MCM |
 | **Hub CA trust-bundle delivery** | 🟢 | **Resolved 2026-09-02.** Authoritative in Secret `hub-ca-bundle`; `hub_trust` demoted to a mirror. Mounted and read by web-outbound, web-inbound and the connector |
 | Local dev environment | 🟢 | k3d + Vault + cert-manager + **SoftHSM2** all in place, each with a re-runnable script. `runbooks/ceremony-local.md` is now implemented by `scripts/ceremony-local.sh` — the runbook prose is still pre-rename and single-domain, but the script supersedes it |
@@ -577,6 +577,47 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### MCM CA registration reconcile · 2026-09-02
+
+trust-manager's third scheduled job, and the last of phase 4's registry-sync work
+apart from publishing own keys.
+
+| File | Change |
+| --- | --- |
+| `packages/core/trust/domain/component/mcm-ca-registration.scheduler.ts` | **new** |
+| `packages/shared/mcm-client` | `getDfspCa()` and its DTO, for the read-back |
+
+**No state table.** The plan proposes an `mcm_ca_registration` table for drift
+detection; this reads MCM directly each tick instead. MCM is authoritative for what
+MCM holds, so a local mirror would only add a second copy to drift against the very
+thing it describes. The table stays available for reporting, but nothing depends on
+it and no migration is needed.
+
+**The CA comes from Vault PKI's unauthenticated CA endpoint.** A CA certificate is
+public, and Vault serves `pki_hub_client_root/ca/pem` without a credential — so
+trust-manager needs no Vault authentication for this job at all.
+
+**Verified in-cluster, and it found real drift on the first run:**
+
+```
+tick 1   2 registered, 0 already correct, 1 failed, of 3 tenants
+tick 2   0 registered, 2 already correct, 1 failed, of 3 tenants
+```
+
+Idempotent from the second tick, because the read-back matches. The failure is
+genuine and is exactly what this job exists to surface: `cofinagn` is a `self` tenant
+in Pivotal that **does not exist in MCM** — `404 DFSP with id cofinagn not found`.
+Onboarding to Pivotal and onboarding to MCM are separate acts, and nothing previously
+noticed when only one of them had happened.
+
+**One tenant failing does not stop the rest.** A partial reconcile that converges the
+others is better than none, and the next tick retries the one that failed.
+
+**Registering is not distributing**, and the log can mislead on this point: MCM stores
+what it is told and does not put the certificate into the Hub's ingress trust store.
+A Hub operator does that out of band, so this job can report everything registered
+while the Hub still rejects the connection.
 
 ### Hub CA sync — the delivery loop closed · 2026-09-02
 

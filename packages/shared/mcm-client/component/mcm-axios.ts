@@ -5,6 +5,7 @@ import {Logger} from '@nestjs/common';
 import {AxiosClientBuilder} from '@shared/axios/component';
 import {McmException} from '../exception';
 import {
+    DfspCa,
     DfspCredentials,
     HubCa,
     JwsCert,
@@ -75,6 +76,11 @@ export class McmAxios {
 
     async getHubCa(): Promise<HubCa> {
         return this.get('/hub/ca');
+    }
+
+    /** What MCM currently holds for this tenant, so a re-post can be avoided. */
+    async getDfspCa(dfspId: string): Promise<DfspCa> {
+        return this.get(`/dfsps/${McmAxios.encodePathSegment(dfspId)}/ca`);
     }
 
     // ── JWS keys ─────────────────────────────────────────────────────────────
