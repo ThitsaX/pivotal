@@ -488,8 +488,8 @@ sequenceDiagram
     rect rgb(255,243,214)
     Note over TM,GW: make Pivotal trust the Hub, and serve it
     TM->>MCM: GET /hub/ca
-    TM->>DP: write trust bundle — validates the Hub server cert
-    TM->>GW: write trust bundle — validates the Hub client cert
+    TM->>DP: write Secret hub-ca-bundle — validates the Hub server cert
+    TM->>GW: same Secret, via SDS — validates the Hub client cert
     TM->>MCM: POST /dfsps/{pivotalDfspId}/enrollments/inbound (CSR)
     MCM-->>TM: certificate signed by the HUB CA
     TM->>GW: install as the Gateway server certificate

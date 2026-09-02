@@ -31,6 +31,18 @@ spec:
             {{- include "pivotal-stack.envVars" .Values.webInbound.env | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+          volumeMounts:
+            - name: hub-ca-bundle
+              mountPath: /etc/pivotal/hub-ca
+              readOnly: true
+      volumes:
+        # Authoritative store for the Hub CA — NOT a projection of MySQL.
+        # pki-issuance-flows.md 3.4. Connectors have no MySQL access, so the
+        # bundle cannot live there; one Secret serves every consumer.
+        - name: hub-ca-bundle
+          secret:
+            secretName: {{ .Values.global.hubCaSecretName }}
+            optional: true
 ---
 apiVersion: v1
 kind: Service
@@ -84,6 +96,18 @@ spec:
             {{- include "pivotal-stack.envVars" .Values.webOutbound.env | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
             {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+          volumeMounts:
+            - name: hub-ca-bundle
+              mountPath: /etc/pivotal/hub-ca
+              readOnly: true
+      volumes:
+        # Authoritative store for the Hub CA — NOT a projection of MySQL.
+        # pki-issuance-flows.md 3.4. Connectors have no MySQL access, so the
+        # bundle cannot live there; one Secret serves every consumer.
+        - name: hub-ca-bundle
+          secret:
+            secretName: {{ .Values.global.hubCaSecretName }}
+            optional: true
 ---
 apiVersion: v1
 kind: Service

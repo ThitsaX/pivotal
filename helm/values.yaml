@@ -4,6 +4,11 @@ fullnameOverride: ""
 global:
   imagePullPolicy: IfNotPresent
 
+  # Hub CA trust bundle. Authoritative store, written by trust-manager after
+  # GET /hub/ca — see pki-issuance-flows.md 3.4. Mounted optional so a cluster
+  # without it still starts; mTLS is what needs it, and mTLS is not on yet.
+  hubCaSecretName: hub-ca-bundle
+
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
     FSPIOP_QUOTES_URL: http://web-inbound:3201

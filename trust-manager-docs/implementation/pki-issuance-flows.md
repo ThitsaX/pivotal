@@ -473,18 +473,57 @@ Two consequences:
   `implementation-plan.md` §3's connector row lists the protected header, PKCS#11 signing, the two new
   HTTP headers, the subscription and ack-after-PUT — but **not** certificate wiring.
 
-### 3.4 Hub CA delivery is undefined
+### 3.4 Hub CA delivery — **resolved 2026-09-02**
 
-`hub_trust` is the authoritative store for the Hub CA, but [`architecture.md`](../design/architecture.md) §5.1
-defines only two data-plane read paths — Vault KV for `keyRef`, MySQL for public key and certificate
-*registry rows*. A trust bundle is neither, and the connectors have no MySQL access at all.
+**A Kubernetes Secret is the authoritative store for the Hub CA bundle. The `hub_trust` row becomes a
+non-authoritative mirror.**
 
-[`hub-facing-leg.md`](../design/hub-facing-leg.md) B3 shows `TM → data plane: write trust bundle` and
-`TM → Gateway: write trust bundle` with no mechanism behind either arrow, and
-[`architecture.md`](../design/architecture.md) §7 lists it under *Not yet specified*. **Phase 5 cannot
-complete until this is chosen** — the candidates are a trust-manager-managed k8s Secret consumed the
-same way as `tls.crt`, or a `hub_trust` read added to the reconcile poll for the components that do
-have MySQL access.
+This was open because it was posed as *"which pipe carries `hub_trust.hub_ca` to the data plane?"*
+There is no good answer to that question, which is why it stayed open. The rule in
+[`architecture.md`](../design/architecture.md) §5.1 settles it by being applied literally:
+
+> Each value has **exactly one authoritative store**, chosen by **who reads it**.
+
+`hub_ca` is read by web-outbound, web-inbound's Gateway **and every connector** — and connectors have
+no MySQL access, by design. So MySQL cannot be the authoritative store for this value. The defect was
+never a missing mechanism; it was giving `hub_trust` a row it has no business owning.
+
+| | |
+| --- | --- |
+| **Authoritative** | Kubernetes Secret `hub-ca-bundle`, written by trust-manager after `GET /hub/ca` |
+| **Mirror** | `hub_trust` row — expiry alerting and the portal only |
+
+The mirror is not a new concession. It is exactly the pattern already settled for
+`participant_key_ref` (§5.1): *"written after the Vault write. If it drifts, nothing breaks; it is a
+view, not a source."* Same shape, same justification, no new precedent — and **no violation of
+one-store-per-value**, because authority moved rather than being duplicated.
+
+#### Why a Secret and not Vault KV
+
+Vault KV looks like the cheaper answer: connectors already authenticate to Vault and read
+`jwskey/<fspId>`, so it adds no new access path for them. **Envoy decides it.** web-inbound's Gateway
+needs the Hub CA as its client-certificate trust store, and Envoy reads Kubernetes Secrets over SDS,
+not Vault. Choosing Vault KV means maintaining two delivery mechanisms; choosing the Secret means one
+that serves all three consumers — and it is the same mount the workloads already use for
+cert-manager's `tls.crt`.
+
+A CA certificate is public, so a Secret here is *storage*, not custody. No invariant bends. What the
+bundle does need is **write-integrity and audit** rather than secrecy: anyone who can write it can
+insert their own CA and be trusted as the Hub.
+
+#### What this exposes rather than fixes
+
+The mechanism is the easy half. §3.3 already records the harder part: `FspiopMtlsCaStore.load()` runs
+**once at startup**, so a rotated bundle is never picked up — a Hub CA change means a pod restart
+today. The Java connectors are worse: they have no mTLS client path at all. Choosing the store does
+not fix either; it makes both visible and schedulable.
+
+#### Naming collision, worth knowing before a design review
+
+cert-manager ships an upstream CNCF project **also called `trust-manager`**, whose entire job is
+distributing CA bundles across namespaces via a `Bundle` CR. It solves this problem directly and is
+worth evaluating later, but it is a further component and Pivotal's own trust-manager will own this
+eventually. Not adopted; recorded so the name collision does not surprise anyone.
 
 ---
 

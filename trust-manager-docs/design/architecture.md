@@ -516,6 +516,7 @@ of thing it is:
 | `keyRef` + crypto-user credentials — **HSM-backed** | **Vault KV** — `secret/pivotal/keyref/<fspId>`, `secret/pivotal/hsmcred/<fspId>` | web-outbound, connectors |
 | **JWS private key — KMS-backed** | **Vault KV** — `secret/pivotal/jwskey/<fspId>` | web-outbound, connectors |
 | Public keys, certificates, registrations, contacts | **MySQL** | web-outbound, web-inbound |
+| **Hub CA trust bundle** | **Kubernetes Secret** `hub-ca-bundle` | web-outbound, connectors, the Gateway |
 
 The two profiles differ only in *what* the Vault KV path holds — an opaque reference, or the key
 itself. The read path, the authentication, the policy model and the caching are identical, which is
@@ -536,6 +537,13 @@ shown in the portal — none of which Vault KV does, and none of which is secret
 
 `participant_key_ref` remains as a **non-authoritative mirror** for the portal and reporting, written
 after the Vault write. If it drifts, nothing breaks; it is a view, not a source.
+
+`hub_trust` holds a mirror of the Hub CA on the same terms, and for the same reason. The bundle is
+read by the connectors, which have no MySQL access, so by the rule above — *chosen by who reads it* —
+MySQL cannot be authoritative for it. Envoy settles the choice of store: the Gateway needs the bundle
+as a trust store and reads Kubernetes Secrets over SDS, not Vault, so one Secret serves all three
+consumers where Vault KV would serve only two. See
+[`pki-issuance-flows.md`](../implementation/pki-issuance-flows.md) §3.4.
 
 Consumer mode differs by purpose, and confusing the two is the easiest mistake to make here:
 
@@ -719,14 +727,18 @@ not make the Hub's ingress trust it. The Hub operator installs it out of band, a
 
 ### Not yet specified
 
-Two gaps this list makes visible, neither of which has a home in the design today:
+One gap this list makes visible, which has no home in the design today:
 
 - **Offboarding.** When a tenant leaves, something must revoke its certificates and accessKey,
   unshare its key from `cu-web-outbound`, retire the key, disable `cu-<fspId>` and decide what MCM
   retains. No operation, no schema state, no phase.
-- **Trust-bundle distribution.** B3 shows `TM → data plane: write trust bundle`, but the mechanism is
-  undefined — a bundle is not a registry row, so the data plane cannot reach it by the MySQL
-  reconcile poll.
+
+**Trust-bundle distribution — resolved 2026-09-02.** It was listed here because a bundle is not a
+registry row, so the data plane could not reach it by the MySQL reconcile poll. Resolved by applying
+§5.1 rather than adding a pipe: the Hub CA bundle is **authoritative in a Kubernetes Secret**, and the
+`hub_trust` row is a non-authoritative mirror for alerting — the same treatment `participant_key_ref`
+already has. Full reasoning in
+[`pki-issuance-flows.md`](../implementation/pki-issuance-flows.md) §3.4.
 
 ---
 

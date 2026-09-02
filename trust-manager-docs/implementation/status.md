@@ -6,7 +6,7 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-08-31 (5a).
+**Last verified against code:** 2026-09-02.
 
 ---
 
@@ -77,10 +77,12 @@ JWS and key custody are done. The remaining work is scoped by which deployment s
 3. **CA ceremony** — KMS roots for `pki_hub_client` and `pki_dfsp`, Vault PKI intermediates. Runbook
    written, not yet executed. Note production already runs a `pki-hub` mount, so this adds two new
    trust domains beside a pattern that works rather than inventing one.
-4. **mTLS on legs #2, #3 and #4.** No external blocker: the same organisation operates the Hub, so
-   registering the CA, enabling client-certificate verification at the Hub edge and inbound
-   enrollment are all internal changes. **Blocked on one undecided item**: how the Hub CA trust
-   bundle reaches the data plane — [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.4.
+4. **mTLS on legs #2, #3 and #4.** **Unblocked 2026-09-02** — the trust-bundle question is settled
+   and the delivery path is working locally. No external blocker either: the same organisation
+   operates the Hub, so registering the CA, enabling client-certificate verification at the Hub edge
+   and inbound enrollment are all internal changes. The real work now is code, not design: the TS
+   stores read their PEMs **once at startup**, and the Java connectors have **no mTLS client path at
+   all** — [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.3.
 5. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
    operated by other institutions.
 6. **`pkcs11`** — deferred to the HSM-backed delivery.
@@ -340,9 +342,9 @@ Three rows here were stale and contradicted the rest of this file; corrected 202
 | **cert-manager** | 🟢 | **Done 2026-08-30.** Installed, two ClusterIssuers Ready against Vault over Kubernetes auth; a leaf issued and scheduled to auto-renew |
 | `pki_dfsp` CA (leg #1) | 🟡 | **Rehearsed 2026-08-31.** Root generated in **SoftHSM2** and signs the Vault intermediate over PKCS#11; role `dfsp-client`; root CRL signed. The real **KMS/CloudHSM root** is 5b |
 | `pki_hub_client` CA (legs #2, #3) | 🟡 | **Rehearsed 2026-08-31.** Same shape: SoftHSM2 root, PKCS#11-signed intermediate, role `pivotal-client`, root CRL signed. Real root is 5b |
-| MCM registration of the Pivotal CA | 🔴 | `hub-facing-leg.md` B2 |
-| MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs |
-| **Hub CA trust-bundle delivery** | 🔴 | Mechanism undefined; **blocks phase 5** — `pki-issuance-flows.md` §3.4 |
+| MCM registration of the Pivotal CA | 🟡 | **Proven against a local MCM 2026-09-02** — same CA under two tenants, both `VALID`. `shared/mcm-client` itself is still unwritten |
+| MCM inbound enrollment (leg #4 server cert) | 🔴 | Different path from all other certs; **not yet exercised** against the local MCM |
+| **Hub CA trust-bundle delivery** | 🟢 | **Resolved 2026-09-02.** Authoritative in Secret `hub-ca-bundle`; `hub_trust` demoted to a mirror. Mounted and read by web-outbound, web-inbound and the connector |
 | Local dev environment | 🟢 | k3d + Vault + cert-manager + **SoftHSM2** all in place, each with a re-runnable script. `runbooks/ceremony-local.md` is now implemented by `scripts/ceremony-local.sh` — the runbook prose is still pre-rename and single-domain, but the script supersedes it |
 | `NatsPullListener` ack-after-PUT | 🔴 | **Re-confirmed 2026-08-27**: `handle()` still acks in `finally` even on failure (`NatsPullListener.java:162`), logging *"failed - acking to avoid requeue"*, so `maxDeliver=5` never retries. `hub-facing-leg.md` §244 wants this changed. Same file for all four listeners |
 
@@ -575,6 +577,85 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### MCM stood up locally, API surface validated · 2026-09-02
+
+Phase 4 groundwork. `implementation-plan.md` §5 requires MCM to **precede** Hub-facing mTLS — CA
+registration, the Hub CA pull and inbound enrollment are all MCM calls — so this comes before step 6.
+
+| File | Change |
+| --- | --- |
+| `implementation/mcm-api-notes.md` | **new** — what a real MCM does, established by running one |
+
+Local MCM: `DATABASE_PORT=3307 docker compose --profile full up -d` in `connection-manager-api`.
+The override is required — MCM's MySQL wants 3306, which `ml-core-test-harness` holds. ~1.4 GiB.
+
+**Every endpoint `shared/mcm-client` needs is verified working** against v3.8.0, and three design
+claims are now confirmed rather than argued:
+
+| Claim | Evidence |
+| --- | --- |
+| The same CA registers under N tenants (settled decision 6) | Pivotal's `pki_hub_client` root posted to `wallet1` and `wallet2` — both `VALID` |
+| RSA keys register `VALID` (settled decision 3) | both tenants' RS256 keys `VALID`; the EC-`INVALID` problem does not arise |
+| Byte-identical read-back is implementable (§A1) | `POST` then `GET` returned exactly the PEM sent |
+| MCM's native per-DFSP credential model (Part C) | creating the tenants auto-created Keycloak clients `wallet1`, `wallet2` |
+
+**Auth will cost a day if you do not know this.** A machine token needs `aud` containing
+`connection-manager-api` **and** a `groups` claim, and the stock service client has **no protocol
+mappers at all**. Missing `groups` is the nastier one: `extractRoles` spreads the result of
+`claims.groups?.map(...)`, so an absent claim throws `TypeError: roles is not iterable` rather than
+yielding an empty role set — a bare 401 to the caller and a type error in the log.
+
+**Two gaps found:**
+
+- `POST /dfsps` **requires `email`**, which no design document mentions.
+- `GET /dfsps/{id}/credentials` returns **404** in v3.8.0, for tenants whose Keycloak clients exist.
+  Part C treats it as the bootstrap path precisely because `POST` invalidates the existing secret with
+  no grace period. That warning stands; the `GET` path needs investigating.
+
+Inbound enrollment — web-inbound's server certificate, a different issuance path from every other
+certificate here — is **not yet exercised**.
+
+### Hub CA trust bundle — the phase-5 blocker, closed · 2026-09-02
+
+| File | Change |
+| --- | --- |
+| `pivotal/scripts/setup-hub-trust.sh` | **new** — writes Secret `hub-ca-bundle` |
+| `pivotal/helm/templates/apps.yaml`, `values.yaml` | mount it into web-outbound and web-inbound; `global.hubCaSecretName` |
+| `pivotal-thitsawallet-connector/deploy/local-k3d.yaml` | same mount for the connector |
+| `design/architecture.md` §5.1, §7 · `design/hub-facing-leg.md` B3 · `implementation/pki-issuance-flows.md` §3.4 | record the resolution |
+
+**The question was wrong, which is why it stayed open.** It was posed as *"which pipe carries
+`hub_trust.hub_ca` to the data plane?"* — and there is no good answer, because connectors have no
+MySQL access by design. Applying `architecture.md` §5.1 literally settles it: *one authoritative
+store, chosen by who reads it*. The Hub CA is read by web-outbound, the Gateway **and every
+connector**, so MySQL cannot own it. The defect was `hub_trust` holding a row it had no business
+owning, not a missing mechanism.
+
+**Authority moves; nothing is duplicated.** The Secret is authoritative, `hub_trust` becomes a
+non-authoritative mirror for expiry alerting — the same treatment `participant_key_ref` already has,
+so no new precedent and no violation of one-store-per-value.
+
+**Envoy chose the store, not preference.** Vault KV looked cheaper — connectors already read
+`jwskey/<fspId>` there. But the Gateway needs the bundle as a client-cert trust store and reads
+Kubernetes Secrets over SDS, not Vault. One Secret serves all three consumers; Vault KV would have
+served two and required a second mechanism for the third.
+
+**Verified** — all three read the same bundle from `/etc/pivotal/hub-ca/hub-ca.pem`:
+
+| Consumer | |
+| --- | --- |
+| web-outbound | `O=Mojaloop, CN=Hub CA (stand-in)` |
+| web-inbound | same |
+| connector-wallet2 | same — **and it has no MySQL access**, which is the whole point |
+
+**Stand-in, deliberately.** MCM is not wired up and the local Hub does no client-cert verification, so
+the script generates a placeholder CA. Replacing it is one marked line — `GET /hub/ca` — and nothing
+downstream changes. Mounted `optional: true` so a cluster without the Secret still starts; mTLS is
+what needs it, and mTLS is not on yet.
+
+**Not written: the `hub_trust` mirror.** That table does not exist — `implementation-plan.md` §2
+proposes it and no migration creates it. The mirror lands with that migration.
 
 ### CA ceremony rehearsed locally — step 5a · 2026-08-31
 
