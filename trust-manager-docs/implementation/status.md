@@ -12,16 +12,18 @@ Design lives in [`design/`](../design/); the spine is
 
 ## Where the work actually sits — read this first
 
-**FSPIOP JWS is complete across all three repositories, and — as of 2026-08-27 — the production
-Vault credential path is proven in both languages.** JWS signing and key custody are done. What
-remains on legs #2, #3 and #4 is mTLS; leg #1 additionally has replay defence (**G**) and accessKey
-revocation (**E**) unspecified.
+**FSPIOP JWS is complete across all three repositories, and — as of 2026-09-02 — so is the
+hub-facing mTLS code on legs #2, #3 and #4.** Signing, key custody and certificate handling are
+written, tested against real handshakes and running in the local cluster. **What is not done is
+turning mTLS on**: that waits on the Hub terminating TLS and verifying client certificates, which is
+a deployment step rather than a code one. Leg #1 — the DFSP-facing leg — has no mTLS at all yet, and
+additionally has replay defence (**G**) and accessKey revocation (**E**) unspecified.
 
 | Repo | Branch | Head | Tree |
 | --- | --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | `de1d666` — helm ServiceAccounts for Vault Kubernetes auth | clean |
-| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `429c174` — FSPIOP JWS signing for the hub-facing leg | clean |
-| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `1e9b3a3` — local-build image and k3d manifest | clean |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `50e5c87` — present the enrolled server certificate from web-inbound | clean |
+| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `13df358` — present a hub client certificate from connectors | clean |
+| `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2d0e0e8` — wire the hub client certificate into the connector | clean |
 
 All three working trees are clean and the cluster work is committed.
 
@@ -55,8 +57,17 @@ Both signers signed live, from Vault-sourced keys:
    2026-08-30: the newest tag is **`v0.0.24`**, so 0.0.25 exists only in the local Maven repository.
    The connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so **no connector build
    off this machine can succeed**. `pivotal-thitsawallet-connector/Dockerfile.local` exists only to
-   work around this and should be deleted once the publish workflow has run.
-2. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
+   work around this and should be deleted once the publish workflow has run. **This got more
+   expensive on 2026-09-02:** the connector's entire mTLS client path now lives in that untagged
+   artifact, so no deployment can consume it. The client-owned `gin-*` connectors also need five
+   lines added to their own `docker-entrypoint.sh` before they can enable mTLS — they inherit the
+   component through package scanning, but not the environment mapping that configures it.
+2. **Reissue `web-outbound-hub-client-tls` as PKCS#8.** cert-manager writes PKCS#1 unless told
+   otherwise. Node reads both, so this is harmless today — but it is the same encoding that stopped
+   the Java connector dead at startup, waiting for whoever next points a JVM at that Secret. One
+   field, `privateKey.encoding: PKCS8`, plus deleting the Secret so cert-manager reissues; an
+   encoding change alone does not trigger re-issuance.
+3. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
    `mvn package` during cluster bring-up produced binary diffs on tracked `target/` artifacts
    including `app.jar`. **35 files under `target/` are tracked** as of 2026-08-30.
 
@@ -77,12 +88,13 @@ JWS and key custody are done. The remaining work is scoped by which deployment s
 3. **CA ceremony** — KMS roots for `pki_hub_client` and `pki_dfsp`, Vault PKI intermediates. Runbook
    written, not yet executed. Note production already runs a `pki-hub` mount, so this adds two new
    trust domains beside a pattern that works rather than inventing one.
-4. **mTLS on legs #2, #3 and #4.** **Unblocked 2026-09-02** — the trust-bundle question is settled
-   and the delivery path is working locally. No external blocker either: the same organisation
-   operates the Hub, so registering the CA, enabling client-certificate verification at the Hub edge
-   and inbound enrollment are all internal changes. The real work now is code, not design: the TS
-   stores read their PEMs **once at startup**, and the Java connectors have **no mTLS client path at
-   all** — [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.3.
+4. ~~**mTLS on legs #2, #3 and #4**~~ — **code done 2026-09-02.** web-outbound presents a client
+   certificate, web-inbound presents the Hub-enrolled server certificate, and the Java connectors
+   present their own client certificate; all three reload on renewal without a restart. See the three
+   mTLS entries in the change log and
+   [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.3. **What remains is enablement at the Hub
+   edge** — terminating TLS and verifying client certificates — which is a deployment change in the
+   same organisation, not a design question.
 5. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
    operated by other institutions.
 6. **`pkcs11`** — deferred to the HSM-backed delivery.
@@ -134,16 +146,20 @@ Two things people get wrong about this table:
 | # | JWS | mTLS | Overall |
 | --- | --- | --- | --- |
 | 1 | 🟡 works; accessKey custody unchanged (DFSP-held) | 🔴 not started (VPN today) | **partial** |
-| 2 | 🟢 **conformant + per-participant** | 🔴 not started (plaintext HTTP) | **JWS done** |
-| 3 | 🟢 **JWS complete** — signer, vectors, callback wiring, Vault key access | 🔴 not started | **JWS done** |
-| 4 | 🟢 **verify + cross-checks + tri-state** | 🔴 not started | **JWS done** |
+| 2 | 🟢 **conformant + per-participant** | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
+| 3 | 🟢 **JWS complete** — signer, vectors, callback wiring, Vault key access | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
+| 4 | 🟢 **verify + cross-checks + tri-state** | 🟡 **code complete + reload**; off until the Hub presents a client certificate | **code done** |
 | 5 | — | ⚪ out of scope (but see note) | **excluded** |
 
 🟢 done · 🟡 partial · 🔴 not started · ⚪ out of scope
 
-No leg is finished — **every remaining item on #2, #3 and #4 is mTLS.** JWS on those three is
-conformant, per-participant, running from Vault-held keys under Kubernetes ServiceAccount auth, and
-confirmed against a live Hub (see *Proven, not just tested*).
+**The remaining item on #2, #3 and #4 is enablement, not code.** JWS on those three is conformant,
+per-participant, running from Vault-held keys under Kubernetes ServiceAccount auth, and confirmed
+against a live Hub (see *Proven, not just tested*). The mTLS paths are written and exercised against
+real handshakes, including certificate reload, but every one of them is switched off: the Hub in the
+local stack speaks plain HTTP and holds no client certificate, so turning any of them on would only
+break a working loop. Enabling them is coordinated with the Hub edge, and is the one thing standing
+between "code done" and "leg done".
 
 The paragraph that used to sit here said the JWS mechanism was "simply disabled and produces a
 protected header Mojaloop will not accept". That was true through commit 1 and is kept only to
@@ -169,9 +185,21 @@ explain why #2/#4 were *correction* work rather than greenfield.
 
 ### Left
 
-- **mTLS is entirely absent.** Today this leg is protected by a VPN. Needs the DFSP-facing CA, the
-  enrollment endpoint, and the fingerprint → `participant_cert` → `FSPIOP-Source` binding described in
-  `dfsp-facing-leg.md` §2–§3.
+- **mTLS is entirely absent.** Today this leg is protected by a VPN. **This is now the next leg to
+  build**, and the PKI beneath it already stands: the `pki_dfsp` mount, the `dfsp-client` role and
+  the `pki-dfsp` ClusterIssuer are up and rooted in KMS. What is missing is everything above that —
+  there is no `participant_cert` anywhere in `packages/`, no issuance service, no operator screens
+  and no binding enforcement.
+- **What the operator-mediated decision leaves to build.** Schema and issuance first, since the
+  screens are a UI over it and the binding checks read the rows it writes: `participant_cert`, then a
+  service that signs a submitted CSR through `pki_dfsp/sign/dfsp-client` with the common name
+  enforced to `fsp_id`, recording serial, SHA-256 fingerprint, validity and status. Then the
+  hub-operator screens — CSR upload, certificate and chain download, certificate status, accessKey
+  registration, contact management. Then the fingerprint → `participant_cert` → `FSPIOP-Source`
+  binding and the parallel endpoint (`dfsp-facing-leg.md` §2–§3).
+- **Two constraints the plan already fixes.** Issued validity is **1 year**, and a row is never
+  hard-deleted before its `valid_to` passes — a revoked certificate whose row has been purged
+  degrades from a known revocation into a lookup miss, which is a different and worse thing.
 - **Enrollment must use `pki/sign`, not `pki/issue`.** `dfsp-facing-leg.md` §2 currently names
   `pki/issue`, which would make Vault generate the keypair and contradicts "the DFSP's private key
   never leaves the DFSP". Recorded in `pki-issuance-flows.md` §5; the leg doc is still uncorrected.
@@ -210,11 +238,15 @@ explain why #2/#4 were *correction* work rather than greenfield.
 
 ### Left
 
-**JWS signing on this leg is complete.** What remains is mTLS.
+**JWS signing and the mTLS client path are both complete on this leg.** What remains is enablement.
 
-- **mTLS not started** — plain in-cluster HTTP to the Hub. Note `FspiopMtlsClientCertStore.load()`
-  runs **once at startup**, so a cert-manager renewal needs a pod restart until that is addressed
+- **mTLS code done 2026-09-02.** web-outbound presents its client certificate through
+  `MutualTlsAgent`, reads the certificate and Hub CA from mounted Secrets, reloads on renewal without
+  a restart, and refuses to start if mutual TLS is on with nothing configured
   (`pki-issuance-flows.md` §3.3).
+- **Not switched on, and not yet exercised against the Hub.** The Hub endpoints are `http://` in the
+  local stack, so axios never reaches for the agent. This needs a TLS-terminating Hub endpoint that
+  verifies client certificates.
 - Key custody: **resolved in commit 6**, and the Kubernetes half proven 2026-08-27.
   `KEY_PROVIDER=vault-kv` reads each signing tenant's key from `secret/pivotal/jwskey/<fspId>` over
   Kubernetes ServiceAccount auth. The plaintext-MySQL path survives as `KEY_PROVIDER=database`,
@@ -258,29 +290,39 @@ rebuilds them: `FspiopCallbackService`'s six `putX` methods **did not** need pat
 (`FspiopUri.extract` already strips scheme, host and base path from the outgoing OkHttp URL), and the
 `keyRef`/HSM-credential settings belong to `pkcs11`, which is deferred.
 
-What remains on #3 is mTLS:
+**mTLS on #3 is also done, as of 2026-09-02.** `ReloadableMutualTls` builds the socket factory and
+`FspiopMutualTls` applies it to the derived OkHttp client, reloading on renewal. The planned reuse of
+`RetrofitServiceBuilder.withMutualTLS()` was **not** taken: it carries `hostnameVerifier -> true`,
+and lifting a helper out of it would have invited that back. A purpose-built path avoided the
+question entirely.
+
+What remains on #3:
 
 | Where | Change |
 | --- | --- |
-| `mod_component/…/retrofit/RetrofitServiceBuilder.java` | Lift the `SSLContext` construction out of `withMutualTLS()` into a reusable helper. **Do not** carry over its `hostnameVerifier -> true`. |
+| deployable connector repos | Five lines in each `docker-entrypoint.sh` mapping the new environment variables to system properties. Done for `pivotal-thitsawallet-connector`; the client-owned `gin-*` connectors need it from their owners before they can enable mutual TLS. They inherit the component itself through package scanning. |
+| `pivotal-connector` | **Tag `v0.0.25`.** The entire mTLS client path sits in an artifact no deployment can resolve. |
 | `mod_component/…/fspiop/jws/` | `KeyProvider`: add the `pkcs11` implementation alongside `vault-kv`. HSM-backed profile only, deferred |
-| — | **No client-certificate path exists at all** in the Java connectors: `sharedOkHttpClient()` sets timeouts only — no `sslSocketFactory`, no trust manager, no client cert. `implementation-plan.md` §3's connector row does not list certificate wiring either. `pki-issuance-flows.md` §3.3 |
 
 ### Blockers specific to this leg
 
 - **`sharedOkHttpClient` is overridden by every deployable** — each connector repository defines its
   own, so anything attached to the library's `OkHttpClient` bean is dead in production. *Solved for
   JWS in commit 4*: `FspiopCallbackService` derives its own client with
-  `http.newBuilder().addInterceptor(...)`, which shares the connection pool and dispatcher. **The same
-  decision has to be made again for mTLS**, where the requirement is an `SSLSocketFactory` on the
-  client rather than an interceptor.
+  `http.newBuilder().addInterceptor(...)`, which shares the connection pool and dispatcher. **Resolved
+  the same way for mTLS on 2026-09-02**: `FspiopMutualTls.apply()` sets the `SSLSocketFactory` on that
+  same derived builder, so one `newBuilder()` now carries both the signature and the certificate.
 - **Config plumbing is manual and fails closed.** `docker-entrypoint.sh` runs `set -eu` with no
   defaults, so every new property needs an entry in the entrypoint *and* the Dockerfile `ENV` block
   *and* the README table, in **each** connector repo, or the container exits on an unbound variable.
+  The mTLS variables are written with `${VAR:-default}` so an unset one cannot halt a container, but
+  the per-repo duplication stands — and it is precisely why the client-owned connectors cannot enable
+  mutual TLS until their owners make that edit.
 - **`Settings.prop()` is weakened in the deployables.** `PivotalConfiguration.Settings` shadows seven
   parent fields and reimplements `prop()` as exact-match `System.getProperty` only
   (`PivotalConfiguration.java:96-99`), dropping the parent's env-style and normalized-key fallbacks.
-  Fix by extending rather than shadowing, or new settings will silently take defaults.
+  Fix by extending rather than shadowing, or new settings will silently take defaults. The mTLS
+  settings were deliberately left unshadowed for this reason and resolve correctly in the cluster.
 
 ---
 
@@ -304,11 +346,15 @@ What remains on #3 is mTLS:
 
 ### Left
 
-- Nothing. JWS verification for this leg is complete; what remains on #4 is server-side mTLS via
-  MCM inbound enrollment.
-- **Server-side mTLS not started.** Needs the Hub CA as trust anchor (`GET /hub/ca`) and a Pivotal
-  server certificate obtained through **MCM inbound enrollment** — a different issuance path from
-  every other certificate in this programme.
+- JWS verification for this leg is complete, and **server-side mTLS is done as of 2026-09-02**. The
+  listener presents the certificate obtained through MCM inbound enrollment and verifies callers
+  against the Hub CA, reloading both without a restart.
+- **A real defect was found and fixed here**, not merely wired: the listener was built from the
+  *client* certificate store, so it would have presented a leaf signed by Pivotal's own CA where the
+  Hub expects its own. See the change log entry.
+- **Not switched on.** `requestCert` is true when enabled, so every caller must present a
+  certificate the Hub CA signed — which the local Hub services do not have. Enabling this is
+  coordinated with the Hub edge.
 - Guard is not registered globally; per-controller `@UseGuards` coverage needs an audit.
 
 ---
@@ -404,11 +450,15 @@ entirely — building it now would spend the schedule on the deployment that is 
    5b   │ CA ceremony — KMS roots            DONE │  rehearsal keys; prod
         │                                         │  roots still to create
         └────────────────────┬────────────────────┘
-  NEXT  ┌────────────────────▼────────────────────┐
-    6   │ mTLS across #2, #3, #4                  │  no external blocker
+  DONE  ┌────────────────────▼────────────────────┐
+    6   │ mTLS across #2, #3, #4              CODE │  client, server and Java
+        │ present · verify · reload on renewal    │  paths all reload;
+        │                                         │  OFF until the Hub edge
         └────────────────────┬────────────────────┘
-        ┌────────────────────▼────────────────────┐
-    7   │ #1 DFSP-facing mTLS + enrollment        │  DFSP coordination
+  NEXT  ┌────────────────────▼────────────────────┐
+    7   │ #1 DFSP-facing mTLS + enrollment        │  operator-mediated;
+        │ schema · issuance · operator screens ·  │  PKI already stood up
+        │ binding enforcement                     │
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
     8   │ pkcs11 — HSM-backed profile             │  deferred, both repos
@@ -420,7 +470,9 @@ own tenants (`architecture.md` §2), so signing and verification were testable i
 Hub, no CA and no HSM. That also pinned the protected-header contract before anyone built against it.
 
 **Why mTLS follows rather than accompanies JWS.** JWS is application-level and flips per participant;
-mTLS is a hard cutover on a shared listener. Entangling them would make both un-rollbackable.
+mTLS is a hard cutover on a shared listener. Entangling them would make both un-rollbackable. This
+is also why step 6 is marked **CODE** rather than DONE: writing the paths and turning them on are
+separable, and only the first half is finished.
 
 **Why the cluster comes before the ceremony.** cert-manager issues the leaves and Vault Kubernetes
 auth is the production credential path. The second half of that reasoning is now spent: Kubernetes
@@ -588,6 +640,101 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### Connector mutual TLS — the hub-facing leg closed · 2026-09-02
+
+The last of the three hub-facing paths, and the only one starting from nothing:
+`sharedOkHttpClient()` set timeouts and no more — no socket factory, no trust manager, no client
+certificate.
+
+**Where it had to go.** Not on the shared client. Every deployable connector overrides that bean
+with its own, so anything configured there reaches part of the fleet. The JWS signer already solved
+this by installing itself on a *derived* client inside `FspiopCallbackService`; mutual TLS now does
+the same, from a component in the scanned package that every deployable picks up without changing.
+The client-owned connectors inherit it for free.
+
+**Reload, in a language with no equivalent of swapping a context.** The socket factory is built once
+and never replaced; behind it sit key and trust managers that delegate to a swappable reference. The
+JSSE resolves those per handshake, so a rotation reaches new connections while established ones drain
+— and the OkHttp client, its pool and its dispatcher survive untouched.
+
+**Two findings the fail-fast produced immediately.**
+
+- **cert-manager issues PKCS#1 private keys by default, and the JDK cannot read them.** The connector
+  refused to start with exactly that message. OpenSSL-based stacks read both encodings, which is why
+  this surfaced only on the Java leg and only once a real certificate was mounted. Fixed at issuance
+  with `privateKey.encoding: PKCS8` — the alternative was a second PEM parser inside an artifact four
+  connectors inherit, for a difference that carries no meaning.
+- **An encoding change alone does not trigger re-issuance.** The Secret keeps its original key until
+  deleted.
+
+Seven tests against a real certificate authority and a real TLS server: the certificate is presented,
+a renewal reaches the next connection through the same factory, an identical rewrite is a no-op, a
+truncated file leaves the previous material serving, and half a pair is refused. BouncyCastle was
+added **test-scoped only** to build the authority; the shipped artifact stays free of it.
+
+**Worth recording about the dev loop.** `k3d image import` silently does nothing when the tag already
+exists on the node, and the deployable's manifest names a different image than the one
+`Dockerfile.local`'s comment builds. Between them, several rebuilds never reached the cluster while
+every command reported success. Verify the artifact inside the pod, not the build's exit code.
+
+### Server certificate on web-inbound — a substitution that would have passed review · 2026-09-02
+
+`main.ts` built the listener's TLS options from the **client** certificate store. web-inbound would
+have presented a leaf signed by Pivotal's own CA as its server certificate, where the Hub verifies
+inbound connections against its own chain.
+
+The enrolled certificate was already there — `hub-server-cert.enroller.ts` obtains it through MCM and
+writes it to a Secret — and nothing read it.
+
+**Why this is worse than a plain bug.** A peer that verifies rejects the connection outright. A peer
+that does not verify accepts it, and mutual TLS then *appears* to work while authenticating nothing.
+Proven by probing the running service: it now presents `CN=web-inbound.pivotal` issued by
+`CN=Hub Root CA`, matching the bundle in `hub-ca-bundle`. Before the fix it would have offered the
+leaf issued by `CN=Pivotal Hub Client CA Root`.
+
+The two stores are now separate types rather than one reused for both roles, so the substitution
+cannot be made silently again. The listener reloads through `setSecureContext`, the server-side
+counterpart to the agent's context swap.
+
+Two smaller things went with it: the guard messages read `FSPIOP_USE_MUTUAL_TLS=false requires...` on
+a path only reached when it was **true**, and the `as any` on the Nest options is now a narrow cast —
+Node's server options are genuinely wider than the shape Nest declares, differing only in the
+nullability of an SNI callback argument this code never sets.
+
+**A test finding worth keeping.** The first assertion that an uncertificated caller is rejected
+failed, and the code was right: under TLS 1.3 the client certificate is sent *after* the server's
+Finished, so the rejection surfaces on first read rather than at connect. That is also where
+operators will see it in the field.
+
+### Client certificate on web-outbound, and certificate reload · 2026-09-02
+
+The first of the three. The stores existed but read inline environment variables and built an
+`https.Agent` once, so cert-manager's 60–90 day renewal would have done nothing until a restart.
+
+Reload was deliberately deferred earlier as a separate concern. It stopped being separable here:
+turning mutual TLS on is what makes an unrenewed certificate an outage rather than an inconvenience,
+so it shipped alongside rather than after.
+
+**The seam.** One agent whose `secureContext` is swapped. Node reads that option per new connection,
+so new connections take the new material and pooled ones finish on the old — the overlap both
+certificates are valid for. The material is fingerprinted rather than compared by timestamp, because
+a Secret update rewrites the file whether or not the bytes changed; reload failures are logged and
+swallowed, because a Secret is briefly half-written mid-update.
+
+The service now **refuses to start** when mutual TLS is on and no material is configured. Previously
+that combination would have sent requests with no client certificate and failed at the peer as an
+opaque handshake error, far from the cause.
+
+**A chart defect this exposed.** `apps.yaml` emitted the shared environment blocks *after* each
+component's own, so no service could override a shared value — which makes per-service rollout
+impossible, and per-service rollout is the entire model here. The first fix relied on "last duplicate
+wins" and was wrong: server-side apply rejects duplicate environment keys outright, and the upgrade
+failed with `duplicate entries for key [name="FSPIOP_USE_MUTUAL_TLS"]`. The template now merges the
+maps, so a component value overrides and one entry is emitted. Verified across all eight deployments.
+
+**Not proven end-to-end.** The local Hub URLs are `http://`, so axios never reaches for the agent.
+Real Hub verification waits on a TLS-terminating Hub endpoint.
 
 ### Enrollment model settled — operator-mediated · 2026-09-02
 

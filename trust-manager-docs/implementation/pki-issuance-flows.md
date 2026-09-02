@@ -456,22 +456,38 @@ leaf (connector-fspB)    ─┘         [Vault PKI]                    │
 cert-manager writes the intermediate into each Secret's `tls.crt` alongside the leaf, so each
 workload ships the full chain on the handshake and the Hub only ever needs root A.
 
-### 3.3 How the running process reads it — and what is missing
+### 3.3 How the running process reads it — **resolved 2026-09-02**
 
 | Workload | Reads from | Reload on renewal |
 | --- | --- | --- |
-| **web-outbound** | `FSPIOP_MTLS_CLIENT_CERT` / `_KEY` / `_CA` env → `FspiopMtlsClientCertStore.load()`, `FspiopMtlsCaStore.load()` → `https.Agent` in `core/outbound/domain/domain.module.ts` | **none** — `load()` runs once at startup |
-| **TS sample connectors** | same stores → `https.Agent` in `core/connector/domain/domain.module.ts` | **none** |
-| **Java connectors** | — nothing. `sharedOkHttpClient()` sets timeouts only: no `sslSocketFactory`, no trust manager, no client cert | **n/a — not wired at all** |
+| **web-outbound** | `FSPIOP_MTLS_CLIENT_CERT_PATH` / `_KEY_PATH` / `FSPIOP_MTLS_CA_PATH` → `MutualTlsAgent` in `core/outbound/domain/domain.module.ts` | **yes** — polls every 60s, swaps the agent's `secureContext` |
+| **web-inbound** | `FSPIOP_MTLS_SERVER_CERT_PATH` / `_KEY_PATH` / `FSPIOP_MTLS_CA_PATH` → `MutualTlsServer` in `apps/web-inbound/main.ts` | **yes** — polls every 60s, calls `setSecureContext` on the listener |
+| **Java connectors** | `fspiopMtlsClientCertPath` / `fspiopMtlsClientKeyPath` / `fspiopMtlsCaPath` → `ReloadableMutualTls`, applied to the derived OkHttp client in `FspiopCallbackService` | **yes** — polls every 60s, swaps the delegating key and trust managers |
+| **TS sample connectors** | the stores directly → `https.Agent` in `core/connector/domain/domain.module.ts` | **none** — still built once at startup |
 
-Two consequences:
+**Reload is uniform in mechanism across all three production paths.** Each keeps one long-lived
+object — an agent, a listener, a socket factory — and swaps only the material behind it. New
+connections pick up the new certificate while established ones finish on the old, which is exactly
+the overlap a renewal window provides. Each fingerprints the material rather than trusting a
+timestamp, because a Secret update rewrites the file whether or not the bytes changed; and each
+logs and swallows a failed read, because a Secret is briefly half-written mid-update and the
+material already loaded is still valid.
 
-- **cert-manager renews every 60–90 days, but no pod picks the new material up.** A renewal today
-  means a restart. A volume-mounted Secret updates in place, but the stores read the PEMs once.
-- **The Java connectors have no mTLS client path whatsoever**, yet
-  [`hub-facing-leg.md`](../design/hub-facing-leg.md) B1 makes `connector → Hub` a client relationship.
-  `implementation-plan.md` §3's connector row lists the protected header, PKCS#11 signing, the two new
-  HTTP headers, the subscription and ack-after-PUT — but **not** certificate wiring.
+**The TS sample connectors are the one path still reading once at startup.** They are samples rather
+than a deployed artifact — the production connector path is Java — so this is a known gap, not an
+oversight. Moving them onto `MutualTlsAgent` is a small change whenever it is wanted.
+
+**Two things the implementation settled that the design did not state.**
+
+- **The server certificate is not the client certificate.** `web-inbound` was building its listener
+  from the *client* store, so it would have presented a leaf signed by Pivotal's own CA where the
+  Hub expects one signed by the Hub's. A peer that verifies rejects it; a peer that does not accepts
+  it, which is worse, because mTLS then only appears to work. The two stores are now separate types
+  so the substitution cannot be made silently.
+- **cert-manager issues PKCS#1 private keys by default, and the JDK cannot read them.** OpenSSL-based
+  stacks read both encodings, so this surfaces only on the Java leg — where it is fatal at startup.
+  Fixed at issuance with `privateKey.encoding: PKCS8` rather than by adding a second PEM parser to an
+  artifact every connector inherits.
 
 ### 3.4 Hub CA delivery — **resolved 2026-09-02**
 
@@ -513,10 +529,10 @@ insert their own CA and be trusted as the Hub.
 
 #### What this exposes rather than fixes
 
-The mechanism is the easy half. §3.3 already records the harder part: `FspiopMtlsCaStore.load()` runs
-**once at startup**, so a rotated bundle is never picked up — a Hub CA change means a pod restart
-today. The Java connectors are worse: they have no mTLS client path at all. Choosing the store does
-not fix either; it makes both visible and schedulable.
+The mechanism was the easy half; §3.3 recorded the harder part, and both halves are now closed. The
+bundle is re-read on a poll by web-outbound, web-inbound and the Java connectors, so a rotated Hub CA
+takes effect within a minute rather than at the next restart. Choosing the store did not fix that —
+it made it visible and schedulable, and it was then scheduled.
 
 #### Naming collision, worth knowing before a design review
 
