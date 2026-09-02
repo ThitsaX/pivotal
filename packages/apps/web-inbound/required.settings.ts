@@ -5,14 +5,10 @@ import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {
     FspiopJwsPrivateKeyStore,
     FspiopJwsPublicKeyStore,
-    FspiopMtlsCaStore,
-    FspiopMtlsClientCertStore,
     FspiopSettings,
     FspiopVerifyMode,
 } from '@shared/fspiop';
 import {
-    CaStore,
-    ClientCertStore,
     PrivateKeyStore,
     PublicKeyStore,
 } from '@shared/security';
@@ -24,14 +20,10 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
     private readonly inboundPublicKeyStore: PublicKeyStore;
     private readonly inboundPrivateKeyStore: PrivateKeyStore;
-    private readonly inboundCaStore: CaStore;
-    private readonly inboundClientCertStore: ClientCertStore;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
         this.inboundPublicKeyStore = new FspiopJwsPublicKeyStore().load();
         this.inboundPrivateKeyStore = new FspiopJwsPrivateKeyStore().load();
-        this.inboundCaStore = new FspiopMtlsCaStore().load();
-        this.inboundClientCertStore = new FspiopMtlsClientCertStore().load();
     }
 
     natsUrl(): string {
@@ -114,14 +106,6 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
     privateKeyStore(): PrivateKeyStore {
         return this.inboundPrivateKeyStore;
-    }
-
-    caStore(): CaStore {
-        return this.inboundCaStore;
-    }
-
-    clientCertStore(): ClientCertStore {
-        return this.inboundClientCertStore;
     }
 
     private readRequiredString(name: string): string {

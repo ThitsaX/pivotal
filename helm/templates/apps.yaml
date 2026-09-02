@@ -36,6 +36,9 @@ spec:
             - name: hub-ca-bundle
               mountPath: /etc/pivotal/hub-ca
               readOnly: true
+            - name: hub-server-cert
+              mountPath: /etc/pivotal/hub-server-cert
+              readOnly: true
       volumes:
         # Authoritative store for the Hub CA — NOT a projection of MySQL.
         # Connectors have no MySQL access, so the bundle cannot live there;
@@ -43,6 +46,12 @@ spec:
         - name: hub-ca-bundle
           secret:
             secretName: {{ .Values.global.hubCaSecretName }}
+            optional: true
+        # Enrolled with the Hub and renewed by trust-manager, not by cert-manager:
+        # the Hub signs what this listener presents, so the Hub is where it comes from.
+        - name: hub-server-cert
+          secret:
+            secretName: {{ .Values.global.hubServerCertSecretName }}
             optional: true
 ---
 apiVersion: v1

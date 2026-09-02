@@ -85,12 +85,12 @@ export class HubCaSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
         try {
             if (await this.sync()) {
-                // Worth an operator's attention: consumers read this file once at
-                // startup, so until that is addressed a changed bundle needs a
-                // restart before it takes effect.
+                // A trust anchor changing is worth an operator's attention on its own,
+                // whether or not consumers pick it up unaided. The Node services reload
+                // the bundle within a minute; the Java connectors still need a restart.
                 this.logger.warn(
                     `Hub CA changed and Secret '${this.secretName}' was rewritten. `
-                    + 'Consumers load the bundle at startup and will not pick it up until restarted.',
+                    + 'Services that do not reload the bundle need a restart to pick it up.',
                 );
             }
         } catch (error: unknown) {

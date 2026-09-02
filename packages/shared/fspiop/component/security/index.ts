@@ -6,3 +6,6 @@ export * from './fspiop-mtls-ca-store';
 export * from './fspiop-mtls-client-cert-store';
 export * from './jws-policy-store';
 export * from './mutual-tls-agent';
+export * from './pem-pair';
+export * from './fspiop-mtls-server-cert-store';
+export * from './mutual-tls-server';

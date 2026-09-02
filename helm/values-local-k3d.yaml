@@ -107,3 +107,13 @@ webInbound:
     # web-inbound only VERIFIES, so it needs public keys from MySQL and no Vault
     # access at all -- no role, no crypto user.
     KEY_PROVIDER: database
+    # The listener presents the certificate the Hub signed through enrollment, and
+    # verifies callers against the Hub's own CA. Deliberately NOT the client leaf,
+    # which no peer verifying against the Hub's chain would accept.
+    FSPIOP_MTLS_SERVER_CERT_PATH: /etc/pivotal/hub-server-cert/tls.crt
+    FSPIOP_MTLS_SERVER_KEY_PATH: /etc/pivotal/hub-server-cert/tls.key
+    FSPIOP_MTLS_CA_PATH: /etc/pivotal/hub-ca/hub-ca.pem
+    # Left off here: the Hub services in the Compose stack call this listener over
+    # plain HTTP and hold no client certificate, so enabling it locally would only
+    # break the loop. Turned on per environment once the caller can present one.
+    FSPIOP_USE_MUTUAL_TLS: "false"

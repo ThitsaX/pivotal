@@ -3,11 +3,11 @@
 import 'reflect-metadata';
 import {existsSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
-import {Logger} from '@nestjs/common';
+import {Logger, NestApplicationOptions} from '@nestjs/common';
 import {NestFactory} from '@nestjs/core';
 import {config as loadDotEnv} from 'dotenv';
 import {json} from 'express';
-import {FspInboundGuard, FspiopExceptionFilter, PivotalLogger} from '@shared/fspiop';
+import {FspInboundGuard, FspiopExceptionFilter, MutualTlsServer, PivotalLogger} from '@shared/fspiop';
 import {WebInboundSettings} from './required.settings';
 import {WebInboundAppModule} from './app.module';
 
@@ -43,33 +43,6 @@ const findRepoRoot = (): string => {
     return process.cwd();
 };
 
-const resolveHttpsOptions = (
-    settings: WebInboundSettings,
-    useMutualTls: boolean,
-): Record<string, unknown> | undefined => {
-    if (!useMutualTls) {
-        return undefined;
-    }
-
-    const ca = settings.caStore().get();
-    if (ca == null || ca.toBuffer().length === 0) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CA.');
-    }
-
-    const clientCert = settings.clientCertStore().get();
-    if (clientCert == null) {
-        throw new Error('FSPIOP_USE_MUTUAL_TLS=false requires FSPIOP_MTLS_CLIENT_CERT and FSPIOP_MTLS_CLIENT_KEY.');
-    }
-
-    return {
-        ca: ca.toBuffer(),
-        cert: clientCert.certBuffer(),
-        key: clientCert.keyBuffer(),
-        requestCert: true,
-        rejectUnauthorized: true,
-    };
-};
-
 const bootstrap = async (): Promise<void> => {
     const repoRoot = findRepoRoot();
 
@@ -89,10 +62,22 @@ const bootstrap = async (): Promise<void> => {
     const port = Number(process.env['WEB_INBOUND_PORT'] ?? DEFAULT_HTTP_PORT);
     const deps = new WebInboundSettings();
     const settings = deps.fspiopSettings();
-    const httpsOptions = resolveHttpsOptions(deps, settings.useMutualTls);
-    const nestOptions = {
+
+    // The listener presents the certificate the Hub signed through inbound enrollment,
+    // and verifies callers against the Hub's own CA. Both are mounted Secrets that are
+    // renewed independently of this process, so the material is watched rather than
+    // captured at startup.
+    const mutualTls = settings.useMutualTls
+        ? MutualTlsServer.create({ requestClientCert: true })
+        : null;
+
+    const nestOptions: NestApplicationOptions = {
         logger: new PivotalLogger(),
-        ...(httpsOptions == null ? {} : {httpsOptions: httpsOptions as any}),
+        // Node's own server options are wider than the shape Nest declares; the two
+        // differ only in the nullability of an SNI callback argument this code never sets.
+        ...(mutualTls == null
+            ? {}
+            : { httpsOptions: mutualTls.httpsOptions() as NestApplicationOptions['httpsOptions'] }),
     };
 
     const app = await NestFactory.create(WebInboundAppModule, nestOptions);
@@ -119,6 +104,9 @@ const bootstrap = async (): Promise<void> => {
     httpServer.headersTimeout = Number(process.env['WEB_INBOUND_HEADERS_TIMEOUT_MS'] ?? 66000);
 
     await app.listen(port);
+
+    mutualTls?.watch(httpServer);
+
     const protocol = settings.useMutualTls ? 'https' : 'http';
     Logger.log(`Web inbound is listening on ${protocol} port ${port}.`, 'Bootstrap');
 };
