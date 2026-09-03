@@ -146,7 +146,7 @@ Pivotal terminates or originates five distinct TLS/signature relationships. Four
 | **2** | `web-outbound` → Hub | client | **signs** as the payer tenant | monorepo | yes |
 | **3** | `connector` → Hub | client | **signs** as its own tenant | `pivotal-connector` | yes |
 | **4** | Hub → `web-inbound` | **server** | **verifies** peer + own-tenant JWS | monorepo | yes |
-| **5** | `connector` → payee CBS | client, against the FSP's own CA | none | connector repos | **no** |
+| **5** | `connector` → payee CBS | client, against the FSP's own CA | none | connector repos | **no** — but see the leg #5 section: server certificates are **not verified** today, and an option for Pivotal as CA is recorded there |
 
 Two things people get wrong about this table:
 
@@ -427,6 +427,55 @@ those backends' server certificates". **They do not.** Every connector calls
 `withDisableSSLVerification()` — an all-trusting `X509TrustManager`, `hostnameVerifier -> true`, and
 `SSLContext.getInstance("SSL")`. The current state is *unverified*, not *manually verified*. Worth a sentence in
 `architecture.md`; not trust-manager work.
+
+### The cheap fix, worth doing whether or not the leg comes into scope
+
+**Stop disabling verification.** Trust the FSP's CA and verify the hostname. This needs one thing
+from each DFSP — their CA certificate — and nothing on Pivotal's side: no client certificate, no
+renewal calendar, no enrollment. It closes the actual exposure, which is not "traffic is
+unencrypted" but "any host that can influence routing impersonates the backend, receives real
+customer data, and returns fabricated responses, while every log still reads as TLS".
+
+That is a different and larger problem than the absence of mutual TLS, and much cheaper to fix.
+
+### If Pivotal becomes the CA for this leg — recorded 2026-09-04, not scheduled
+
+Raised as a possibility because Pivotal already operates the machinery. Ordered by ascending effort;
+the first three are reuse, the fourth is new design.
+
+**The dependency chain already helps:** deployable → `mod-pivotal-connector-api` → `mod-component`,
+so `ReloadableMutualTls` — swappable key and trust managers with reload, already tested for the
+hub-facing leg — is on every connector's classpath today.
+
+| # | Component | Change | Effort |
+| --- | --- | --- | --- |
+| 1 | `ThitsaWalletClientImpl`, `ApiClient` in `mod_fspiop_interface` | replace the two `withDisableSSLVerification()` calls with the existing `ReloadableMutualTls` socket factory and trust manager; add backend-specific settings and the entrypoint mapping | small in the framework, **multiplied per connector repo** — the `gin-*` ones are their owners' to change |
+| 2 | Vault PKI, cert-manager | a new mount and role, plus a `Certificate` per connector | low; cert-manager already issues from Vault PKI on the hub-facing leg |
+| 3 | trust-manager | deliver the backend trust anchor as a mounted Secret, the way `hub-ca-bundle` is delivered | low/moderate; `DfspCaPublishScheduler` is the template |
+| 4 | `DfspCertificateIssuer`, `participant_cert`, portal | issue **server** certificates to DFSP backends | **highest, and genuinely new** |
+
+**A fourth trust domain, not a reuse of `pki_dfsp`.** Those certificates are issued *to* DFSPs for
+traffic coming *in*; these are certificates Pivotal *presents* going *out*. One CA for both would
+mean a DFSP's own client certificate is accepted by a backend expecting a connector. The rule that
+trust domains never merge applies directly — this is `pki_backend_client`.
+
+**Why row 4 is not an extension of what exists.** Everything built so far issues client certificates
+(`client_flag=true server_flag=false`). A backend server certificate is identified by **hostnames in
+SANs**, not by `CN=fspId` — so the issuer's central guarantee, forcing the common name to the
+enrolled participant, is *wrong* here and must not be copied across. `participant_cert` has no
+notion of certificate usage or SANs, so it needs a column or a sibling table, and the operator flow
+has to accept a CSR carrying SANs it does not control.
+
+**Recommended scope if this is ever taken up: rows 1–3 only.** That gives mutual TLS with the DFSP's
+server certificate verified against the DFSP's CA, and Pivotal's client certificate issued and
+renewed by machinery already running. Row 4 buys control of their server identity at the cost of new
+design plus persuading each DFSP to install a Pivotal-issued certificate on their infrastructure —
+and it puts Pivotal on the hook whenever their endpoint changes hostname.
+
+**Whatever is done here, expiry is the failure mode to design against**, not compromise. A
+hand-installed certificate that nothing monitors will lapse and take a DFSP's traffic down without
+warning. The phase-7 expiry alerting must cover certificates Pivotal *holds*, not only those it
+issues.
 
 ---
 
