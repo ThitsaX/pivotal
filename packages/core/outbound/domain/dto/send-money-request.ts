@@ -69,6 +69,7 @@ export class SendMoneyRequest {
     @MaxLength(32, {message: 'subScenario must not exceed 32 characters'})
     subScenario!: string;
 
+    @Transform(({value}) => typeof value === 'string' && value.trim().length === 0 ? undefined : value)
     @IsOptional()
     @IsString()
     @MaxLength(128, {message: 'note must not exceed 128 characters'})
