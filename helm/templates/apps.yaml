@@ -293,8 +293,18 @@ spec:
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
-              containerPort: 80
+              # nginx in this image listens on 8080, not 80: the config in
+              # docker/portal.nginx.conf binds it there so the container needs no
+              # privileged port. The Service targets this name, so the two must agree.
+              containerPort: 8080
               protocol: TCP
+          {{- with .Values.portal.env }}
+          # Read at container start by docker/portal-runtime-config.sh, which writes
+          # config.js for the browser. The bundle is built once and configured here, so
+          # the same image serves every environment.
+          env:
+            {{- include "pivotal-stack.envVars" . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service

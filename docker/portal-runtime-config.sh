@@ -25,7 +25,7 @@ window.__PIVOTAL_CONFIG__ = {
     REPORT_DOWNLOAD_POLL_INTERVAL_SEC: "$(escape_js "$poll_interval_sec")",
     REPORT_DOWNLOAD_JOB_TTL_MS: "$(escape_js "$job_ttl_ms")",
     REPORT_DOWNLOAD_READY_TTL_MS: "$(escape_js "$ready_ttl_ms")",
-    REPORT_DOWNLOAD_POLL_INTERVAL_MS: "$(escape_js "$poll_interval_ms")"
-    SIGNING_KEYS_UI_ENABLED: "$(escape_js "$signing_keys_ui_enabled")",
+    REPORT_DOWNLOAD_POLL_INTERVAL_MS: "$(escape_js "$poll_interval_ms")",
+    SIGNING_KEYS_UI_ENABLED: "$(escape_js "$signing_keys_ui_enabled")"
 };
 EOF
