@@ -28,11 +28,11 @@ function validator(mandatory: boolean, decimalPlaces: number = 2): PayerProvided
     );
 }
 
-function feeValues(schemeFee: unknown, payerProvidedFee: unknown): ExtensionList {
+function feeValues(payerProvidedSchemeFee: unknown, payerProvidedPayerFee: unknown): ExtensionList {
     return {
         extension: [
-            {key: 'schemeFee', value: schemeFee},
-            {key: 'payerProvidedFee', value: payerProvidedFee},
+            {key: 'payerProvidedSchemeFee', value: payerProvidedSchemeFee},
+            {key: 'payerProvidedPayerFee', value: payerProvidedPayerFee},
         ],
     } as ExtensionList;
 }
@@ -51,7 +51,7 @@ describe('PayerProvidedFeesValidator', () => {
 
         assert.doesNotThrow(() => feeValidator.validate(
             true,
-            extensionList('schemeFee', 'payerProvidedFee'),
+            extensionList('payerProvidedSchemeFee', 'payerProvidedPayerFee'),
         ));
     });
 
@@ -65,7 +65,7 @@ describe('PayerProvidedFeesValidator', () => {
         assert.equal(fees.extension[1]!.value, '5.1');
     });
 
-    it('rejects schemeFee when it exceeds DECIMAL_PLACES', () => {
+    it('rejects payerProvidedSchemeFee when it exceeds DECIMAL_PLACES', () => {
         const feeValidator = validator(true, 2);
 
         assertErrorCode(
@@ -74,7 +74,7 @@ describe('PayerProvidedFeesValidator', () => {
         );
     });
 
-    it('rejects payerProvidedFee when it exceeds DECIMAL_PLACES', () => {
+    it('rejects payerProvidedPayerFee when it exceeds DECIMAL_PLACES', () => {
         const feeValidator = validator(true, 2);
 
         assertErrorCode(
@@ -101,21 +101,21 @@ describe('PayerProvidedFeesValidator', () => {
         );
     });
 
-    it('rejects acceptParty when schemeFee is missing', () => {
+    it('rejects acceptParty when payerProvidedSchemeFee is missing', () => {
         const feeValidator = validator(true);
 
         assertFeeValidationError(() => feeValidator.validate(
             true,
-            extensionList('payerProvidedFee'),
+            extensionList('payerProvidedPayerFee'),
         ));
     });
 
-    it('rejects acceptParty when payerProvidedFee is missing', () => {
+    it('rejects acceptParty when payerProvidedPayerFee is missing', () => {
         const feeValidator = validator(true);
 
         assertFeeValidationError(() => feeValidator.validate(
             true,
-            extensionList('schemeFee'),
+            extensionList('payerProvidedSchemeFee'),
         ));
     });
 
@@ -143,7 +143,7 @@ describe('PayerProvidedFeesValidator', () => {
 
         assertFeeValidationError(() => feeValidator.validate(
             true,
-            extensionList('SchemeFee', 'payerprovidedfee'),
+            extensionList('PayerProvidedSchemeFee', 'payerprovidedpayerfee'),
         ));
     });
 });

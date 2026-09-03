@@ -78,8 +78,8 @@ describe('PutAcceptPartyHandler', () => {
         let savedRequest: TransferRequest | undefined;
         const extensionList: ExtensionList = {
             extension: [
-                {key: 'schemeFee', value: '1.23'},
-                {key: 'payerProvidedFee', value: '2.34'},
+                {key: 'payerProvidedSchemeFee', value: '1.23'},
+                {key: 'payerProvidedPayerFee', value: '2.34'},
             ],
         };
 
