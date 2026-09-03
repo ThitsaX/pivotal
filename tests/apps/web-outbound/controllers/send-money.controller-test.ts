@@ -170,6 +170,16 @@ describe('SendMoneyRequest', () => {
         assert.equal(request.amount, '12');
     });
 
+    it('accepts an empty note and normalizes it to undefined', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.note = '';
+
+        const {request, errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.note, undefined);
+    });
+
     it('accepts 32-character payer and payee FSP IDs', async () => {
         const fspId = 'f'.repeat(32);
         const {errors} = await validateSendMoneyRequest(sendMoneyBody(fspId, fspId));
