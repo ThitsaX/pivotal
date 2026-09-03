@@ -8,8 +8,8 @@ export class PayerProvidedFeesValidator {
         'Fee validation failed. Required fee information was not provided by the Payer DFSP.';
 
     private static readonly REQUIRED_EXTENSION_KEYS = [
-        'schemeFee',
-        'payerProvidedFee',
+        'payerProvidedSchemeFee',
+        'payerProvidedPayerFee',
     ] as const;
 
     constructor(
