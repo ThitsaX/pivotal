@@ -10,12 +10,18 @@ import {
     AddFspCurrencyHandler,
     AddHubCurrencyHandler,
     AddSigningKeysHandler,
+    EnrollDfspCertificateHandler,
     OnboardFspHandler,
+    RevokeDfspCertificateHandler,
     UpdateAccessKeyHandler,
     UpsertEndpointHandler,
 } from './command';
 import {Participant, ParticipantCert, ParticipantCertStatus, ParticipantKey} from './model';
-import {ListCentralLedgerParticipantsHandler} from './query';
+import {
+    GetDfspCertificateHandler,
+    ListCentralLedgerParticipantsHandler,
+    ListDfspCertificatesHandler,
+} from './query';
 import {
     ParticipantCertRepository,
     ParticipantKeyRepository,
@@ -84,10 +90,14 @@ const CommandHandlers = [
     AddSigningKeysHandler,
     UpsertEndpointHandler,
     UpdateAccessKeyHandler,
+    EnrollDfspCertificateHandler,
+    RevokeDfspCertificateHandler,
 ];
 
 const QueryHandlers = [
     ListCentralLedgerParticipantsHandler,
+    ListDfspCertificatesHandler,
+    GetDfspCertificateHandler,
 ];
 
 @Module({})

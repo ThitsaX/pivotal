@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Inject, Injectable, Logger} from '@nestjs/common';
-import {DbTarget} from '@shared/typeorm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { DbTarget } from '@shared/typeorm';
 import {
     ADMIN_ROLE_CODE,
     DFSP_USER_ROLE_CODE,
@@ -24,59 +24,62 @@ import {
 
 export interface RbacStepResult {
     inserted: number;
-    skipped:  boolean;
+    skipped: boolean;
 }
 
 export interface RbacSeedResult {
-    roles:           RbacStepResult;
-    permissions:     RbacStepResult;
+    roles: RbacStepResult;
+    permissions: RbacStepResult;
     rolePermissions: RbacStepResult;
-    menus:           RbacStepResult;
+    menus: RbacStepResult;
     menuPermissions: RbacStepResult;
 }
 
 interface RoleSeed {
-    code:        string;
-    name:        string;
-    scope:       RoleScope;
+    code: string;
+    name: string;
+    scope: RoleScope;
     description: string;
 }
 
 interface PermissionSeed {
-    keyName:     string;
-    scope:       PermissionScope;
+    keyName: string;
+    scope: PermissionScope;
     description: string;
 }
 
 interface MenuSeed {
-    menuKey:    string;
+    menuKey: string;
     groupLabel: string;
-    label:      string;
-    route:      string;
-    sortOrder:  number;
+    label: string;
+    route: string;
+    sortOrder: number;
     permissionKey: string;
 }
 
 const ROLE_SEEDS: RoleSeed[] = [
-    {code: ADMIN_ROLE_CODE,     name: 'System Administrator', scope: 'HUB',  description: 'Full access to all hub operations.'},
-    {code: DFSP_USER_ROLE_CODE, name: 'DFSP Operator',        scope: 'DFSP', description: 'Operator scoped to a single FSP by fsp_id.'},
+    { code: ADMIN_ROLE_CODE, name: 'System Administrator', scope: 'HUB', description: 'Full access to all hub operations.' },
+    { code: DFSP_USER_ROLE_CODE, name: 'DFSP Operator', scope: 'DFSP', description: 'Operator scoped to a single FSP by fsp_id.' },
 ];
 
 const PERMISSION_SEEDS: PermissionSeed[] = [
-    {keyName: PermissionKey.HUB_CURRENCY_ADD,                scope: 'HUB',  description: 'Provision hub settlement accounts for a new currency.'},
-    {keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE,         scope: 'HUB',  description: 'Update the hub-side JWS signing key pair.'},
-    {keyName: PermissionKey.PARTICIPANT_LIST,                scope: 'HUB',  description: 'View the list of registered participants.'},
-    {keyName: PermissionKey.PARTICIPANT_ONBOARD,             scope: 'HUB',  description: 'Onboard a new FSP into the hub.'},
-    {keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD,        scope: 'HUB',  description: 'Enable an additional currency for an existing participant.'},
-    {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   scope: 'HUB',  description: 'Register or replace a participant\'s callback endpoint.'},
-    {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'Update the JWS signing keys for a participant.'},
-    {keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,   scope: 'HUB',  description: 'Update the access public key used to verify a participant\'s signed requests.'},
-    {keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST,         scope: 'BOTH', description: 'Query the audited transactions list.'},
-    {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         scope: 'BOTH', description: 'View a single audited transaction by transfer ID.'},
-    {keyName: PermissionKey.AUDIT_DASHBOARD_VIEW,            scope: 'BOTH', description: 'View the transaction statistics dashboard.'},
-    {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
-    {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              scope: 'HUB',  description: 'Manage portal roles and their granted permissions.'},
-    {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          scope: 'HUB',  description: 'Browse the read-only permission catalogue.'},
+    { keyName: PermissionKey.HUB_CURRENCY_ADD, scope: 'HUB', description: 'Provision hub settlement accounts for a new currency.' },
+    { keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE, scope: 'HUB', description: 'Update the hub-side JWS signing key pair.' },
+    { keyName: PermissionKey.PARTICIPANT_LIST, scope: 'HUB', description: 'View the list of registered participants.' },
+    { keyName: PermissionKey.PARTICIPANT_ONBOARD, scope: 'HUB', description: 'Onboard a new FSP into the hub.' },
+    { keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD, scope: 'HUB', description: 'Enable an additional currency for an existing participant.' },
+    { keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER, scope: 'HUB', description: 'Register or replace a participant\'s callback endpoint.' },
+    { keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB', description: 'Update the JWS signing keys for a participant.' },
+    { keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE, scope: 'HUB', description: 'Update the access public key used to verify a participant\'s signed requests.' },
+    { keyName: PermissionKey.PARTICIPANT_CERT_ENROLL, scope: 'HUB', description: 'Sign a participant\'s certificate request and issue a client certificate.' },
+    { keyName: PermissionKey.PARTICIPANT_CERT_VIEW, scope: 'HUB', description: 'View and download participant client certificates and their status.' },
+    { keyName: PermissionKey.PARTICIPANT_CERT_REVOKE, scope: 'HUB', description: 'Revoke a participant client certificate before it expires.' },
+    { keyName: PermissionKey.AUDIT_TRANSACTIONS_LIST, scope: 'BOTH', description: 'Query the audited transactions list.' },
+    { keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW, scope: 'BOTH', description: 'View a single audited transaction by transfer ID.' },
+    { keyName: PermissionKey.AUDIT_DASHBOARD_VIEW, scope: 'BOTH', description: 'View the transaction statistics dashboard.' },
+    { keyName: PermissionKey.ADMIN_USERS_MANAGE, scope: 'HUB', description: 'Manage portal user accounts (list, create, update, reset password, deactivate).' },
+    { keyName: PermissionKey.ADMIN_ROLES_MANAGE, scope: 'HUB', description: 'Manage portal roles and their granted permissions.' },
+    { keyName: PermissionKey.ADMIN_PERMISSIONS_LIST, scope: 'HUB', description: 'Browse the read-only permission catalogue.' },
 ];
 
 const ROLE_GRANTS: Record<string, string[]> = {
@@ -89,17 +92,18 @@ const ROLE_GRANTS: Record<string, string[]> = {
 };
 
 const MENU_SEEDS: MenuSeed[] = [
-    {menuKey: 'hub-add-currency',              groupLabel: 'Hub',         label: 'Add Currency',         route: '/views/hub-add-currency',              sortOrder: 10, permissionKey: PermissionKey.HUB_CURRENCY_ADD},
-    {menuKey: 'hub-list-participants',         groupLabel: 'Hub',         label: 'List Participants',    route: '/views/hub-list-participants',         sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_LIST},
-    {menuKey: 'hub-add-signing-keys',          groupLabel: 'Hub',         label: 'Update Signing Keys',  route: '/views/hub-add-signing-keys',          sortOrder: 30, permissionKey: PermissionKey.HUB_SIGNING_KEYS_UPDATE},
-    {menuKey: 'participant-onboarding',        groupLabel: 'Participant', label: 'Onboard FSP',          route: '/views/participant-onboarding',        sortOrder: 10, permissionKey: PermissionKey.PARTICIPANT_ONBOARD},
-    {menuKey: 'participant-add-new-currency',  groupLabel: 'Participant', label: 'Add Currency',         route: '/views/participant-add-new-currency',  sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_CURRENCY_ADD},
-    {menuKey: 'participant-register-endpoint', groupLabel: 'Participant', label: 'Register Endpoint',    route: '/views/participant-register-endpoint', sortOrder: 30, permissionKey: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER},
-    {menuKey: 'participant-add-signing-keys',  groupLabel: 'Participant', label: 'Update Signing Keys', route: '/views/participant-add-signing-keys',  sortOrder: 40, permissionKey: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE},
-    {menuKey: 'transactions',                  groupLabel: 'Audit',       label: 'Find Transactions',    route: '/views/transactions',                  sortOrder: 10, permissionKey: PermissionKey.AUDIT_TRANSACTIONS_LIST},
-    {menuKey: 'admin-users',                   groupLabel: 'Admin',       label: 'Users',                route: '/views/admin-users',                   sortOrder: 10, permissionKey: PermissionKey.ADMIN_USERS_MANAGE},
-    {menuKey: 'admin-roles',                   groupLabel: 'Admin',       label: 'Roles',                route: '/views/admin-roles',                   sortOrder: 20, permissionKey: PermissionKey.ADMIN_ROLES_MANAGE},
-    {menuKey: 'admin-permissions',             groupLabel: 'Admin',       label: 'Permissions',          route: '/views/admin-permissions',             sortOrder: 30, permissionKey: PermissionKey.ADMIN_PERMISSIONS_LIST},
+    { menuKey: 'hub-add-currency', groupLabel: 'Hub', label: 'Add Currency', route: '/views/hub-add-currency', sortOrder: 10, permissionKey: PermissionKey.HUB_CURRENCY_ADD },
+    { menuKey: 'hub-list-participants', groupLabel: 'Hub', label: 'List Participants', route: '/views/hub-list-participants', sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_LIST },
+    { menuKey: 'hub-add-signing-keys', groupLabel: 'Hub', label: 'Update Signing Keys', route: '/views/hub-add-signing-keys', sortOrder: 30, permissionKey: PermissionKey.HUB_SIGNING_KEYS_UPDATE },
+    { menuKey: 'participant-onboarding', groupLabel: 'Participant', label: 'Onboard FSP', route: '/views/participant-onboarding', sortOrder: 10, permissionKey: PermissionKey.PARTICIPANT_ONBOARD },
+    { menuKey: 'participant-add-new-currency', groupLabel: 'Participant', label: 'Add Currency', route: '/views/participant-add-new-currency', sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_CURRENCY_ADD },
+    { menuKey: 'participant-register-endpoint', groupLabel: 'Participant', label: 'Register Endpoint', route: '/views/participant-register-endpoint', sortOrder: 30, permissionKey: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER },
+    { menuKey: 'participant-add-signing-keys', groupLabel: 'Participant', label: 'Update Signing Keys', route: '/views/participant-add-signing-keys', sortOrder: 40, permissionKey: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE },
+    { menuKey: 'participant-certificates', groupLabel: 'Participant', label: 'Certificates', route: '/views/participant-certificates', sortOrder: 50, permissionKey: PermissionKey.PARTICIPANT_CERT_VIEW },
+    { menuKey: 'transactions', groupLabel: 'Audit', label: 'Find Transactions', route: '/views/transactions', sortOrder: 10, permissionKey: PermissionKey.AUDIT_TRANSACTIONS_LIST },
+    { menuKey: 'admin-users', groupLabel: 'Admin', label: 'Users', route: '/views/admin-users', sortOrder: 10, permissionKey: PermissionKey.ADMIN_USERS_MANAGE },
+    { menuKey: 'admin-roles', groupLabel: 'Admin', label: 'Roles', route: '/views/admin-roles', sortOrder: 20, permissionKey: PermissionKey.ADMIN_ROLES_MANAGE },
+    { menuKey: 'admin-permissions', groupLabel: 'Admin', label: 'Permissions', route: '/views/admin-permissions', sortOrder: 30, permissionKey: PermissionKey.ADMIN_PERMISSIONS_LIST },
 ];
 
 @Injectable()
@@ -129,14 +133,14 @@ export class RbacSeeder {
         const menus = await this.seedMenus();
         const menuPermissions = await this.seedMenuPermissions();
 
-        return {roles, permissions, rolePermissions, menus, menuPermissions};
+        return { roles, permissions, rolePermissions, menus, menuPermissions };
     }
 
     private async seedRoles(): Promise<RbacStepResult> {
 
         if (await this.roleRepository.count(DbTarget.Write) > 0) {
             RbacSeeder.LOGGER.log('roles already populated; skipping.');
-            return {inserted: 0, skipped: true};
+            return { inserted: 0, skipped: true };
         }
 
         for (const seed of ROLE_SEEDS) {
@@ -144,14 +148,14 @@ export class RbacSeeder {
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${ROLE_SEEDS.length} role(s): ${ROLE_SEEDS.map((r) => r.code).join(', ')}.`);
-        return {inserted: ROLE_SEEDS.length, skipped: false};
+        return { inserted: ROLE_SEEDS.length, skipped: false };
     }
 
     private async seedPermissions(): Promise<RbacStepResult> {
 
         if (await this.permissionRepository.count(DbTarget.Write) > 0) {
             RbacSeeder.LOGGER.log('permissions already populated; skipping.');
-            return {inserted: 0, skipped: true};
+            return { inserted: 0, skipped: true };
         }
 
         for (const seed of PERMISSION_SEEDS) {
@@ -159,14 +163,14 @@ export class RbacSeeder {
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${PERMISSION_SEEDS.length} permission(s).`);
-        return {inserted: PERMISSION_SEEDS.length, skipped: false};
+        return { inserted: PERMISSION_SEEDS.length, skipped: false };
     }
 
     private async seedRolePermissions(): Promise<RbacStepResult> {
 
         if (await this.rolePermissionRepository.count(DbTarget.Write) > 0) {
             RbacSeeder.LOGGER.log('role_permissions already populated; skipping.');
-            return {inserted: 0, skipped: true};
+            return { inserted: 0, skipped: true };
         }
 
         let inserted = 0;
@@ -193,14 +197,14 @@ export class RbacSeeder {
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${inserted} role_permission link(s).`);
-        return {inserted, skipped: false};
+        return { inserted, skipped: false };
     }
 
     private async seedMenus(): Promise<RbacStepResult> {
 
         if (await this.menuRepository.count(DbTarget.Write) > 0) {
             RbacSeeder.LOGGER.log('menus already populated; skipping.');
-            return {inserted: 0, skipped: true};
+            return { inserted: 0, skipped: true };
         }
 
         for (const seed of MENU_SEEDS) {
@@ -214,14 +218,14 @@ export class RbacSeeder {
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${MENU_SEEDS.length} menu(s).`);
-        return {inserted: MENU_SEEDS.length, skipped: false};
+        return { inserted: MENU_SEEDS.length, skipped: false };
     }
 
     private async seedMenuPermissions(): Promise<RbacStepResult> {
 
         if (await this.menuPermissionRepository.count(DbTarget.Write) > 0) {
             RbacSeeder.LOGGER.log('menu_permissions already populated; skipping.');
-            return {inserted: 0, skipped: true};
+            return { inserted: 0, skipped: true };
         }
 
         let inserted = 0;
@@ -245,6 +249,6 @@ export class RbacSeeder {
         }
 
         RbacSeeder.LOGGER.log(`Seeded ${inserted} menu_permission link(s).`);
-        return {inserted, skipped: false};
+        return { inserted, skipped: false };
     }
 }

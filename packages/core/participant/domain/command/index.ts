@@ -12,3 +12,7 @@ export * from './upsert-endpoint.command';
 export * from './upsert-endpoint.handler';
 export * from './update-access-key.command';
 export * from './update-access-key.handler';
+export * from './enroll-dfsp-certificate.command';
+export * from './enroll-dfsp-certificate.handler';
+export * from './revoke-dfsp-certificate.command';
+export * from './revoke-dfsp-certificate.handler';
