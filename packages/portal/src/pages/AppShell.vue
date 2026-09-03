@@ -24,6 +24,7 @@ import ParticipantAddNewCurrencyPage from './participant/ParticipantAddNewCurren
 import ParticipantUpdateSigningKeysPage from './participant/ParticipantUpdateSigningKeysPage.vue';
 import ParticipantOnboardingPage from './participant/ParticipantOnboardingPage.vue';
 import ParticipantRegisterEndpointPage from './participant/ParticipantRegisterEndpointPage.vue';
+import ParticipantCertificatesPage from './participant/ParticipantCertificatesPage.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -72,6 +73,7 @@ const pageComponentByKey: Record<ViewKey, Component> = {
     'participant-add-signing-keys': ParticipantUpdateSigningKeysPage,
     'participant-add-new-currency': ParticipantAddNewCurrencyPage,
     'participant-register-endpoint': ParticipantRegisterEndpointPage,
+    'participant-certificates': ParticipantCertificatesPage,
     transactions: TransactionsPage,
     'admin-users': UsersAdminPage,
     'admin-roles': RolesAdminPage,

@@ -65,11 +65,16 @@ v "vault write pki_hub_client/roles/pivotal-client \
 
 # DFSP-facing: client certs issued to DFSPs. trust-manager forces CN = fsp_id, so
 # no certificate can exist whose subject contradicts its tenant.
+# use_csr_common_name=false is load-bearing, not tidiness: Vault otherwise takes the subject from
+# the submitted request, and a DFSP could name itself anything. The runtime binding rule compares
+# the certificate against FSPIOP-Source, so a self-named certificate defeats the check it exists
+# for. The same applies to SANs, which are another place an identity can hide.
 v "vault write pki_dfsp/roles/dfsp-client \
      allow_any_name=true enforce_hostnames=false \
      client_flag=true server_flag=false \
      key_bits=2048 max_ttl=8760h ttl=8760h \
      organization='ThitsaWorks' ou='DFSP' \
+     use_csr_common_name=false use_csr_sans=false \
      no_store=true require_cn=true" >/dev/null
 echo "Roles: pki_hub_client/pivotal-client, pki_dfsp/dfsp-client"
 

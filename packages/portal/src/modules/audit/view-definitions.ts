@@ -112,6 +112,16 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
         primaryKey: 'id',
     },
     {
+        key: 'participant-certificates',
+        title: 'Certificates',
+        subtitle: 'Sign a DFSP certificate request and manage the certificates it holds.',
+        endpoint: '/participant/certificates',
+        criteriaFields: [],
+        orderColumns: [],
+        columns: [],
+        primaryKey: 'id',
+    },
+    {
         key: 'transactions',
         title: 'Find Transactions',
         subtitle: 'Search audited transactions across parties, quotes, and transfers from one place.',

@@ -4,6 +4,7 @@ import {ConfigService} from '@nestjs/config';
 import {ReportDownloadSettings} from '@core/audit/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {DfspCertificateIssuer} from '@core/participant/domain';
 import {KeyProvider, VaultAuthMethod, VaultSettings} from '@shared/vault';
 import type {WebPivotalModule} from './web-pivotal.module';
 
@@ -227,6 +228,21 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
      */
     keyProvider(): KeyProvider {
         return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+    }
+
+    /**
+     * The DFSP-facing CA, when this deployment is one.
+     *
+     * Absent mount means the deployment issues no DFSP certificates and the enrollment paths report
+     * that plainly. The role's own TTL applies unless one is given here, so validity stays defined
+     * in one place — Vault — rather than drifting between the CA and its caller.
+     */
+    dfspCertIssuerSettings(): DfspCertificateIssuer.Settings {
+        return {
+            mount: this.readOptionalValue('DFSP_CERT_PKI_MOUNT') ?? '',
+            role: this.readOptionalValue('DFSP_CERT_PKI_ROLE') ?? 'dfsp-client',
+            ttl: this.readOptionalValue('DFSP_CERT_TTL'),
+        };
     }
 
     vaultSettings(): VaultSettings {

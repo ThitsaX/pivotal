@@ -52,6 +52,21 @@ class FakeCa {
     }
 }
 
+/**
+ * A CA that takes the subject from the request, which is what Vault's PKI role does by default
+ * (`use_csr_common_name=true`). The original FakeCa encoded the intended behaviour rather than the
+ * real one, and so could never have caught it.
+ */
+class SubjectHonouringCa extends FakeCa {
+
+    signCertificate(request: any): Promise<any> {
+        const csr = forge.pki.certificationRequestFromPem(request.csrPem);
+        const claimed = csr.subject.getField('CN')?.value as string;
+
+        return super.signCertificate({...request, commonName: claimed});
+    }
+}
+
 class FakeCertRepository {
 
     readonly saved: ParticipantCert[] = [];
@@ -178,6 +193,19 @@ describe('DfspCertificateIssuer', () => {
         // schedule: the old one keeps working until it expires.
         assert.equal(previous.status, ParticipantCertStatusCode.RETIRING);
         assert.ok(repository.saved.includes(previous));
+    });
+
+    it('should refuse a certificate the authority named after the request, not the tenant', async () => {
+        const ca = new SubjectHonouringCa();
+        const repository = new FakeCertRepository();
+
+        // Exactly the live failure: a Vault role left at use_csr_common_name=true issues a
+        // certificate the DFSP has named itself, which defeats the binding rule silently.
+        await assert.rejects(
+            issuerWith(ca, repository).issue({fspId: 'dfsp-a', csrPem: csrClaiming('dfsp-b')}),
+            /issued a certificate for 'dfsp-b' when 'dfsp-a' was requested/);
+
+        assert.equal(repository.saved.length, 0, 'a mis-bound certificate must not be recorded');
     });
 
     it('should refuse a request that is not a certificate signing request', async () => {

@@ -48,6 +48,12 @@ export class DfspCertificateIssuer {
         const signed = await this.sign(request);
         const parsed = DfspCertificateIssuer.parse(signed.certificatePem);
 
+        // Checked against what came back, not assumed from what was asked for. Vault's PKI role
+        // takes the subject from the submitted request unless `use_csr_common_name=false`, so a
+        // role left at its default silently issues certificates a DFSP has named itself. That
+        // defeats the binding rule outright, and it is invisible until someone reads a subject.
+        DfspCertificateIssuer.assertBoundTo(request.fspId, parsed);
+
         // Supersede rather than replace. The previous certificate stays acceptable until it expires
         // on its own, so a DFSP installs the new one on its own schedule instead of coordinating a
         // cutover with the hub operator.
@@ -117,6 +123,24 @@ export class DfspCertificateIssuer {
     }
 
     /**
+     * Refuses a certificate whose subject does not name the tenant it was issued for.
+     *
+     * The last line of defence for the guarantee the DFSP-facing leg rests on. Nothing downstream
+     * can recover from a mis-bound certificate: the runtime compares the certificate against
+     * `FSPIOP-Source`, so one naming the wrong tenant either fails every request or, worse,
+     * authorises the wrong one.
+     */
+    private static assertBoundTo(fspId: string, parsed: DfspCertificateIssuer.ParsedCertificate): void {
+
+        if (parsed.commonName !== fspId) {
+            throw new Error(
+                `The certificate authority issued a certificate for '${parsed.commonName}' `
+                + `when '${fspId}' was requested. Check that the issuing role sets `
+                + 'use_csr_common_name=false; the certificate has not been recorded.');
+        }
+    }
+
+    /**
      * Checks the request is a PKCS#10 this CA will sign, before Vault is troubled with it.
      *
      * Only two things are checked: that it parses, and that the key is large enough. Vault enforces
@@ -159,10 +183,13 @@ export class DfspCertificateIssuer {
         const certificate = forge.pki.certificateFromPem(certificatePem);
         const der = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
 
+        const commonName = certificate.subject.getField('CN')?.value as string | undefined;
+
         return {
             fingerprintSha256: createHash('sha256')
                 .update(Buffer.from(der, 'binary'))
                 .digest('hex'),
+            commonName: commonName ?? '',
             serial: certificate.serialNumber,
             subject: certificate.subject.attributes
                 .map(attribute => `${attribute.shortName ?? attribute.name}=${attribute.value as string}`)
@@ -191,6 +218,8 @@ export namespace DfspCertificateIssuer {
 
     export interface ParsedCertificate {
         fingerprintSha256: string;
+        /** The name the authority actually put in the subject, not the one requested. */
+        commonName: string;
         serial: string;
         subject: string;
         validFrom: Date;
