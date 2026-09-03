@@ -270,6 +270,14 @@ web-outbound resolves the fingerprint to a `participant_cert` row and applies th
 | `Xfcc` parser | reads `Hash` from the **first** entry only — under `SANITIZE_SET` there is one, and a second means a proxy appended rather than replaced |
 | `DfspCertificateGuard` | fingerprint → row → status, validity, then `fsp_id` against `FSPIOP-Source` |
 
+> **Known deviation from decision 7 — to be corrected.** The guard currently treats
+> `DFSP_FACING_MTLS` as a global switch: off means no request is checked, on means every request
+> must carry XFCC. The decision specifies the opposite shape — verify **whenever XFCC is present**,
+> and let the flag decide only whether its absence is fatal. Until that is changed, a deployment
+> cannot serve a mixed scheme (one participant on VPN alone, others on mutual TLS), and migration by
+> parallel endpoint still flips for everyone at once. Recorded in `status.md` under leg #1 with the
+> table of intended behaviour.
+
 **Three things this settled that the design left implicit.**
 
 - **`Hash` is the field to key on**, not `Subject`. It is SHA-256 over the certificate's DER — the

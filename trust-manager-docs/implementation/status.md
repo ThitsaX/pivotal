@@ -211,9 +211,36 @@ explain why #2/#4 were *correction* work rather than greenfield.
 
 ### Left
 
-- **Enablement, not code.** `DFSP_FACING_MTLS` is off by default and the mutual-TLS endpoint runs
-  beside the existing one, so DFSPs migrate by changing their base URL rather than on a flag day.
-  Each DFSP still has to enroll — one CSR exchange per participant, operator-mediated.
+- **The flag is all-or-nothing per deployment, and decision 7 says it should not be. Planned fix
+  below.** `DfspCertificateGuard` returns immediately when `DFSP_FACING_MTLS` is off, so with the
+  flag off nobody is checked even when they present a valid certificate, and with it on every caller
+  must present one. Two consequences:
+  - **A mixed scheme cannot be served.** Where one DFSP's country accepts VPN alone while others
+    require mutual TLS, today they cannot share a web-outbound: turning the flag on rejects the
+    VPN-only participant, leaving it off means the others are unverified.
+  - **Migration by parallel endpoint does not actually work yet**, despite being the stated
+    mechanism. Both endpoints route to the same service and the same guard, so the flag flips for
+    everyone at once — the flag day the parallel endpoint exists to avoid.
+
+  **The fix, which restores the recorded design.** Decision 7 already specifies it: the certificate
+  checks key on **XFCC presence per request**, and `DFSP_FACING_MTLS` only decides whether XFCC is
+  *mandatory*. Concretely, in `dfsp-certificate.guard.ts`:
+
+  | XFCC | Flag off | Flag on |
+  | --- | --- | --- |
+  | present | verify fully — status, validity, `fsp_id` ↔ `FSPIOP-Source` | verify fully |
+  | absent | admit | reject |
+
+  A participant that has enrolled is then verified from its first request, whichever endpoint it
+  used, while one that has not keeps working. The flag stops being a switch and becomes a statement
+  that migration is complete. A few lines and a handful of tests; the guard already has every input
+  it needs.
+
+  **One caveat to record with it.** With the flag off, an unenrolled participant is protected by VPN
+  alone, so the plain endpoint must not be reachable from outside that VPN — otherwise it is a
+  bypass for the enrolled participants too, who could simply stop presenting a certificate. That is
+  a network control, not an application one, and it belongs in the deployment's ingress rules.
+- Each DFSP still has to enroll — one CSR exchange per participant, operator-mediated.
 - **The gateway is not in the chart.** The `MUTUAL` Gateway, its VirtualService and
   `forwardClientCertDetails: SANITIZE_SET` belong in `apps/pivotal` in the gitops repositories,
   which carry the Istio templates; the monorepo chart has none. Applied directly in the local
