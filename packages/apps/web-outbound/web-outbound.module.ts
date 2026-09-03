@@ -3,8 +3,13 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OutboundDomainModule } from '@core/outbound/domain';
-import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
-import { AccessGuard, JwtPolicy } from './component';
+import {
+    ParticipantAccessKeyStore,
+    ParticipantCertRepository,
+    ParticipantDomainModule,
+    ParticipantJwsPrivateKeyStore,
+} from '@core/participant/domain';
+import { AccessGuard, DfspCertificateGuard, JwtPolicy } from './component';
 import { DfspListController, SendMoneyController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
@@ -74,7 +79,19 @@ export class WebOutboundModule {
                     return new AccessGuard(accessKeyStore, settings.jwtPolicy(), reflector);
                 },
                 inject: [AccessKeyStore, REQUIRED_SETTINGS, Reflector],
-            }
+            },
+            {
+                provide: DfspCertificateGuard,
+                useFactory: (
+                    certificates: ParticipantCertRepository,
+                    settings: WebOutboundModule.RequiredSettings,
+                    reflector: Reflector,
+                ): DfspCertificateGuard => {
+                    return new DfspCertificateGuard(
+                        certificates, settings.dfspFacingMutualTls(), reflector);
+                },
+                inject: [ParticipantCertRepository, REQUIRED_SETTINGS, Reflector],
+            },
 
         ];
     }
@@ -96,6 +113,9 @@ export namespace WebOutboundModule {
 
     export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings, OutboundDomainModule.RequiredSettings {
         jwtPolicy(): JwtPolicy;
+
+        /** Whether the DFSP-facing leg requires a verified client certificate. */
+        dfspFacingMutualTls(): boolean;
     }
 
     export type AsyncOptions = {

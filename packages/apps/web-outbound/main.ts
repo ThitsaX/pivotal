@@ -8,8 +8,8 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config as loadDotEnv } from 'dotenv';
 import { json } from 'express';
-import { FspiopHeaders, FspiopUserMessages, PivotalLogger } from '@shared/fspiop';
-import { AccessGuard, OutboundExceptionFilter } from './component';
+import { FspiopHeaders, FspiopUserMessages, PivotalLogger, Xfcc} from '@shared/fspiop';
+import { AccessGuard, DfspCertificateGuard, OutboundExceptionFilter } from './component';
 import { WebOutboundAppModule } from './app.module';
 import { createOutboundValidationException } from './component/outbound-validation-error';
 
@@ -77,7 +77,12 @@ const bootstrap = async (): Promise<void> => {
     }));
 
     app.useGlobalFilters(new OutboundExceptionFilter(language));
-    app.useGlobalGuards(app.get(AccessGuard));
+    // Transport identity before message identity: the certificate says which DFSP is connected,
+    // the signature says which one the message claims to be from. Checking the connection first
+    // means a request that cannot even be attributed is rejected before any key lookup.
+    const dfspCertificateGuard = app.get(DfspCertificateGuard);
+
+    app.useGlobalGuards(dfspCertificateGuard, app.get(AccessGuard));
 
     const swaggerConfig = new DocumentBuilder()
         .setTitle('Pivotal - Outbound API')
@@ -93,6 +98,21 @@ const bootstrap = async (): Promise<void> => {
 
     await app.listen(port);
     Logger.log('AccessGuard is enabled.', 'Bootstrap');
+
+    if (dfspCertificateGuard.isEnabled()) {
+        // The guard reads an identity it cannot itself authenticate. Nothing in this process can
+        // tell a header written by a terminating proxy from one a caller set, so enabling this
+        // without a proxy that overwrites the header does not merely fail to protect the leg --
+        // it reports success while accepting anyone who names a fingerprint.
+        Logger.warn(
+            'DFSP-facing mutual TLS is enabled. This service trusts the '
+            + `'${Xfcc.HEADER_NAME}' header and cannot verify who set it: it MUST sit behind a `
+            + 'proxy configured to overwrite that header (Istio forwardClientCertDetails: '
+            + 'SANITIZE_SET). Exposed directly, any caller can present another participant\'s '
+            + 'fingerprint.',
+            'Bootstrap',
+        );
+    }
     Logger.log(`Web outbound is listening on port ${port}.`, 'Bootstrap');
 };
 

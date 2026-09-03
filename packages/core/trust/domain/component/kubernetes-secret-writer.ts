@@ -15,6 +15,12 @@ import {Logger} from '@nestjs/common';
  * The credential is the pod's identity — nothing to distribute and nothing to
  * rotate. The RBAC it needs is deliberately narrow: get, create and patch on one
  * named Secret in one namespace.
+ *
+ * A target namespace may be given per call. It defaults to the pod's own, which is all the Hub CA
+ * bundle needs — but an Istio gateway reads its credentials only from the namespace it runs in, so
+ * delivering a CA there means writing across a boundary. That is a deliberate scope in Istio:
+ * whoever can write that Secret decides which authority the gateway trusts, so it is granted by a
+ * separate Role in that namespace rather than inherited.
  */
 export class KubernetesSecretWriter {
 
@@ -38,9 +44,13 @@ export class KubernetesSecretWriter {
      * matched. Rewriting an unchanged Secret is not free: it bumps the resource
      * version, and anything watching it reloads for nothing.
      */
-    async putIfChanged(name: string, data: Record<string, string>): Promise<boolean> {
+    async putIfChanged(
+        name: string,
+        data: Record<string, string>,
+        targetNamespace?: string,
+    ): Promise<boolean> {
         const client = await this.connect();
-        const namespace = await this.readNamespace();
+        const namespace = await this.resolveNamespace(targetNamespace);
         const encoded = Object.fromEntries(
             Object.entries(data).map(([key, value]) => [key, Buffer.from(value).toString('base64')]),
         );
@@ -75,9 +85,9 @@ export class KubernetesSecretWriter {
     }
 
     /** One value out of a Secret, or null when the Secret or the key is absent. */
-    async read(name: string, key: string): Promise<string | null> {
+    async read(name: string, key: string, targetNamespace?: string): Promise<string | null> {
         const client = await this.connect();
-        const namespace = await this.readNamespace();
+        const namespace = await this.resolveNamespace(targetNamespace);
 
         const response = await client.get(`/api/v1/namespaces/${namespace}/secrets/${name}`);
 
@@ -88,6 +98,15 @@ export class KubernetesSecretWriter {
         const encoded = (response.data?.data ?? {})[key] as string | undefined;
 
         return encoded == null ? null : Buffer.from(encoded, 'base64').toString('utf8');
+    }
+
+    private async resolveNamespace(override?: string): Promise<string> {
+
+        if (override != null && override.trim().length > 0) {
+            return override.trim();
+        }
+
+        return this.readNamespace();
     }
 
     private async connect(): Promise<AxiosInstance> {

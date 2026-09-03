@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {ConfigService} from '@nestjs/config';
-import {TrustDomainModule} from '@core/trust/domain';
+import {TrustDomainModule, DfspCaPublishScheduler} from '@core/trust/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {McmSettings} from '@shared/mcm-client';
 import {TypeOrmSettings} from '@shared/typeorm';
@@ -45,6 +45,38 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
         }
 
         return seconds * 1000;
+    }
+
+    /**
+     * Where the DFSP-facing CA is read from, and which gateway credential it is published to.
+     *
+     * Absent gateway settings mean this deployment fronts no DFSP-facing mutual TLS endpoint, and
+     * the job stays idle rather than failing — most deployments will not have one on day one.
+     */
+    dfspCaPublishSettings(): DfspCaPublishScheduler.Settings {
+        return new DfspCaPublishScheduler.Settings(
+            this.read('DFSP_CA_PKI_MOUNT') ?? 'pki_dfsp',
+            this.read('DFSP_CA_ROOT_PKI_MOUNT') ?? 'pki_dfsp_root',
+            this.read('DFSP_CA_GATEWAY_NAMESPACE') ?? '',
+            this.read('DFSP_CA_GATEWAY_SECRET_NAME') ?? '',
+        );
+    }
+
+    dfspCaPublishIntervalMs(): number {
+        const configured = this.read('DFSP_CA_PUBLISH_INTERVAL_SECONDS');
+        const seconds = configured == null ? 3600 : Number(configured);
+
+        if (!Number.isInteger(seconds) || seconds <= 0) {
+            throw new Error('DFSP_CA_PUBLISH_INTERVAL_SECONDS must be a positive whole number of seconds.');
+        }
+
+        return seconds * 1000;
+    }
+
+    private read(name: string): string | undefined {
+        const value = this.configService.get<string>(name);
+
+        return value == null || value.trim().length === 0 ? undefined : value.trim();
     }
 
     hubCaSecretName(): string {

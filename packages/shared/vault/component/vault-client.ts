@@ -153,6 +153,32 @@ export class VaultClient {
         };
     }
 
+    /**
+     * Reads a PKI mount's own certificate chain — the authority that signs its leaves.
+     *
+     * Unauthenticated by design in Vault: a CA certificate is public, and this endpoint exists so
+     * anything needing to verify the chain can fetch it without a credential. Read here through
+     * the same client for one timeout and one base URL rather than a second HTTP path.
+     *
+     * @returns the chain as PEM, or null when the mount has no CA yet
+     */
+    async readPkiCaChain(mount: string): Promise<string | null> {
+
+        const response = await this.http.get(`/v1/${mount}/ca_chain`, {
+            // The PEM endpoints answer with text, not the usual JSON envelope.
+            responseType: 'text',
+            headers: {Accept: 'application/pem-certificate-chain'},
+        });
+
+        if (response.status === 404) {
+            return null;
+        }
+
+        const chain = typeof response.data === 'string' ? response.data.trim() : '';
+
+        return chain.length === 0 ? null : chain;
+    }
+
     /** Drops the cached token so the next read re-authenticates. */
     invalidateToken(): void {
         this.token = undefined;

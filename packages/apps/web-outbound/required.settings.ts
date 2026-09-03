@@ -83,6 +83,16 @@ export class WebOutboundSettings
         };
     }
 
+    /**
+     * Whether a verified client certificate is required on the DFSP-facing leg.
+     *
+     * Off by default so the mutual-TLS endpoint can run beside the existing one and DFSPs migrate
+     * at their own pace, rather than every caller breaking on the day it is switched on.
+     */
+    dfspFacingMutualTls(): boolean {
+        return this.readOptionalBoolean('DFSP_FACING_MTLS') ?? false;
+    }
+
     centralLedgerUrl(): string {
         return this.readRequiredString('CENTRAL_LEDGER_URL');
     }

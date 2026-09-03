@@ -53,4 +53,54 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ $name }}-hub-ca
+
+{{- with .Values.trustManager.dfspCaGateway }}
+{{- if and .enabled .namespace .secretName }}
+---
+{{/*
+Publishing the DFSP-facing CA means writing into the ingress gateway's namespace, because Istio
+reads a gateway's credentials only from the namespace that gateway runs in.
+
+That boundary is the point, not an inconvenience: whoever can write this Secret decides which
+authority the gateway will trust, and therefore whose client certificates are accepted. The grant
+is a separate Role in that namespace, named to the single object, rather than anything inherited
+from the workload namespace.
+
+`create` is not granted here. The Secret is expected to exist — created alongside the gateway —
+so trust-manager only ever updates it. A missing Secret surfaces as a failed sync rather than as
+this job quietly minting a trust anchor of its own.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ .secretName | quote }}
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-dfsp-ca
+{{- end }}
+{{- end }}
 {{- end }}

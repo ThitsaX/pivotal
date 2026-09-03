@@ -5,7 +5,9 @@ import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
+import {VaultClient, VaultSettings} from '@shared/vault';
 import {
+    DfspCaPublishScheduler,
     HubCaSyncScheduler,
     HubServerCertEnroller,
     JwsKeyPublishScheduler,
@@ -19,6 +21,7 @@ const HUB_CA_LOCK = Symbol('TrustDomainHubCaLock');
 const CA_REGISTRATION_LOCK = Symbol('TrustDomainCaRegistrationLock');
 const JWS_PUBLISH_LOCK = Symbol('TrustDomainJwsPublishLock');
 const SERVER_CERT_LOCK = Symbol('TrustDomainServerCertLock');
+const DFSP_CA_LOCK = Symbol('TrustDomainDfspCaLock');
 
 const Components: Provider[] = [
     {
@@ -70,6 +73,27 @@ const Components: Provider[] = [
             mcm, secrets, lock, settings.hubCaSecretName(), settings.hubCaSyncIntervalMs(),
         ),
         inject: [McmAxios, KubernetesSecretWriter, HUB_CA_LOCK, REQUIRED_SETTINGS],
+    },
+    {
+        provide: DFSP_CA_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:dfsp-ca-publish'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        provide: DfspCaPublishScheduler,
+        useFactory: (
+            secrets: KubernetesSecretWriter,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): DfspCaPublishScheduler => new DfspCaPublishScheduler(
+            new VaultClient(settings.vaultSettings()),
+            secrets,
+            lock,
+            settings.dfspCaPublishSettings(),
+            settings.dfspCaPublishIntervalMs(),
+        ),
+        inject: [KubernetesSecretWriter, DFSP_CA_LOCK, REQUIRED_SETTINGS],
     },
     {
         provide: CA_REGISTRATION_LOCK,
@@ -158,7 +182,8 @@ export class TrustDomainModule {
             exports: [
             McmAxios,
             PeerJwsSyncScheduler,
-            HubCaSyncScheduler,
+            DfspCaPublishScheduler,
+    HubCaSyncScheduler,
             McmCaRegistrationScheduler,
             JwsKeyPublishScheduler,
             HubServerCertEnroller,
@@ -184,6 +209,13 @@ export namespace TrustDomainModule {
 
         /** The Secret that holds the Hub CA trust bundle. */
         hubCaSecretName(): string;
+
+        /** Where the DFSP-facing CA is read from and published to. */
+        dfspCaPublishSettings(): DfspCaPublishScheduler.Settings;
+
+        dfspCaPublishIntervalMs(): number;
+
+        vaultSettings(): VaultSettings;
 
         /** The Hub CA rotates rarely, so this poll is a slow backstop. */
         hubCaSyncIntervalMs(): number;

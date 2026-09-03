@@ -228,6 +228,13 @@ webPivotal:
     REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
 
 trustManager:
+  # Publishing the DFSP-facing CA to the ingress gateway. Off by default: a deployment that
+  # fronts no DFSP-facing mutual TLS endpoint has no gateway to give a trust anchor to.
+  # `secretName` must match the Gateway's own `credentialName`.
+  dfspCaGateway:
+    enabled: false
+    namespace: ""
+    secretName: ""
   enabled: false
   replicaCount: 1
   image:

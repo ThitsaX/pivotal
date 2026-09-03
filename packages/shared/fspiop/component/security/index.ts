@@ -9,3 +9,4 @@ export * from './mutual-tls-agent';
 export * from './pem-pair';
 export * from './fspiop-mtls-server-cert-store';
 export * from './mutual-tls-server';
+export * from './xfcc';

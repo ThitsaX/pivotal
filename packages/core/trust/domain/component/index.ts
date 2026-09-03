@@ -6,3 +6,4 @@ export * from './jws-key-publish.scheduler';
 export * from './kubernetes-secret-writer';
 export * from './mcm-ca-registration.scheduler';
 export * from './peer-jws-sync.scheduler';
+export * from './dfsp-ca-publish.scheduler';
