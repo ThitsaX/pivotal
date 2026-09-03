@@ -257,10 +257,35 @@ sequenceDiagram
     O->>O: cache by fingerprint_sha256 — the XFCC lookup key
 ```
 
-**Runtime use of that leaf**: the DFSP presents it to the mTLS gateway, Envoy validates the chain
-against the DFSP-facing root and injects XFCC (`SANITIZE_SET`), and web-outbound resolves the
-fingerprint to the cached row to run the status check and the `fsp_id` ↔ `FSPIOP-Source` binding
-rule — [`dfsp-facing-leg.md`](../design/dfsp-facing-leg.md) §3–§4.
+### 1.3 Runtime enforcement — **built and proven 2026-09-04**
+
+The DFSP presents its leaf to the mutual-TLS gateway; Envoy validates the chain against the
+DFSP-facing CA, terminates, and describes what it verified in `x-forwarded-client-cert`;
+web-outbound resolves the fingerprint to a `participant_cert` row and applies the binding rule from
+[`dfsp-facing-leg.md`](../design/dfsp-facing-leg.md) §3.
+
+| Where | Responsibility |
+| --- | --- |
+| Gateway (`mode: MUTUAL`) | demands a certificate, verifies it against the CA, **overwrites** any XFCC the caller sent |
+| `Xfcc` parser | reads `Hash` from the **first** entry only — under `SANITIZE_SET` there is one, and a second means a proxy appended rather than replaced |
+| `DfspCertificateGuard` | fingerprint → row → status, validity, then `fsp_id` against `FSPIOP-Source` |
+
+**Three things this settled that the design left implicit.**
+
+- **`Hash` is the field to key on**, not `Subject`. It is SHA-256 over the certificate's DER — the
+  same value stored as `fingerprint_sha256` and printed by `openssl x509 -fingerprint -sha256` —
+  and Envoy includes it whenever it sets the header. `Subject` requires explicit gateway
+  configuration and depends on the CA having been configured correctly, which §5.1 shows cannot be
+  assumed.
+- **The row is read per request.** One indexed lookup on a unique key. Revocation therefore takes
+  effect immediately, and validity is checked against the clock rather than trusted from `status`,
+  so a lapsed certificate is refused without any expiry sweep having run.
+- **`SANITIZE_SET` is load-bearing, and defaults are not evidence.** Istio's gateway default is
+  already correct, but it is configured nowhere in the gitops repositories. Verified from Envoy's
+  own config dump rather than assumed, by connecting with one participant's certificate while
+  forging a header naming another: the forgery was discarded. Without a sanitising proxy the guard
+  is worse than absent — it accepts anyone who names a fingerprint while reporting success — so
+  web-outbound warns at startup that it trusts a header it cannot itself authenticate.
 
 ---
 
@@ -580,7 +605,7 @@ branches.
 
 ---
 
-## 5. One correction to the existing documents
+## 5. Corrections to the existing documents
 
 [`dfsp-facing-leg.md`](../design/dfsp-facing-leg.md) §2 labels the DFSP enrollment call
 `TM->>V: sign the CSR — pki/issue`. The endpoint should be **`pki/sign`**, not `pki/issue`:
@@ -592,4 +617,33 @@ branches.
 
 `issue` would contradict the leg's central guarantee that the DFSP's private key never leaves the
 DFSP. The same applies to cert-manager on the Hub-facing leg — its Vault issuer generates the key
-in-cluster and calls `sign`. Both flows in this document use `sign`.
+in-cluster and calls `sign`. Both flows in this document use `sign`, and so does the implementation.
+
+### 5.1 `sign` alone does not stop a DFSP naming itself — **found 2026-09-03**
+
+Choosing `sign` over `issue` protects the *key*. It does not protect the *name*. Vault's PKI role
+defaults to **`use_csr_common_name=true`**, which takes the subject from the submitted request and
+ignores the `common_name` the caller supplies.
+
+Found by enrolling a request whose subject deliberately claimed a different tenant: it came back
+signed with that name. A DFSP could therefore have obtained a certificate for any participant,
+which defeats the binding rule in §3 of the leg document entirely — the check compares the
+certificate against `FSPIOP-Source`, and a self-named certificate satisfies it.
+
+Two changes, deliberately in both places:
+
+| Where | Change |
+| --- | --- |
+| `scripts/setup-vault-pki.sh` | the `dfsp-client` role sets `use_csr_common_name=false use_csr_sans=false` — SANs are the other place an identity can hide |
+| `DfspCertificateIssuer` | verifies the returned common name against the enrolled participant, and records nothing when they differ |
+
+**Any environment provisioned from the earlier script is still exposed**, and certificates issued
+from a mis-configured role should be treated as suspect.
+
+### 5.2 Private keys arrive as PKCS#1 unless asked otherwise
+
+cert-manager and Vault both write PKCS#1 for RSA by default. OpenSSL-based stacks read both
+encodings, so this surfaces only where a JVM is involved — where it is fatal at startup, as it was
+for the Java connector. Set `privateKey.encoding: PKCS8` at issuance rather than adding a second
+PEM parser. An encoding change alone does not trigger re-issuance: the Secret keeps its original
+key until deleted.

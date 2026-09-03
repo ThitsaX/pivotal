@@ -6,22 +6,26 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
-**Last verified against code:** 2026-09-02.
+**Last verified against code:** 2026-09-04.
 
 ---
 
 ## Where the work actually sits — read this first
 
-**FSPIOP JWS is complete across all three repositories, and — as of 2026-09-02 — so is the
-hub-facing mTLS code on legs #2, #3 and #4.** Signing, key custody and certificate handling are
-written, tested against real handshakes and running in the local cluster. **What is not done is
-turning mTLS on**: that waits on the Hub terminating TLS and verifying client certificates, which is
-a deployment step rather than a code one. Leg #1 — the DFSP-facing leg — has no mTLS at all yet, and
-additionally has replay defence (**G**) and accessKey revocation (**E**) unspecified.
+**Every leg in scope now has its mTLS code written, and leg #1 has been proven running.** JWS was
+complete across all three repositories; hub-facing mTLS followed on 2026-09-02; the DFSP-facing leg
+— issuance, operator screens and request-time enforcement — landed 2026-09-03/04 and is the first
+to have been exercised against a real mutual-TLS handshake through an Istio gateway.
+
+**What remains is enablement and ceremony, not application code.** The hub-facing legs wait on the
+Hub edge accepting client certificates. The DFSP-facing leg waits on a gateway in the gitops
+repositories and on each DFSP enrolling. Both trust domains are still rooted in **rehearsal** KMS
+keys, so no production root exists yet. Leg #1 additionally has replay defence (**G**) and accessKey
+revocation (**E**) unspecified.
 
 | Repo | Branch | Head | Tree |
 | --- | --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | `50e5c87` — present the enrolled server certificate from web-inbound | clean |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `f6dbe70` — make the portal runtime config and container port work | clean |
 | `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `13df358` — present a hub client certificate from connectors | clean |
 | `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2d0e0e8` — wire the hub client certificate into the connector | clean |
 
@@ -67,9 +71,23 @@ Both signers signed live, from Vault-sourced keys:
    the Java connector dead at startup, waiting for whoever next points a JVM at that Secret. One
    field, `privateKey.encoding: PKCS8`, plus deleting the Secret so cert-manager reissues; an
    encoding change alone does not trigger re-issuance.
-3. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
+3. **Production CA ceremony.** *Blocks go-live.* Both trust domains are rooted in **rehearsal**
+   KMS keys in a trial account, named `-rehearsal`. No production root exists. The runbook is
+   written and the ceremony has been executed twice, so this is scheduling rather than discovery —
+   but the `kms:Sign` CloudTrail alarm should be proven to fire before the real one runs.
+4. **Re-run `setup-vault-pki.sh` in every provisioned environment.** The `use_csr_common_name=false`
+   fix of 2026-09-03 exists only in the local cluster. Anywhere provisioned from the earlier script
+   still lets a DFSP choose the name on its own certificate, which defeats the binding rule. Any
+   certificate issued from a mis-configured role should be treated as suspect.
+5. **`.gitignore` for `pivotal-thitsawallet-connector`.** Still open, and now demonstrated: a single
    `mvn package` during cluster bring-up produced binary diffs on tracked `target/` artifacts
    including `app.jar`. **35 files under `target/` are tracked** as of 2026-08-30.
+6. **Schedule the rehearsal KMS keys for deletion.** They bill until they are.
+7. **Re-register the local participant callback endpoints.** Both point at
+   `http://host.docker.internal:3201`, which was web-inbound's address when it ran as a host
+   process. It now runs in k3d, so the callbacks only work while a `kubectl port-forward
+   --address 0.0.0.0` is alive. Local-only, but it silently breaks every transfer when the forward
+   dies.
 
 ### What to do next
 
@@ -95,8 +113,9 @@ JWS and key custody are done. The remaining work is scoped by which deployment s
    [`pki-issuance-flows.md`](./pki-issuance-flows.md) §3.3. **What remains is enablement at the Hub
    edge** — terminating TLS and verifying client certificates — which is a deployment change in the
    same organisation, not a design question.
-5. **Leg #1** — DFSP-facing CA and enrollment. Last, because it is the only leg reaching systems
-   operated by other institutions.
+5. ~~**Leg #1** — DFSP-facing CA and enrollment~~ — **code done 2026-09-03/04**, and the only leg
+   proven against a real mutual-TLS handshake. What remains is a gateway in the gitops
+   repositories, the CA delivery job configured, and one CSR exchange per DFSP.
 6. **`pkcs11`** — deferred to the HSM-backed delivery.
 
 **Enough of trust-manager to survive handover.** Manual key provisioning is tolerable while the
@@ -145,7 +164,7 @@ Two things people get wrong about this table:
 
 | # | JWS | mTLS | Overall |
 | --- | --- | --- | --- |
-| 1 | 🟡 works; accessKey custody unchanged (DFSP-held) | 🔴 not started (VPN today) | **partial** |
+| 1 | 🟡 works; accessKey custody unchanged (DFSP-held) | 🟢 **issuance + binding, proven over a real handshake**; off until each DFSP enrolls | **code done** |
 | 2 | 🟢 **conformant + per-participant** | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
 | 3 | 🟢 **JWS complete** — signer, vectors, callback wiring, Vault key access | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
 | 4 | 🟢 **verify + cross-checks + tri-state** | 🟡 **code complete + reload**; off until the Hub presents a client certificate | **code done** |
@@ -182,27 +201,39 @@ explain why #2/#4 were *correction* work rather than greenfield.
 - Admin-side key rotation: `UpdateAccessKeyCommand` / `.handler.ts` under
   `packages/core/participant/domain/command/`, with the permission gated by
   `V9__add_participant_access_key_update_permission.sql`.
+- **The DFSP-facing CA, issuance and enforcement — built 2026-09-03/04.** `participant_cert` with a
+  seeded status lookup table, `DfspCertificateIssuer` signing through `pki_dfsp/sign/dfsp-client`,
+  four hub-operator routes behind three HUB-scoped permissions, the portal certificates screen, and
+  the request-time binding check in web-outbound.
+- **Proven end to end over real mutual TLS**, through an Istio gateway with `mode: MUTUAL`: a
+  send-money reached the payee lookup and returned the resolved party. Every rejection path was
+  exercised against real certificates — see the change log.
 
 ### Left
 
-- **mTLS is entirely absent.** Today this leg is protected by a VPN. **This is now the next leg to
-  build**, and the PKI beneath it already stands: the `pki_dfsp` mount, the `dfsp-client` role and
-  the `pki-dfsp` ClusterIssuer are up and rooted in KMS. What is missing is everything above that —
-  there is no `participant_cert` anywhere in `packages/`, no issuance service, no operator screens
-  and no binding enforcement.
-- **What the operator-mediated decision leaves to build.** Schema and issuance first, since the
-  screens are a UI over it and the binding checks read the rows it writes: `participant_cert`, then a
-  service that signs a submitted CSR through `pki_dfsp/sign/dfsp-client` with the common name
-  enforced to `fsp_id`, recording serial, SHA-256 fingerprint, validity and status. Then the
-  hub-operator screens — CSR upload, certificate and chain download, certificate status, accessKey
-  registration, contact management. Then the fingerprint → `participant_cert` → `FSPIOP-Source`
-  binding and the parallel endpoint (`dfsp-facing-leg.md` §2–§3).
-- **Two constraints the plan already fixes.** Issued validity is **1 year**, and a row is never
-  hard-deleted before its `valid_to` passes — a revoked certificate whose row has been purged
-  degrades from a known revocation into a lookup miss, which is a different and worse thing.
-- **Enrollment must use `pki/sign`, not `pki/issue`.** `dfsp-facing-leg.md` §2 currently names
-  `pki/issue`, which would make Vault generate the keypair and contradicts "the DFSP's private key
-  never leaves the DFSP". Recorded in `pki-issuance-flows.md` §5; the leg doc is still uncorrected.
+- **Enablement, not code.** `DFSP_FACING_MTLS` is off by default and the mutual-TLS endpoint runs
+  beside the existing one, so DFSPs migrate by changing their base URL rather than on a flag day.
+  Each DFSP still has to enroll — one CSR exchange per participant, operator-mediated.
+- **The gateway is not in the chart.** The `MUTUAL` Gateway, its VirtualService and
+  `forwardClientCertDetails: SANITIZE_SET` belong in `apps/pivotal` in the gitops repositories,
+  which carry the Istio templates; the monorepo chart has none. Applied directly in the local
+  cluster to prove the path, deliberately not committed anywhere.
+- **The CA reaches the gateway by hand today.** `DfspCaPublishScheduler` exists and is tested, but
+  its cross-namespace Role is only rendered when `trustManager.dfspCaGateway` is configured, and no
+  deployment sets it yet.
+- **Certificates never become `expired` on their own.** `findLapsed` exists and nothing calls it.
+  This is deliberate rather than missed: validity is evaluated live at request time, so a lapsed
+  certificate is refused whether or not a sweep has relabelled the row. The sweep is reporting
+  hygiene, and belongs with the phase-7 lifecycle work.
+- **`participant_contact` and expiry alerting are absent** (phase 7). With operator-mediated
+  renewal the expiry alert is the trigger to *start* a human exchange, so this matters more here
+  than it would with self-service.
+- **The standalone accessKey registration screen was on the operator-screens list and is not
+  built.** The API exists; the portal only exposes it inside onboarding.
+- **Enrollment uses `pki/sign`, as it must.** `dfsp-facing-leg.md` §2 still names `pki/issue`,
+  which would have Vault generate the keypair and contradicts the leg's central guarantee. The
+  implementation ignores the leg doc and follows the correction in `pki-issuance-flows.md` §5; the
+  leg doc remains uncorrected.
 - Replay defence (open decision **G**) and accessKey revocation semantics (open decision **E**) are
   unspecified.
 
@@ -455,10 +486,14 @@ entirely — building it now would spend the schedule on the deployment that is 
         │ present · verify · reload on renewal    │  paths all reload;
         │                                         │  OFF until the Hub edge
         └────────────────────┬────────────────────┘
+  DONE  ┌────────────────────▼────────────────────┐
+    7   │ #1 DFSP-facing mTLS + enrollment    CODE │  schema · issuance ·
+        │ operator screens · binding · CA to gw   │  screens · binding;
+        │                                         │  proven over real mTLS
+        └────────────────────┬────────────────────┘
   NEXT  ┌────────────────────▼────────────────────┐
-    7   │ #1 DFSP-facing mTLS + enrollment        │  operator-mediated;
-        │ schema · issuance · operator screens ·  │  PKI already stood up
-        │ binding enforcement                     │
+    9   │ production CA ceremony — real KMS roots │  rehearsal roots only;
+        │ then enable each leg at its edge        │  blocks go-live
         └────────────────────┬────────────────────┘
         ┌────────────────────▼────────────────────┐
     8   │ pkcs11 — HSM-backed profile             │  deferred, both repos
@@ -640,6 +675,91 @@ this file listed it in error. These remain open for the later steps:
 ---
 
 ## Change log
+
+### DFSP-facing enforcement, proven over a real handshake · 2026-09-04
+
+The binding check, the gateway credential job, and the first transaction to complete over mutual TLS.
+
+**What the check does.** A request is refused unless the certificate the gateway verified and the
+`FSPIOP-Source` header name the same DFSP. The fingerprint from `x-forwarded-client-cert` resolves
+a `participant_cert` row, and the row's `fsp_id` is compared with the header. Registered ahead of
+`AccessGuard`: transport identity before message identity, so a request that cannot be attributed
+at all is rejected before any key lookup.
+
+**Read per request, not from a cache.** One indexed lookup on a unique key. That is what let phase 2
+stay deferred: revocation takes effect immediately rather than when a cache turns over, and validity
+is evaluated against the clock rather than trusted from `status`, so a lapsed certificate is refused
+without any sweep having run. Confirmed live — a certificate revoked and queried in the same second
+was rejected.
+
+**Proven against Istio rather than a stand-in.** Istio was installed locally for this, because the
+one assumption worth testing could not be tested any other way:
+
+| Sent | Result |
+| --- | --- |
+| No client certificate | refused at TLS; never reaches the application |
+| wallet1 certificate, `fspiop-source: wallet1` | admitted |
+| wallet1 certificate, `fspiop-source: wallet2` | **401** — the binding rule |
+| wallet1 certificate **plus a forged XFCC naming wallet2** | **401** — the forgery was discarded |
+
+The last row is the one that mattered. Envoy's own config dump reports
+`"forward_client_cert_details": "SANITIZE_SET"`, so the caller's header was replaced with the
+gateway's own. **Until that was proven, every earlier test of this guard had been performed by
+forging the header** — which also demonstrated the hazard: with the flag on and no sanitising proxy
+in front, anyone who names a fingerprint is accepted. web-outbound now says so loudly at startup,
+because nothing in the process can detect that misconfiguration.
+
+It also settles an assumption recorded as unverified: Envoy's `Hash` and `participant_cert.
+fingerprint_sha256` agree byte for byte. The lookup resolved, so they must.
+
+**The CA cannot reach the gateway the way the Hub CA does.** Istio reads a gateway's credentials
+only from the namespace the gateway runs in, and `KubernetesSecretWriter` could only write its own.
+`DfspCaPublishScheduler` now writes across that boundary, under the `cacert` key, assembling
+**intermediate followed by root** — the issuing mount's own chain contains only itself, so a bundle
+from one alone leaves the gateway unable to build a path. The cross-namespace Role withholds
+`create`: the Secret is expected to exist beside the gateway, so a missing one surfaces as a failed
+sync rather than as this job minting a trust anchor of its own.
+
+**A live transaction completed**, payee resolved, over mutual TLS end to end. Getting there exposed
+that both participants' callbacks are still registered at `http://host.docker.internal:3201` — web-
+inbound's address when it ran on the host rather than in the cluster. Unrelated to certificates, and
+bridged with a port-forward; the endpoints want re-registering.
+
+**Deploying the portal surfaced three defects in the chart and image, all pre-existing.** The
+generated `config.js` was missing a comma and so never parsed, leaving `window.__PIVOTAL_CONFIG__`
+unset in *every* deployment using that image; the portal Deployment passed no environment at all, so
+the values that generate it were ignored; and it declared port 80 while nginx binds 8080, leaving
+the Service with no reachable endpoint. web-pivotal was also asking Vault for signing keys it never
+uses — it now runs `KEY_PROVIDER=database` and holds a certificate-issuing role only.
+
+### DFSP certificate issuance, and a CA that let callers name themselves · 2026-09-03
+
+Schema, issuance, the hub-operator API and the portal screen — the half of the DFSP-facing leg that
+creates certificates.
+
+`participant_cert` carries the fingerprint as the runtime lookup key, with status in a seeded lookup
+table rather than an application enum. The row is the only record a certificate exists: the issuing
+role runs `no_store=true`, so a purged row does not disable a certificate, it makes it
+unaccountable. Rows are retired by status and never deleted before `valid_to` passes.
+
+**The finding.** With the CA reachable, an enrollment was run using a request whose subject
+deliberately claimed a different tenant. It came back **signed with that name**. Vault's PKI `sign`
+endpoint defaults to `use_csr_common_name=true`, so it takes the subject from the submitted request
+and ignores the `common_name` supplied by the caller.
+
+That defeats the binding rule outright — a DFSP could have obtained a certificate for any tenant.
+Every unit test had passed throughout, because the fake certificate authority implemented the
+behaviour that was *intended* rather than the one Vault has. The mock encoded the assumption, so it
+could never have caught it.
+
+Fixed in two places on purpose: the issuing role now sets `use_csr_common_name=false use_csr_sans=
+false`, and issuance verifies the returned common name against the enrolled participant and records
+nothing if they differ. A role left at its default can no longer produce a mis-bound certificate
+silently. A regression test now reproduces Vault's real default.
+
+**Also worth knowing:** cert-manager and Vault both write PKCS#1 private keys unless told
+otherwise, and an encoding change alone does not trigger re-issuance — the Secret keeps its original
+key until deleted.
 
 ### Connector mutual TLS — the hub-facing leg closed · 2026-09-02
 
