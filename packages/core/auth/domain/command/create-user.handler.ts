@@ -6,7 +6,7 @@ import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
 import {User} from '../model';
 import {RoleRepository, UserRepository} from '../repository';
-import {PasswordService, TempPasswordService} from '../service';
+import {PasswordService, TempPasswordService, UserManagementPolicy} from '../service';
 import {CreateUserCommand} from './create-user.command';
 
 @CommandHandler(CreateUserCommand)
@@ -21,12 +21,15 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand, Cre
         private readonly passwordService: PasswordService,
         @Inject(TempPasswordService)
         private readonly tempPasswordService: TempPasswordService,
+        @Inject(UserManagementPolicy)
+        private readonly userManagementPolicy: UserManagementPolicy,
     ) {
     }
 
     async execute(command: CreateUserCommand): Promise<CreateUserCommand.Output> {
 
-        const {email, roleId, fspId} = command.input;
+        const {actingUserId, email, roleId, fspId} = command.input;
+        const context = await this.userManagementPolicy.resolveManagementContext(actingUserId);
 
         const role = await this.roleRepository.findById(roleId, DbTarget.Write);
 
@@ -34,13 +37,16 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand, Cre
             throw new BadRequestException(adminError(AdminErrorCode.USER_ROLE_NOT_FOUND));
         }
 
-        const normalizedFspId = fspId != null && fspId.trim().length > 0 ? fspId.trim() : null;
+        await this.userManagementPolicy.assertCanAssignRole(context, role);
 
-        if (role.scope === 'HUB' && normalizedFspId != null) {
+        const requestedFspId = fspId != null && fspId.trim().length > 0 ? fspId.trim() : null;
+        const effectiveFspId = this.userManagementPolicy.resolveCreateFspId(context, requestedFspId);
+
+        if (role.scope === 'HUB' && effectiveFspId != null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID));
         }
 
-        if (role.scope === 'DFSP' && normalizedFspId == null) {
+        if (role.scope === 'DFSP' && effectiveFspId == null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_DFSP_REQUIRES_FSP_ID));
         }
 
@@ -53,7 +59,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand, Cre
         const tempPassword = this.tempPasswordService.generate();
         const passwordHash = await this.passwordService.hash(tempPassword);
 
-        const user = new User(email, passwordHash, role.id, normalizedFspId, true);
+        const user = new User(email, passwordHash, role.id, effectiveFspId, true);
         const saved = await this.userRepository.save(user);
 
         return new CreateUserCommand.Output(saved, role, tempPassword);

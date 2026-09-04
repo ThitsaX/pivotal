@@ -14,6 +14,7 @@ export interface UserListFilters {
     fspId?:   string;
     isActive?: boolean;
     search?:  string;
+    managementFspId?: string;
 }
 
 export interface UserListPage {
@@ -55,6 +56,10 @@ export class UserRepository {
     async findAll(filters: UserListFilters, target: DbTarget = DbTarget.Read): Promise<UserListPage> {
 
         const qb = this.getRepository(target).createQueryBuilder('u');
+
+        if (filters.managementFspId != null) {
+            qb.andWhere('u.fsp_id = :managementFspId', {managementFspId: filters.managementFspId});
+        }
 
         if (filters.roleId != null) {
             qb.andWhere('u.role_id = :roleId', {roleId: filters.roleId});
@@ -104,6 +109,26 @@ export class UserRepository {
                        .innerJoin('permissions', 'p', 'p.id = rp.permission_id')
                        .where('u.is_active = TRUE')
                        .andWhere('p.key_name = :permissionKey', {permissionKey});
+
+        if (excludeUserId != null) {
+            qb.andWhere('u.id != :excludeUserId', {excludeUserId});
+        }
+
+        return qb.getCount();
+    }
+
+    async countActiveUsersByRoleCodeForFsp(
+        roleCode: string,
+        fspId: string,
+        excludeUserId?: string,
+        target: DbTarget = DbTarget.Read,
+    ): Promise<number> {
+
+        const qb = this.getRepository(target).createQueryBuilder('u')
+                       .innerJoin('roles', 'r', 'r.id = u.role_id')
+                       .where('u.is_active = TRUE')
+                       .andWhere('u.fsp_id = :fspId', {fspId})
+                       .andWhere('r.code = :roleCode', {roleCode});
 
         if (excludeUserId != null) {
             qb.andWhere('u.id != :excludeUserId', {excludeUserId});

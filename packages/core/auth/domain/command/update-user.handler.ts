@@ -7,6 +7,7 @@ import {adminError, AdminErrorCode} from '../error';
 import {PermissionKey} from '../model';
 import {RolePermissionRepository, RoleRepository, UserRepository, UserUpdate} from '../repository';
 import {RefreshTokenRepository} from '../repository/refresh-token.repository';
+import {UserManagementPolicy} from '../service';
 import {UpdateUserCommand} from './update-user.command';
 
 @CommandHandler(UpdateUserCommand)
@@ -21,18 +22,23 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, Upd
         private readonly rolePermissionRepository: RolePermissionRepository,
         @Inject(RefreshTokenRepository)
         private readonly refreshTokenRepository: RefreshTokenRepository,
+        @Inject(UserManagementPolicy)
+        private readonly userManagementPolicy: UserManagementPolicy,
     ) {
     }
 
     async execute(command: UpdateUserCommand): Promise<UpdateUserCommand.Output> {
 
         const {targetUserId, actingUserId, roleId, fspId, isActive} = command.input;
+        const context = await this.userManagementPolicy.resolveManagementContext(actingUserId);
 
         const target = await this.userRepository.findById(targetUserId, DbTarget.Write);
 
         if (target == null) {
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
+
+        this.userManagementPolicy.assertCanManageTarget(context, target);
 
         const isSelf = targetUserId === actingUserId;
         const roleChange = roleId != null && roleId !== target.roleId;
@@ -50,7 +56,10 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, Upd
             throw new BadRequestException(adminError(AdminErrorCode.USER_ROLE_NOT_FOUND));
         }
 
-        const effectiveFspId = fspId === undefined ? target.fspId : (fspId != null && fspId.trim().length > 0 ? fspId.trim() : null);
+        await this.userManagementPolicy.assertCanAssignRole(context, newRole);
+
+        const requestedFspId = fspId === undefined ? target.fspId : (fspId != null && fspId.trim().length > 0 ? fspId.trim() : null);
+        const effectiveFspId = context.globalManager ? requestedFspId : context.managementFspId;
 
         if (newRole.scope === 'HUB' && effectiveFspId != null) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID));
@@ -64,13 +73,21 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, Upd
             await this.assertNotLastAdmin(target.id, target.roleId, roleChange ? newRole.id : target.roleId, deactivation);
         }
 
+        await this.userManagementPolicy.assertNotLastDfspManager(
+            target,
+            target.roleId,
+            newRole.id,
+            effectiveFspId,
+            deactivation,
+        );
+
         const patch: UserUpdate = {};
 
         if (roleChange) {
             patch.roleId = newRole.id;
         }
 
-        if (fspId !== undefined) {
+        if (effectiveFspId !== target.fspId) {
             patch.fspId = effectiveFspId;
         }
 

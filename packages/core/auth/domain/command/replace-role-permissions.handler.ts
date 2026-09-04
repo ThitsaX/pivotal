@@ -4,10 +4,12 @@ import {BadRequestException, ConflictException, Inject, NotFoundException} from 
 import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
+import {ADMIN_ROLE_CODE, DFSP_ADMIN_ROLE_CODE} from '../model';
 import {PermissionRepository, RolePermissionRepository, RoleRepository, UserRepository} from '../repository';
 import {ReplaceRolePermissionsCommand} from './replace-role-permissions.command';
 
 const ADMIN_KEY_PREFIX = 'admin.';
+const ADMIN_PERMISSION_LOCKED_ROLE_CODES = new Set([ADMIN_ROLE_CODE, DFSP_ADMIN_ROLE_CODE]);
 
 @CommandHandler(ReplaceRolePermissionsCommand)
 export class ReplaceRolePermissionsHandler
@@ -49,7 +51,7 @@ export class ReplaceRolePermissionsHandler
             throw new BadRequestException(adminError(AdminErrorCode.ROLE_PERMISSION_SCOPE_MISMATCH));
         }
 
-        if (role.isSystem) {
+        if (role.isSystem && ADMIN_PERMISSION_LOCKED_ROLE_CODES.has(role.code)) {
             const currentKeys = await this.rolePermissionRepository.findPermissionKeysByRoleId(role.id, DbTarget.Write);
             const currentAdminKeys = currentKeys.filter((k) => k.startsWith(ADMIN_KEY_PREFIX));
             const nextKeySet = new Set(dedupedKeys);

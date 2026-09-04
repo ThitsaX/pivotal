@@ -23,18 +23,22 @@ import {
     CreateUserCommand,
     DeactivateUserCommand,
     PermissionKey,
+    RequiresAnyPermission,
     RequiresPermission,
     ResetUserPasswordCommand,
     Role,
+    RolePermissionRepository,
     RoleRepository,
     UpdateUserCommand,
     User,
+    UserManagementPolicy,
     UserRepository,
 } from '@core/auth/domain';
 import {ParticipantRepository} from '@core/participant/domain';
 import {DbTarget} from '@shared/typeorm';
 import {AuthUser} from '../../decorators';
 import {
+    RoleResponseDto,
     UserCreateDto,
     UserListQueryDto,
     UserListResponseDto,
@@ -54,22 +58,32 @@ export class UsersAdminController {
         private readonly userRepository: UserRepository,
         @Inject(RoleRepository)
         private readonly roleRepository: RoleRepository,
+        @Inject(RolePermissionRepository)
+        private readonly rolePermissionRepository: RolePermissionRepository,
         @Inject(ParticipantRepository)
         private readonly participantRepository: ParticipantRepository,
+        @Inject(UserManagementPolicy)
+        private readonly userManagementPolicy: UserManagementPolicy,
     ) {
     }
 
     @Get()
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
-    async list(@Query() query: UserListQueryDto): Promise<UserListResponseDto> {
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
+    async list(
+        @Query() query: UserListQueryDto,
+        @AuthUser() claims: AccessTokenClaims | undefined,
+    ): Promise<UserListResponseDto> {
 
+        const actorId = UsersAdminController.requireAuthUser(claims);
+        const context = await this.userManagementPolicy.resolveManagementContext(actorId);
         const page = await this.userRepository.findAll({
-            page:     query.page,
-            pageSize: query.pageSize,
-            roleId:   query.roleId,
-            fspId:    query.fspId,
-            isActive: query.isActive,
-            search:   query.search,
+            page:            query.page,
+            pageSize:        query.pageSize,
+            roleId:          query.roleId,
+            fspId:           context.globalManager ? query.fspId : undefined,
+            isActive:        query.isActive,
+            search:          query.search,
+            managementFspId: context.managementFspId ?? undefined,
         });
 
         const roles = await this.roleRepository.findAll();
@@ -86,6 +100,24 @@ export class UsersAdminController {
         return new UserListResponseDto(items, page.page, page.pageSize, page.total);
     }
 
+    @Get('assignable-roles')
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
+    async listAssignableRoles(@AuthUser() claims: AccessTokenClaims | undefined): Promise<RoleResponseDto[]> {
+
+        const actorId = UsersAdminController.requireAuthUser(claims);
+        const context = await this.userManagementPolicy.resolveManagementContext(actorId);
+        const roles = await this.roleRepository.findAll(DbTarget.Write);
+        const assignable: RoleResponseDto[] = [];
+
+        for (const role of roles) {
+            if (await this.userManagementPolicy.canAssignRole(context, role)) {
+                assignable.push(await this.toRoleResponse(role));
+            }
+        }
+
+        return assignable;
+    }
+
     @Get('fsp-options')
     @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
     async listFspOptions(): Promise<string[]> {
@@ -99,14 +131,21 @@ export class UsersAdminController {
     }
 
     @Get(':id')
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
-    async getById(@Param('id') id: string): Promise<UserResponseDto> {
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
+    async getById(
+        @Param('id') id: string,
+        @AuthUser() claims: AccessTokenClaims | undefined,
+    ): Promise<UserResponseDto> {
 
+        const actorId = UsersAdminController.requireAuthUser(claims);
+        const context = await this.userManagementPolicy.resolveManagementContext(actorId);
         const user = await this.userRepository.findById(id);
 
         if (user == null) {
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
+
+        this.userManagementPolicy.assertCanManageTarget(context, user);
 
         const role = await this.roleRepository.findById(user.roleId);
 
@@ -118,14 +157,22 @@ export class UsersAdminController {
     }
 
     @Post()
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
-    async create(@Body() dto: UserCreateDto): Promise<UserWithTempPasswordResponseDto> {
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
+    async create(
+        @Body() dto: UserCreateDto,
+        @AuthUser() claims: AccessTokenClaims | undefined,
+    ): Promise<UserWithTempPasswordResponseDto> {
 
-        await this.validateFspIdForRole(dto.roleId, dto.fspId);
+        const actorId = UsersAdminController.requireAuthUser(claims);
+        const context = await this.userManagementPolicy.resolveManagementContext(actorId);
+        const normalizedFspId = UsersAdminController.normalizeFspId(dto.fspId);
+        const effectiveFspId = this.userManagementPolicy.resolveCreateFspId(context, normalizedFspId);
+
+        await this.validateFspIdForRole(dto.roleId, effectiveFspId);
 
         const output = await this.commandBus.execute<CreateUserCommand, CreateUserCommand.Output>(
             new CreateUserCommand(
-                new CreateUserCommand.Input(dto.email, dto.roleId, UsersAdminController.normalizeFspId(dto.fspId)),
+                new CreateUserCommand.Input(actorId, dto.email, dto.roleId, effectiveFspId),
             ),
         );
 
@@ -136,16 +183,14 @@ export class UsersAdminController {
     }
 
     @Patch(':id')
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
     async update(
         @Param('id') id: string,
         @Body() dto: UserUpdateDto,
         @AuthUser() claims: AccessTokenClaims | undefined,
     ): Promise<UserResponseDto> {
 
-        if (claims == null) {
-            throw new BadRequestException(adminError(AdminErrorCode.USER_SELF_LOCK));
-        }
+        const actorId = UsersAdminController.requireAuthUser(claims);
 
         await this.validateFspIdForUpdate(id, dto.roleId, dto.fspId);
 
@@ -153,7 +198,7 @@ export class UsersAdminController {
             new UpdateUserCommand(
                 new UpdateUserCommand.Input(
                     id,
-                    claims.sub,
+                    actorId,
                     dto.roleId,
                     dto.fspId === undefined ? undefined : UsersAdminController.normalizeFspId(dto.fspId),
                     dto.isActive,
@@ -166,11 +211,16 @@ export class UsersAdminController {
 
     @Post(':id/reset-password')
     @HttpCode(HttpStatus.OK)
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
-    async resetPassword(@Param('id') id: string): Promise<UserWithTempPasswordResponseDto> {
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
+    async resetPassword(
+        @Param('id') id: string,
+        @AuthUser() claims: AccessTokenClaims | undefined,
+    ): Promise<UserWithTempPasswordResponseDto> {
+
+        const actorId = UsersAdminController.requireAuthUser(claims);
 
         const output = await this.commandBus.execute<ResetUserPasswordCommand, ResetUserPasswordCommand.Output>(
-            new ResetUserPasswordCommand(new ResetUserPasswordCommand.Input(id)),
+            new ResetUserPasswordCommand(new ResetUserPasswordCommand.Input(id, actorId)),
         );
 
         return new UserWithTempPasswordResponseDto(
@@ -181,21 +231,45 @@ export class UsersAdminController {
 
     @Delete(':id')
     @HttpCode(HttpStatus.OK)
-    @RequiresPermission(PermissionKey.ADMIN_USERS_MANAGE)
+    @RequiresAnyPermission(PermissionKey.ADMIN_USERS_MANAGE, PermissionKey.ADMIN_DFSP_USERS_MANAGE)
     async deactivate(
         @Param('id') id: string,
         @AuthUser() claims: AccessTokenClaims | undefined,
     ): Promise<UserResponseDto> {
 
-        if (claims == null) {
-            throw new BadRequestException(adminError(AdminErrorCode.USER_SELF_LOCK));
-        }
+        const actorId = UsersAdminController.requireAuthUser(claims);
 
         const output = await this.commandBus.execute<DeactivateUserCommand, DeactivateUserCommand.Output>(
-            new DeactivateUserCommand(new DeactivateUserCommand.Input(id, claims.sub)),
+            new DeactivateUserCommand(new DeactivateUserCommand.Input(id, actorId)),
         );
 
         return UsersAdminController.toUserResponse(output.user, output.role);
+    }
+
+    private async toRoleResponse(role: Role): Promise<RoleResponseDto> {
+        const [userCount, permissionCount] = await Promise.all([
+            this.userRepository.countByRoleId(role.id),
+            this.rolePermissionRepository.countByRoleId(role.id),
+        ]);
+
+        return new RoleResponseDto(
+            role.id,
+            role.code,
+            role.name,
+            role.description,
+            role.scope,
+            role.isSystem,
+            userCount,
+            permissionCount,
+        );
+    }
+
+    private static requireAuthUser(claims: AccessTokenClaims | undefined): string {
+        if (claims == null) {
+            throw new BadRequestException(adminError(AdminErrorCode.USER_MANAGEMENT_SCOPE_DENIED));
+        }
+
+        return claims.sub;
     }
 
     private static toUserResponse(user: User, role: Role): UserResponseDto {

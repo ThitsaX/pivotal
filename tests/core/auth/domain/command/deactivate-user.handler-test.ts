@@ -6,6 +6,7 @@ import {
     RolePermissionRepository,
     RoleRepository,
     UserRepository,
+    UserManagementPolicy,
 } from '../../../../../packages/core/auth/domain';
 import {DeactivateUserCommand, DeactivateUserHandler} from '../../../../../packages/core/auth/domain/command';
 import {ADMIN_ROLE_CODE, DFSP_USER_ROLE_CODE, PermissionKey, Role, User} from '../../../../../packages/core/auth/domain/model';
@@ -77,13 +78,25 @@ function makeHandler(state: State): DeactivateUserHandler {
         },
     } as unknown as RolePermissionRepository;
 
+    const policy = {
+        async resolveManagementContext(): Promise<unknown> {
+            return {globalManager: true, managementFspId: null};
+        },
+        assertCanManageTarget(): void {
+            return;
+        },
+        async assertNotLastDfspManager(): Promise<void> {
+            return;
+        },
+    } as unknown as UserManagementPolicy;
+
     const tokenRepo = {
         async revokeAllForUser(id: string): Promise<void> {
             state.revokeAllForUserCalls.push(id);
         },
     } as unknown as RefreshTokenRepository;
 
-    return new DeactivateUserHandler(userRepo, roleRepo, rpRepo, tokenRepo);
+    return new DeactivateUserHandler(userRepo, roleRepo, rpRepo, tokenRepo, policy);
 }
 
 describe('DeactivateUserHandler', () => {

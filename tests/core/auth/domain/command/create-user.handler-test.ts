@@ -4,7 +4,7 @@ import {BadRequestException, ConflictException} from '@nestjs/common';
 import {RoleRepository, UserRepository} from '../../../../../packages/core/auth/domain';
 import {CreateUserCommand, CreateUserHandler} from '../../../../../packages/core/auth/domain/command';
 import {ADMIN_ROLE_CODE, DFSP_USER_ROLE_CODE, Role, User} from '../../../../../packages/core/auth/domain/model';
-import {PasswordService, TempPasswordService} from '../../../../../packages/core/auth/domain/service';
+import {PasswordService, TempPasswordService, UserManagementPolicy} from '../../../../../packages/core/auth/domain/service';
 
 interface State {
     rolesById:    Map<string, Role>;
@@ -52,6 +52,20 @@ function makePasswordService(): PasswordService {
     } as unknown as PasswordService;
 }
 
+function makeUserManagementPolicy(): UserManagementPolicy {
+    return {
+        async resolveManagementContext(): Promise<unknown> {
+            return {globalManager: true, managementFspId: null};
+        },
+        async assertCanAssignRole(): Promise<void> {
+            return;
+        },
+        resolveCreateFspId(_context: unknown, requestedFspId: string | null): string | null {
+            return requestedFspId;
+        },
+    } as unknown as UserManagementPolicy;
+}
+
 function makeTempPasswordService(): TempPasswordService {
     return {
         generate(): string {
@@ -66,6 +80,7 @@ function makeHandler(state: State): CreateUserHandler {
         makeRoleRepo(state),
         makePasswordService(),
         makeTempPasswordService(),
+        makeUserManagementPolicy(),
     );
 }
 
@@ -75,7 +90,7 @@ describe('CreateUserHandler', () => {
 
         const state = freshState();
         const output = await makeHandler(state).execute(new CreateUserCommand(
-            new CreateUserCommand.Input('dfsp@example.com', 'role-dfsp', 'fsp-001'),
+            new CreateUserCommand.Input('admin-1', 'dfsp@example.com', 'role-dfsp', 'fsp-001'),
         ));
 
         assert.equal(state.saved.length, 1);
@@ -95,7 +110,7 @@ describe('CreateUserHandler', () => {
 
         const state = freshState();
         const output = await makeHandler(state).execute(new CreateUserCommand(
-            new CreateUserCommand.Input('admin@example.com', 'role-admin', null),
+            new CreateUserCommand.Input('admin-1', 'admin@example.com', 'role-admin', null),
         ));
 
         assert.equal(state.saved.length, 1);
@@ -108,7 +123,7 @@ describe('CreateUserHandler', () => {
         const state = freshState();
         await assert.rejects(
             makeHandler(state).execute(new CreateUserCommand(
-                new CreateUserCommand.Input('x@example.com', 'role-missing', 'fsp-001'),
+                new CreateUserCommand.Input('admin-1', 'x@example.com', 'role-missing', 'fsp-001'),
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_ROLE_NOT_FOUND',
@@ -120,7 +135,7 @@ describe('CreateUserHandler', () => {
         const state = freshState();
         await assert.rejects(
             makeHandler(state).execute(new CreateUserCommand(
-                new CreateUserCommand.Input('x@example.com', 'role-dfsp', null),
+                new CreateUserCommand.Input('admin-1', 'x@example.com', 'role-dfsp', null),
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_DFSP_REQUIRES_FSP_ID',
@@ -132,7 +147,7 @@ describe('CreateUserHandler', () => {
         const state = freshState();
         await assert.rejects(
             makeHandler(state).execute(new CreateUserCommand(
-                new CreateUserCommand.Input('x@example.com', 'role-dfsp', '   '),
+                new CreateUserCommand.Input('admin-1', 'x@example.com', 'role-dfsp', '   '),
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_DFSP_REQUIRES_FSP_ID',
@@ -144,7 +159,7 @@ describe('CreateUserHandler', () => {
         const state = freshState();
         await assert.rejects(
             makeHandler(state).execute(new CreateUserCommand(
-                new CreateUserCommand.Input('x@example.com', 'role-admin', 'fsp-001'),
+                new CreateUserCommand.Input('admin-1', 'x@example.com', 'role-admin', 'fsp-001'),
             )),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_ADMIN_FORBIDS_FSP_ID',
@@ -158,7 +173,7 @@ describe('CreateUserHandler', () => {
 
         await assert.rejects(
             makeHandler(state).execute(new CreateUserCommand(
-                new CreateUserCommand.Input('dup@example.com', 'role-dfsp', 'fsp-001'),
+                new CreateUserCommand.Input('admin-1', 'dup@example.com', 'role-dfsp', 'fsp-001'),
             )),
             (error: unknown) => error instanceof ConflictException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_EMAIL_TAKEN',

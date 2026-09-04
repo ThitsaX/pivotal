@@ -9,7 +9,7 @@ import {
 } from '../../../../../packages/core/auth/domain';
 import {ReplaceRolePermissionsCommand, ReplaceRolePermissionsHandler}
     from '../../../../../packages/core/auth/domain/command';
-import {ADMIN_ROLE_CODE, Permission, PermissionKey, PermissionScope, Role, RoleScope} from '../../../../../packages/core/auth/domain/model';
+import {ADMIN_ROLE_CODE, DFSP_ADMIN_ROLE_CODE, DFSP_USER_ROLE_CODE, Permission, PermissionKey, PermissionScope, Role, RoleScope} from '../../../../../packages/core/auth/domain/model';
 
 interface State {
     rolesById:           Map<string, Role>;
@@ -24,6 +24,7 @@ const PERMISSION_SCOPES: Record<string, PermissionScope> = {
     [PermissionKey.ADMIN_USERS_MANAGE]:        'HUB',
     [PermissionKey.ADMIN_ROLES_MANAGE]:        'HUB',
     [PermissionKey.ADMIN_PERMISSIONS_LIST]:    'HUB',
+    [PermissionKey.ADMIN_DFSP_USERS_MANAGE]:   'DFSP',
     [PermissionKey.AUDIT_TRANSACTIONS_LIST]:   'BOTH',
     [PermissionKey.AUDIT_TRANSACTIONS_VIEW]:   'BOTH',
     [PermissionKey.PARTICIPANT_LIST]:          'HUB',
@@ -165,7 +166,7 @@ describe('ReplaceRolePermissionsHandler', () => {
         assert.equal(state.replaceCalls.length, 0);
     });
 
-    it('rejects 409 ROLE_CANNOT_REMOVE_ADMIN_KEY when a system role would lose an admin.* key', async () => {
+    it('rejects 409 ROLE_CANNOT_REMOVE_ADMIN_KEY when ADMIN would lose an admin.* key', async () => {
 
         const state = freshState();
         addSystemRole(state, 'role-admin', ADMIN_ROLE_CODE, 'HUB',[
@@ -189,6 +190,40 @@ describe('ReplaceRolePermissionsHandler', () => {
         assert.equal(state.invalidateForRoleCalls.length, 0);
     });
 
+    it('rejects 409 ROLE_CANNOT_REMOVE_ADMIN_KEY when DFSP_ADMIN would lose its admin key', async () => {
+
+        const state = freshState();
+        addSystemRole(state, 'role-dfsp-admin', DFSP_ADMIN_ROLE_CODE, 'DFSP',[
+            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
+            PermissionKey.AUDIT_TRANSACTIONS_LIST,
+        ]);
+
+        await assert.rejects(
+            makeHandler(state).execute(new ReplaceRolePermissionsCommand(
+                new ReplaceRolePermissionsCommand.Input('role-dfsp-admin', [PermissionKey.AUDIT_TRANSACTIONS_LIST]),
+            )),
+            (error: unknown) => error instanceof ConflictException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_ROLE_CANNOT_REMOVE_ADMIN_KEY',
+        );
+        assert.equal(state.replaceCalls.length, 0);
+        assert.equal(state.invalidateForRoleCalls.length, 0);
+    });
+
+    it('allows DFSP_USER system role to drop accidental admin.dfsp-users.manage grants', async () => {
+
+        const state = freshState();
+        addSystemRole(state, 'role-dfsp-user', DFSP_USER_ROLE_CODE, 'DFSP',[
+            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
+            PermissionKey.AUDIT_TRANSACTIONS_LIST,
+        ]);
+
+        await makeHandler(state).execute(new ReplaceRolePermissionsCommand(
+            new ReplaceRolePermissionsCommand.Input('role-dfsp-user', [PermissionKey.AUDIT_TRANSACTIONS_LIST]),
+        ));
+
+        assert.equal(state.replaceCalls.length, 1);
+        assert.deepEqual(state.invalidateForRoleCalls, ['role-dfsp-user']);
+    });
     it('allows system role edits that keep all admin.* keys and add/remove non-admin keys', async () => {
 
         const state = freshState();

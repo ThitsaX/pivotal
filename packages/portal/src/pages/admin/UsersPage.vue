@@ -27,7 +27,9 @@ defineEmits<{
     (event: 'update:selectedTimeZone', value: string): void;
 }>();
 
-const hasPermission = computed((): boolean => authStore.hasPermission('admin.users.manage'));
+const hasPermission = computed((): boolean => authStore.hasPermission('admin.users.manage') || authStore.hasPermission('admin.dfsp-users.manage'));
+const canChooseFsp = computed((): boolean => authStore.hasPermission('admin.users.manage'));
+const fixedFspId = computed((): string | null => authStore.state.user?.fspId ?? null);
 const currentUserId = computed((): string | null => authStore.state.user?.id ?? null);
 
 const state = usersAdminStore.state;
@@ -59,7 +61,11 @@ const clearFilters = async (): Promise<void> => {
 
 onMounted(async (): Promise<void> => {
     if (!hasPermission.value) return;
-    await Promise.all([usersAdminStore.loadUsers(), usersAdminStore.loadRoles(), usersAdminStore.loadFspOptions()]);
+    const tasks: Array<Promise<void>> = [usersAdminStore.loadUsers(), usersAdminStore.loadRoles()];
+    if (canChooseFsp.value) {
+        tasks.push(usersAdminStore.loadFspOptions());
+    }
+    await Promise.all(tasks);
 });
 
 onActivated((): void => {
@@ -96,12 +102,12 @@ const createDisabled = computed((): boolean => {
     if (createForm.submitting) return true;
     if (createForm.email.trim().length === 0) return true;
     if (createForm.roleId.length === 0) return true;
-    if (createRoleRequiresFspId.value && createForm.fspId.trim().length === 0) return true;
+    if (canChooseFsp.value && createRoleRequiresFspId.value && createForm.fspId.trim().length === 0) return true;
     return false;
 });
 
 const openCreate = (): void => {
-    if (!state.fspOptionsLoaded && state.fspOptionsError == null) {
+    if (canChooseFsp.value && !state.fspOptionsLoaded && state.fspOptionsError == null) {
         void usersAdminStore.loadFspOptions();
     }
 
@@ -138,7 +144,7 @@ const submitCreate = async (): Promise<void> => {
         const input: AdminUserCreateInput = {
             email:  createForm.email.trim(),
             roleId: createForm.roleId,
-            fspId:  createRoleForbidsFspId.value ? null : createForm.fspId.trim(),
+            fspId:  canChooseFsp.value && !createRoleForbidsFspId.value ? createForm.fspId.trim() : null,
         };
         const result = await usersAdminStore.createUser(input);
         createOpen.value = false;
@@ -193,7 +199,7 @@ const editFspOptions = computed((): string[] => {
 });
 
 const openEdit = (user: AdminUser): void => {
-    if (!state.fspOptionsLoaded && state.fspOptionsError == null) {
+    if (canChooseFsp.value && !state.fspOptionsLoaded && state.fspOptionsError == null) {
         void usersAdminStore.loadFspOptions();
     }
 
@@ -220,7 +226,7 @@ watch(() => [editForm.roleId, editForm.fspId], () => {
 const editDirty = computed((): boolean => {
     if (editForm.user == null) return false;
     if (editForm.roleId !== editForm.user.role.id) return true;
-    if ((editForm.fspId.trim().length > 0 ? editForm.fspId.trim() : null) !== editForm.user.fspId) return true;
+    if (canChooseFsp.value && (editForm.fspId.trim().length > 0 ? editForm.fspId.trim() : null) !== editForm.user.fspId) return true;
     if (editForm.isActive !== editForm.user.isActive) return true;
     return false;
 });
@@ -249,9 +255,11 @@ const submitEdit = async (): Promise<void> => {
                 patch.isActive = editForm.isActive;
             }
         }
-        const newFspId = editForm.fspId.trim().length > 0 ? editForm.fspId.trim() : null;
-        if (newFspId !== editForm.user.fspId) {
-            patch.fspId = newFspId;
+        if (canChooseFsp.value) {
+            const newFspId = editForm.fspId.trim().length > 0 ? editForm.fspId.trim() : null;
+            if (newFspId !== editForm.user.fspId) {
+                patch.fspId = newFspId;
+            }
         }
         await usersAdminStore.updateUser(editForm.user.id, patch);
         editForm.user = null;
@@ -493,7 +501,7 @@ const onPageChange = async (page: number): Promise<void> => {
         <p v-if="state.rolesError != null" class="text-xs text-amber-700">
             Could not load role options ({{ state.rolesError }}). Role filtering and editing may be limited.
         </p>
-        <p v-if="state.fspOptionsError != null" class="text-xs text-amber-700">
+        <p v-if="canChooseFsp && state.fspOptionsError != null" class="text-xs text-amber-700">
             Could not load FSP options ({{ state.fspOptionsError }}). DFSP user creation and editing may be limited.
         </p>
 
@@ -601,7 +609,7 @@ const onPageChange = async (page: number): Promise<void> => {
                             <option v-for="role in state.roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                         </select>
                     </div>
-                    <div>
+                    <div v-if="canChooseFsp">
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="createRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
@@ -622,6 +630,9 @@ const onPageChange = async (page: number): Promise<void> => {
                             </option>
                         </select>
                     </div>
+                    <p v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        FSP ID: <span class="font-mono text-ink">{{ fixedFspId ?? '—' }}</span>
+                    </p>
 
                     <div
                         v-if="createForm.error != null"
@@ -678,7 +689,7 @@ const onPageChange = async (page: number): Promise<void> => {
                             <option v-for="role in state.roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                         </select>
                     </div>
-                    <div>
+                    <div v-if="canChooseFsp">
                         <label class="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                             FSP ID
                             <span v-if="editRoleForbidsFspId" class="font-normal normal-case text-slate-400">— not used for HUB-scoped roles</span>
@@ -701,6 +712,9 @@ const onPageChange = async (page: number): Promise<void> => {
                             {{ editFspValidationMessage }}
                         </p>
                     </div>
+                    <p v-else class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        FSP ID: <span class="font-mono text-ink">{{ editForm.user?.fspId ?? fixedFspId ?? '—' }}</span>
+                    </p>
                     <label class="flex items-center gap-2 text-sm text-ink">
                         <input
                             v-model="editForm.isActive"

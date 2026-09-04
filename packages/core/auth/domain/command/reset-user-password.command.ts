@@ -13,6 +13,7 @@ export namespace ResetUserPasswordCommand {
     export class Input {
         constructor(
             public readonly targetUserId: string,
+            public readonly actingUserId: string,
         ) {
         }
     }
