@@ -7,6 +7,7 @@ import {adminError, AdminErrorCode} from '../error';
 import {PermissionKey} from '../model';
 import {RolePermissionRepository, RoleRepository, UserRepository} from '../repository';
 import {RefreshTokenRepository} from '../repository/refresh-token.repository';
+import {UserManagementPolicy} from '../service';
 import {DeactivateUserCommand} from './deactivate-user.command';
 
 @CommandHandler(DeactivateUserCommand)
@@ -22,12 +23,15 @@ export class DeactivateUserHandler
         private readonly rolePermissionRepository: RolePermissionRepository,
         @Inject(RefreshTokenRepository)
         private readonly refreshTokenRepository: RefreshTokenRepository,
+        @Inject(UserManagementPolicy)
+        private readonly userManagementPolicy: UserManagementPolicy,
     ) {
     }
 
     async execute(command: DeactivateUserCommand): Promise<DeactivateUserCommand.Output> {
 
         const {targetUserId, actingUserId} = command.input;
+        const context = await this.userManagementPolicy.resolveManagementContext(actingUserId);
 
         if (targetUserId === actingUserId) {
             throw new BadRequestException(adminError(AdminErrorCode.USER_SELF_LOCK));
@@ -38,6 +42,8 @@ export class DeactivateUserHandler
         if (target == null) {
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
+
+        this.userManagementPolicy.assertCanManageTarget(context, target);
 
         const role = (await this.roleRepository.findById(target.roleId, DbTarget.Write))!;
 
@@ -58,6 +64,8 @@ export class DeactivateUserHandler
                 throw new ConflictException(adminError(AdminErrorCode.USER_LAST_ADMIN));
             }
         }
+
+        await this.userManagementPolicy.assertNotLastDfspManager(target, target.roleId, target.roleId, target.fspId, true);
 
         await this.userRepository.deactivate(target.id);
         await this.refreshTokenRepository.revokeAllForUser(target.id);

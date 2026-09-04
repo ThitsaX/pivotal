@@ -6,6 +6,7 @@ import {
     RolePermissionRepository,
     RoleRepository,
     UserRepository,
+    UserManagementPolicy,
 } from '../../../../../packages/core/auth/domain';
 import {UpdateUserCommand, UpdateUserHandler} from '../../../../../packages/core/auth/domain/command';
 import {ADMIN_ROLE_CODE, DFSP_USER_ROLE_CODE, PermissionKey, Role, User} from '../../../../../packages/core/auth/domain/model';
@@ -82,6 +83,23 @@ function makeRolePermissionRepo(state: State): RolePermissionRepository {
     } as unknown as RolePermissionRepository;
 }
 
+function makeUserManagementPolicy(): UserManagementPolicy {
+    return {
+        async resolveManagementContext(): Promise<unknown> {
+            return {globalManager: true, managementFspId: null};
+        },
+        assertCanManageTarget(): void {
+            return;
+        },
+        async assertCanAssignRole(): Promise<void> {
+            return;
+        },
+        async assertNotLastDfspManager(): Promise<void> {
+            return;
+        },
+    } as unknown as UserManagementPolicy;
+}
+
 function makeRefreshTokenRepo(state: State): RefreshTokenRepository {
     return {
         async revokeAllForUser(id: string): Promise<void> {
@@ -96,6 +114,7 @@ function makeHandler(state: State): UpdateUserHandler {
         makeRoleRepo(state),
         makeRolePermissionRepo(state),
         makeRefreshTokenRepo(state),
+        makeUserManagementPolicy(),
     );
 }
 

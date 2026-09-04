@@ -13,6 +13,7 @@ export const PermissionKey = {
     AUDIT_TRANSACTIONS_VIEW:         'audit.transactions.view',
     AUDIT_DASHBOARD_VIEW:            'audit.dashboard.view',
     ADMIN_USERS_MANAGE:              'admin.users.manage',
+    ADMIN_DFSP_USERS_MANAGE:         'admin.dfsp-users.manage',
     ADMIN_ROLES_MANAGE:              'admin.roles.manage',
     ADMIN_PERMISSIONS_LIST:          'admin.permissions.list',
 } as const;

@@ -4,7 +4,7 @@ import {NotFoundException} from '@nestjs/common';
 import {RefreshTokenRepository, RoleRepository, UserRepository} from '../../../../../packages/core/auth/domain';
 import {ResetUserPasswordCommand, ResetUserPasswordHandler} from '../../../../../packages/core/auth/domain/command';
 import {ADMIN_ROLE_CODE, Role, User} from '../../../../../packages/core/auth/domain/model';
-import {PasswordService, TempPasswordService} from '../../../../../packages/core/auth/domain/service';
+import {PasswordService, TempPasswordService, UserManagementPolicy} from '../../../../../packages/core/auth/domain/service';
 
 interface Calls {
     updatePasswordHash:    Array<{id: string; hash: string; mustChangePassword: boolean}>;
@@ -58,6 +58,17 @@ function makePasswordService(): PasswordService {
     } as unknown as PasswordService;
 }
 
+function makeUserManagementPolicy(): UserManagementPolicy {
+    return {
+        async resolveManagementContext(): Promise<unknown> {
+            return {globalManager: true, managementFspId: null};
+        },
+        assertCanManageTarget(): void {
+            return;
+        },
+    } as unknown as UserManagementPolicy;
+}
+
 function makeTempPasswordService(): TempPasswordService {
     return {
         generate(): string {
@@ -80,10 +91,11 @@ describe('ResetUserPasswordHandler', () => {
             makeRefreshTokenRepo(calls),
             makePasswordService(),
             makeTempPasswordService(),
+            makeUserManagementPolicy(),
         );
 
         const output = await handler.execute(new ResetUserPasswordCommand(
-            new ResetUserPasswordCommand.Input('user-1'),
+            new ResetUserPasswordCommand.Input('user-1', 'admin-1'),
         ));
 
         assert.equal(output.tempPassword, 'Reset-Pass-12345!');
@@ -101,10 +113,11 @@ describe('ResetUserPasswordHandler', () => {
             makeRefreshTokenRepo(calls),
             makePasswordService(),
             makeTempPasswordService(),
+            makeUserManagementPolicy(),
         );
 
         await assert.rejects(
-            handler.execute(new ResetUserPasswordCommand(new ResetUserPasswordCommand.Input('missing'))),
+            handler.execute(new ResetUserPasswordCommand(new ResetUserPasswordCommand.Input('missing', 'admin-1'))),
             (error: unknown) => error instanceof NotFoundException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_NOT_FOUND',
         );

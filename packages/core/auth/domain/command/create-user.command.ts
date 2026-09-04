@@ -12,9 +12,10 @@ export namespace CreateUserCommand {
 
     export class Input {
         constructor(
-            public readonly email:  string,
-            public readonly roleId: string,
-            public readonly fspId:  string | null,
+            public readonly actingUserId: string,
+            public readonly email:        string,
+            public readonly roleId:       string,
+            public readonly fspId:        string | null,
         ) {
         }
     }

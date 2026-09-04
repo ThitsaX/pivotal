@@ -6,7 +6,7 @@ import {DbTarget} from '@shared/typeorm';
 import {adminError, AdminErrorCode} from '../error';
 import {RoleRepository, UserRepository} from '../repository';
 import {RefreshTokenRepository} from '../repository/refresh-token.repository';
-import {PasswordService, TempPasswordService} from '../service';
+import {PasswordService, TempPasswordService, UserManagementPolicy} from '../service';
 import {ResetUserPasswordCommand} from './reset-user-password.command';
 
 @CommandHandler(ResetUserPasswordCommand)
@@ -24,18 +24,23 @@ export class ResetUserPasswordHandler
         private readonly passwordService: PasswordService,
         @Inject(TempPasswordService)
         private readonly tempPasswordService: TempPasswordService,
+        @Inject(UserManagementPolicy)
+        private readonly userManagementPolicy: UserManagementPolicy,
     ) {
     }
 
     async execute(command: ResetUserPasswordCommand): Promise<ResetUserPasswordCommand.Output> {
 
-        const {targetUserId} = command.input;
+        const {targetUserId, actingUserId} = command.input;
+        const context = await this.userManagementPolicy.resolveManagementContext(actingUserId);
 
         const user = await this.userRepository.findById(targetUserId, DbTarget.Write);
 
         if (user == null) {
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
+
+        this.userManagementPolicy.assertCanManageTarget(context, user);
 
         const role = (await this.roleRepository.findById(user.roleId, DbTarget.Write))!;
 
