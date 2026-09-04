@@ -25,8 +25,8 @@ revocation (**E**) unspecified.
 
 | Repo | Branch | Head | Tree |
 | --- | --- | --- | --- |
-| `pivotal` | `MOJ-1211/trust-manager-implementation` | `f6dbe70` — make the portal runtime config and container port work | clean |
-| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `13df358` — present a hub client certificate from connectors | clean |
+| `pivotal` | `MOJ-1211/trust-manager-implementation` | `caf152d` — record the connector-to-backend options | clean |
+| `pivotal-connector` | `MOJ-1211/hub-facing-jws` | `13df358` — present a hub client certificate from connectors, tagged `v0.0.26` | clean |
 | `pivotal-thitsawallet-connector` | `MOJ-1211/hub-facing-jws` | `2d0e0e8` — wire the hub client certificate into the connector | clean |
 
 All three working trees are clean and the cluster work is committed.
@@ -57,15 +57,28 @@ Both signers signed live, from Vault-sourced keys:
 
 ### Pending actions
 
-1. **Tag `v0.0.25` on `pivotal-connector`.** *The one action that blocks deployment.* Verified
-   2026-08-30: the newest tag is **`v0.0.24`**, so 0.0.25 exists only in the local Maven repository.
-   The connectors resolve `mod-pivotal-connector-api` from GitHub Packages, so **no connector build
-   off this machine can succeed**. `pivotal-thitsawallet-connector/Dockerfile.local` exists only to
-   work around this and should be deleted once the publish workflow has run. **This got more
-   expensive on 2026-09-02:** the connector's entire mTLS client path now lives in that untagged
-   artifact, so no deployment can consume it. The client-owned `gin-*` connectors also need five
-   lines added to their own `docker-entrypoint.sh` before they can enable mTLS — they inherit the
-   component through package scanning, but not the environment mapping that configures it.
+1. **Merge `MOJ-1211/hub-facing-jws` into `pivotal-connector`'s `main`.** *Replaces the tagging
+   action, which is done.* `v0.0.26` was tagged on 2026-09-04 at `13df358` and published from the
+   branch, deliberately, to unblock the dev testing environment. That works — the workflow triggers
+   on the tag and takes its version from the tag name, so the pre-release label on the GitHub
+   Release changes nothing, and Maven has no notion of a pre-release either. The risk is what is
+   left behind: **`main` contains no JWS and no mTLS sources at all.** Anyone tagging `v0.0.27` off
+   `main` would publish an artifact missing both, and the failure is silent — the components are
+   found by package scanning, so a connector built against it starts cleanly and simply stops
+   signing. Merging closes that window.
+
+   **The collision this uncovered, now cleaned up.** `v0.0.25` already existed, tagged 2026-08-25 on
+   `main` at `8b723c9`, which carries neither `jws/` nor `mtls/`. The `0.0.25` built here from the
+   branch carried both, so one coordinate named two different jars — working locally, missing the
+   signing path everywhere else. The consumed and published versions are now `0.0.26`, and the
+   locally-built `0.0.24`/`0.0.25` of every module in the reactor were deleted from `~/.m2` so
+   builds resolve what is actually published rather than a local shadow of it.
+
+   The three client-owned `gin-*` connectors still pin `0.0.25` and so are still on the artifact
+   without the signing path. They also need five lines added to their own `docker-entrypoint.sh`
+   before they can enable mTLS — they inherit the component through package scanning, but not the
+   environment mapping that configures it. Both changes belong to their owners.
+
 2. **Reissue `web-outbound-hub-client-tls` as PKCS#8.** cert-manager writes PKCS#1 unless told
    otherwise. Node reads both, so this is harmless today — but it is the same encoding that stopped
    the Java connector dead at startup, waiting for whoever next points a JVM at that Secret. One
