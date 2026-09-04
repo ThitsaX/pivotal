@@ -26,6 +26,8 @@ jobs:
             dockerfile: docker/report-worker.Dockerfile
           - name: portal
             dockerfile: docker/portal.Dockerfile
+          - name: trust-manager
+            dockerfile: docker/trust-manager.Dockerfile
 
     steps:
       - name: Checkout repository

@@ -254,13 +254,25 @@ explain why #2/#4 were *correction* work rather than greenfield.
   bypass for the enrolled participants too, who could simply stop presenting a certificate. That is
   a network control, not an application one, and it belongs in the deployment's ingress rules.
 - Each DFSP still has to enroll — one CSR exchange per participant, operator-mediated.
-- **The gateway is not in the chart.** The `MUTUAL` Gateway, its VirtualService and
-  `forwardClientCertDetails: SANITIZE_SET` belong in `apps/pivotal` in the gitops repositories,
-  which carry the Istio templates; the monorepo chart has none. Applied directly in the local
-  cluster to prove the path, deliberately not committed anywhere.
-- **The CA reaches the gateway by hand today.** `DfspCaPublishScheduler` exists and is tested, but
-  its cross-namespace Role is only rendered when `trustManager.dfspCaGateway` is configured, and no
-  deployment sets it yet.
+- **The gateway now exists in `dev2-hub`, switched off.** A `MUTUAL` Gateway and its
+  VirtualService sit in `apps/pivotal/values.yaml` on a second host, both `enabled: false`, beside
+  the plain endpoint they will eventually replace. They stay off until the trust anchor is in
+  place, because a `MUTUAL` server with no anchor refuses every handshake. Other gitops
+  repositories still have none. The monorepo chart deliberately has none either — it carries no
+  Istio templates.
+- **The CA reaches the gateway by hand until the next release.** `trust-manager` was missing from
+  the image publish matrix, so no image of it had ever been built; it was added on 2026-09-04 and
+  the Dockerfile was verified to build and start. Nothing ships until a release after `v0.2.59` is
+  cut, so the anchor Secret is placed by an operator meanwhile.
+
+  **Two things to set when it is first deployed.** `trust-manager` requires the full MCM
+  configuration — base URL, token URL, client id and secret, `PIVOTAL_CA_PATH`, `PIVOTAL_DFSP_ID`
+  and `HUB_SERVER_CERT_COMMON_NAME` — even in a deployment that only wants the DFSP CA published,
+  because those settings are read at startup rather than per job. And `DFSP_CA_PKI_MOUNT` defaults
+  to `pki_dfsp`, which is not what every environment calls the mount: `dev2-hub` uses `pki-dfsp`,
+  with no separate root mount, so it must also set `DFSP_CA_ROOT_PKI_MOUNT` empty. A mismatch here
+  does not fail loudly — it logs that Vault returned no certificate and leaves the published bundle
+  untouched.
 - **Certificates never become `expired` on their own.** `findLapsed` exists and nothing calls it.
   This is deliberate rather than missed: validity is evaluated live at request time, so a lapsed
   certificate is refused whether or not a sweep has relabelled the row. The sweep is reporting
