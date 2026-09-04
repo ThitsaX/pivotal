@@ -7,3 +7,15 @@ useDefault = true
 description = "Deterministic certificate fixture used only by shared security tests"
 targetRules = ["private-key"]
 paths = ['''^tests/shared/security/component/cert/test-cert-fixtures\.ts$''']
+
+[[allowlists]]
+description = """
+Vault KV path prefix and a database column name, both matched only because they sit \
+beside the word "key". Allowlisted by value rather than by path so that a real secret \
+appearing in the same files is still reported."""
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+    '''^pivotal/jwskey$''',
+    '''^jws_sign_enabled=1$''',
+]
