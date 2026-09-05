@@ -301,3 +301,57 @@ workload leaves via cert-manager, and **neither issuance path touches KMS again*
 
 Registering the **root** rather than a leaf is settled decision 6: cert-manager can then rotate every
 workload leaf on its own cadence with **no MCM interaction at all**.
+
+---
+
+## 9. Rooting a second environment under the same roots
+
+An additional environment — `dev2` and anything after it — reuses the **existing root keys** rather
+than creating its own. There is no security cost to that, provided the rule below is kept.
+
+**Run steps 3 to 6 only.** Steps 0 to 2 created the roots; they exist. The root certificates are
+already on disk from the first ceremony, so the second environment needs the KMS key exactly once
+per domain, at step 4.
+
+Everything else is unchanged except the intermediate's name, which must say which environment it
+belongs to:
+
+```bash
+vault write -format=json $MOUNT/intermediate/generate/internal \
+  common_name="Pivotal ${DOMAIN} Intermediate CA — dev2" \
+  issuer_name="pivotal-${DOMAIN}-intermediate-dev2" \
+  key_type=rsa key_bits=2048 \
+  | jq -r '.data.csr' > "${DOMAIN}-intermediate-dev2.csr"
+```
+
+**Every environment gets its own intermediate.** Sharing one would put the same signing key in two
+Vaults, so a development Vault — dev root token, looser access — could mint certificates a stricter
+environment accepts, and rotating or revoking in one would take out the other. The root is a
+signature; the intermediate is a live key. Only the first is safe to share.
+
+### The rule that keeps the environments apart
+
+Sharing a root does **not** by itself make one environment's certificates valid in another. What
+decides that is the trust anchor each verifier is given:
+
+| Anchor published to the gateway | Effect |
+| --- | --- |
+| **The environment's own intermediate, alone** | A certificate from another environment fails to verify. This is what you want. |
+| The shared root | Every environment accepts every other environment's certificates — a test participant's certificate verifies in production |
+
+So publish the intermediate, never the root, to a DFSP-facing gateway. `DfspCaPublishScheduler`
+already behaves this way: leave `DFSP_CA_ROOT_PKI_MOUNT` empty and it publishes the issuing mount's
+own chain and nothing above it.
+
+The Hub-client side is the opposite case and is meant to be: the **root** is what gets registered
+with MCM, precisely so leaves can rotate without re-registration. That is safe because the Hub is
+deciding whether to trust Pivotal at all, not which environment it is talking to. If a Hub must
+distinguish environments, register that environment's intermediate instead and accept that a
+rotation of it needs a re-registration.
+
+### Before you do this
+
+The root keys currently in use are the **rehearsal** keys, and the pending actions list schedules
+them for deletion. An environment rooted in them dies with them — every issued certificate stops
+verifying the moment the key is gone. Either take them off the deletion list, or root the new
+environment in the production keys once those exist.

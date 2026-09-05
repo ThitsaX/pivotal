@@ -88,7 +88,14 @@ Both signers signed live, from Vault-sourced keys:
    KMS keys in a trial account, named `-rehearsal`. No production root exists. The runbook is
    written and the ceremony has been executed twice, so this is scheduling rather than discovery —
    but the `kms:Sign` CloudTrail alarm should be proven to fire before the real one runs.
-4. **Re-run `setup-vault-pki.sh` in every provisioned environment.** The `use_csr_common_name=false`
+4. **Run the ceremony for `dev2`, and re-run `setup-vault-pki.sh` in every provisioned
+   environment.** `dev2-hub` is configured for **ceremony-rooted** mounts, not self-signed ones:
+   its issuing roles, policy and ClusterIssuers are reconciled by the Vault operator, while
+   `pki_dfsp` and `pki_hub_client` themselves are created and rooted by hand, because generating a
+   CSR and importing an externally signed certificate is not something a reconciler can express.
+   Until that ceremony runs, the roles will fail to apply and retry, which is the expected state.
+   Both intermediates chain to the **existing** roots — see the runbook's section on rooting a
+   second environment. The `use_csr_common_name=false`
    fix of 2026-09-03 exists only in the local cluster. Anywhere provisioned from the earlier script
    still lets a DFSP choose the name on its own certificate, which defeats the binding rule. Any
    certificate issued from a mis-configured role should be treated as suspect.
@@ -265,14 +272,12 @@ explain why #2/#4 were *correction* work rather than greenfield.
   the Dockerfile was verified to build and start. Nothing ships until a release after `v0.2.59` is
   cut, so the anchor Secret is placed by an operator meanwhile.
 
-  **Two things to set when it is first deployed.** `trust-manager` requires the full MCM
+  **One thing to know when it is first deployed.** `trust-manager` requires the full MCM
   configuration — base URL, token URL, client id and secret, `PIVOTAL_CA_PATH`, `PIVOTAL_DFSP_ID`
   and `HUB_SERVER_CERT_COMMON_NAME` — even in a deployment that only wants the DFSP CA published,
-  because those settings are read at startup rather than per job. And `DFSP_CA_PKI_MOUNT` defaults
-  to `pki_dfsp`, which is not what every environment calls the mount: `dev2-hub` uses `pki-dfsp`,
-  with no separate root mount, so it must also set `DFSP_CA_ROOT_PKI_MOUNT` empty. A mismatch here
-  does not fail loudly — it logs that Vault returned no certificate and leaves the published bundle
-  untouched.
+  because those settings are read at startup rather than per job. The mount defaults need nothing:
+  `dev2-hub` uses `pki_dfsp`, matching `DFSP_CA_PKI_MOUNT`'s default, and leaves
+  `DFSP_CA_ROOT_PKI_MOUNT` empty so the intermediate is published without the root above it.
 - **Certificates never become `expired` on their own.** `findLapsed` exists and nothing calls it.
   This is deliberate rather than missed: validity is evaluated live at request time, so a lapsed
   certificate is refused whether or not a sweep has relabelled the row. The sweep is reporting
