@@ -29,6 +29,15 @@ export class SigningTenantPublisher {
 
     async publish(fspId: string): Promise<void> {
 
+        if (!this.nats.isConnected) {
+            // Asked now rather than when this was constructed: at construction the connection has
+            // not been opened yet, so deciding then would disable announcements permanently in a
+            // deployment that has NATS perfectly well configured.
+            this.logger.log(
+                `No NATS connection; '${fspId}' will be published by the periodic reconcile.`);
+            return;
+        }
+
         try {
             const js = this.nats.nc.jetstream();
 

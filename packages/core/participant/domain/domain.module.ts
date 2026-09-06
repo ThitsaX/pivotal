@@ -73,8 +73,12 @@ const Components: Provider[] = [
         // connection: the announcement is an optimisation over trust-manager's reconcile, so its
         // absence delays publication rather than preventing it.
         provide: SigningTenantPublisher,
+        // Connectivity is NOT decided here. A provider factory runs while dependencies are being
+        // constructed, which is before NatsClientService's onModuleInit has connected -- so a check
+        // at this point always sees a disconnected client and silently yields no publisher. The
+        // publisher takes the client and asks at publish time instead.
         useFactory: (nats: NatsClientService | undefined): SigningTenantPublisher | null =>
-            nats == null || !nats.isConnected ? null : new SigningTenantPublisher(nats),
+            nats == null ? null : new SigningTenantPublisher(nats),
         inject: [{token: NatsClientService, optional: true}],
     },
     {
