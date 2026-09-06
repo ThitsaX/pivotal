@@ -185,6 +185,16 @@ That is a gap worth closing, either by refusing to start when a deployment's sig
 disagree with its provisioning service, or by moving the setting somewhere a single value serves
 both.
 
+**Configured in `dev2-hub` on 2026-09-07**, with the read grants deliberately unequal: web-outbound
+signs for every tenant it fronts and reads the whole prefix, while each connector reads exactly one
+path. A shared wildcard for connectors would mean a compromise of one wallet's connector yields
+every wallet's signing key, which would make "isolation comes from per-tenant Vault path policy"
+untrue in the one place it matters most.
+
+Note the two stacks name the address differently — `VAULT_ADDRESS` in the TypeScript services,
+`VAULT_URL` in the Java connectors, mapped by their entrypoint. Same idea, and nothing reconciles
+the names, so setting the wrong one leaves a connector silently unable to reach Vault.
+
 ---
 
 ## 6. Open
