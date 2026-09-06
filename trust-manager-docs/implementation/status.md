@@ -326,7 +326,43 @@ explain why #2/#4 were *correction* work rather than greenfield.
 
 ### Left
 
-**JWS signing and the mTLS client path are both complete on this leg.** What remains is enablement.
+**JWS signing and the mTLS client path are both complete on this leg. Provisioning a signing tenant
+is not** — see below. What otherwise remains is enablement.
+
+#### No supported way to create a signing tenant — found in dev2, 2026-09-06
+
+Signing reads `participant_key` rows where `role = self`. In dev2 there are none, and there is no
+route to creating one that does not put a private key in MySQL. Three separate gaps make one chain:
+
+1. **Onboarding writes the wrong table.** `onboard-fsp.handler.ts` calls central-ledger and then
+   saves a `Participant` — the V1 `participant` table, with keys stored inline. It never touches
+   `participant_key`, the V3 table carrying `role`, `jws_sign_enabled` and `jws_verify_mode` that
+   signing and trust-manager actually read. The onboarding flow was never moved onto the newer
+   model, which is why a DFSP can transact perfectly while `participant_key` stays empty.
+2. **Nothing provisions the Vault key.** Under `KEY_PROVIDER=vault-kv` the key must exist at
+   `secret/pivotal/jwskey/<fspId>`, and no code puts it there. `jws-private-key-source.ts` at least
+   fails loudly when a tenant is enabled with no key, so the mistake is noisy rather than silent.
+3. **The one API that can write the row infers the role from a private key in the request.**
+   `add-signing-keys.handler.ts` marks a row `self` only when a private key is supplied, and stores
+   that key in `participant_key.jws_private_key`. So the vault-kv custody model has no path through
+   it. That handler is also the only code that writes `jws_sign_enabled`, and it always writes
+   `false` — nothing anywhere can turn signing on.
+
+**Consequence beyond JWS.** `McmCaRegistrationScheduler` registers the hub-client CA once per `self`
+tenant, so with no such rows it silently registers nothing. Its silence reads exactly like success,
+which is how this stayed hidden: trust-manager appeared healthy while doing nothing.
+
+**trust-manager is not the gap.** It consumes these rows correctly and will pick them up the moment
+they exist; `PeerJwsSyncScheduler` already reports `0 own tenants skipped`, which is the same
+absence seen from the other side.
+
+**The fix is a feature, not a patch**, and it is designed in
+[`jws-tenant-provisioning.md`](./jws-tenant-provisioning.md) — agreed 2026-09-06, not started.
+Onboarding provisions through a profile-selected seam that returns only a public key (so the same
+path is correct under CloudHSM, where no private key can be exported), emits an event, and leaves
+signing off; trust-manager publishes to MCM and enables it. Rows can be written by hand to prove the
+path first — the schema permits `role='self'` with `jws_private_key` NULL — but that is per tenant
+and per environment, and leaves database state nobody can account for later.
 
 - **mTLS code done 2026-09-02.** web-outbound presents its client certificate through
   `MutualTlsAgent`, reads the certificate and Hub CA from mounted Secrets, reloads on renewal without
