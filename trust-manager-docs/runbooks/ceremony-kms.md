@@ -188,6 +188,10 @@ vault write pki_hub_client/roles/pivotal-workload \
 
 ## 5. The ceremony script
 
+**It lives beside this file, as [`ceremony.py`](./ceremony.py).** The first time it was needed it
+had been written on the ceremony host and never committed, so it was gone when the host was — which
+is why it is in the repository now. It needs `asn1crypto`, `cryptography` and `boto3`.
+
 KMS signs a **digest**; the script builds the X.509. Neither KMS nor CloudHSM is a CA — that is why
 the HSM-backed and KMS-backed ceremonies differ by exactly one call.
 
@@ -308,6 +312,14 @@ workload leaf on its own cadence with **no MCM interaction at all**.
 
 An additional environment — `dev2` and anything after it — reuses the **existing root keys** rather
 than creating its own. There is no security cost to that, provided the rule below is kept.
+
+**The alias names carry the environment.** `dev2` roots to the rehearsal keys, so the aliases are
+`alias/pivotal-dfsp-root-ca-rehearsal` and `alias/pivotal-hub-client-root-ca-rehearsal`, not the
+bare names in section 4. Pass the real alias to `--kms-key`; nothing derives it.
+
+Note also that the ceremony IAM user is scoped to signing, so `aws kms list-aliases` is denied. That
+is correct — the credential should not be able to enumerate the account. Confirm a key with
+`aws kms get-public-key --key-id <alias>` instead, which is a call the ceremony makes anyway.
 
 **Run steps 3 to 6 only.** Steps 0 to 2 created the roots; they exist. The root certificates are
 already on disk from the first ceremony, so the second environment needs the KMS key exactly once
