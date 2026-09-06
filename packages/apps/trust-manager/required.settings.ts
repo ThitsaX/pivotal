@@ -5,7 +5,7 @@ import {TrustDomainModule, DfspCaPublishScheduler} from '@core/trust/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {McmSettings} from '@shared/mcm-client';
 import {TypeOrmSettings} from '@shared/typeorm';
-import {KeyProvider, VaultSettings} from '@shared/vault';
+import {KeyProvider, VaultAuthMethod, VaultSettings} from '@shared/vault';
 
 export class TrustManagerSettings implements TrustDomainModule.RequiredSettings {
 
@@ -198,8 +198,56 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
         return KeyProvider.Database;
     }
 
+    /**
+     * Vault is read, never written to and never signed with.
+     *
+     * The only thing this service needs from Vault is the DFSP-facing CA certificate it
+     * publishes to the ingress gateway. That is why `keyProvider` above stays on the database
+     * path: no signing key is ever fetched here. Reading a CA is a different job, and it does
+     * need a real address -- an empty one throws `Invalid URL` at the first read, which reads
+     * as a broken gateway rather than as missing configuration.
+     *
+     * Absent settings leave the CA publish job idle rather than failing, so a deployment that
+     * fronts no DFSP-facing endpoint needs none of this.
+     */
     vaultSettings(): VaultSettings {
-        return new VaultSettings('', '');
+        return new VaultSettings(
+            this.read('VAULT_ADDRESS') ?? '',
+            this.read('VAULT_ROLE') ?? '',
+            this.read('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.read('VAULT_KV_MOUNT') ?? 'secret',
+            this.read('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.read('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            10_000,
+            this.readVaultAuthMethod(),
+            this.read('VAULT_TOKEN') ?? '',
+        );
+    }
+
+    /**
+     * How this workload authenticates to Vault. Defaults to Kubernetes ServiceAccount auth; the
+     * token method exists only so a Vault running outside Kubernetes can be reached during local
+     * development, where there is no kubelet to project a ServiceAccount token.
+     */
+    private readVaultAuthMethod(): VaultAuthMethod {
+
+        const value = this.read('VAULT_AUTH_METHOD');
+
+        if (value == null || value.trim().length === 0) {
+            return VaultAuthMethod.Kubernetes;
+        }
+
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized !== VaultAuthMethod.Kubernetes && normalized !== VaultAuthMethod.Token) {
+            throw new Error(
+                `Invalid VAULT_AUTH_METHOD: '${value}'. Expected `
+                + `${VaultAuthMethod.Kubernetes} or ${VaultAuthMethod.Token}.`,
+            );
+        }
+
+        return normalized as VaultAuthMethod;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
