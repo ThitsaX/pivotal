@@ -24,11 +24,9 @@ export class OnboardFspRequest {
 
     @IsOptional()
     @IsString()
-    jwsPublicKey?: string;
 
     @IsOptional()
     @IsString()
-    jwsPrivateKey?: string;
 
     @IsString()
     @IsNotEmpty()
@@ -55,8 +53,6 @@ export class OnboardFspController {
                     request.name,
                     request.currencies,
                     request.endpoint,
-                    request.jwsPublicKey,
-                    request.jwsPrivateKey,
                     request.accessPublicKey,
                 ),
             ),

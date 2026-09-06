@@ -100,6 +100,52 @@ export class VaultClient {
     }
 
     /**
+     * Writes a single field into a KV v2 secret, creating the secret if it is not there.
+     *
+     * **Read-modify-write, not blind overwrite.** A KV v2 write replaces the whole payload, so
+     * writing one field naively would delete every other field at that path. Under the HSM profile
+     * the same path holds a key reference alongside crypto-user credentials, and losing either
+     * would strand a tenant's key inside the HSM with no way to address it.
+     */
+    async writeKvField(path: string, field: string, value: string): Promise<void> {
+
+        if (this.token == null) {
+            await this.login();
+        }
+
+        const existing = await this.readKv(path);
+
+        const response = await this.http.post(
+            `/v1/${this.settings.kvMount}/data/${path}`,
+            {data: {...existing, [field]: value}},
+            {headers: {[VaultClient.VAULT_TOKEN_HEADER]: this.token}},
+        );
+
+        if (response.status >= 400) {
+            throw new Error(
+                `Writing '${field}' to Vault path '${path}' failed with status ${response.status}.`,
+            );
+        }
+    }
+
+    /** Every field at a KV v2 path, or an empty object when the secret does not exist. */
+    private async readKv(path: string): Promise<Record<string, string>> {
+
+        const response = await this.http.get(
+            `/v1/${this.settings.kvMount}/data/${path}`,
+            {headers: {[VaultClient.VAULT_TOKEN_HEADER]: this.token}},
+        );
+
+        if (response.status === 404) {
+            return {};
+        }
+
+        const data = response.data?.data?.data as unknown;
+
+        return typeof data === 'object' && data != null ? data as Record<string, string> : {};
+    }
+
+    /**
      * Signs an externally supplied CSR against a PKI role.
      *
      * **`sign`, never `issue`.** `issue` has Vault generate the keypair and return the private key,

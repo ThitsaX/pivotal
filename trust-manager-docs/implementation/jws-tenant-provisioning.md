@@ -1,6 +1,6 @@
 # Signing Tenant Provisioning
 
-**Status:** designed, not started. Agreed 2026-09-06.
+**Status:** built 2026-09-06/07, not yet deployed. Two corrections to the original design are marked below.
 
 Onboarding a DFSP must produce a working signing tenant with no manual step — no SQL, no key pasted
 into a form, no operator ever seeing private key material. This describes how.
@@ -138,8 +138,8 @@ Private keys currently reach the system through the API and the portal. That sur
 | --- | --- |
 | `OnboardFspCommand.Input` | drop `jwsPublicKey` and `jwsPrivateKey` — a deliberate breaking change |
 | `ParticipantOnboardingPage.vue` | drop the JWS block; the page keeps **Access Public Key**, which is the DFSP-facing accessKey and unrelated |
-| `ParticipantUpdateSigningKeysPage.vue` | becomes public-key display plus a **Rotate** action calling provisioning. Rotation is a real need; key entry is not |
-| `HubUpdateSigningKeysPage.vue` | **kept as-is.** That is the *hub's* public key, which Pivotal verifies against rather than signs with. No custody implication |
+| `ParticipantUpdateSigningKeysPage.vue` | became a **Signing Policy** page — the `jws_sign_enabled` and `jws_verify_mode` switches. The **Rotate** action was deliberately not built: rotation is still open below, and publishing a new key before peers re-pull breaks verification for all of them. An honest gap beats invented semantics |
+| `HubUpdateSigningKeysPage.vue` | **corrected while building.** This design said it was public-only; it was not. The endpoint *required* a private key, and supplying one is what marks a row `self` — so an operator could have classified the Hub as a tenant this deployment signs for. The Hub is seeded as a `peer`: Pivotal verifies what it signs and never signs as it, so a private key there is material with no use. Endpoint and page now take the public key alone |
 | `SIGNING_KEYS_UI_ENABLED` | deleted once there is nothing to hide |
 
 **On that flag.** It gates the JWS block in `ParticipantOnboardingPage` and strips both keys from the
@@ -164,11 +164,26 @@ operational switches and need an operator-facing route regardless of this design
 pre-V3 `participant` row. Writing both keeps existing readers working while the new model takes over;
 retiring the inline key columns is separate work.
 
-**A Vault policy for web-pivotal covering KV write** on `secret/data/pivotal/jwskey/*`. Under
-`pkcs11` the same path holds the key reference and credentials, so the grant shape does not change —
-another reason provisioning belongs behind the seam rather than in the handler.
+**A Vault policy for web-pivotal covering KV write** on `secret/data/pivotal/jwskey/*` — and
+`read` alongside it. Not a convenience: a KV v2 write replaces the whole payload, so the client
+reads the existing fields and merges. Under `pkcs11` that path holds a key reference beside
+crypto-user credentials, and a blind write would drop whichever it was not writing. Without `read`
+the merge fails and provisioning fails with it.
 
 **`VaultClient` has no KV write method.** It belongs to `VaultJwsKeyProvisioner`, not to onboarding.
+
+---
+
+## 5a. What still has to agree
+
+`KEY_PROVIDER` decides custody for **writing** on web-pivotal and for **reading** on web-outbound
+and the connectors. Those must match, or a key is written where nothing looks for it — and the
+symptom is a tenant that is provisioned, published, enabled, and silently unable to sign.
+
+Nothing enforces the agreement, and nothing detects the mismatch: each side is separately valid.
+That is a gap worth closing, either by refusing to start when a deployment's signing services
+disagree with its provisioning service, or by moving the setting somewhere a single value serves
+both.
 
 ---
 

@@ -5,3 +5,4 @@ export * from './participant-jws-private-key-store';
 export * from './participant-jws-public-key-store';
 export * from './participant-jws-policy-store';
 export * from './jws-private-key-source';
+export * from './jws-key-provisioner';

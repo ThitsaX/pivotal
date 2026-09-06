@@ -9,7 +9,6 @@ export type PivotalRuntimeConfig = {
     REPORT_DOWNLOAD_JOB_TTL_MS?: string;
     REPORT_DOWNLOAD_READY_TTL_MS?: string;
     REPORT_DOWNLOAD_POLL_INTERVAL_MS?: string;
-    SIGNING_KEYS_UI_ENABLED?: string;
 };
 
 declare global {
@@ -46,7 +45,3 @@ export const booleanEnv = (value: unknown, fallback: boolean): boolean => {
     return fallback;
 };
 
-const rawSigningKeysUiEnabled = getPivotalRuntimeConfig().SIGNING_KEYS_UI_ENABLED
-    ?? (import.meta.env.VITE_SIGNING_KEYS_UI_ENABLED as string | undefined);
-
-export const SIGNING_KEYS_UI_ENABLED = booleanEnv(rawSigningKeysUiEnabled, false);

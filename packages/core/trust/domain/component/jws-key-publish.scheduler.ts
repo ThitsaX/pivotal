@@ -75,6 +75,52 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
         await this.mcm.publishAndVerifyJwsKey(fspId, key.jwsPublicKey);
     }
 
+    /**
+     * Publishes a newly provisioned tenant's key, then switches its signing on.
+     *
+     * The two steps belong together and in this order. A tenant whose signing is enabled before
+     * MCM holds its public key produces signatures no peer can verify, and that surfaces as a Hub
+     * rejection — a failure that points at the transfer rather than at the provisioning that caused
+     * it. Enabling only after MCM confirms means the worst case is a tenant that cannot sign yet,
+     * which is visible and harmless.
+     *
+     * Publishing here is additive, not a rotation: a tenant MCM already knows about is left alone,
+     * because replacing a key peers have pulled breaks verification for all of them. That is what
+     * makes this safe to call again on redelivery.
+     */
+    async publishAndEnable(fspId: string): Promise<void> {
+
+        const key = await this.participantKeys.findByFspId(fspId);
+
+        if (key == null || key.role !== ParticipantKeyRole.Self || key.jwsPublicKey == null) {
+            throw new Error(`No self-role public key held for '${fspId}'.`);
+        }
+
+        const stored = await this.mcm.getJwsKey(fspId).catch(() => null);
+        const storedKey = stored?.publicKey;
+
+        if (storedKey != null && storedKey.trim().length > 0) {
+            if (!JwsKeyPublishScheduler.samePem(storedKey, key.jwsPublicKey)) {
+                // Deliberately not overwritten, and deliberately fatal for this message: peers hold
+                // one key each and cannot try both, so resolving this is a human decision about
+                // which key is current, not something to settle by whoever wrote last.
+                throw new Error(
+                    `MCM holds a different signing key for '${fspId}' than Pivotal does. `
+                    + 'Resolve this deliberately rather than by republishing.',
+                );
+            }
+        } else {
+            await this.mcm.publishAndVerifyJwsKey(fspId, key.jwsPublicKey);
+        }
+
+        if (!key.jwsSignEnabled) {
+            key.jwsSignEnabled = true;
+            await this.participantKeys.save(key);
+
+            this.logger.log(`'${fspId}' is published to MCM and signing is now enabled.`);
+        }
+    }
+
     /** Exposed for tests and for an operator-triggered pass. */
     async reconcile(): Promise<JwsKeyPublishScheduler.Result> {
         const tenants = (await this.participantKeys.findAll())

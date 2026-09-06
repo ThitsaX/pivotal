@@ -30,6 +30,17 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
         );
     }
 
+    /**
+     * Where signing-tenant announcements arrive from.
+     *
+     * Publication also happens on a periodic reconcile, so a deployment without NATS still works —
+     * a newly provisioned tenant simply waits for the next sweep instead of being published within
+     * seconds of onboarding.
+     */
+    natsUrl(): string {
+        return this.read('NATS_URL') ?? '';
+    }
+
     redisUrl(): string {
         return this.readRequiredString('REDIS_URL');
     }

@@ -5,6 +5,7 @@ import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantDomainModule} from '@core/participant/domain';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios, McmSettings} from '@shared/mcm-client';
+import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
 import {VaultClient, VaultSettings} from '@shared/vault';
 import {
     DfspCaPublishScheduler,
@@ -14,6 +15,7 @@ import {
     KubernetesSecretWriter,
     McmCaRegistrationScheduler,
     PeerJwsSyncScheduler,
+    SigningTenantConsumer,
 } from './component';
 
 const REQUIRED_SETTINGS = Symbol('TrustDomainRequiredSettings');
@@ -132,6 +134,20 @@ const Components: Provider[] = [
         inject: [McmAxios, ParticipantKeyRepository, JWS_PUBLISH_LOCK, REQUIRED_SETTINGS],
     },
     {
+        // Turns a newly provisioned tenant into a published one without waiting for the sweep.
+        // Optional: a deployment with no NATS still publishes keys, just on the reconcile.
+        provide: SigningTenantConsumer,
+        useFactory: (
+            nats: NatsClientService | undefined,
+            publisher: JwsKeyPublishScheduler,
+        ): SigningTenantConsumer | null =>
+            nats == null ? null : new SigningTenantConsumer(nats, publisher),
+        inject: [
+            {token: NatsClientService, optional: true},
+            JwsKeyPublishScheduler,
+        ],
+    },
+    {
         provide: SERVER_CERT_LOCK,
         useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
             new RollupLock(settings.redisUrl(), 'pivotal:trust:hub-server-cert'),
@@ -170,6 +186,11 @@ export class TrustDomainModule {
                     inject: asyncOptions.inject,
                     useFactory: asyncOptions.useFactory,
                 }),
+                NatsClientServiceModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: asyncOptions.useFactory,
+                }),
             ],
             providers: [
                 {
@@ -198,7 +219,8 @@ export namespace TrustDomainModule {
      * Extends the participant domain's settings because this module owns
      * `participant_key` writes and therefore needs its repositories and connections.
      */
-    export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings {
+    export interface RequiredSettings
+        extends ParticipantDomainModule.RequiredSettings, NatsClientServiceModule.RequiredSettings {
 
         mcmSettings(): McmSettings;
 

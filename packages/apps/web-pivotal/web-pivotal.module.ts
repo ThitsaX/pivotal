@@ -25,6 +25,7 @@ import {
     TransactionReportsAuditController,
     TransactionsAuditController,
     UpdateAccessKeyController,
+    UpdateJwsPolicyController,
     UpsertEndpointController,
     UsersAdminController,
 } from './controllers';
@@ -74,6 +75,7 @@ export class WebPivotalModule {
                 AddHubSigningKeysController,
                 AddSigningKeysController,
                 UpdateAccessKeyController,
+                UpdateJwsPolicyController,
                 DfspCertificateController,
                 ListCentralLedgerParticipantsController,
                 UpsertEndpointController,

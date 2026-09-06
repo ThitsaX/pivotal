@@ -14,6 +14,7 @@ import {
     OnboardFspHandler,
     RevokeDfspCertificateHandler,
     UpdateAccessKeyHandler,
+    UpdateJwsPolicyHandler,
     UpsertEndpointHandler,
 } from './command';
 import {Participant, ParticipantCert, ParticipantCertStatus, ParticipantKey} from './model';
@@ -30,11 +31,19 @@ import {
     PIVOTAL_DB_WRITE_CONNECTION_NAME,
 } from './repository';
 import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
+import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
+import {SigningTenantPublisher} from './component/signing-tenant.publisher';
 import {
     DatabaseJwsPrivateKeySource,
     JwsPrivateKeySource,
     VaultJwsPrivateKeySource,
 } from './component/store/jws-private-key-source';
+import {
+    DatabaseJwsKeyProvisioner,
+    JwsKeyProvisioner,
+    Pkcs11JwsKeyProvisioner,
+    VaultJwsKeyProvisioner,
+} from './component/store/jws-key-provisioner';
 import {DfspCertificateIssuer} from './component/cert';
 
 const REQUIRED_SETTINGS = Symbol('ParticipantDomainRequiredSettings');
@@ -57,6 +66,21 @@ const Components: Provider[] = [
         provide: JwsPrivateKeySource,
         useFactory: (settings: ParticipantDomainModule.RequiredSettings): JwsPrivateKeySource =>
             ParticipantDomainModule.createPrivateKeySource(settings),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        // Announces a provisioned tenant so its key reaches MCM promptly. Null without a NATS
+        // connection: the announcement is an optimisation over trust-manager's reconcile, so its
+        // absence delays publication rather than preventing it.
+        provide: SigningTenantPublisher,
+        useFactory: (nats: NatsClientService | undefined): SigningTenantPublisher | null =>
+            nats == null || !nats.isConnected ? null : new SigningTenantPublisher(nats),
+        inject: [{token: NatsClientService, optional: true}],
+    },
+    {
+        provide: JwsKeyProvisioner,
+        useFactory: (settings: ParticipantDomainModule.RequiredSettings): JwsKeyProvisioner =>
+            ParticipantDomainModule.createKeyProvisioner(settings),
         inject: [REQUIRED_SETTINGS],
     },
     {
@@ -90,6 +114,7 @@ const CommandHandlers = [
     AddSigningKeysHandler,
     UpsertEndpointHandler,
     UpdateAccessKeyHandler,
+    UpdateJwsPolicyHandler,
     EnrollDfspCertificateHandler,
     RevokeDfspCertificateHandler,
 ];
@@ -108,6 +133,23 @@ export class ParticipantDomainModule {
             module: ParticipantDomainModule,
             imports: [
                 CqrsModule,
+                // Imported unconditionally, and harmless where NATS is not configured: an empty
+                // NATS_URL leaves the client unconnected rather than failing to start, so services
+                // that make no use of it are unaffected.
+                NatsClientServiceModule.forRootAsync({
+                    imports: asyncOptions.imports ?? [],
+                    inject: asyncOptions.inject ?? [],
+                    useFactory: async (...args: unknown[]) => {
+                        // Read structurally rather than through the interface. Several apps combine
+                        // these settings with a module that already requires natsUrl, and declaring
+                        // an optional member of the same name here makes those types incompatible.
+                        const settings = await asyncOptions.useFactory(...args) as {
+                            natsUrl?: () => string;
+                        };
+
+                        return {natsUrl: () => settings.natsUrl?.() ?? ''};
+                    },
+                }),
                 TypeOrmModule.forRootAsync({
                                                connectionName: PIVOTAL_DB_WRITE_CONNECTION_NAME,
                                                target: DbTarget.Write,
@@ -178,6 +220,45 @@ export class ParticipantDomainModule {
         }
 
         return new VaultJwsPrivateKeySource(new VaultClient(vaultSettings), vaultSettings);
+    }
+
+    /**
+     * Builds the provisioner matching `KEY_PROVIDER`, so a key is created where the same profile
+     * will later look for it.
+     *
+     * Deliberately mirrors {@link createPrivateKeySource}, including its refusal to fall back:
+     * provisioning into the wrong custody is worse than failing, because it succeeds visibly while
+     * putting a private key somewhere an operator believes it is not.
+     *
+     * Unlike the read side, `pkcs11` throws from the provisioner rather than from this factory. A
+     * deployment on that profile can still start and serve traffic for tenants keyed elsewhere; it
+     * simply cannot create new ones until the HSM path exists.
+     */
+    static createKeyProvisioner(
+        settings: ParticipantDomainModule.RequiredSettings,
+    ): JwsKeyProvisioner {
+
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+
+        if (keyProvider === KeyProvider.Database) {
+            return new DatabaseJwsKeyProvisioner();
+        }
+
+        if (keyProvider === KeyProvider.Pkcs11) {
+            return new Pkcs11JwsKeyProvisioner();
+        }
+
+        const vaultSettings = settings.vaultSettings?.();
+
+        if (vaultSettings == null || !vaultSettings.isConfigured()) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.VaultKv}' but Vault is not configured. `
+                + 'Set VAULT_ADDRESS, plus VAULT_ROLE for Kubernetes auth or VAULT_TOKEN when '
+                + 'VAULT_AUTH_METHOD=token.',
+            );
+        }
+
+        return new VaultJwsKeyProvisioner(new VaultClient(vaultSettings), vaultSettings);
     }
 
     /**

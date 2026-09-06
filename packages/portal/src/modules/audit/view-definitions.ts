@@ -103,9 +103,10 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-add-signing-keys',
-        title: 'Add Signing Keys',
-        subtitle: 'Create or update the JWS signing key pair for a participant by name.',
-        endpoint: '/participant/signing-keys',
+        title: 'Signing Policy',
+        subtitle: 'Turn FSPIOP signing on or off for a participant, and set how strictly their '
+            + 'inbound signatures are checked.',
+        endpoint: '/participant/jws-policy',
         criteriaFields: [],
         orderColumns: [],
         columns: [],

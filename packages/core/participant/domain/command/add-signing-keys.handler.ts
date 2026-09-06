@@ -38,7 +38,7 @@ export class AddSigningKeysHandler
 
         entity.fspId = fspId;
         entity.jwsPublicKey = command.input.jwsPublicKey;
-        entity.jwsPrivateKey = command.input.jwsPrivateKey;
+        entity.jwsPrivateKey = command.input.jwsPrivateKey ?? null;
 
         // An existing row keeps its role: an operator may have classified it deliberately, and a
         // key update is not a reclassification. Only a new row infers one, from whether a private

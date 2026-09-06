@@ -47,6 +47,15 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         );
     }
 
+    /**
+     * Optional. Where onboarding announces a newly provisioned signing tenant, so trust-manager
+     * publishes its key to MCM within seconds rather than on the next reconcile. Absent means the
+     * reconcile does it.
+     */
+    natsUrl(): string {
+        return this.configService.get<string>('NATS_URL') ?? '';
+    }
+
     centralLedgerUrl(): string {
         return this.readRequiredValue('CENTRAL_LEDGER_URL');
     }
