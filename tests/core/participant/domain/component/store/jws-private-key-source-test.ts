@@ -132,7 +132,12 @@ describe('VaultJwsPrivateKeySource', () => {
         );
 
         assert.equal(keys.get('payerfsp'), 'PREVIOUS-PEM');
-        assert.equal(client.invalidated, 1);
+
+        // The source no longer reaches into the client's token state. Renewing ahead of the lease
+        // and retrying once on rejection belong to VaultClient, so that every caller gets them —
+        // a caller that has to remember is a caller that can forget, which is how certificate
+        // issuance came to fail permanently an hour after startup.
+        assert.equal(client.invalidated, 0);
     });
 
     it('should omit the tenant when Vault fails and nothing was previously loaded', async () => {

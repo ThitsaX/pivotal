@@ -6,13 +6,17 @@ is left".** Update it in the same commit as the code it describes.
 Design lives in [`design/`](../design/); the spine is
 [`implementation-plan.md`](./implementation-plan.md). This file answers only *where are we*.
 
+**Standing up an environment, or onboarding a DFSP into one, is
+[`environment-and-onboarding.md`](../runbooks/environment-and-onboarding.md)** — the operator steps,
+in order, with the ones that fail silently called out.
+
 **Last verified against code:** 2026-09-04.
 
 ---
 
 ## Where the work actually sits — read this first
 
-**Every leg in scope now has its mTLS code written, and leg #1 has been proven running.** JWS was
+**Leg #1 is live in dev2. Every other leg in scope has its code written.** JWS was
 complete across all three repositories; hub-facing mTLS followed on 2026-09-02; the DFSP-facing leg
 — issuance, operator screens and request-time enforcement — landed 2026-09-03/04 and is the first
 to have been exercised against a real mutual-TLS handshake through an Istio gateway.
@@ -54,6 +58,41 @@ Both signers signed live, from Vault-sourced keys:
 | **Java connector** (`user-agent: okhttp/4.10.0`) | quoting-service logged an inbound `PUT /quotes/{id}` from `wallet2` **carrying `fspiop-signature`** — leg #3 confirmed at the Hub, not from our own logs |
 
 `GET /parties` went out **unsigned**, as commit 12 requires: a detached JWS has no body to sign.
+
+### Proven in dev2 — 2026-09-06
+
+The DFSP-facing leg ran end to end against a live environment, with every control on.
+
+**A transfer was accepted.** `DemoDFSP3` called `POST /secured/sendmoney` presenting a client
+certificate issued from `pki_dfsp`, and got `HTTP 200` with the payee resolved through the Hub —
+`transferId 01M1W4QKAG3V51GYHDXVJYV6SE`, state `WAITING_FOR_PARTY_ACCEPTANCE`. Four checks passed in
+order: the gateway verified the certificate, `DfspCertificateGuard` bound it to `fspiop-source`, the
+accessKey JWS verified against the registered public key, and party lookup reached the Hub.
+
+**An impersonation was refused.** `DemoDFSP4` presented its own certificate — genuine, current,
+issued by the same CA — while claiming `fspiop-source: DemoDFSP3`:
+
+```
+DfspCertificateGuard : Rejected: certificate belongs to 'DemoDFSP4'
+                       but the request claims fspiop-source 'DemoDFSP3'.
+```
+
+That is the property the leg exists for. Both credentials were individually valid; only the pairing
+was wrong. A leaked accessKey is not usable by whoever holds it unless they also hold that tenant's
+certificate.
+
+**A caller with no certificate never reaches the application** — refused at TLS with alert 116,
+which under TLS 1.3 appears as a failed read rather than a failed connect.
+
+**Signing tenant provisioning also ran end to end**, in the same second: onboarding provisioned a key
+into Vault, announced it, trust-manager published it to MCM and enabled signing. No SQL, no key in a
+form, no private key on the API. See
+[`jws-tenant-provisioning.md`](./jws-tenant-provisioning.md).
+
+Operator steps are in
+[`environment-and-onboarding.md`](../runbooks/environment-and-onboarding.md).
+
+---
 
 ### Pending actions
 
@@ -184,7 +223,7 @@ Two things people get wrong about this table:
 
 | # | JWS | mTLS | Overall |
 | --- | --- | --- | --- |
-| 1 | 🟡 works; accessKey custody unchanged (DFSP-held) | 🟢 **issuance + binding, proven over a real handshake**; off until each DFSP enrolls | **code done** |
+| 1 | 🟢 accessKey custody unchanged (DFSP-held), and proven end to end | 🟢 **LIVE in dev2** — gateway `MUTUAL`, `DFSP_FACING_MTLS=true`, impersonation refused | **done** |
 | 2 | 🟢 **conformant + per-participant** | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
 | 3 | 🟢 **JWS complete** — signer, vectors, callback wiring, Vault key access | 🟡 **code complete + reload**; off until the Hub accepts TLS | **code done** |
 | 4 | 🟢 **verify + cross-checks + tri-state** | 🟡 **code complete + reload**; off until the Hub presents a client certificate | **code done** |
@@ -368,9 +407,33 @@ and per environment, and leaves database state nobody can account for later.
   `MutualTlsAgent`, reads the certificate and Hub CA from mounted Secrets, reloads on renewal without
   a restart, and refuses to start if mutual TLS is on with nothing configured
   (`pki-issuance-flows.md` §3.3).
-- **Not switched on, and not yet exercised against the Hub.** The Hub endpoints are `http://` in the
-  local stack, so axios never reaches for the agent. This needs a TLS-terminating Hub endpoint that
-  verifies client certificates.
+- **Not switched on, and not yet exercised against the Hub.** The Hub endpoints are `http://`, so
+  axios never reaches for the agent. This needs a TLS-terminating Hub endpoint that verifies client
+  certificates.
+
+  **What that would take in dev2, surveyed 2026-09-06.** The Hub already has an external FSPIOP
+  endpoint — `extapi.dev2.wynepayhubsanbox-pre.com`, `interop-gateway` in
+  `dev2-hub/apps/mojaloop/istio-config.yaml`, `mode: SIMPLE`. Turning it `MUTUAL` and adding a
+  `-cacert` companion holding the `pki_hub_client` root is two lines and a Secret.
+
+  **But that host has live external callers.** `royalbank` and `cibsbank` transact through it from
+  outside the cluster — signed FSPIOP traffic, most recently 04:34 and 04:42 on 2026-09-06. Flipping
+  the existing host breaks them at TLS, before a request is seen, and they cannot be fixed from
+  Pivotal's side. So this needs the parallel-host pattern used on the DFSP-facing leg — and unlike
+  that one, the old host can never be retired, because those callers are not ours.
+
+  Three things make it more than a config change: DNS is hand-made here (external-dns cannot read
+  Istio resources), the `interop-jwt` AuthorizationPolicy delegates that whole host to Ory and would
+  refuse certificate-authenticated callers, and Pivotal would begin verifying the Hub's server
+  certificate — which is issued by a `pki-hub` CA with an **empty subject DN**. RFC 5280 requires a
+  non-empty issuer, so a strict client may refuse the chain. Test that one connection before
+  changing anything else; it is the difference between an afternoon and a week.
+
+  **Worth weighing first:** Istio already provides mutual TLS between Pivotal and the Hub in this
+  cluster — the `x-forwarded-client-cert` headers in quoting-service carry SPIFFE identities. What
+  this leg adds is application-level certificates from Pivotal's own CA, registered through MCM,
+  which is what matters when the Hub is *not* sharing a mesh. In dev2 it largely duplicates the
+  mesh.
 - Key custody: **resolved in commit 6**, and the Kubernetes half proven 2026-08-27.
   `KEY_PROVIDER=vault-kv` reads each signing tenant's key from `secret/pivotal/jwskey/<fspId>` over
   Kubernetes ServiceAccount auth. The plaintext-MySQL path survives as `KEY_PROVIDER=database`,

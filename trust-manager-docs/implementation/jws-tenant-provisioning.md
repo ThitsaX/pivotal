@@ -197,6 +197,39 @@ the names, so setting the wrong one leaves a connector silently unable to reach 
 
 ---
 
+## 5b. Onboarding does not register the tenant with MCM
+
+Observed in dev2 on 2026-09-06. `DemoDFSP3` was onboarded, provisioned and recorded as a signing
+tenant, and every MCM-facing job then failed:
+
+```
+404 POST /dfsps/DemoDFSP3/ca        {"message":"DFSP with id DemoDFSP3 not found"}
+404 POST /dfsps/DemoDFSP3/jwscerts  {"message":"DFSP with id DemoDFSP3 not found"}
+MCM CA reconcile: 0 registered, 0 already correct, 1 failed, of 1 tenants
+```
+
+Onboarding creates the participant in **central-ledger** and in Pivotal's own database. MCM is a
+third registry and nothing writes to it, so a DFSP has to be created there by hand — `POST /dfsps`
+— before trust-manager can register anything against it.
+
+**Why this is worse than it sounds.** Onboarding reports success. The tenant is provisioned, its key
+is in Vault, and the row says `role = self`. Nothing surfaces the omission until a scheduler runs up
+to an hour later and logs a 404 that names the tenant but not the cause. Anyone reading the
+onboarding response would reasonably believe the participant was ready.
+
+Two ways to close it, both defensible:
+
+- **Onboarding registers with MCM**, as it already does with central-ledger. Consistent, but it adds
+  a second registry to the onboarding path and a second way for onboarding to fail.
+- **Onboarding refuses to provision a tenant MCM does not know**, turning a silent late failure into
+  an immediate and specific one. Cheaper, and it keeps MCM registration an operator decision — which
+  suits a registry the Hub operator may own rather than Pivotal.
+
+The second is probably right for a deployment where MCM is the Hub's, not Pivotal's. Either beats
+the present arrangement, where the two registries drift and only a log notices.
+
+---
+
 ## 6. Open
 
 - **Event contract.** Subject naming, payload, and which stream. Existing subjects follow

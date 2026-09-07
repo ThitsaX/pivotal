@@ -131,9 +131,6 @@ export class VaultJwsPrivateKeySource extends JwsPrivateKeySource {
                         : 'No previously loaded key to fall back on; this tenant will not sign.'),
                 );
 
-                // Force re-authentication: an expired token is the likeliest cause.
-                this.vaultClient.invalidateToken();
-
                 if (carried != null) {
                     keys.set(fspId, carried);
                 }
