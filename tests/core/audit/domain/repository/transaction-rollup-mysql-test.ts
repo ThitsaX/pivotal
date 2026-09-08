@@ -171,4 +171,12 @@ describe('Dashboard range SQL', {skip: !mysqlUrl && !mysqlSocket}, () => {
         assertDays(await load('2026-09-06T17:30:00Z', '2026-09-08T17:30:00Z', 'Asia/Yangon'),
             [['2026-09-07', 0, null], ['2026-09-08', 0, null]]);
     });
+
+    it('excludes incomplete transactions from the daily latency denominator', async () => {
+        await seed([['2026-09-04 17:29:59.999999', null], ['2026-09-04 17:30:00', 500],
+            ['2026-09-04 17:45:00', null]]);
+        const output = await load('2026-09-03T17:30:00Z', '2026-09-05T17:30:00Z', 'Asia/Yangon');
+        assertDays(output, [['2026-09-04', 1, null], ['2026-09-05', 2, 500]]);
+        assert.equal(output.avgLatencyMs, 500);
+    });
 });

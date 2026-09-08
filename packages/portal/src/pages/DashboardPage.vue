@@ -384,7 +384,7 @@ const latencyOptions = computed<ApexOptions>(() => ({
         type: 'gradient',
         gradient: {shade: 'light', type: 'vertical', gradientToColors: [COLOR.violetTo], opacityFrom: 0.4, opacityTo: 0.03, stops: [0, 95]},
     },
-    markers: {size: 0, hover: {size: 5}},
+    markers: {size: 4, hover: {size: 6}},
     dataLabels: {enabled: false},
     xaxis: {
         categories: (data.value?.latencyTrend ?? []).map((p) => formatShortDate(p.date)),
