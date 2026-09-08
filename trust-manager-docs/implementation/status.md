@@ -163,6 +163,65 @@ just-issued suspension as a tenant that was never activated. `publish` — the o
 reads from the write side too, where a stale key is precisely the peer-breaking mistake that path
 exists to avoid.
 
+### All four controls on one transfer — dev2, 2026-09-08
+
+`01M217PBTTWJSH1QEN9PPMK06M`, `DemoDFSP3 → DemoDFSP4`, USD 10. DFSP-facing mTLS and accessKey JWS,
+plus hub-facing JWS and mutual TLS on both the payer and payee legs, all exercised by one transfer —
+with an impersonation refused against the same endpoint twenty-four seconds earlier. Signatures on
+both hub-facing legs are confirmed **in the switch's own logs**, from two different senders with two
+different HTTP clients, rather than from ours.
+
+Collected and quoted verbatim in
+[`evidence/2026-09-08-dev2-end-to-end.md`](../evidence/2026-09-08-dev2-end-to-end.md), including the
+negative controls and what the run does **not** show — two of the four connectors cannot do this at
+all, leg #4 is untouched, and both domains are still rehearsal-rooted.
+
+### Proven in dev2 — hub-facing transport, 2026-09-09
+
+**web-outbound reached the switch over real mutual TLS, by name, with its own certificate.**
+
+```
+status 400 in 138ms
+tls TLSv1.3, server verified: true
+peer CN: extapi-mtls.dev2.wynepayhubsanbox-pre.com
+body: {"errorCode":"3102","errorDescription":"Missing required date header"}
+```
+
+The 400 is the proof rather than a failure: it is the account-lookup service objecting to a missing
+FSPIOP header in a hand-built request, which means the request reached the switch's application. The
+gateway demanded a client certificate and accepted the one cert-manager issued from
+`pki_hub_client`; web-outbound verified the switch's certificate against the mounted anchor; and the
+name resolved in-mesh, with no public DNS record for the host at any point.
+
+Refusal was confirmed first, from outside: a caller with no certificate gets `Request CERT` followed
+by **alert 116**, `certificate_required`, which under TLS 1.3 surfaces as a failed read rather than
+a failed connect. The server certificate returned was `extapi-mtls`, not the wildcard, which settles
+empirically that the exact-SNI filter chain wins over the `*.dev2` `SIMPLE` server sharing those
+pods — the one way this could have looked enabled while doing nothing.
+
+**Two things had to be measured rather than reasoned about.**
+
+*The gateway cannot be reached on its ClusterIP.* An `EnvoyFilter` inserts a `proxy_protocol`
+listener filter on the external ingress pods, so every connection must open with a PROXY protocol
+header. The load balancer adds it; a connection straight to the ClusterIP does not, and Envoy resets
+before TLS starts. So the ServiceEntry points at the load balancer address and the traffic does leave
+the cluster and come back — which is what a remote deployment would do anyway, and is the hop this
+rehearsal exists to exercise. Measured at ~21ms.
+
+*`MESH_INTERNAL` breaks it.* That marks the endpoint as a mesh workload, and the sidecar then tries
+to wrap the connection in Istio's own mTLS. The gateway is not sidecar-injected and expects the TLS
+we are speaking ourselves, so it resets — the same `ECONNRESET before secure TLS` as the ClusterIP
+case, from a different cause. `MESH_EXTERNAL` is required.
+
+**Not published, deliberately.** The host sits outside the `interop-jwt` policy, so its client
+certificate is the only control on it. A public A record would put an unauthenticated path to the
+transfer APIs on the internet behind a rehearsal CA; resolving in-mesh gives an identical handshake
+with none of that. `external-dns` would not have created the record anyway — nothing in that zone
+carries its ownership TXT marker, so those records are maintained by hand.
+
+**What remains on this leg** is a full transfer rather than a request, and the connectors' own
+certificates (leg #3), which carry the same configuration but have not been exercised.
+
 ### A nak with no delay is an unbounded retry loop — found in dev2, fixed 2026-09-09
 
 `DemoDFSP5` was onboarded in Pivotal on 2026-09-08 but never registered in MCM, which is a separate
