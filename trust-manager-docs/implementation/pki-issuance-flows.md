@@ -270,13 +270,12 @@ web-outbound resolves the fingerprint to a `participant_cert` row and applies th
 | `Xfcc` parser | reads `Hash` from the **first** entry only — under `SANITIZE_SET` there is one, and a second means a proxy appended rather than replaced |
 | `DfspCertificateGuard` | fingerprint → row → status, validity, then `fsp_id` against `FSPIOP-Source` |
 
-> **Known deviation from decision 7 — to be corrected.** The guard currently treats
-> `DFSP_FACING_MTLS` as a global switch: off means no request is checked, on means every request
-> must carry XFCC. The decision specifies the opposite shape — verify **whenever XFCC is present**,
-> and let the flag decide only whether its absence is fatal. Until that is changed, a deployment
-> cannot serve a mixed scheme (one participant on VPN alone, others on mutual TLS), and migration by
-> parallel endpoint still flips for everyone at once. Recorded in `status.md` under leg #1 with the
-> table of intended behaviour.
+> **Corrected 2026-09-08.** The guard used to treat `DFSP_FACING_MTLS` as a global switch: off meant
+> no request was checked, on meant every request had to carry XFCC. It now verifies **whenever XFCC
+> is present**, and the flag decides only whether its absence is fatal — so a deployment can serve a
+> mixed scheme, and migration by parallel endpoint moves one participant at a time. A bad
+> certificate is still refused in either state; only *arriving without one* is what the flag
+> tolerates.
 
 **Three things this settled that the design left implicit.**
 

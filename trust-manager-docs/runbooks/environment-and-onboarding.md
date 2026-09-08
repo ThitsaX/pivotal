@@ -203,7 +203,7 @@ Sync `vault-pki-app` before `pivotal`.
 | | Turn on when |
 | --- | --- |
 | `FSPIOP_USE_JWS` | every tenant that will transact has a key in Vault and is published to MCM. A tenant without one logs a warning and sends unsigned — it does not fail |
-| `DFSP_FACING_MTLS` | every caller on that host holds an enrolled certificate. It rejects any request without one |
+| `DFSP_FACING_MTLS` | every caller on that host holds an enrolled certificate **and has been seen using it**. It rejects any request without one. Leaving it off does not leave the leg unprotected: a caller that presents a certificate is verified either way, so enrolled participants are bound to theirs from their first request and this flag only closes the door behind the last one |
 | `FSPIOP_USE_MUTUAL_TLS` | the Hub endpoints are `https://` **and** the Hub edge requests a client certificate. Until then there is no handshake to make mutual |
 
 Turn them on one at a time. They fail at different layers — JWS at the Hub, mutual TLS at your own
@@ -211,13 +211,18 @@ gateway — and a single failed transfer will not tell you which.
 
 ### The test that matters
 
-With `DFSP_FACING_MTLS` on, and two enrolled participants:
+With two enrolled participants — and worth running **before** turning `DFSP_FACING_MTLS` on, since
+every row below behaves identically either way:
 
 | Certificate | `fspiop-source` | Expected |
 | --- | --- | --- |
 | A | A | accepted |
 | B | B | accepted |
 | **B** | **A** | **rejected** |
+
+Running it with the flag still off is how a participant proves its certificate works without risking
+anyone else: only the flag's own row — a caller presenting **no** certificate, accepted while off and
+rejected once on — changes when you turn it on.
 | none | anything | refused at TLS |
 
 The third row is the point. Both credentials are individually valid — B's certificate is genuine and

@@ -16,10 +16,31 @@ import { IS_PUBLIC_KEY } from './public.decorator';
  * the two forces compromise of both credentials of the same tenant, which is the whole reason to
  * layer mutual TLS on a signature scheme that already works.
  *
- * **Every failure path rejects.** No header, an unreadable header, a fingerprint matching no row,
- * a withdrawn or lapsed certificate, or a mismatch — all refused. A lookup miss must never read as
- * permission: the row is the only record that a certificate was ever issued, so its absence means
- * this deployment did not issue the certificate being presented.
+ * **A presented certificate is always checked. The flag decides only what an absent one means.**
+ *
+ * | Presented | Not mandatory | Mandatory |
+ * | --- | --- | --- |
+ * | yes | verified in full | verified in full |
+ * | no  | admitted         | rejected  |
+ *
+ * That split is what makes migration possible one DFSP at a time. A deployment-wide switch over
+ * whether to check at all cannot express it: with the switch off an enrolled DFSP's certificate is
+ * discarded unopened, so nobody is protected until the last participant is ready, and the day it is
+ * turned on is the first time anyone learns whether each DFSP's setup works. Keying on what the
+ * request actually carries lets each participant cut over when it chooses, contains a broken setup
+ * to the one participant that has it, and reduces the flag to a statement that migration is done.
+ *
+ * Tolerating an absent certificate is not the same as tolerating a bad one. **Every failure path
+ * past that point rejects**, mandatory or not: a fingerprint matching no row, a withdrawn or lapsed
+ * certificate, or a mismatch. A caller that offers a credential is held to it — we issued it, so we
+ * know whether it is still good, and admitting someone on a certificate we would otherwise refuse
+ * is worse than never having asked. A lookup miss in particular must never read as permission: the
+ * row is the only record that a certificate was ever issued, so its absence means this deployment
+ * did not issue the one being presented.
+ *
+ * While certificates are not mandatory an enrolled DFSP can still decline to present one and be
+ * admitted, so the endpoint that permits that must not be reachable outside the network control it
+ * relies on. That is an ingress rule, not something this guard can enforce.
  */
 export class DfspCertificateGuard implements CanActivate {
 
@@ -27,21 +48,17 @@ export class DfspCertificateGuard implements CanActivate {
 
     constructor(
         private readonly certificates: ParticipantCertRepository,
-        private readonly enabled: boolean,
+        private readonly mandatory: boolean,
         private readonly reflector: Reflector,
     ) {
     }
 
-    /** Whether this leg requires a certificate, so the bootstrap can report it. */
-    isEnabled(): boolean {
-        return this.enabled;
+    /** Whether a caller may arrive without a certificate, so the bootstrap can report it. */
+    isMandatory(): boolean {
+        return this.mandatory;
     }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-
-        if (!this.enabled) {
-            return true;
-        }
 
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
             context.getHandler(),
@@ -54,17 +71,25 @@ export class DfspCertificateGuard implements CanActivate {
 
         const request = context.switchToHttp().getRequest<Request>();
 
-        const source = DfspCertificateGuard.readSource(request);
         const presented = Xfcc.parse(request.headers[Xfcc.HEADER_NAME] as string | undefined);
 
         if (presented == null) {
             // Either no proxy terminated mutual TLS for this request, or it did not describe the
-            // certificate. Both mean the caller's transport identity is unknown.
+            // certificate. Both mean the caller's transport identity is unknown, and an unknown
+            // identity is the one thing the flag governs.
+            if (!this.mandatory) {
+                return true;
+            }
+
             throw new FspiopException(
                 FspiopErrors.INVALID_SIGNATURE,
                 'No verified client certificate accompanied this request.',
             );
         }
+
+        // Read after the admission above, so a caller that presents nothing is not refused here for
+        // a header AccessGuard will demand a moment later anyway.
+        const source = DfspCertificateGuard.readSource(request);
 
         // Read per request rather than from a cache. One indexed lookup on a unique key buys
         // revocation that takes effect immediately instead of whenever a cache happens to turn

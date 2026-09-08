@@ -44,8 +44,8 @@ function contextWith(headers: Record<string, string>): any {
     };
 }
 
-function guard(repository: FakeCertRepository, enabled = true): DfspCertificateGuard {
-    return new DfspCertificateGuard(repository as any, enabled, reflector);
+function guard(repository: FakeCertRepository, mandatory = true): DfspCertificateGuard {
+    return new DfspCertificateGuard(repository as any, mandatory, reflector);
 }
 
 function headers(hash: string | null, source: string | null): Record<string, string> {
@@ -160,13 +160,96 @@ describe('DfspCertificateGuard', () => {
         assert.equal(repository.lookups.length, 0);
     });
 
-    it('should let everything through while the leg is not yet switched on', async () => {
-        // The migration property: the endpoint runs beside the existing one, so callers that have
-        // not enrolled are unaffected until the flag is turned on for them.
+    it('should reject a request carrying nothing at all', async () => {
+        // Both headers missing. The certificate is the one reported, because transport identity is
+        // settled before message identity and AccessGuard demands fspiop-source straight after.
+        await assert.rejects(
+            guard(new FakeCertRepository()).canActivate(contextWith({})),
+            /No verified client certificate/);
+    });
+});
+
+describe('DfspCertificateGuard when certificates are not mandatory', () => {
+
+    it('should admit a caller that presents nothing', async () => {
+        // The migration property: a participant that has not enrolled keeps working, and needs no
+        // coordination with the ones that have.
         const repository = new FakeCertRepository();
 
         assert.equal(
             await guard(repository, false).canActivate(contextWith({})),
+            true);
+
+        assert.equal(repository.lookups.length, 0, 'nothing to resolve, so nothing is looked up');
+    });
+
+    it('should still verify a caller that does present a certificate', async () => {
+        // The point of the change. A participant that has enrolled is bound to its certificate from
+        // its first request, without waiting for every other participant to be ready.
+        const repository = new FakeCertRepository([row()]);
+
+        assert.equal(
+            await guard(repository, false).canActivate(contextWith(headers(WALLET1_HASH, 'wallet1'))),
+            true);
+
+        assert.deepEqual(repository.lookups, [WALLET1_HASH]);
+    });
+
+    it('should reject a presented certificate used to claim another participant', async () => {
+        // Tolerating an absent certificate is not tolerating a bad one. The binding rule holds
+        // whatever the deployment's policy on arriving without one.
+        const repository = new FakeCertRepository([
+            row(),
+            row({fspId: 'wallet2', fingerprintSha256: WALLET2_HASH}),
+        ]);
+
+        await assert.rejects(
+            guard(repository, false).canActivate(contextWith(headers(WALLET2_HASH, 'wallet1'))),
+            /does not belong to the participant named in fspiop-source/);
+    });
+
+    it('should reject a presented certificate that has been revoked', async () => {
+        // Otherwise revoking a certificate would do nothing until the flag was turned on, and the
+        // operator screen would say "revoked" of a credential still being honoured.
+        const repository = new FakeCertRepository([
+            row({status: ParticipantCertStatusCode.REVOKED}),
+        ]);
+
+        await assert.rejects(
+            guard(repository, false).canActivate(contextWith(headers(WALLET1_HASH, 'wallet1'))),
+            /has been revoked/);
+    });
+
+    it('should reject a presented fingerprint this deployment never issued', async () => {
+        await assert.rejects(
+            guard(new FakeCertRepository(), false)
+                .canActivate(contextWith(headers(WALLET1_HASH, 'wallet1'))),
+            /not recognised/);
+    });
+
+    it('should admit a caller whose header carries no usable identity', async () => {
+        // An unreadable header resolves to no certificate rather than to a bad one: there is no
+        // fingerprint to hold anyone to. Treated as arriving without one, which is admitted here
+        // and refused when certificates are mandatory.
+        const repository = new FakeCertRepository([row()]);
+
+        assert.equal(
+            await guard(repository, false).canActivate(contextWith({
+                'x-forwarded-client-cert': 'Hash=not-a-digest',
+                'fspiop-source': 'wallet1',
+            })),
+            true);
+
+        assert.equal(repository.lookups.length, 0);
+    });
+
+    it('should not look at a public route', async () => {
+        const repository = new FakeCertRepository([row()]);
+        const publicGuard = new DfspCertificateGuard(
+            repository as any, false, {getAllAndOverride: () => true} as any);
+
+        assert.equal(
+            await publicGuard.canActivate(contextWith(headers(WALLET1_HASH, 'wallet1'))),
             true);
 
         assert.equal(repository.lookups.length, 0);

@@ -99,17 +99,30 @@ const bootstrap = async (): Promise<void> => {
     await app.listen(port);
     Logger.log('AccessGuard is enabled.', 'Bootstrap');
 
-    if (dfspCertificateGuard.isEnabled()) {
+    if (dfspCertificateGuard.isMandatory()) {
         // The guard reads an identity it cannot itself authenticate. Nothing in this process can
-        // tell a header written by a terminating proxy from one a caller set, so enabling this
-        // without a proxy that overwrites the header does not merely fail to protect the leg --
-        // it reports success while accepting anyone who names a fingerprint.
+        // tell a header written by a terminating proxy from one a caller set, so requiring a
+        // certificate without a proxy that overwrites the header does not merely fail to protect
+        // the leg -- it reports success while accepting anyone who names a fingerprint.
+        //
+        // Only a warning while certificates are mandatory. Where they are not, a forged header can
+        // still only get a caller refused: one that presents nothing is admitted already, so naming
+        // someone else's fingerprint buys an attacker a rejection rather than an identity.
         Logger.warn(
-            'DFSP-facing mutual TLS is enabled. This service trusts the '
+            'DFSP-facing mutual TLS is mandatory. This service trusts the '
             + `'${Xfcc.HEADER_NAME}' header and cannot verify who set it: it MUST sit behind a `
             + 'proxy configured to overwrite that header (Istio forwardClientCertDetails: '
             + 'SANITIZE_SET). Exposed directly, any caller can present another participant\'s '
             + 'fingerprint.',
+            'Bootstrap',
+        );
+    } else {
+        // Said out loud because the enforcement is no longer visible in configuration alone: which
+        // participants are bound to a certificate now depends on which of them present one.
+        Logger.log(
+            'DFSP-facing mutual TLS is not mandatory. Callers presenting a client certificate are '
+            + 'still verified in full; callers presenting none are admitted, so this endpoint must '
+            + 'stay behind the network control that protects them.',
             'Bootstrap',
         );
     }

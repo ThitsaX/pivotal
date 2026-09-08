@@ -383,35 +383,52 @@ explain why #2/#4 were *correction* work rather than greenfield.
 
 ### Left
 
-- **The flag is all-or-nothing per deployment, and decision 7 says it should not be. Planned fix
-  below.** `DfspCertificateGuard` returns immediately when `DFSP_FACING_MTLS` is off, so with the
-  flag off nobody is checked even when they present a valid certificate, and with it on every caller
-  must present one. Two consequences:
-  - **A mixed scheme cannot be served.** Where one DFSP's country accepts VPN alone while others
-    require mutual TLS, today they cannot share a web-outbound: turning the flag on rejects the
-    VPN-only participant, leaving it off means the others are unverified.
-  - **Migration by parallel endpoint does not actually work yet**, despite being the stated
-    mechanism. Both endpoints route to the same service and the same guard, so the flag flips for
-    everyone at once — the flag day the parallel endpoint exists to avoid.
+- ~~**The flag is all-or-nothing per deployment**~~ — **fixed 2026-09-08.** `DfspCertificateGuard`
+  used to return immediately when `DFSP_FACING_MTLS` was off, so nobody was checked even when they
+  presented a valid certificate, and with it on every caller had to present one. That cost two
+  things: a mixed scheme could not be served at all, and migration by parallel endpoint did not
+  work despite being the stated mechanism — both endpoints route to the same service and the same
+  guard, so the flag flipped for everyone at once, which is the flag day the parallel endpoint
+  exists to avoid.
 
-  **The fix, which restores the recorded design.** Decision 7 already specifies it: the certificate
-  checks key on **XFCC presence per request**, and `DFSP_FACING_MTLS` only decides whether XFCC is
-  *mandatory*. Concretely, in `dfsp-certificate.guard.ts`:
+  The guard now keys on **XFCC presence per request**, and `DFSP_FACING_MTLS` decides only whether
+  XFCC is *mandatory*:
 
-  | XFCC | Flag off | Flag on |
+  | XFCC | Not mandatory | Mandatory |
   | --- | --- | --- |
   | present | verify fully — status, validity, `fsp_id` ↔ `FSPIOP-Source` | verify fully |
   | absent | admit | reject |
 
-  A participant that has enrolled is then verified from its first request, whichever endpoint it
-  used, while one that has not keeps working. The flag stops being a switch and becomes a statement
-  that migration is complete. A few lines and a handful of tests; the guard already has every input
-  it needs.
+  A participant that has enrolled is verified from its first request, whichever endpoint it used,
+  while one that has not keeps working. **Tolerating an absent certificate is not tolerating a bad
+  one:** an unknown fingerprint, a revoked or lapsed certificate, or a name that disagrees with
+  `FSPIOP-Source` is refused in both columns. Otherwise revocation would do nothing until the flag
+  was turned on, and the operator screen would report "revoked" of a credential still being
+  honoured. An unreadable header resolves to *no* certificate rather than a bad one — there is no
+  fingerprint to hold anyone to — so it lands on the `absent` row.
 
-  **One caveat to record with it.** With the flag off, an unenrolled participant is protected by VPN
-  alone, so the plain endpoint must not be reachable from outside that VPN — otherwise it is a
-  bypass for the enrolled participants too, who could simply stop presenting a certificate. That is
-  a network control, not an application one, and it belongs in the deployment's ingress rules.
+  **What this buys operationally** is blast radius. Each DFSP cuts over when it chooses, by starting
+  to present a certificate; a broken setup breaks that one participant and no other, and its
+  rollback is that participant returning to the plain endpoint rather than a redeploy. Under the old
+  shape, cutover day was the first time anyone learned whether each DFSP's certificates worked, and
+  one bad setup forced the flag back off for everybody.
+
+  The flag was renamed through the guard as `mandatory`, and `isEnabled()` became `isMandatory()` —
+  the guard is now always active, and the flag no longer says whether it runs.
+
+  **One caveat, unchanged.** While certificates are not mandatory, an enrolled participant can still
+  decline to present one and be admitted, so the endpoint that permits that must not be reachable
+  from outside the network control it relies on. That is an ingress rule, not an application one.
+  Closing it in the application would mean per-participant enforcement — rejecting a caller that has
+  a usable certificate on record but presented none — which is stored policy and belongs in the
+  database, not inferred from an env var. Deliberately not built.
+
+  **The startup warning was reviewed and left gated on the flag.** With certificates mandatory, a
+  forged XFCC header admits anyone who names a fingerprint, so the warning about needing a
+  `SANITIZE_SET` proxy still fires. Where they are not mandatory it is not needed: a caller
+  presenting nothing is admitted already, so forging a header can only earn a rejection, never an
+  identity. web-outbound now logs the not-mandatory state instead, because which participants are
+  bound to a certificate is no longer visible from configuration alone.
 - Each DFSP still has to enroll — one CSR exchange per participant, operator-mediated.
 - **The gateway now exists in `dev2-hub`, switched off.** A `MUTUAL` Gateway and its
   VirtualService sit in `apps/pivotal/values.yaml` on a second host, both `enabled: false`, beside
