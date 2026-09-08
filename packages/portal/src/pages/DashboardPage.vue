@@ -91,6 +91,7 @@ const rangeEnd = ref(initialRange.to);
 const rangeInvalid = ref(false);
 const appliedMode = ref<RangeMode>('today');
 const appliedRange = ref({...initialRange});
+const rangeEditorOpen = ref(true);
 
 const rangeModeLabel = computed((): string => ({
     today: 'Today',
@@ -485,6 +486,7 @@ function applyRange(): void {
 
     appliedMode.value = rangeMode.value;
     appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
+    rangeEditorOpen.value = false;
     loadAppliedRange();
 }
 
@@ -567,6 +569,7 @@ watch(
             class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
         >
             <TimeRangeSelector
+                v-show="rangeEditorOpen"
                 label="Dashboard time range"
                 :selected-time-zone="selectedTimeZone"
                 :mode="rangeMode"
@@ -595,6 +598,13 @@ watch(
             <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
                 Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
                 {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+                <button
+                    v-if="!rangeEditorOpen"
+                    type="button"
+                    class="ml-3 font-semibold text-accent underline disabled:opacity-50"
+                    :disabled="loading"
+                    @click="rangeEditorOpen = true"
+                >Edit range</button>
             </p>
         </article>
 
