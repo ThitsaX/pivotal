@@ -255,8 +255,12 @@ export class TransactionRollupRepository {
         scopeFspId: string | undefined,
         from: Date,
         to: Date,
+        timeZone: string = 'UTC',
     ): Promise<TransactionRollupRepository.TimeBucket[]> {
-        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
+        // A UTC hour can straddle local midnight (e.g. 17:00–18:00 UTC in Yangon).
+        // Split those hours into exact raw intervals before assigning them to a day.
+        const sources = TransactionRollupRepository.localDayRanges(from, to, timeZone)
+            .map((range) => TransactionRollupRepository.rangeSource(scopeFspId, range.from, range.to));
         const rows = await this.readRepository.query(
             `SELECT bucket_hour,
                     COALESCE(SUM(txn_count), 0)        AS count,
@@ -264,10 +268,10 @@ export class TransactionRollupRepository {
                     COALESCE(SUM(dispute_count), 0)    AS dispute_count,
                     SUM(sum_latency_ms)                AS sum_latency,
                     COALESCE(SUM(latency_count), 0)    AS latency_count
-             FROM (${source.sql}) AS selected_range
+             FROM (${sources.map((source) => source.sql).join(' UNION ALL ')}) AS selected_range
              GROUP BY bucket_hour
              ORDER BY bucket_hour ASC`,
-            source.params,
+            sources.flatMap((source) => source.params),
         );
 
         return rows.map((row: Record<string, unknown>) => ({
@@ -411,6 +415,47 @@ export class TransactionRollupRepository {
         );
 
         return rows.map((row: Record<string, unknown>) => String(row.fsp));
+    }
+
+    private static localDayRanges(from: Date, to: Date, timeZone: string): Array<{from: Date; to: Date}> {
+        const hourMs = 3_600_000;
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+        });
+        const starts = [from.getTime()];
+        const lastMs = to.getTime() - 1;
+        let cursor = from.getTime();
+        let date = formatter.format(cursor);
+
+        // Resolve boundaries with IANA rules at each date, including DST changes;
+        // using one fixed offset for the entire range would shift some midnights.
+        while (cursor < lastMs) {
+            const next = Math.min(cursor + hourMs, lastMs);
+            const nextDate = formatter.format(next);
+            if (date !== nextDate) {
+                let lower = cursor;
+                let upper = next;
+                while (upper - lower > 1) {
+                    const middle = Math.floor((lower + upper) / 2);
+                    if (formatter.format(middle) === date) {
+                        lower = middle;
+                    } else {
+                        upper = middle;
+                    }
+                }
+                // Whole UTC hours already separate these dates correctly in the rollup.
+                if (upper % hourMs !== 0) {
+                    starts.push(upper);
+                }
+            }
+            cursor = next;
+            date = nextDate;
+        }
+
+        return starts.map((start, index) => ({
+            from: new Date(start),
+            to: new Date(starts[index + 1] ?? to.getTime()),
+        }));
     }
 
     private static rangeSource(scopeFspId: string | undefined, from: Date, to: Date): {

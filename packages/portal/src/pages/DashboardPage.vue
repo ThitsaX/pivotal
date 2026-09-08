@@ -246,6 +246,7 @@ const trendOptions = computed<ApexOptions>(() => ({
     colors: [COLOR.accent, COLOR.aborted],
     dataLabels: {enabled: false},
     stroke: {curve: 'smooth', width: 2.5},
+    markers: {size: 4, hover: {size: 6}},
     fill: {
         type: 'gradient',
         gradient: {
