@@ -4,7 +4,9 @@ import {Logger, OnModuleInit} from '@nestjs/common';
 import {AckPolicy, ConsumerMessages, DeliverPolicy, JetStreamManager, ReplayPolicy} from 'nats';
 import {SigningTenantProvisionedMessage} from '@core/trust/common';
 import {NatsClientService, parseMaxAgeMs, resolveStreamWithLimits, UNLIMITED} from '@shared/nats';
+import {McmException} from '@shared/mcm-client';
 import {JwsKeyPublishScheduler} from './jws-key-publish.scheduler';
+import {PermanentPublishError} from './signing-tenant.error';
 
 /**
  * Publishes a newly provisioned tenant's signing key to MCM as soon as it is announced.
@@ -33,6 +35,19 @@ export class SigningTenantConsumer implements OnModuleInit {
      * sized for an outage lasting days rather than for throughput.
      */
     private static readonly DEFAULT_STREAM_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+    /**
+     * Retry delays for a failure that might resolve itself, doubling from five seconds to five
+     * minutes.
+     *
+     * A nak with no delay is redelivered immediately, so a failure that persists becomes a loop
+     * bounded only by how fast the far end can say no — which for a tenant MCM had never heard of
+     * meant three hundred requests a second, sustained, against MCM. The floor matters more than
+     * the ceiling here: these events are rare and each one only gates how soon a tenant can sign,
+     * so waiting minutes costs nothing worth having.
+     */
+    private static readonly BASE_BACKOFF_MS = 5_000;
+    private static readonly MAX_BACKOFF_MS = 5 * 60_000;
 
     private readonly logger = new Logger(SigningTenantConsumer.name);
 
@@ -122,13 +137,73 @@ export class SigningTenantConsumer implements OnModuleInit {
             } catch (error: unknown) {
                 const detail = error instanceof Error ? error.message : String(error);
 
-                // Nacked so JetStream redelivers. MCM being down is the expected reason to be here,
-                // and it is temporary; the alternative — dropping the event — would leave a tenant
-                // provisioned but never published, with nothing to show why.
+                if (SigningTenantConsumer.isPermanent(error)) {
+                    // Terminated rather than retried: this fails identically however long we wait,
+                    // and a message that cannot succeed must not be redelivered forever. Not lost —
+                    // the hourly reconcile publishes any tenant MCM has no key for, so the cost is
+                    // an hour rather than the tenant's ability to sign.
+                    this.logger.error(
+                        `Cannot publish the signing key for '${fspId}': ${detail} `
+                        + 'Not retrying — this will not resolve on its own. The hourly reconcile '
+                        + 'will publish it once the cause is fixed.',
+                    );
+                    msg.term();
+                    continue;
+                }
+
+                // Nacked so JetStream redelivers, but after a delay. MCM being unreachable is the
+                // expected reason to be here and it is temporary; the alternative — dropping the
+                // event — would leave a tenant provisioned but never published, with nothing to
+                // show why.
+                const delayMs = SigningTenantConsumer.backoffMs(msg.info.redeliveryCount);
+
                 this.logger.error(
-                    `Could not publish signing key for '${fspId}': ${detail}. Will retry.`);
-                msg.nak();
+                    `Could not publish signing key for '${fspId}': ${detail}. `
+                    + `Retrying in ${Math.round(delayMs / 1000)}s `
+                    + `(attempt ${msg.info.redeliveryCount}).`,
+                );
+                msg.nak(delayMs);
             }
         }
+    }
+
+    /**
+     * Whether this failure will repeat identically however often it is retried.
+     *
+     * Two shapes. {@link PermanentPublishError} covers what this deployment knows about its own
+     * state — a tenant with no key, or a key that disagrees with MCM's. A 4xx from MCM covers what
+     * MCM knows about it: most often a tenant that was onboarded here but never registered there,
+     * which answers 404 to every attempt until an operator creates it.
+     *
+     * 408 and 429 are excluded deliberately. Both are 4xx and neither is a statement about the
+     * request being wrong — one says MCM ran out of time, the other that it wants us to slow down,
+     * and slowing down is exactly what the retry path does.
+     */
+    private static isPermanent(error: unknown): boolean {
+
+        if (error instanceof PermanentPublishError) {
+            return true;
+        }
+
+        if (!(error instanceof McmException) || error.status == null) {
+            // No status means no answer: a refused connection, a timeout, a name that did not
+            // resolve. Those are the transient ones.
+            return false;
+        }
+
+        return error.status >= 400
+            && error.status < 500
+            && error.status !== 408
+            && error.status !== 429;
+    }
+
+    /** Exponential, from {@link BASE_BACKOFF_MS}, capped at {@link MAX_BACKOFF_MS}. */
+    private static backoffMs(redeliveryCount: number): number {
+
+        // redeliveryCount is 1 on the first delivery, so the first retry waits the base delay.
+        const exponent = Math.max(0, redeliveryCount - 1);
+        const delay = SigningTenantConsumer.BASE_BACKOFF_MS * Math.pow(2, Math.min(exponent, 20));
+
+        return Math.min(delay, SigningTenantConsumer.MAX_BACKOFF_MS);
     }
 }

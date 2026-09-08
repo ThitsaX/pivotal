@@ -163,6 +163,38 @@ just-issued suspension as a tenant that was never activated. `publish` — the o
 reads from the write side too, where a stale key is precisely the peer-breaking mistake that path
 exists to avoid.
 
+### A nak with no delay is an unbounded retry loop — found in dev2, fixed 2026-09-09
+
+`DemoDFSP5` was onboarded in Pivotal on 2026-09-08 but never registered in MCM, which is a separate
+operator step and the *first* one. The announcement therefore named a tenant MCM had never heard of,
+MCM answered 404, and `SigningTenantConsumer` nacked. A nak with no delay is redelivered
+immediately, so the retry rate was bounded only by how fast MCM could say no — and MCM says no in
+about 8ms.
+
+**It ran for roughly a day, and it accelerated.** Measured at 2,238 retries/minute when first seen
+and 19,272/minute half an hour later, ~320 requests a second sustained against MCM. The comment in
+the consumer recorded the assumption that produced this: *"MCM being down is the expected reason to
+be here, and it is temporary."* A 404 for a tenant that does not exist is neither.
+
+The fix is two changes that belong together. Failures are now classified: `PermanentPublishError`
+for what this deployment knows about its own state — no key of ours, or a key MCM holds that
+disagrees with ours — and a 4xx from MCM for what MCM knows, excluding 408 and 429, which are 4xx
+without being statements that the request is wrong. Permanent failures are **terminated**, not
+retried, which is safe rather than lossy: the hourly reconcile publishes any tenant MCM lacks a key
+for, so dropping the announcement costs an hour, not the tenant's ability to sign. Everything else
+naks with exponential backoff, five seconds doubling to a five-minute cap. The same failure that
+produced 27.6 million retries in a day now produces 293, and `DemoDFSP5`'s own 404 produces one.
+
+`McmException` gained a `status` field to make that decision without parsing prose out of an error
+message. It is undefined when no answer arrived at all — a refused connection, a timeout — which is
+exactly the case that must stay retryable.
+
+**Recovering the stuck message took a stream edit.** The event sits in `PIVOTAL_TRUST` for a week,
+so deleting the participant rows does not stop the loop — the consumer simply fails earlier, at
+`No self-role public key held`, and naks just as fast. There is no `nats` CLI in the cluster; the
+Pivotal images bundle the client library, so `jsm.streams.deleteMessage` from a pod is the tool to
+hand.
+
 ### Hub-facing mTLS — why it cannot be tested as things stand, 2026-09-08
 
 **Nothing on this path uses TLS at all.** Pivotal reaches the Hub on `http://moja-*.mojaloop`
@@ -236,6 +268,26 @@ wildcard `*.dev2` SIMPLE server on the same pods, and landing on that chain woul
 certificate is ever requested — mTLS that silently is not. `pivotal.dev2` already runs MUTUAL
 alongside that same wildcard and works, so exact-over-wildcard holds here. Still worth one
 `config_dump` before trusting a green test.
+
+**`FSPIOP_USE_MUTUAL_TLS` means opposite things on the two sides, and sharing it broke web-inbound.**
+Found on the first deploy, 2026-09-09. For web-outbound and the connectors the flag means *present*
+a client certificate when calling the Hub; for web-inbound it means *demand* one and serve TLS.
+Carried in `commonFspiopEnv` it reached both, and web-inbound refused to start:
+
+```
+Error: Mutual TLS is enabled but no server certificate is configured.
+Set FSPIOP_MTLS_SERVER_CERT_PATH and FSPIOP_MTLS_SERVER_KEY_PATH.
+```
+
+It could not have worked anyway: the Hub reaches web-inbound over plain HTTP and presents a client
+certificate to nobody. No outage — the previous ReplicaSet kept serving and the rollout simply
+stalled — but web-inbound stayed on the old image until this was fixed. The chart now emits the flag
+per workload, true only for those holding a hub client certificate, which is the set that calls out
+and excludes web-inbound by construction rather than by remembering to exclude it. It is always
+emitted and never omitted, because the services read it as a required setting and an absent value
+fails startup rather than defaulting to off. `global.hubFacingMutualTls` remains the deployment-wide
+switch, and turning it off leaves the certificates mounted and unread — the separability the
+issuance step was built to have.
 
 **One prerequisite the draft did not name.** Pivotal runs in this cluster, so calling the switch's
 public address loops out to the load balancer and back, which on GKE frequently fails as a timeout.

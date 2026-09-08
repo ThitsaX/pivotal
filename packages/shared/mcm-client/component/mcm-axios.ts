@@ -248,12 +248,13 @@ export class McmAxios {
                 + 'claim; or its issuer does not match the one MCM discovered. The last is easy to '
                 + 'miss — a token is issued for the host it was requested from, so fetching it by a '
                 + 'different name than MCM expects produces a valid token MCM will not accept.',
+                status,
             );
         }
 
         const detail = McmAxios.describe(axiosError);
 
-        return new McmException('MCM_REQUEST_FAILED', `${method} ${path} failed${detail}`);
+        return new McmException('MCM_REQUEST_FAILED', `${method} ${path} failed${detail}`, status);
     }
 
     private static describe(error: AxiosError): string {

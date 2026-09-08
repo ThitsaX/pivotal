@@ -91,8 +91,12 @@ web-pivotal ──provision──▶ Vault / HSM
 Three properties follow:
 
 - **Onboarding never fails because MCM is down.** The event waits in the stream.
-- **The failure is loud.** A consumer that cannot reach MCM nacks and retries, and the error surfaces
-  in trust-manager's logs immediately rather than being discovered later by a rejected signature.
+- **The failure is loud, and bounded.** A consumer that cannot reach MCM nacks and retries, and the
+  error surfaces in trust-manager's logs immediately rather than being discovered later by a
+  rejected signature. Retries back off — five seconds doubling to five minutes — because a nak with
+  no delay is redelivered at once, which turns a failure that does not resolve into a loop running
+  at whatever rate the far end can refuse. A failure that *cannot* resolve, such as a tenant MCM has
+  never been told about, is terminated instead and left to the sweep.
 - **Publication is near-instant** in the normal case, rather than waiting for a sweep.
 
 ### Why JetStream makes this sound

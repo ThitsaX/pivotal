@@ -6,6 +6,7 @@ import {ParticipantKey, ParticipantKeyRole} from '@core/participant/domain/model
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios} from '@shared/mcm-client';
 import {DbTarget} from '@shared/typeorm';
+import {PermanentPublishError} from './signing-tenant.error';
 
 /**
  * Publishes the public half of each Pivotal-fronted tenant's FSPIOP signing key to
@@ -72,7 +73,7 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
         const key = await this.participantKeys.findByFspId(fspId, DbTarget.Write);
 
         if (key == null || key.role !== ParticipantKeyRole.Self || key.jwsPublicKey == null) {
-            throw new Error(`No self-role public key held for '${fspId}'.`);
+            throw new PermanentPublishError(`No self-role public key held for '${fspId}'.`);
         }
 
         await this.mcm.publishAndVerifyJwsKey(fspId, key.jwsPublicKey);
@@ -98,7 +99,9 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
         const key = await this.participantKeys.findByFspId(fspId, DbTarget.Write);
 
         if (key == null || key.role !== ParticipantKeyRole.Self || key.jwsPublicKey == null) {
-            throw new Error(`No self-role public key held for '${fspId}'.`);
+            // Permanent: no amount of retrying gives this tenant a key. Either onboarding never
+            // finished, or the row has since been removed.
+            throw new PermanentPublishError(`No self-role public key held for '${fspId}'.`);
         }
 
         const stored = await this.mcm.getJwsKey(fspId).catch(() => null);
@@ -109,7 +112,7 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
                 // Deliberately not overwritten, and deliberately fatal for this message: peers hold
                 // one key each and cannot try both, so resolving this is a human decision about
                 // which key is current, not something to settle by whoever wrote last.
-                throw new Error(
+                throw new PermanentPublishError(
                     `MCM holds a different signing key for '${fspId}' than Pivotal does. `
                     + 'Resolve this deliberately rather than by republishing.',
                 );

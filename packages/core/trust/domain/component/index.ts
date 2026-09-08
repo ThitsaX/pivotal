@@ -8,3 +8,4 @@ export * from './mcm-ca-registration.scheduler';
 export * from './peer-jws-sync.scheduler';
 export * from './dfsp-ca-publish.scheduler';
 export * from './signing-tenant.consumer';
+export * from './signing-tenant.error';
