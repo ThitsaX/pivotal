@@ -577,7 +577,6 @@ watch(
                 :end-value="rangeEnd"
                 :disabled="loading"
                 compact-mode-selector
-                :show-last24="false"
                 :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
                 @update:mode="rangeMode = $event as RangeMode"
                 @update:start-value="rangeStart = $event"
