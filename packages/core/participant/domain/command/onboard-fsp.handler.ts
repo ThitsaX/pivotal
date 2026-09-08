@@ -91,8 +91,12 @@ export class OnboardFspHandler
         // legacy database profile has a private key to store here.
         participantKey.jwsPrivateKey = provisioned.legacyPrivateKeyPem ?? null;
 
-        // Left off until trust-manager has published the public key to MCM and confirmed it.
+        // Left off until trust-manager has published the public key to MCM and confirmed it. The
+        // activation record is cleared with it: this is a key nothing has ever signed with, so any
+        // earlier activation of this tenant says nothing about whether this one should be trusted
+        // on — and leaving it set would stop the sweep from ever switching signing back on.
         participantKey.jwsSignEnabled = false;
+        participantKey.jwsSignActivatedAt = null;
         participantKey.jwsVerifyMode = existing?.jwsVerifyMode ?? FspiopVerifyMode.Off;
 
         await this.participantKeyRepository.save(participantKey);

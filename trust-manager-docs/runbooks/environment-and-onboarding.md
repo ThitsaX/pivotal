@@ -150,7 +150,9 @@ kubectl -n pivotal logs deploy/trust-manager --tail=30 | grep -iE 'published|ena
 ```
 
 Expect: provisioned into Vault → announced → published to MCM → `signing is now enabled`. If the
-announcement is missing, the hourly reconcile publishes instead — later, but not broken.
+announcement is missing, the hourly reconcile both publishes and switches signing on instead — later,
+but not broken. It logs `was published to MCM but never switched on`, which names the tenant and says
+the announcement was the part that failed.
 
 ```bash
 vault kv get secret/pivotal/jwskey/<fspId>

@@ -64,6 +64,13 @@ export class UpdateJwsPolicyHandler
         existing.jwsSignEnabled = command.input.jwsSignEnabled ?? existing.jwsSignEnabled;
         existing.jwsVerifyMode = command.input.jwsVerifyMode ?? existing.jwsVerifyMode;
 
+        if (existing.jwsSignEnabled && existing.jwsSignActivatedAt == null) {
+            // Records that signing has been on at least once. The key-publish sweep switches on
+            // only tenants that have never been activated, so without this a tenant enabled here
+            // and suspended later would be switched back on within the hour.
+            existing.jwsSignActivatedAt = new Date();
+        }
+
         const saved = await this.repository.save(existing);
 
         this.logger.log(

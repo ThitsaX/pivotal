@@ -108,15 +108,27 @@ persists and redelivers.
 Onboarding writes the row and then dies before publishing. No message exists, so nothing can be
 redelivered, and a `self` tenant sits unpublished forever.
 
-**The existing hourly sweep stays, as reconciliation.** `JwsKeyPublishScheduler` already does this
-work idempotently: it reads what MCM holds, compares, and publishes only when MCM has nothing. At
-any realistic tenant count that is a handful of reads per hour.
+**The existing hourly sweep stays, as reconciliation.** `JwsKeyPublishScheduler` reads what MCM
+holds, compares, publishes only when MCM has nothing — and then switches signing on. At any
+realistic tenant count that is a handful of reads per hour.
 
 Its job changes, though. It is no longer how keys reach MCM — the event is. It exists only to notice
 what the event missed, turning "this tenant silently never publishes" into "this tenant publishes an
 hour late". The alternative that would let it be removed is a transactional outbox, writing row and
 event in one transaction. That is airtight and considerably more machinery; the sweep is already
 written.
+
+**The sweep has to finish the job, not half of it.** It once only published, and that made the
+missed-announcement case permanent rather than late: the key reached MCM, so every subsequent pass
+found it registered, counted the tenant correct and moved on, while `jws_sign_enabled` stayed at 0
+forever. A reconciler that converges on part of the intended state and reports success is worse than
+one that does nothing, because the report is what stops anyone looking.
+
+**Which means the sweep must be able to recognise a deliberate 0.** Signing is switched off for two
+quite different reasons — never yet switched on, and switched off by an operator suspending a tenant
+— and the flag cannot tell them apart. `jws_sign_activated_at` records the first activation and no
+suspension clears it, so NULL means "never activated" and is the only case the sweep acts on. Without
+that distinction, automatic activation would quietly undo a suspension within the hour.
 
 ### Enabling signing is trust-manager's job, not onboarding's
 

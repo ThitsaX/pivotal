@@ -41,6 +41,16 @@ export class ParticipantKey {
     @Column({type: 'boolean', name: 'jws_sign_enabled', default: false})
     public jwsSignEnabled!: boolean;
 
+    /**
+     * When signing was first switched on for this tenant, or null if it never has been.
+     *
+     * Distinct from {@link jwsSignEnabled}, which is the live switch and moves in both directions.
+     * A suspension clears the switch and leaves this set, which is what lets the key-publish sweep
+     * activate a tenant it finds stranded without also undoing an operator's suspension.
+     */
+    @Column({type: 'datetime', name: 'jws_sign_activated_at', nullable: true})
+    public jwsSignActivatedAt!: Date | null;
+
     @Column({type: 'varchar', length: 20, name: 'jws_verify_mode', default: 'off'})
     public jwsVerifyMode!: string;
 

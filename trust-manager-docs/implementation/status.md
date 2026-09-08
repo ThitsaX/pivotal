@@ -135,11 +135,33 @@ the service's own keys were invisible to the CLI; nothing reported a fault. Pivo
 version 1 mount rather than operating on it silently. The Java client was left alone deliberately: it
 only reads, so a wrong mount there already fails loudly.
 
-**The hourly reconcile publishes to MCM without enabling signing. Not fixed.** Only the JetStream
-path calls `publishAndEnable`. A tenant that misses the event has its key published and
-`jws_sign_enabled` left at 0 — permanently, since the sweep will thereafter report it as "already
-correct". `DemoDFSP3` is in exactly that state. This contradicts what `jws-tenant-provisioning.md`
-claims about the sweep being "an hour late, but not broken".
+**The hourly reconcile publishes to MCM without enabling signing. Fixed 2026-09-08.** Only the
+JetStream path called `publishAndEnable`. A tenant that missed the event had its key published and
+`jws_sign_enabled` left at 0 — permanently, since the sweep thereafter reported it as "already
+correct". `DemoDFSP3` was in exactly that state. The sweep now switches signing on for any tenant it
+confirms MCM holds the key for, so the missed-announcement case is late rather than fatal, which is
+what `jws-tenant-provisioning.md` always claimed.
+
+Enabling from a sweep needs one thing the schema could not express: whether a 0 means "not yet
+switched on" or "an operator suspended this tenant". `jws_sign_activated_at` (migration `V5`) records
+the first activation and is never cleared by a suspension, so only a NULL invites the sweep to act.
+Re-provisioning a tenant clears it, because that is a new key nothing has signed with. The pass now
+reports an `activated` count and names each tenant it rescues, so a missed announcement is visible
+rather than inferred from a tenant that never signs.
+
+**Deploying it has an order.** `participant_key` is migrated by web-pivotal and app-auditor and by
+nobody else, so those must roll first; trust-manager, web-outbound and web-inbound select the new
+column and fail their reads until `V5` has landed. Nothing corrupts, and nothing signs unverifiably:
+the sweep logs and retries on the next tick, and web-outbound and web-inbound await their first
+signing-key load during module init, so a pod that starts too early fails to boot rather than serving
+with an empty key cache. The cost of getting the order wrong is a restart loop, not a silent one.
+
+Two smaller repairs went with it. `publishAndEnable` and the sweep now read from the **write**
+connection: the announcement arrives within milliseconds of onboarding's write, so a replica miss
+there presents as "no such tenant", and deciding to switch signing on from a replica risks reading a
+just-issued suspension as a tenant that was never activated. `publish` — the operator rotation path —
+reads from the write side too, where a stale key is precisely the peer-breaking mistake that path
+exists to avoid.
 
 ### Hub-facing mTLS — why it cannot be tested as things stand, 2026-09-08
 

@@ -2,9 +2,10 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {RollupLock} from '@core/audit/domain/component';
-import {ParticipantKeyRole} from '@core/participant/domain/model';
+import {ParticipantKey, ParticipantKeyRole} from '@core/participant/domain/model';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios} from '@shared/mcm-client';
+import {DbTarget} from '@shared/typeorm';
 
 /**
  * Publishes the public half of each Pivotal-fronted tenant's FSPIOP signing key to
@@ -66,7 +67,9 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
      * it when peers are ready to be told about a new key.
      */
     async publish(fspId: string): Promise<void> {
-        const key = await this.participantKeys.findByFspId(fspId);
+        // From the write side: a rotation is exactly when the replica's copy of this key is most
+        // likely to be the old one, and publishing that to MCM is the peer-breaking mistake.
+        const key = await this.participantKeys.findByFspId(fspId, DbTarget.Write);
 
         if (key == null || key.role !== ParticipantKeyRole.Self || key.jwsPublicKey == null) {
             throw new Error(`No self-role public key held for '${fspId}'.`);
@@ -90,7 +93,9 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
      */
     async publishAndEnable(fspId: string): Promise<void> {
 
-        const key = await this.participantKeys.findByFspId(fspId);
+        // From the write side: onboarding writes the row and announces it in the same breath, so
+        // the replica may not have it yet and a miss here reads as "no such tenant".
+        const key = await this.participantKeys.findByFspId(fspId, DbTarget.Write);
 
         if (key == null || key.role !== ParticipantKeyRole.Self || key.jwsPublicKey == null) {
             throw new Error(`No self-role public key held for '${fspId}'.`);
@@ -113,21 +118,59 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
             await this.mcm.publishAndVerifyJwsKey(fspId, key.jwsPublicKey);
         }
 
-        if (!key.jwsSignEnabled) {
-            key.jwsSignEnabled = true;
-            await this.participantKeys.save(key);
-
+        if (await this.activate(key)) {
             this.logger.log(`'${fspId}' is published to MCM and signing is now enabled.`);
         }
     }
 
-    /** Exposed for tests and for an operator-triggered pass. */
+    /**
+     * Switches signing on for a tenant MCM is confirmed to hold the key for, and records that it
+     * happened. Returns whether anything changed.
+     *
+     * The record is what separates a tenant that has never been activated from one that was
+     * activated and has since been suspended. Both sit at `jws_sign_enabled = 0`, and only the
+     * first is ours to act on: re-enabling the second would undo an operator's suspension within
+     * the hour and log it as routine.
+     *
+     * A tenant that is already signing but carries no timestamp — enabled by hand, before this was
+     * recorded — is stamped without touching the switch, so that a later suspension of it is
+     * respected too.
+     */
+    private async activate(key: ParticipantKey): Promise<boolean> {
+
+        if (key.jwsSignActivatedAt != null) {
+            return false;
+        }
+
+        key.jwsSignActivatedAt = new Date();
+
+        const wasOff = !key.jwsSignEnabled;
+        key.jwsSignEnabled = true;
+
+        await this.participantKeys.save(key);
+
+        return wasOff;
+    }
+
+    /**
+     * Brings every tenant to the state provisioning intended: key registered with MCM, and signing
+     * on unless someone decided otherwise.
+     *
+     * Both halves matter. Registering alone is what stranded tenants that missed the announcement —
+     * their key reached MCM, so each later pass counted them "already correct" and moved on while
+     * they never signed, and nothing in the sweep's output said so.
+     *
+     * Exposed for tests and for an operator-triggered pass.
+     */
     async reconcile(): Promise<JwsKeyPublishScheduler.Result> {
-        const tenants = (await this.participantKeys.findAll())
+        // From the write side: this pass decides whether to switch signing on, and a suspension
+        // issued moments ago must not be read as a tenant that was never activated.
+        const tenants = (await this.participantKeys.findAll(DbTarget.Write))
             .filter(key => key.role === ParticipantKeyRole.Self && key.jwsPublicKey != null);
 
         let published = 0;
         let alreadyCorrect = 0;
+        let activated = 0;
         let diverged = 0;
         let failed = 0;
 
@@ -139,30 +182,42 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
                 const storedKey = stored?.publicKey;
 
                 if (storedKey != null && storedKey.trim().length > 0) {
-                    if (JwsKeyPublishScheduler.samePem(storedKey, tenant.jwsPublicKey!)) {
-                        alreadyCorrect += 1;
+                    if (!JwsKeyPublishScheduler.samePem(storedKey, tenant.jwsPublicKey!)) {
+                        // Deliberately not resolved here. Either a rotation is half-done and
+                        // finishing it automatically would cut off peers still holding the
+                        // old key, or someone else wrote to this tenant — and both want a
+                        // person, not a timer. Signing stays off: which key is current is
+                        // precisely what is in doubt.
+                        diverged += 1;
+
+                        this.logger.warn(
+                            `MCM holds a different signing key for '${fspId}' than Pivotal does. `
+                            + 'Not overwriting: peers hold one key each and cannot try both, so replacing '
+                            + 'it breaks every peer that has not re-pulled. Resolve this deliberately.',
+                        );
                         continue;
                     }
 
-                    // Deliberately not resolved here. Either a rotation is half-done and
-                    // finishing it automatically would cut off peers still holding the
-                    // old key, or someone else wrote to this tenant — and both want a
-                    // person, not a timer.
-                    diverged += 1;
-
-                    this.logger.warn(
-                        `MCM holds a different signing key for '${fspId}' than Pivotal does. `
-                        + 'Not overwriting: peers hold one key each and cannot try both, so replacing '
-                        + 'it breaks every peer that has not re-pulled. Resolve this deliberately.',
-                    );
-                    continue;
+                    alreadyCorrect += 1;
+                } else {
+                    // MCM has nothing for this tenant, so there is no peer holding an older
+                    // key to break. Filling the gap is safe and is what unblocks a peer
+                    // turning on verification.
+                    await this.mcm.publishAndVerifyJwsKey(fspId, tenant.jwsPublicKey!);
+                    published += 1;
                 }
 
-                // MCM has nothing for this tenant, so there is no peer holding an older
-                // key to break. Filling the gap is safe and is what unblocks a peer
-                // turning on verification.
-                await this.mcm.publishAndVerifyJwsKey(fspId, tenant.jwsPublicKey!);
-                published += 1;
+                // MCM is now confirmed to hold this tenant's key, whether this pass put it there or
+                // found it already registered. Either way the precondition for signing is met, and
+                // a tenant still waiting to be switched on is one the announcement never reached.
+                if (await this.activate(tenant)) {
+                    activated += 1;
+
+                    this.logger.log(
+                        `'${fspId}' was published to MCM but never switched on; signing is now `
+                        + 'enabled. Its provisioning announcement was missed.',
+                    );
+                }
             } catch (error: unknown) {
                 // One tenant failing must not stop the rest; the next tick retries.
                 failed += 1;
@@ -172,7 +227,7 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
             }
         }
 
-        return {tenants: tenants.length, published, alreadyCorrect, diverged, failed};
+        return {tenants: tenants.length, published, alreadyCorrect, activated, diverged, failed};
     }
 
     /** PEMs differ harmlessly in trailing whitespace; compare the content. */
@@ -197,11 +252,11 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
         try {
             const result = await this.reconcile();
 
-            if (result.published > 0 || result.diverged > 0 || result.failed > 0) {
+            if (result.published > 0 || result.activated > 0 || result.diverged > 0 || result.failed > 0) {
                 this.logger.log(
-                    `JWS key publish: ${result.published} published, ${result.alreadyCorrect} already `
-                    + `correct, ${result.diverged} diverged, ${result.failed} failed, `
-                    + `of ${result.tenants} tenants.`,
+                    `JWS key publish: ${result.published} published, ${result.activated} activated, `
+                    + `${result.alreadyCorrect} already correct, ${result.diverged} diverged, `
+                    + `${result.failed} failed, of ${result.tenants} tenants.`,
                 );
             }
         } catch (error: unknown) {
@@ -220,6 +275,8 @@ export namespace JwsKeyPublishScheduler {
         tenants: number;
         published: number;
         alreadyCorrect: number;
+        /** Tenants whose signing this pass switched on, having found MCM already holding their key. */
+        activated: number;
         diverged: number;
         failed: number;
     }
