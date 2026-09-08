@@ -193,19 +193,57 @@ connecting to it takes `dev2-hub` off the routing table):
   nobody**. Leg #4 therefore cannot be rehearsed by any participant until the Hub's egress is
   configured, which is Hub-side work.
 
-**Recommended shape, drafted but not applied.** A parallel `extapi-mtls` host on the existing
-`interop-gateway` — a `servers[]` entry, not a new process, selected by SNI on the same pods and
-port — anchored only on `pki_hub_client`, plus the host added to `interop-vs.spec.hosts` so the
-existing routes apply. External rather than internal gateway, because the point is to rehearse the
-separated deployment and that is the path a remote Pivotal would take.
+**Recommended shape — written and rendering, not yet applied to the cluster, 2026-09-08.** A
+parallel `extapi-mtls` host on the existing `interop-gateway` — a `servers[]` entry, not a new
+process, selected by SNI on the same pods and port — anchored only on `pki_hub_client`, plus the
+host added to `interop-vs.spec.hosts` so the existing routes apply. External rather than internal
+gateway, because the point is to rehearse the separated deployment and that is the path a remote
+Pivotal would take. Six files in `dev2-hub`, no application code.
 
-**Two gaps that surfaced from the draft.** The `interop-jwt` AuthorizationPolicy is scoped by
-hostname and requires a bearer token; **Pivotal has never obtained one**, because it has never passed
-through that gateway. So either the rehearsal host stays outside the policy, or Pivotal gains OAuth
-client credentials against the Hub's Keycloak the way the banks have `OAUTH_CLIENT_KEY: dfsp-jwt` —
-and nothing in Pivotal does that today. Separately, the gateway's server certificate must cover the
-new hostname, and `FSPIOP_MTLS_CA` or `FSPIOP_MTLS_CA_PATH` must carry whatever signed it, which has
-never been set because there has never been a server certificate to verify.
+**The credential name is load-bearing.** Istio derives a MUTUAL server's trust anchor by appending
+`-cacert` to its `credentialName`, so two hosts sharing a credential share an anchor. The
+DFSP-facing gateway already runs MUTUAL on `lets-enc-external-tls` anchored on the DFSP CA. Reusing
+that credential here would have let a DFSP's certificate authenticate on the hub-facing host and the
+reverse — collapsing the two trust domains that `pivotal-trust-pki.yaml` keeps apart precisely so a
+DFSP cannot transact as us. Hence a credential of its own, and hence a server certificate of its
+own: `extapi-mtls-certificate.yaml`, from the same platform PKI that signs the host beside it.
+Registered in `kustomization.yaml`'s `resources:`, without which it would be a dead file in the way
+`royalbank-dfsp-clientcert.yaml` is.
+
+**A chart gap that only appeared on inspection.** The chart mounts each workload's own hub-client
+certificate and sets two paths to it, but has no provision for the CA used to check the *switch* —
+there has never been a server certificate to check. Supplying it as the inline `FSPIOP_MTLS_CA`
+would have covered the two Node services and silently missed the four Java connectors, which read
+the anchor from disk only and **build their trust store from that anchor alone**: with none
+configured they trust nothing, so even a publicly-trusted certificate fails. That also closes off
+the shortcut of taking the server certificate from the `letsencrypt` ClusterIssuer to avoid
+configuring a CA at all. So the anchor is a mounted ConfigMap and `FSPIOP_MTLS_CA_PATH`, which is
+the one form both languages read, and it reaches exactly the five workloads that call the Hub.
+
+**The Ory decision, taken.** The rehearsal host stays outside `interop-jwt`. The policy is
+`action: CUSTOM`, so a host it does not name never reaches the provider — and naming it would reject
+every Pivotal request, since Pivotal has never obtained a bearer token and nothing in it does OAuth
+against the Hub's Keycloak the way the banks do with `OAUTH_CLIENT_KEY: dfsp-jwt`. The consequence is
+recorded rather than waved through: the new host routes to the same backends with the client
+certificate as its only control, on a public address. **Confirm the gateway is genuinely demanding a
+certificate before the DNS record exists, not after** — the record is created by the
+`interop-vs.spec.hosts` line, so ordering it last is free. A source-scoped AuthorizationPolicy that
+narrows it without a token is drafted in place, commented, because the egress address has to be read
+from the cluster rather than guessed.
+
+**The SNI overlap is answered by precedent, not by argument.** `extapi-mtls` also matches the
+wildcard `*.dev2` SIMPLE server on the same pods, and landing on that chain would mean no client
+certificate is ever requested — mTLS that silently is not. `pivotal.dev2` already runs MUTUAL
+alongside that same wildcard and works, so exact-over-wildcard holds here. Still worth one
+`config_dump` before trusting a green test.
+
+**One prerequisite the draft did not name.** Pivotal runs in this cluster, so calling the switch's
+public address loops out to the load balancer and back, which on GKE frequently fails as a timeout.
+A `ServiceEntry` resolving the name to the in-cluster ingress gateway keeps the address, SNI and
+certificate name intact while skipping the round trip. Written but deliberately left out of the
+change: the round trip is what a remote Pivotal would actually do, so it is worth one `curl` from a
+web-outbound pod before deciding to skip it. **Test that first — if it fails, none of the
+certificate work is worth doing in this shape.**
 
 ### Pending actions
 
