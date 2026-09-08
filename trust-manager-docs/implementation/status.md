@@ -10,13 +10,14 @@ Design lives in [`design/`](../design/); the spine is
 [`environment-and-onboarding.md`](../runbooks/environment-and-onboarding.md)** — the operator steps,
 in order, with the ones that fail silently called out.
 
-**Last verified against code:** 2026-09-04.
+**Last verified against code:** 2026-09-08.
 
 ---
 
 ## Where the work actually sits — read this first
 
-**Leg #1 is live in dev2. Every other leg in scope has its code written.** JWS was
+**Legs #1, #2 and #3 are live in dev2 — DFSP-facing mutual TLS and hub-facing JWS both proven
+against a real Hub. What is left on the hub-facing side is transport, not signing.** JWS was
 complete across all three repositories; hub-facing mTLS followed on 2026-09-02; the DFSP-facing leg
 — issuance, operator screens and request-time enforcement — landed 2026-09-03/04 and is the first
 to have been exercised against a real mutual-TLS handshake through an Istio gateway.
@@ -93,6 +94,96 @@ Operator steps are in
 [`environment-and-onboarding.md`](../runbooks/environment-and-onboarding.md).
 
 ---
+
+### Proven in dev2 — hub-facing JWS, 2026-09-07
+
+**Both hub-facing signing legs are live and confirmed at the Hub, not from our own logs.**
+
+`DemoDFSP1 → DemoDFSP2`, USD 10, `01M1XGJH7C5EJN0QN5Z7BXV2XT`, **COMMITTED**.
+
+| Leg | Evidence, from the Hub's logs |
+| --- | --- |
+| #2 web-outbound → Hub | `POST /quotes` and `POST /transfers`, `fspiop-source: DemoDFSP1`, `user-agent: axios/1.13.5`, carrying `fspiop-signature` with matching `fspiop-uri` and `fspiop-http-method` |
+| #3 connector → Hub | `PUT /quotes/{id}` and `PUT /transfers/{id}`, `fspiop-source: DemoDFSP2`, `user-agent: okhttp/4.10.0`, signed |
+
+The protected header decodes to the expected `{alg: RS256, FSPIOP-URI, FSPIOP-HTTP-Method,
+FSPIOP-Source, FSPIOP-Destination, Date}`. `GET /parties` went out unsigned, as it must.
+
+DFSP-facing mTLS was exercised in the same window: two impersonation attempts with DemoDFSP1's
+genuine certificate claiming `fspiop-source: DemoDFSP3` and `DemoDFSP2` were both refused, and the
+correctly-paired request went through.
+
+**`FSPIOP_USE_MUTUAL_TLS` is still false.** Hub-facing *signing* is done; hub-facing *transport* is
+not, and the survey below says why.
+
+### Three Vault defects found while getting there — two fixed, 2026-09-07
+
+**Token lifetime was never tracked. Fixed.** `VaultClient` cached the token from login and only
+dropped it after a call failed, so once the lease expired every call failed. Reads degraded quietly
+by reusing the last key; **certificate issuance and key provisioning had nothing to fall back on and
+stopped entirely** — web-pivotal had been unable to issue a certificate for roughly thirteen hours,
+returning a 403 that reads exactly like a missing policy. Tokens now renew ahead of the lease and
+retry once on rejection, and a second rejection says explicitly that it is the policy rather than the
+credential.
+
+**The KV engine was version 1. Fixed by moving to a v2 mount.** Both clients speak v2 — they insert
+`/data/` into the path and nest the payload under `data`. Against a v1 mount that round-trips
+perfectly while storing everything at a literal `data/...` path, so the services worked and no
+`vault kv` command addressed the same place. A key written by hand was invisible to the service, and
+the service's own keys were invisible to the CLI; nothing reported a fault. Pivotal now has its own
+`pivotal-kv` v2 mount, the four signing keys were migrated, and the TypeScript client refuses a
+version 1 mount rather than operating on it silently. The Java client was left alone deliberately: it
+only reads, so a wrong mount there already fails loudly.
+
+**The hourly reconcile publishes to MCM without enabling signing. Not fixed.** Only the JetStream
+path calls `publishAndEnable`. A tenant that misses the event has its key published and
+`jws_sign_enabled` left at 0 — permanently, since the sweep will thereafter report it as "already
+correct". `DemoDFSP3` is in exactly that state. This contradicts what `jws-tenant-provisioning.md`
+claims about the sweep being "an hour late, but not broken".
+
+### Hub-facing mTLS — why it cannot be tested as things stand, 2026-09-08
+
+**Nothing on this path uses TLS at all.** Pivotal reaches the Hub on `http://moja-*.mojaloop`
+service names and the Hub reaches web-inbound on `http://web-inbound.pivotal.svc.cluster.local:3201`.
+`FSPIOP_USE_MUTUAL_TLS=true` over `http://` does nothing — there is no handshake to make mutual.
+Istio's mesh mTLS has been quietly covering that hop, which is why nobody noticed, and it is exactly
+the protection that disappears when the two are deployed separately.
+
+**The Pivotal half is ready.** Client certificates from `pki_hub_client` are issued and mounted on
+web-outbound and all four connectors, with reload-on-renewal built.
+
+**Surveyed the PM4ML side** (`dev2-pm4ml`, a separate cluster reachable over WireGuard — note that
+connecting to it takes `dev2-hub` off the routing table):
+
+- Both banks already run `OUTBOUND_MUTUAL_TLS_ENABLED: true` and receive `ca`, `cert` and `key` over
+  the PM4ML control channel. They would **not** break if `extapi` were flipped to `MUTUAL`. An
+  earlier note in this file said they would; that was wrong.
+- `royalbank-dfsp-clientcert.yaml` exists in the repo but is absent from `kustomization.yaml`'s
+  `resources:`, so that Secret is never created. Dead file.
+- **Their certificates cannot identify them.** Both carry
+  `subject=O=ThitsaWorks, OU=Platform Engineering Team, CN=dev2.wynepayhubsanbox-pre.com` with
+  `SAN=DNS:dev2.wynepayhubsanbox-pre.com` and an **empty issuer DN**; only the serial differs, and
+  both chain to the same CA. Requiring these on the shared host would verify a chain while
+  authenticating "someone who enrolled in dev2" — a control that looks like authentication and is
+  not. The empty issuer also violates RFC 5280 and is where Envoy's verification path is most likely
+  to object.
+- `INBOUND_MUTUAL_TLS_ENABLED: false` on both banks, so **the Hub presents client certificates to
+  nobody**. Leg #4 therefore cannot be rehearsed by any participant until the Hub's egress is
+  configured, which is Hub-side work.
+
+**Recommended shape, drafted but not applied.** A parallel `extapi-mtls` host on the existing
+`interop-gateway` — a `servers[]` entry, not a new process, selected by SNI on the same pods and
+port — anchored only on `pki_hub_client`, plus the host added to `interop-vs.spec.hosts` so the
+existing routes apply. External rather than internal gateway, because the point is to rehearse the
+separated deployment and that is the path a remote Pivotal would take.
+
+**Two gaps that surfaced from the draft.** The `interop-jwt` AuthorizationPolicy is scoped by
+hostname and requires a bearer token; **Pivotal has never obtained one**, because it has never passed
+through that gateway. So either the rehearsal host stays outside the policy, or Pivotal gains OAuth
+client credentials against the Hub's Keycloak the way the banks have `OAUTH_CLIENT_KEY: dfsp-jwt` —
+and nothing in Pivotal does that today. Separately, the gateway's server certificate must cover the
+new hostname, and `FSPIOP_MTLS_CA` or `FSPIOP_MTLS_CA_PATH` must carry whatever signed it, which has
+never been set because there has never been a server certificate to verify.
 
 ### Pending actions
 
@@ -368,7 +459,13 @@ explain why #2/#4 were *correction* work rather than greenfield.
 **JWS signing and the mTLS client path are both complete on this leg. Provisioning a signing tenant
 is not** — see below. What otherwise remains is enablement.
 
-#### No supported way to create a signing tenant — found in dev2, 2026-09-06
+#### No supported way to create a signing tenant — found in dev2, 2026-09-06, CLOSED 2026-09-07
+
+**Resolved.** Onboarding now provisions into Vault, announces over JetStream, and trust-manager
+publishes and enables. Four tenants are live on it. The account below is kept because the failure
+shape is instructive, not because it is still true — with one exception: the reconcile still does not
+enable, which is recorded above.
+
 
 Signing reads `participant_key` rows where `role = self`. In dev2 there are none, and there is no
 route to creating one that does not put a private key in MySQL. Three separate gaps make one chain:
