@@ -5,9 +5,12 @@ import {TransactionRollupRepository} from '../../../../../packages/core/audit/do
 describe('TransactionRollupRepository dashboard projections', () => {
 
     it('returns committed value grouped by use case and FSP amounts separated by currency', async () => {
+        const queries: string[] = [];
         const readRepository = {
             async query(sql: string): Promise<Record<string, unknown>[]> {
-                if (sql.includes('sub_scenario')) {
+                queries.push(sql);
+
+                if (sql.includes('SELECT currency,')) {
                     return [
                         {currency: 'USD', sub_scenario: 'PERSON_TO_PERSON', total_amount: '12.50', txn_count: '2'},
                     ];
@@ -39,5 +42,42 @@ describe('TransactionRollupRepository dashboard projections', () => {
             },
             {fspId: 'wallet2', count: 4, amounts: []},
         ]);
+        assert.ok(queries.every((sql) => sql.includes('FROM transaction_hourly_rollup')));
+        assert.ok(queries.every((sql) => !sql.includes('FROM transactions\n')));
+    });
+
+    it('reads exact raw boundary intervals around full rollup hours', async () => {
+        let capturedSql = '';
+        let capturedParams: unknown[] = [];
+        const readRepository = {
+            async query(sql: string, params: unknown[]): Promise<Record<string, unknown>[]> {
+                capturedSql = sql;
+                capturedParams = params;
+                return [];
+            },
+        };
+        const repository = new TransactionRollupRepository({} as never, readRepository as never);
+        const from = new Date('2026-08-01T17:30:00.000Z');
+        const to = new Date('2026-08-02T17:30:00.000Z');
+
+        await repository.getTimeBuckets('wallet1', from, to);
+
+        assert.match(capturedSql, /FROM transaction_hourly_rollup/);
+        assert.equal(capturedSql.match(/FROM transactions\n/g)?.length, 2);
+        assert.equal(capturedSql.match(/transaction_started_at >= \? AND transaction_started_at < \?/g)?.length, 2);
+        assert.deepEqual(
+            capturedParams.filter((value): value is Date => value instanceof Date).map((value) => value.toISOString()),
+            [
+                '2026-08-01T18:00:00.000Z',
+                '2026-08-02T17:00:00.000Z',
+                '2026-08-01T17:30:00.000Z',
+                '2026-08-01T17:30:00.000Z',
+                '2026-08-01T18:00:00.000Z',
+                '2026-08-02T17:00:00.000Z',
+                '2026-08-02T17:00:00.000Z',
+                '2026-08-02T17:30:00.000Z',
+            ],
+        );
+        assert.equal(capturedParams.filter((value) => value === 'wallet1').length, 6);
     });
 });
