@@ -219,15 +219,17 @@ export class TransactionRollupRepository {
     ): Promise<TransactionRollupRepository.FspCount[]> {
         const scope = TransactionRollupRepository.scopeClause(scopeFspId);
         // `leg` is a fixed enum literal (never user input), safe to interpolate as a column.
+        // Counts and values use the same committed-or-disputed population.
         // Keep amounts separated by currency; summing unlike currencies would be misleading.
         const rows = await this.readRepository.query(
             `SELECT ${leg} AS fsp_id,
                     currency,
-                    COALESCE(SUM(txn_count), 0) AS count,
+                    COALESCE(SUM(committed_count), 0) AS count,
                     COALESCE(SUM(committed_amount), 0) AS total_amount
              FROM transaction_hourly_rollup
              WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
-             GROUP BY ${leg}, currency`,
+             GROUP BY ${leg}, currency
+             HAVING count > 0`,
             [from, to, ...scope.params],
         );
 
