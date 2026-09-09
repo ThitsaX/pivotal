@@ -178,6 +178,10 @@ function formatAmount(value: string): string {
     return `${intPart}.${dec}`;
 }
 
+function isZeroAmount(value: string): boolean {
+    return /^[+-]?0+(?:\.0+)?$/.test(value.trim());
+}
+
 function formatUseCase(value: string): string {
     if (value === 'UNSPECIFIED') {
         return 'Unspecified';
@@ -433,7 +437,8 @@ function fspOptions(leg: FspLeg, color: string, toColor: string): ApexOptions {
                 formatter: (value: number, context?: {dataPointIndex?: number}): string => {
                     // ApexCharts may retain this formatter while updating the series/options.
                     // Resolve current rows at hover time instead of closing over the initial range.
-                    const amounts = fspRows(leg)[context?.dataPointIndex ?? -1]?.amounts ?? [];
+                    const amounts = (fspRows(leg)[context?.dataPointIndex ?? -1]?.amounts ?? [])
+                        .filter((amount) => !isZeroAmount(amount.totalAmount));
                     const amountLabel = amounts.length === 0
                         ? 'No committed value'
                         : amounts.map((amount) => `${amount.currency} ${formatAmount(amount.totalAmount)}`).join(' · ');
