@@ -32,6 +32,7 @@ function request(): SendMoneyRequest {
     value.amount = '100';
     value.transactionType = TransactionScenario.Transfer;
     value.subScenario = 'PERSON_TO_BUSINESS';
+    value.note = '';
     return value;
 }
 
@@ -106,6 +107,7 @@ describe('PostSendMoneyHandler optional payee FSP', () => {
 
         assert.equal(requestHeaders?.[FspiopHeaders.Names.FSPIOP_DESTINATION], undefined);
         assert.equal((cachedRequest as {to: FspParty}).to.fspId, 'resolvedfsp');
+        assert.equal((cachedRequest as {note?: string}).note, undefined);
         assert.equal(output.response.to?.fspId, 'resolvedfsp');
         assert.equal(auditMessages.length, 2);
         assert.equal(auditMessages[0]?.content.payeeFsp, '');
