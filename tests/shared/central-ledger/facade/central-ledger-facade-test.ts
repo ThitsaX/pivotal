@@ -23,6 +23,9 @@ describe('CentralLedgerFacade', () => {
         let capturedName: string | undefined;
         let capturedBody: {currency?: Currency; type?: string} | undefined;
         const centralLedgerAxios = {
+            async getParticipants(): Promise<Array<{name: string}>> {
+                return [{name: 'Hub'}];
+            },
             async createParticipantAccounts(
                 name: string,
                 body: {currency?: Currency; type?: string},
@@ -44,6 +47,9 @@ describe('CentralLedgerFacade', () => {
         let capturedName: string | undefined;
         let capturedBody: {currency?: Currency; type?: string} | undefined;
         const centralLedgerAxios = {
+            async getParticipants(): Promise<Array<{name: string}>> {
+                return [{name: 'Hub'}];
+            },
             async createParticipantAccounts(
                 name: string,
                 body: {currency?: Currency; type?: string},
@@ -95,9 +101,14 @@ describe('CentralLedgerFacade', () => {
         assert.equal(capturedBody?.settlementAccountType, 'SETTLEMENT');
     });
 
-    it('should add the Hub currency for the given currency', async () => {
+    it('should add the Hub currency using the exact participant name from Central Ledger', async () => {
         const calls: string[] = [];
+        let participantLookups = 0;
         const centralLedgerAxios = {
+            async getParticipants(): Promise<Array<{name: string}>> {
+                participantLookups += 1;
+                return [{name: 'hub'}];
+            },
             async createParticipantAccounts(
                 name: string,
                 body: {currency?: Currency; type?: string},
@@ -113,10 +124,34 @@ describe('CentralLedgerFacade', () => {
         await facade.addHubCurrency(Currency.Usd);
 
         assert.deepEqual(calls, [
-            'Hub:HUB_MULTILATERAL_SETTLEMENT:USD',
-            'Hub:HUB_RECONCILIATION:USD',
+            'hub:HUB_MULTILATERAL_SETTLEMENT:USD',
+            'hub:HUB_RECONCILIATION:USD',
             'DEFERREDNETUSD:USD',
         ]);
+        assert.equal(participantLookups, 1);
+    });
+
+    it('should identify a custom Hub participant by its existing Hub account', async () => {
+        const participantNames: string[] = [];
+        const centralLedgerAxios = {
+            async getParticipants(): Promise<Array<{name: string; accounts: Array<{ledgerAccountType: string}>}>> {
+                return [{
+                    name: 'switch',
+                    accounts: [{ledgerAccountType: 'HUB_RECONCILIATION'}],
+                }];
+            },
+            async createParticipantAccounts(name: string): Promise<void> {
+                participantNames.push(name);
+            },
+            async createSettlementModel(): Promise<void> {
+                // No-op for this participant-name resolution test.
+            },
+        };
+        const facade = new CentralLedgerFacade(centralLedgerAxios as never);
+
+        await facade.addHubCurrency(Currency.Usd);
+
+        assert.deepEqual(participantNames, ['switch', 'switch']);
     });
 
     it('should list all participants via central ledger axios', async () => {
