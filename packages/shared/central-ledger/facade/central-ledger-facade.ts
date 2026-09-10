@@ -117,11 +117,19 @@ export class CentralLedgerFacade {
     }
 
     async createHubMultilateralSettlementAccount(currency: FspiopCurrency): Promise<void> {
-        await this.createHubAccount(currency, CentralLedgerFacade.HUB_MULTILATERAL_SETTLEMENT_ACCOUNT_TYPE);
+        await this.createHubAccount(
+            await this.resolveHubParticipantName(),
+            currency,
+            CentralLedgerFacade.HUB_MULTILATERAL_SETTLEMENT_ACCOUNT_TYPE,
+        );
     }
 
     async createHubReconciliationAccount(currency: FspiopCurrency): Promise<void> {
-        await this.createHubAccount(currency, CentralLedgerFacade.HUB_RECONCILIATION_ACCOUNT_TYPE);
+        await this.createHubAccount(
+            await this.resolveHubParticipantName(),
+            currency,
+            CentralLedgerFacade.HUB_RECONCILIATION_ACCOUNT_TYPE,
+        );
     }
 
     async createDeferredNetSettlementModel(currency: FspiopCurrency): Promise<void> {
@@ -142,8 +150,18 @@ export class CentralLedgerFacade {
 
     async addHubCurrency(currency: FspiopCurrency): Promise<void> {
         try {
-            await this.createHubMultilateralSettlementAccount(currency);
-            await this.createHubReconciliationAccount(currency);
+            const hubParticipantName = await this.resolveHubParticipantName();
+
+            await this.createHubAccount(
+                hubParticipantName,
+                currency,
+                CentralLedgerFacade.HUB_MULTILATERAL_SETTLEMENT_ACCOUNT_TYPE,
+            );
+            await this.createHubAccount(
+                hubParticipantName,
+                currency,
+                CentralLedgerFacade.HUB_RECONCILIATION_ACCOUNT_TYPE,
+            );
             await this.createDeferredNetSettlementModel(currency);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -231,12 +249,13 @@ export class CentralLedgerFacade {
     }
 
     private async createHubAccount(
+        hubParticipantName: string,
         currency: FspiopCurrency,
         ledgerAccountType: string,
     ): Promise<void> {
         try {
             await this.centralLedgerAxios.createParticipantAccounts(
-                CentralLedgerFacade.HUB_NAME,
+                hubParticipantName,
                 CentralLedgerFacade.toCreateHubAccountRequest(currency, ledgerAccountType),
             );
         } catch (error) {
@@ -248,6 +267,26 @@ export class CentralLedgerFacade {
 
             throw error;
         }
+    }
+
+    private async resolveHubParticipantName(): Promise<string> {
+        const participants = await this.centralLedgerAxios.getParticipants();
+        const hubParticipant = participants.find((participant) => {
+            if (participant.name.toLowerCase() === CentralLedgerFacade.HUB_NAME.toLowerCase()) {
+                return true;
+            }
+
+            return participant.accounts?.some((account) => {
+                return account.ledgerAccountType === CentralLedgerFacade.HUB_MULTILATERAL_SETTLEMENT_ACCOUNT_TYPE
+                    || account.ledgerAccountType === CentralLedgerFacade.HUB_RECONCILIATION_ACCOUNT_TYPE;
+            }) ?? false;
+        });
+
+        if (hubParticipant == null) {
+            throw new CentralLedgerException('Hub participant was not found in Central Ledger.');
+        }
+
+        return hubParticipant.name;
     }
 
     private async resolvePositionAccount(

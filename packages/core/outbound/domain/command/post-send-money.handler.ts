@@ -93,7 +93,7 @@ export class PostSendMoneyHandler
         transferRequest.amount = request.amount;
         transferRequest.transactionType = request.transactionType;
         transferRequest.subScenario = request.subScenario;
-        transferRequest.note = request.note;
+        transferRequest.note = request.note?.trim().length ? request.note : undefined;
         transferRequest.supportedCurrencies = callback.party.supportedCurrencies;
 
         return transferRequest;
