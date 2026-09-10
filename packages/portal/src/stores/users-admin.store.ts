@@ -148,7 +148,7 @@ export const usersAdminStore = {
 
         try {
             const roles = await apiClient.get<Array<AdminRoleSummary & {description?: string | null; isSystem: boolean}>>(
-                '/admin/roles',
+                '/admin/users/assignable-roles',
             );
             state.roles = roles.map((r) => ({id: r.id, code: r.code, name: r.name, scope: r.scope}));
             state.rolesLoaded = true;

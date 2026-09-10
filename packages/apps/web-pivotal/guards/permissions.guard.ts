@@ -27,7 +27,7 @@ export class PermissionsGuard implements CanActivate {
             return true;
         }
 
-        const requiredPermission = this.reflector.getAllAndOverride<string>(REQUIRES_PERMISSION_KEY, [
+        const requiredPermission = this.reflector.getAllAndOverride<string | string[]>(REQUIRES_PERMISSION_KEY, [
             context.getHandler(),
             context.getClass(),
         ]);
@@ -48,7 +48,9 @@ export class PermissionsGuard implements CanActivate {
             throw new ForbiddenException({code: 'AUTH_FORBIDDEN', message: 'Permission denied.'});
         }
 
-        if (!claims.permissions.includes(requiredPermission)) {
+        const requiredPermissions = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+
+        if (!requiredPermissions.some((permission) => claims.permissions.includes(permission))) {
             throw new ForbiddenException({code: 'AUTH_FORBIDDEN', message: 'Permission denied.'});
         }
 

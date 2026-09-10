@@ -3,7 +3,13 @@ import {describe, it} from 'node:test';
 import {BadRequestException} from '@nestjs/common';
 import {CommandBus} from '@nestjs/cqrs';
 import {Participant, ParticipantRepository} from '../../../../../packages/core/participant/domain';
-import {AccessTokenClaims, RoleRepository, UserRepository} from '../../../../../packages/core/auth/domain';
+import {
+    AccessTokenClaims,
+    RolePermissionRepository,
+    RoleRepository,
+    UserManagementPolicy,
+    UserRepository,
+} from '../../../../../packages/core/auth/domain';
 import {CreateUserCommand, UpdateUserCommand} from '../../../../../packages/core/auth/domain/command';
 import {DFSP_USER_ROLE_CODE, Role, User} from '../../../../../packages/core/auth/domain/model';
 import {UsersAdminController} from '../../../../../packages/apps/web-pivotal/controllers/admin/users.controller';
@@ -55,10 +61,29 @@ function makeController(state: State): UsersAdminController {
             },
         } as unknown as RoleRepository,
         {
+            async countByRoleId(): Promise<number> {
+                return 0;
+            },
+        } as unknown as RolePermissionRepository,
+        {
             async findByName(name: string): Promise<Participant | null> {
                 return state.participantsByName.get(name) ?? null;
             },
         } as unknown as ParticipantRepository,
+        {
+            async resolveManagementContext(): Promise<unknown> {
+                return {globalManager: true, managementFspId: null};
+            },
+            resolveCreateFspId(_context: unknown, requestedFspId: string | null): string | null {
+                return requestedFspId;
+            },
+            assertCanManageTarget(): void {
+                return;
+            },
+            async canAssignRole(): Promise<boolean> {
+                return true;
+            },
+        } as unknown as UserManagementPolicy,
     );
 }
 
@@ -78,7 +103,7 @@ describe('UsersAdminController', () => {
             email: 'dfsp@example.com',
             roleId: dfspRole.id,
             fspId: '  wallet1  ',
-        });
+        }, adminClaims);
 
         assert.equal((state.commandInputs[0] as CreateUserCommand.Input).fspId, 'wallet1');
     });
@@ -96,7 +121,7 @@ describe('UsersAdminController', () => {
                 email: 'dfsp@example.com',
                 roleId: dfspRole.id,
                 fspId: 'missing-fsp',
-            }),
+            }, adminClaims),
             (error: unknown) => error instanceof BadRequestException
                 && (error.getResponse() as {code: string}).code === 'ADMIN_USER_FSP_ID_NOT_FOUND',
         );

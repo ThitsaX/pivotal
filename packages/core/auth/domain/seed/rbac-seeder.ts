@@ -4,6 +4,7 @@ import {Inject, Injectable, Logger} from '@nestjs/common';
 import {DbTarget} from '@shared/typeorm';
 import {
     ADMIN_ROLE_CODE,
+    DFSP_ADMIN_ROLE_CODE,
     DFSP_USER_ROLE_CODE,
     Menu,
     MenuPermission,
@@ -58,8 +59,9 @@ interface MenuSeed {
 }
 
 const ROLE_SEEDS: RoleSeed[] = [
-    {code: ADMIN_ROLE_CODE,     name: 'System Administrator', scope: 'HUB',  description: 'Full access to all hub operations.'},
-    {code: DFSP_USER_ROLE_CODE, name: 'DFSP Operator',        scope: 'DFSP', description: 'Operator scoped to a single FSP by fsp_id.'},
+    {code: ADMIN_ROLE_CODE,      name: 'System Administrator', scope: 'HUB',  description: 'Full access to all hub operations.'},
+    {code: DFSP_ADMIN_ROLE_CODE, name: 'DFSP Administrator',   scope: 'DFSP', description: 'Administrator scoped to manage users within a single FSP.'},
+    {code: DFSP_USER_ROLE_CODE,  name: 'DFSP Operator',        scope: 'DFSP', description: 'Operator scoped to a single FSP by fsp_id.'},
 ];
 
 const PERMISSION_SEEDS: PermissionSeed[] = [
@@ -75,12 +77,19 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.AUDIT_TRANSACTIONS_VIEW,         scope: 'BOTH', description: 'View a single audited transaction by transfer ID.'},
     {keyName: PermissionKey.AUDIT_DASHBOARD_VIEW,            scope: 'BOTH', description: 'View the transaction statistics dashboard.'},
     {keyName: PermissionKey.ADMIN_USERS_MANAGE,              scope: 'HUB',  description: 'Manage portal user accounts (list, create, update, reset password, deactivate).'},
+    {keyName: PermissionKey.ADMIN_DFSP_USERS_MANAGE,         scope: 'DFSP', description: 'Manage portal user accounts within the same FSP.'},
     {keyName: PermissionKey.ADMIN_ROLES_MANAGE,              scope: 'HUB',  description: 'Manage portal roles and their granted permissions.'},
     {keyName: PermissionKey.ADMIN_PERMISSIONS_LIST,          scope: 'HUB',  description: 'Browse the read-only permission catalogue.'},
 ];
 
 const ROLE_GRANTS: Record<string, string[]> = {
     [ADMIN_ROLE_CODE]: PERMISSION_SEEDS.map((p) => p.keyName),
+    [DFSP_ADMIN_ROLE_CODE]: [
+        PermissionKey.AUDIT_TRANSACTIONS_LIST,
+        PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+        PermissionKey.AUDIT_DASHBOARD_VIEW,
+        PermissionKey.ADMIN_DFSP_USERS_MANAGE,
+    ],
     [DFSP_USER_ROLE_CODE]: [
         PermissionKey.AUDIT_TRANSACTIONS_LIST,
         PermissionKey.AUDIT_TRANSACTIONS_VIEW,
@@ -243,6 +252,15 @@ export class RbacSeeder {
             await this.menuPermissionRepository.save(new MenuPermission(menu.id, permission.id));
             inserted += 1;
         }
+
+        const usersMenu = await this.menuRepository.findByMenuKey('admin-users', DbTarget.Write);
+        const dfspUsersPermission = await this.permissionRepository.findByKeyName(PermissionKey.ADMIN_DFSP_USERS_MANAGE, DbTarget.Write);
+
+        if (usersMenu != null && dfspUsersPermission != null) {
+            await this.menuPermissionRepository.save(new MenuPermission(usersMenu.id, dfspUsersPermission.id));
+            inserted += 1;
+        }
+
 
         RbacSeeder.LOGGER.log(`Seeded ${inserted} menu_permission link(s).`);
         return {inserted, skipped: false};

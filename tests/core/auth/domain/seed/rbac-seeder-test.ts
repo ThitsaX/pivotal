@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import {beforeEach, describe, it} from 'node:test';
 import {
     ADMIN_ROLE_CODE,
+    DFSP_ADMIN_ROLE_CODE,
     DFSP_USER_ROLE_CODE,
     Menu,
     MenuPermission,
@@ -134,28 +135,30 @@ describe('RbacSeeder', () => {
         state = freshState();
     });
 
-    it('cold-boot seeds 2 roles / 14 permissions / 17 role_permissions / 11 menus / 11 menu_permissions', async () => {
+    it('cold-boot seeds 3 roles / 15 permissions / 22 role_permissions / 11 menus / 12 menu_permissions', async () => {
 
         const result = await makeSeeder(state).seed();
 
-        assert.equal(result.roles.inserted, 2);
-        assert.equal(result.permissions.inserted, 14);
-        assert.equal(result.rolePermissions.inserted, 17);
+        assert.equal(result.roles.inserted, 3);
+        assert.equal(result.permissions.inserted, 15);
+        assert.equal(result.rolePermissions.inserted, 22);
         assert.equal(result.menus.inserted, 11);
-        assert.equal(result.menuPermissions.inserted, 11);
+        assert.equal(result.menuPermissions.inserted, 12);
 
         for (const step of Object.values(result)) {
             assert.equal(step.skipped, false);
         }
     });
 
-    it('seeds both system roles with the right scopes', async () => {
+    it('seeds all system roles with the right scopes', async () => {
 
         await makeSeeder(state).seed();
 
         assert.ok(state.roles.has(ADMIN_ROLE_CODE));
+        assert.ok(state.roles.has(DFSP_ADMIN_ROLE_CODE));
         assert.ok(state.roles.has(DFSP_USER_ROLE_CODE));
         assert.equal(state.roles.get(ADMIN_ROLE_CODE)!.scope, 'HUB');
+        assert.equal(state.roles.get(DFSP_ADMIN_ROLE_CODE)!.scope, 'DFSP');
         assert.equal(state.roles.get(DFSP_USER_ROLE_CODE)!.scope, 'DFSP');
     });
 
@@ -166,30 +169,35 @@ describe('RbacSeeder', () => {
         assert.equal(state.permissions.get('audit.transactions.list')!.scope, 'BOTH');
         assert.equal(state.permissions.get('audit.transactions.view')!.scope, 'BOTH');
         assert.equal(state.permissions.get('admin.users.manage')!.scope, 'HUB');
+        assert.equal(state.permissions.get('admin.dfsp-users.manage')!.scope, 'DFSP');
         assert.equal(state.permissions.get('hub.currency.add')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.list')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.access-key.update')!.scope, 'HUB');
     });
 
-    it('grants ADMIN all 14 permissions and DFSP_USER exactly the 3 audit permissions', async () => {
+    it('grants ADMIN all permissions, DFSP_ADMIN delegated user management, and DFSP_USER audit only', async () => {
 
         await makeSeeder(state).seed();
 
         const adminRoleId = state.roles.get(ADMIN_ROLE_CODE)!.id;
+        const dfspAdminRoleId = state.roles.get(DFSP_ADMIN_ROLE_CODE)!.id;
         const dfspRoleId = state.roles.get(DFSP_USER_ROLE_CODE)!.id;
 
         const adminGrants = state.rolePermissions.filter((rp) => rp.roleId === adminRoleId);
+        const dfspAdminGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspAdminRoleId);
         const dfspGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspRoleId);
 
-        assert.equal(adminGrants.length, 14);
+        assert.equal(adminGrants.length, 15);
+        assert.equal(dfspAdminGrants.length, 4);
         assert.equal(dfspGrants.length, 3);
     });
 
-    it('seeds the three admin permission keys', async () => {
+    it('seeds the admin permission keys', async () => {
 
         await makeSeeder(state).seed();
 
         assert.ok(state.permissions.has('admin.users.manage'));
+        assert.ok(state.permissions.has('admin.dfsp-users.manage'));
         assert.ok(state.permissions.has('admin.roles.manage'));
         assert.ok(state.permissions.has('admin.permissions.list'));
     });
