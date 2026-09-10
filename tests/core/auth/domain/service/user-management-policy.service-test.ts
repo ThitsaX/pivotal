@@ -62,8 +62,8 @@ function makePolicy(state: State): UserManagementPolicy {
         async findById(id: string): Promise<User | null> {
             return state.users.get(id) ?? null;
         },
-        async countActiveUsersByRoleCodeForFsp(roleCode: string, fspId: string, excludeUserId: string): Promise<number> {
-            assert.equal(roleCode, DFSP_ADMIN_ROLE_CODE);
+        async countActiveUsersByRoleIdForFsp(roleId: string, fspId: string, excludeUserId: string): Promise<number> {
+            assert.equal(roleId, 'role-dfsp-admin');
             return state.dfspAdminCountExcluding.get(`${fspId}:${excludeUserId}`) ?? 0;
         },
     } as unknown as UserRepository;
@@ -71,6 +71,9 @@ function makePolicy(state: State): UserManagementPolicy {
     const roleRepository = {
         async findById(id: string): Promise<Role | null> {
             return state.roles.get(id) ?? null;
+        },
+        async findByCode(code: string): Promise<Role | null> {
+            return [...state.roles.values()].find((role) => role.code === code) ?? null;
         },
     } as unknown as RoleRepository;
 
@@ -115,6 +118,35 @@ describe('UserManagementPolicy', () => {
         );
     });
 
+
+    it('blocks custom DFSP managers from managing DFSP_ADMIN users in the same FSP', async () => {
+
+        const state = freshState();
+        addUser(state, 'actor', 'role-custom-dfsp-manager', 'wallet1');
+        const target = addUser(state, 'target', 'role-dfsp-admin', 'wallet1');
+
+        const policy = makePolicy(state);
+        const context = await policy.resolveManagementContext('actor');
+
+        assert.equal(policy.canManageTargetRole(context, target, state.roles.get('role-dfsp-admin')!), false);
+        assert.throws(
+            () => policy.assertCanManageTargetRole(context, target, state.roles.get('role-dfsp-admin')!),
+            (error: unknown) => error instanceof ForbiddenException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_USER_MANAGEMENT_SCOPE_DENIED',
+        );
+    });
+
+    it('blocks non-ADMIN global managers from managing ADMIN users', async () => {
+
+        const state = freshState();
+        addUser(state, 'actor', 'role-hub-operator', null);
+        const target = addUser(state, 'target', 'role-admin', null);
+
+        const policy = makePolicy(state);
+        const context = await policy.resolveManagementContext('actor');
+
+        assert.equal(policy.canManageTargetRole(context, target, state.roles.get('role-admin')!), false);
+    });
     it('allows DFSP managers to assign DFSP roles except the DFSP_ADMIN role code', async () => {
 
         const state = freshState();

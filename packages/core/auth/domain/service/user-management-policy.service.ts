@@ -75,6 +75,29 @@ export class UserManagementPolicy {
         }
     }
 
+    canManageTargetRole(context: UserManagementContext, target: User, targetRole: Role): boolean {
+
+        if (context.globalManager) {
+            return targetRole.code !== ADMIN_ROLE_CODE || context.actorRole.code === ADMIN_ROLE_CODE;
+        }
+
+        if (context.managementFspId == null || target.fspId !== context.managementFspId) {
+            return false;
+        }
+
+        if (targetRole.scope !== 'DFSP') {
+            return false;
+        }
+
+        return targetRole.code !== DFSP_ADMIN_ROLE_CODE || context.actorRole.code === DFSP_ADMIN_ROLE_CODE;
+    }
+
+    assertCanManageTargetRole(context: UserManagementContext, target: User, targetRole: Role): void {
+        if (!this.canManageTargetRole(context, target, targetRole)) {
+            throw new ForbiddenException(adminError(AdminErrorCode.USER_MANAGEMENT_SCOPE_DENIED));
+        }
+    }
+    
     async canAssignRole(context: UserManagementContext, role: Role): Promise<boolean> {
 
         if (context.globalManager) {
@@ -127,8 +150,14 @@ export class UserManagementPolicy {
             }
         }
 
-        const others = await this.userRepository.countActiveUsersByRoleCodeForFsp(
-            DFSP_ADMIN_ROLE_CODE,
+        const dfspAdminRole = await this.roleRepository.findByCode(DFSP_ADMIN_ROLE_CODE, DbTarget.Write);
+
+        if (dfspAdminRole == null) {
+            throw new ConflictException(adminError(AdminErrorCode.USER_LAST_DFSP_ADMIN));
+        }
+
+        const others = await this.userRepository.countActiveUsersByRoleIdForFsp(
+            dfspAdminRole.id,
             targetUser.fspId,
             targetUser.id,
             DbTarget.Write,

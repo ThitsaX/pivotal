@@ -40,9 +40,9 @@ export class ResetUserPasswordHandler
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
 
-        this.userManagementPolicy.assertCanManageTarget(context, user);
-
         const role = (await this.roleRepository.findById(user.roleId, DbTarget.Write))!;
+
+        this.userManagementPolicy.assertCanManageTargetRole(context, user, role);
 
         const tempPassword = this.tempPasswordService.generate();
         const passwordHash = await this.passwordService.hash(tempPassword);

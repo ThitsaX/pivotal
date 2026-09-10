@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {NotFoundException} from '@nestjs/common';
+import {ForbiddenException, NotFoundException} from '@nestjs/common';
 import {RefreshTokenRepository, RoleRepository, UserRepository} from '../../../../../packages/core/auth/domain';
 import {ResetUserPasswordCommand, ResetUserPasswordHandler} from '../../../../../packages/core/auth/domain/command';
 import {ADMIN_ROLE_CODE, Role, User} from '../../../../../packages/core/auth/domain/model';
@@ -63,7 +63,7 @@ function makeUserManagementPolicy(): UserManagementPolicy {
         async resolveManagementContext(): Promise<unknown> {
             return {globalManager: true, managementFspId: null};
         },
-        assertCanManageTarget(): void {
+        assertCanManageTargetRole(): void {
             return;
         },
     } as unknown as UserManagementPolicy;
@@ -104,6 +104,39 @@ describe('ResetUserPasswordHandler', () => {
         assert.deepEqual(calls.invalidateTokens, ['user-1']);
     });
 
+    it('rejects protected target resets before generating a temporary password', async () => {
+
+        const calls = freshCalls();
+        const user = new User('dfsp-admin@x', 'OLD', 'role-admin', 'wallet1', false, 'user-1');
+        user.isActive = true;
+        const policy = {
+            async resolveManagementContext(): Promise<unknown> {
+                return {globalManager: false, managementFspId: 'wallet1'};
+            },
+            assertCanManageTargetRole(): void {
+                throw new ForbiddenException({code: 'ADMIN_USER_MANAGEMENT_SCOPE_DENIED', message: 'Denied.'});
+            },
+        } as unknown as UserManagementPolicy;
+
+        const handler = new ResetUserPasswordHandler(
+            makeUserRepo(user, calls),
+            makeRoleRepo(),
+            makeRefreshTokenRepo(calls),
+            makePasswordService(),
+            makeTempPasswordService(),
+            policy,
+        );
+
+        await assert.rejects(
+            handler.execute(new ResetUserPasswordCommand(new ResetUserPasswordCommand.Input('user-1', 'custom-manager'))),
+            (error: unknown) => error instanceof ForbiddenException
+                && (error.getResponse() as {code: string}).code === 'ADMIN_USER_MANAGEMENT_SCOPE_DENIED',
+        );
+
+        assert.equal(calls.updatePasswordHash.length, 0);
+        assert.equal(calls.revokeAllForUser.length, 0);
+        assert.equal(calls.invalidateTokens.length, 0);
+    });
     it('rejects 404 when the user is missing', async () => {
 
         const calls = freshCalls();

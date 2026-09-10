@@ -43,9 +43,9 @@ export class DeactivateUserHandler
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
 
-        this.userManagementPolicy.assertCanManageTarget(context, target);
-
         const role = (await this.roleRepository.findById(target.roleId, DbTarget.Write))!;
+
+        this.userManagementPolicy.assertCanManageTargetRole(context, target, role);
 
         if (!target.isActive) {
             return new DeactivateUserCommand.Output(target, role);

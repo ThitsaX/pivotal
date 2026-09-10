@@ -38,7 +38,13 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, Upd
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
 
-        this.userManagementPolicy.assertCanManageTarget(context, target);
+        const targetRole = await this.roleRepository.findById(target.roleId, DbTarget.Write);
+
+        if (targetRole == null) {
+            throw new BadRequestException(adminError(AdminErrorCode.USER_ROLE_NOT_FOUND));
+        }
+
+        this.userManagementPolicy.assertCanManageTargetRole(context, target, targetRole);
 
         const isSelf = targetUserId === actingUserId;
         const roleChange = roleId != null && roleId !== target.roleId;

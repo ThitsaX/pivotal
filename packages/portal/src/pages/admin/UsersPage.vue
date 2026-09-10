@@ -31,8 +31,18 @@ const hasPermission = computed((): boolean => authStore.hasPermission('admin.use
 const canChooseFsp = computed((): boolean => authStore.hasPermission('admin.users.manage'));
 const fixedFspId = computed((): string | null => authStore.state.user?.fspId ?? null);
 const currentUserId = computed((): string | null => authStore.state.user?.id ?? null);
-
+const currentRoleCode = computed((): string | null => authStore.state.user?.role ?? null);
 const state = usersAdminStore.state;
+
+
+const canManageUser = (user: AdminUser): boolean => {
+    if (currentRoleCode.value === 'ADMIN') return true;
+    if (authStore.hasPermission('admin.users.manage')) return user.role.code !== 'ADMIN';
+    if (!authStore.hasPermission('admin.dfsp-users.manage')) return false;
+    if (user.fspId == null || user.fspId !== fixedFspId.value) return false;
+    return user.role.code !== 'DFSP_ADMIN' || currentRoleCode.value === 'DFSP_ADMIN';
+};
+
 
 const searchDraft = ref('');
 const isActiveFilter = ref<'all' | 'active' | 'inactive'>('all');
@@ -547,6 +557,7 @@ const onPageChange = async (page: number): Promise<void> => {
             <template #actions="{row}">
                 <div class="flex justify-end gap-2">
                     <button
+                        v-if="canManageUser(row)"
                         type="button"
                         class="text-xs font-medium text-accent transition hover:underline"
                         @click="openEdit(row)"
@@ -554,6 +565,7 @@ const onPageChange = async (page: number): Promise<void> => {
                         Edit
                     </button>
                     <button
+                        v-if="canManageUser(row)"
                         type="button"
                         class="text-xs font-medium text-accent transition hover:underline"
                         @click="openReset(row)"
@@ -561,7 +573,7 @@ const onPageChange = async (page: number): Promise<void> => {
                         Reset password
                     </button>
                     <button
-                        v-if="row.isActive && row.id !== currentUserId"
+                        v-if="row.isActive && row.id !== currentUserId && canManageUser(row)"
                         type="button"
                         class="text-xs font-medium text-red-600 transition hover:underline"
                         @click="openDeactivate(row)"

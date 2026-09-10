@@ -88,7 +88,7 @@ function makeUserManagementPolicy(): UserManagementPolicy {
         async resolveManagementContext(): Promise<unknown> {
             return {globalManager: true, managementFspId: null};
         },
-        assertCanManageTarget(): void {
+        assertCanManageTargetRole(): void {
             return;
         },
         async assertCanAssignRole(): Promise<void> {

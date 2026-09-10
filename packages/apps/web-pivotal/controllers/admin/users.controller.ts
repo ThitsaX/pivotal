@@ -145,13 +145,13 @@ export class UsersAdminController {
             throw new NotFoundException(adminError(AdminErrorCode.USER_NOT_FOUND));
         }
 
-        this.userManagementPolicy.assertCanManageTarget(context, user);
-
         const role = await this.roleRepository.findById(user.roleId);
 
         if (role == null) {
             throw new Error(`User ${user.id} references unknown role_id=${user.roleId}.`);
         }
+
+        this.userManagementPolicy.assertCanManageTarget(context, user);
 
         return UsersAdminController.toUserResponse(user, role);
     }

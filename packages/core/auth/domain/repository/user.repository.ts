@@ -117,18 +117,17 @@ export class UserRepository {
         return qb.getCount();
     }
 
-    async countActiveUsersByRoleCodeForFsp(
-        roleCode: string,
+    async countActiveUsersByRoleIdForFsp(
+        roleId: string,
         fspId: string,
         excludeUserId?: string,
         target: DbTarget = DbTarget.Read,
     ): Promise<number> {
 
         const qb = this.getRepository(target).createQueryBuilder('u')
-                       .innerJoin('roles', 'r', 'r.id = u.role_id')
                        .where('u.is_active = TRUE')
-                       .andWhere('u.fsp_id = :fspId', {fspId})
-                       .andWhere('r.code = :roleCode', {roleCode});
+                       .andWhere('u.role_id = :roleId', {roleId})
+                       .andWhere('u.fsp_id = :fspId', {fspId});
 
         if (excludeUserId != null) {
             qb.andWhere('u.id != :excludeUserId', {excludeUserId});

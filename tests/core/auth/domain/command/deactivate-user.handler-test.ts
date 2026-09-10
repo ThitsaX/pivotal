@@ -82,7 +82,7 @@ function makeHandler(state: State): DeactivateUserHandler {
         async resolveManagementContext(): Promise<unknown> {
             return {globalManager: true, managementFspId: null};
         },
-        assertCanManageTarget(): void {
+        assertCanManageTargetRole(): void {
             return;
         },
         async assertNotLastDfspManager(): Promise<void> {
