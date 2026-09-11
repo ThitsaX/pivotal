@@ -37,7 +37,7 @@ export class GetDashboardHandler
             this.repository.getValueByCurrency(scopeFspId, range.from, range.to),
             this.repository.getTopFsps(scopeFspId, 'payer_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT),
             this.repository.getTopFsps(scopeFspId, 'payee_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT),
-            this.repository.getTimeBuckets(scopeFspId, range.from, range.to),
+            this.repository.getTimeBuckets(scopeFspId, range.from, range.to, timeZone),
             this.repository.getLastUpdatedAt(),
         ]);
 
@@ -156,12 +156,12 @@ export class GetDashboardHandler
 
     private static dayKeys(range: GetDashboardQuery.DateRange, timeZone: string): string[] {
         const keys = new Set<string>();
-        const start = Math.floor(range.from.getTime() / GetDashboardHandler.MS_PER_HOUR)
-            * GetDashboardHandler.MS_PER_HOUR;
+        const start = range.from.getTime();
 
         for (let cursor = start; cursor < range.to.getTime(); cursor += GetDashboardHandler.MS_PER_HOUR) {
             keys.add(GetDashboardHandler.localParts(new Date(cursor), timeZone).date);
         }
+        keys.add(GetDashboardHandler.localParts(new Date(range.to.getTime() - 1), timeZone).date);
 
         return [...keys];
     }

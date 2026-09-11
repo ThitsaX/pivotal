@@ -7,6 +7,7 @@ describe('GetDashboardHandler', () => {
 
     it('aggregates the selected range using the requested portal timezone', async () => {
         const calls: Array<{from: Date; to: Date}> = [];
+        let bucketTimeZone: string | undefined;
         const repository = {
             async getErrorStageBreakdown(_scope: string | undefined, from: Date, to: Date) {
                 calls.push({from, to});
@@ -18,10 +19,11 @@ describe('GetDashboardHandler', () => {
             async getTopFsps(_scope: string | undefined, leg: string) {
                 return [{fspId: leg, count: 5, amounts: [{currency: 'USD', totalAmount: '40'}]}];
             },
-            async getTimeBuckets() {
+            async getTimeBuckets(_scope: string | undefined, _from: Date, _to: Date, timeZone: string) {
+                bucketTimeZone = timeZone;
                 return [
                     {
-                        bucketHour: '2026-08-01T17:00:00.000Z',
+                        bucketHour: '2026-08-01T17:30:00.000Z',
                         count: 2,
                         errorCount: 1,
                         disputeCount: 1,
@@ -29,7 +31,7 @@ describe('GetDashboardHandler', () => {
                         latencyCount: 1,
                     },
                     {
-                        bucketHour: '2026-08-02T16:00:00.000Z',
+                        bucketHour: '2026-08-02T17:00:00.000Z',
                         count: 3,
                         errorCount: 0,
                         disputeCount: 0,
@@ -44,20 +46,21 @@ describe('GetDashboardHandler', () => {
         };
         const handler = new GetDashboardHandler(repository as never);
         const range = new GetDashboardQuery.DateRange(
-            new Date('2026-08-01T17:00:00.000Z'),
-            new Date('2026-08-02T17:00:00.000Z'),
+            new Date('2026-08-01T17:30:00.000Z'),
+            new Date('2026-08-02T17:30:00.000Z'),
         );
 
         const output = await handler.execute(new GetDashboardQuery(
-            new GetDashboardQuery.Input(undefined, range, 'Asia/Bangkok'),
+            new GetDashboardQuery.Input(undefined, range, 'Asia/Yangon'),
         ));
 
         assert.deepEqual(output.range, {
-            from: '2026-08-01T17:00:00.000Z',
-            to: '2026-08-02T17:00:00.000Z',
-            timeZone: 'Asia/Bangkok',
+            from: '2026-08-01T17:30:00.000Z',
+            to: '2026-08-02T17:30:00.000Z',
+            timeZone: 'Asia/Yangon',
         });
         assert.equal(output.total, 5);
+        assert.equal(bucketTimeZone, 'Asia/Yangon');
         assert.equal(output.errors, 1);
         assert.equal(output.disputes, 1);
         assert.equal(output.successRate, 0.8);
