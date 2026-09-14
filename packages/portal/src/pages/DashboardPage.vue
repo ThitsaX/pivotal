@@ -129,6 +129,10 @@ function stateColor(state: string): string {
     }
 }
 
+function stateLabel(state: string): string {
+    return state === 'COMMITTED' ? 'Success Trx' : state;
+}
+
 /** Gradient fill for bar/column series — light, modern, slightly translucent. */
 function barGradient(toColors: string[], direction: 'vertical' | 'horizontal'): ApexFill {
     return {
@@ -286,7 +290,7 @@ const stateOptions = computed<ApexOptions>(() => {
     const states = data.value?.byState ?? [];
     return {
         chart: baseChart('donut'),
-        labels: states.map((s) => s.state),
+        labels: states.map((s) => stateLabel(s.state)),
         colors: states.map((s) => stateColor(s.state)),
         fill: {
             type: 'gradient',
