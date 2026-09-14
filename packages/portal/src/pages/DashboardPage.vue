@@ -130,7 +130,7 @@ function stateColor(state: string): string {
 }
 
 function stateLabel(state: string): string {
-    return state === 'COMMITTED' ? 'Success Transaction Count' : state;
+    return state === 'COMMITTED' ? 'Success Trx' : state;
 }
 
 /** Gradient fill for bar/column series — light, modern, slightly translucent. */
