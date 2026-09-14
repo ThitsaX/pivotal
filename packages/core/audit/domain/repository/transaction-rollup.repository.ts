@@ -148,8 +148,8 @@ export class TransactionRollupRepository {
     }
 
     // ─── Dashboard reads ──────────────────────────────────────────────────────────────────
-    // Small indexed scans over `transaction_hourly_rollup` (never the raw `transactions`
-    // table). `scopeFspId` applies DFSP row-scoping: a transaction is exactly one rollup row,
+    // Full UTC hours use rollups; partial boundary hours read exact transaction timestamps.
+    // `scopeFspId` applies DFSP row-scoping: a transaction is exactly one rollup row,
     // so `(payer_fsp = fsp OR payee_fsp = fsp)` counts each once with no double-counting.
 
     /**
@@ -161,15 +161,14 @@ export class TransactionRollupRepository {
         from: Date,
         to: Date,
     ): Promise<TransactionRollupRepository.StageCount[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
         const rows = await this.readRepository.query(
             `SELECT COALESCE(SUM(parties_error_count), 0)   AS parties,
                     COALESCE(SUM(quotes_error_count), 0)    AS quotes,
                     COALESCE(SUM(transfers_error_count), 0) AS transfers,
                     COALESCE(SUM(patch_error_count), 0)     AS patch
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`,
-            [from, to, ...scope.params],
+             FROM (${source.sql}) AS selected_range`,
+            source.params,
         );
         const row = rows[0] ?? {};
 
@@ -186,7 +185,7 @@ export class TransactionRollupRepository {
         from: Date,
         to: Date,
     ): Promise<TransactionRollupRepository.CurrencyValue[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
         // Value that moved, per currency: committed (incl. disputed) transfers only. 'XXX' is the
         // no-currency placeholder for pre-financial failures (e.g. party-lookup) — never money.
         const rows = await this.readRepository.query(
@@ -194,12 +193,12 @@ export class TransactionRollupRepository {
                     sub_scenario,
                     COALESCE(SUM(committed_amount), 0) AS total_amount,
                     COALESCE(SUM(committed_count), 0)  AS txn_count
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ? AND currency <> 'XXX'${scope.clause}
+             FROM (${source.sql}) AS selected_range
+             WHERE currency <> 'XXX'
              GROUP BY currency, sub_scenario
              HAVING txn_count > 0
              ORDER BY total_amount DESC`,
-            [from, to, ...scope.params],
+            source.params,
         );
 
         return rows.map((row: Record<string, unknown>) => ({
@@ -217,7 +216,7 @@ export class TransactionRollupRepository {
         to: Date,
         limit: number,
     ): Promise<TransactionRollupRepository.FspCount[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
         // `leg` is a fixed enum literal (never user input), safe to interpolate as a column.
         // Counts and values use the same committed-or-disputed population.
         // Keep amounts separated by currency; summing unlike currencies would be misleading.
@@ -226,11 +225,10 @@ export class TransactionRollupRepository {
                     currency,
                     COALESCE(SUM(committed_count), 0) AS count,
                     COALESCE(SUM(committed_amount), 0) AS total_amount
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
+             FROM (${source.sql}) AS selected_range
              GROUP BY ${leg}, currency
              HAVING count > 0`,
-            [from, to, ...scope.params],
+            source.params,
         );
 
         const byFsp = new Map<string, TransactionRollupRepository.FspCount>();
@@ -259,8 +257,12 @@ export class TransactionRollupRepository {
         scopeFspId: string | undefined,
         from: Date,
         to: Date,
+        timeZone: string = 'UTC',
     ): Promise<TransactionRollupRepository.TimeBucket[]> {
-        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        // A UTC hour can straddle local midnight (e.g. 17:00–18:00 UTC in Yangon).
+        // Split those hours into exact raw intervals before assigning them to a day.
+        const sources = TransactionRollupRepository.localDayRanges(from, to, timeZone)
+            .map((range) => TransactionRollupRepository.rangeSource(scopeFspId, range.from, range.to));
         const rows = await this.readRepository.query(
             `SELECT bucket_hour,
                     COALESCE(SUM(txn_count), 0)        AS count,
@@ -268,11 +270,10 @@ export class TransactionRollupRepository {
                     COALESCE(SUM(dispute_count), 0)    AS dispute_count,
                     SUM(sum_latency_ms)                AS sum_latency,
                     COALESCE(SUM(latency_count), 0)    AS latency_count
-             FROM transaction_hourly_rollup
-             WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}
+             FROM (${sources.map((source) => source.sql).join(' UNION ALL ')}) AS selected_range
              GROUP BY bucket_hour
              ORDER BY bucket_hour ASC`,
-            [from, to, ...scope.params],
+            sources.flatMap((source) => source.params),
         );
 
         return rows.map((row: Record<string, unknown>) => ({
@@ -416,6 +417,100 @@ export class TransactionRollupRepository {
         );
 
         return rows.map((row: Record<string, unknown>) => String(row.fsp));
+    }
+
+    private static localDayRanges(from: Date, to: Date, timeZone: string): Array<{from: Date; to: Date}> {
+        const hourMs = 3_600_000;
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+        });
+        const starts = [from.getTime()];
+        const lastMs = to.getTime() - 1;
+        let cursor = from.getTime();
+        let date = formatter.format(cursor);
+
+        // Resolve boundaries with IANA rules at each date, including DST changes;
+        // using one fixed offset for the entire range would shift some midnights.
+        while (cursor < lastMs) {
+            const next = Math.min(cursor + hourMs, lastMs);
+            const nextDate = formatter.format(next);
+            if (date !== nextDate) {
+                let lower = cursor;
+                let upper = next;
+                while (upper - lower > 1) {
+                    const middle = Math.floor((lower + upper) / 2);
+                    if (formatter.format(middle) === date) {
+                        lower = middle;
+                    } else {
+                        upper = middle;
+                    }
+                }
+                // Whole UTC hours already separate these dates correctly in the rollup.
+                if (upper % hourMs !== 0) {
+                    starts.push(upper);
+                }
+            }
+            cursor = next;
+            date = nextDate;
+        }
+
+        return starts.map((start, index) => ({
+            from: new Date(start),
+            to: new Date(starts[index + 1] ?? to.getTime()),
+        }));
+    }
+
+    private static rangeSource(scopeFspId: string | undefined, from: Date, to: Date): {
+        sql: string; params: unknown[];
+    } {
+        const hourMs = 3_600_000;
+        const fullStart = Math.ceil(from.getTime() / hourMs) * hourMs;
+        const fullEnd = Math.floor(to.getTime() / hourMs) * hourMs;
+        const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const selects: string[] = [];
+        const params: unknown[] = [];
+
+        if (fullStart < fullEnd) {
+            selects.push(`SELECT bucket_hour, payer_fsp, payee_fsp, currency, sub_scenario,
+                txn_count, error_count, dispute_count, parties_error_count, quotes_error_count,
+                transfers_error_count, patch_error_count, committed_amount, committed_count,
+                latency_count, sum_latency_ms
+                FROM transaction_hourly_rollup
+                WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`);
+            params.push(new Date(fullStart), new Date(fullEnd), ...scope.params);
+        }
+
+        // Disjoint half-open intervals: no missing or duplicated transactions at boundaries.
+        const edges = fullStart < fullEnd
+            ? [[from.getTime(), fullStart], [fullEnd, to.getTime()]]
+            : [[from.getTime(), to.getTime()]];
+        for (const [start, end] of edges) {
+            if (start >= end) {
+                continue;
+            }
+            selects.push(`SELECT
+                GREATEST(DATE_FORMAT(transaction_started_at, '%Y-%m-%d %H:00:00'), ?) AS bucket_hour,
+                payer_fsp, payee_fsp,
+                COALESCE(transfer_currency, quoting_currency, 'XXX') AS currency,
+                COALESCE(NULLIF(sub_scenario, ''), 'UNSPECIFIED') AS sub_scenario,
+                1 AS txn_count, error AS error_count, possible_dispute AS dispute_count,
+                (parties_error IS NOT NULL) AS parties_error_count,
+                (quotes_error IS NOT NULL) AS quotes_error_count,
+                (transfers_error IS NOT NULL) AS transfers_error_count,
+                (patch_error IS NOT NULL) AS patch_error_count,
+                CASE WHEN transfer_state = 'COMMITTED' OR possible_dispute = 1
+                    THEN COALESCE(transfer_amount, 0) ELSE 0 END AS committed_amount,
+                CASE WHEN transfer_state = 'COMMITTED' OR possible_dispute = 1
+                    THEN 1 ELSE 0 END AS committed_count,
+                (transaction_completed_at IS NOT NULL) AS latency_count,
+                TIMESTAMPDIFF(MICROSECOND, transaction_started_at, transaction_completed_at) / 1000
+                    AS sum_latency_ms
+                FROM transactions
+                WHERE transaction_started_at >= ? AND transaction_started_at < ?${scope.clause}`);
+            params.push(new Date(start), new Date(start), new Date(end), ...scope.params);
+        }
+
+        return {sql: selects.join(' UNION ALL '), params};
     }
 
     private static scopeClause(scopeFspId: string | undefined): {clause: string; params: unknown[]} {

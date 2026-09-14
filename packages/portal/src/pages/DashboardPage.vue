@@ -91,6 +91,7 @@ const rangeEnd = ref(initialRange.to);
 const rangeInvalid = ref(false);
 const appliedMode = ref<RangeMode>('today');
 const appliedRange = ref({...initialRange});
+const rangeEditorOpen = ref(true);
 
 const rangeModeLabel = computed((): string => ({
     today: 'Today',
@@ -250,6 +251,7 @@ const trendOptions = computed<ApexOptions>(() => ({
     colors: [COLOR.accent, COLOR.aborted],
     dataLabels: {enabled: false},
     stroke: {curve: 'smooth', width: 2.5},
+    markers: {size: 4, hover: {size: 6}},
     fill: {
         type: 'gradient',
         gradient: {
@@ -387,7 +389,7 @@ const latencyOptions = computed<ApexOptions>(() => ({
         type: 'gradient',
         gradient: {shade: 'light', type: 'vertical', gradientToColors: [COLOR.violetTo], opacityFrom: 0.4, opacityTo: 0.03, stops: [0, 95]},
     },
-    markers: {size: 0, hover: {size: 5}},
+    markers: {size: 4, hover: {size: 6}},
     dataLabels: {enabled: false},
     xaxis: {
         categories: (data.value?.latencyTrend ?? []).map((p) => formatShortDate(p.date)),
@@ -489,6 +491,7 @@ function applyRange(): void {
 
     appliedMode.value = rangeMode.value;
     appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
+    rangeEditorOpen.value = false;
     loadAppliedRange();
 }
 
@@ -571,6 +574,7 @@ watch(
             class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
         >
             <TimeRangeSelector
+                v-show="rangeEditorOpen"
                 label="Dashboard time range"
                 :selected-time-zone="selectedTimeZone"
                 :mode="rangeMode"
@@ -578,7 +582,6 @@ watch(
                 :end-value="rangeEnd"
                 :disabled="loading"
                 compact-mode-selector
-                :show-last24="false"
                 :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
                 @update:mode="rangeMode = $event as RangeMode"
                 @update:start-value="rangeStart = $event"
@@ -599,6 +602,13 @@ watch(
             <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
                 Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
                 {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+                <button
+                    v-if="!rangeEditorOpen"
+                    type="button"
+                    class="ml-3 font-semibold text-accent underline disabled:opacity-50"
+                    :disabled="loading"
+                    @click="rangeEditorOpen = true"
+                >Edit range</button>
             </p>
         </article>
 
