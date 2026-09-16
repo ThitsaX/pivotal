@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario, IsAmountType } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
+import { HasPayeeFspIdConstraint } from '../component/has-payee-fsp-id.constraint';
 
 @ValidatorConstraint({name: 'hasPayerFspId', async: false})
 class HasPayerFspIdConstraint implements ValidatorConstraintInterface {
@@ -42,6 +43,7 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @ValidateNested()
+    @Validate(HasPayeeFspIdConstraint)
     @Type(() => FspParty)
     to!: FspParty;
 

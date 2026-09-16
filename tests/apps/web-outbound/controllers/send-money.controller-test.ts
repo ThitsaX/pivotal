@@ -12,6 +12,8 @@ import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop'
 import { Test, TestingModule } from '@nestjs/testing';
 import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
 import { useContainer } from 'class-validator';
+import { HasPayeeFspIdConstraint } from '../../../../packages/core/outbound/domain/component/has-payee-fsp-id.constraint';
+
 
 async function validateRequest(body: Record<string, unknown>): Promise<{
     request: PutSendMoneyRequest;
@@ -23,7 +25,8 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
     return {request, errors};
 }
 
-async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false): Promise<{
+
+async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false , payeeFspIdRequired: boolean = false): Promise<{
     request: SendMoneyRequest;
     errors:  ValidationError[];
 }> {
@@ -32,6 +35,10 @@ async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmo
             {
                 provide: AmountTypeConstraint,
                 useValue: new AmountTypeConstraint(strictAmountType),
+            },
+            {
+                provide: HasPayeeFspIdConstraint,
+                useValue: new HasPayeeFspIdConstraint(payeeFspIdRequired),
             },
         ],
     }).compile();
@@ -199,6 +206,29 @@ describe('SendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
         assert.equal(request.to.fspId, undefined);
+    });
+
+    it('rejects a missing payee FSP ID when required by configuration', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        delete (body.to as Record<string, unknown>).fspId;
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'ALIAS',
+            idValue: 'merchant-123',
+        });
+    
+        const {errors} = await validateSendMoneyRequest(body, false, true);
+    
+        assert.ok(messages(errors).includes('to.fspId is required'));
+    });
+    
+    it('accepts a present payee FSP ID when required by configuration', async () => {
+        const {errors} = await validateSendMoneyRequest(
+            sendMoneyBody('wallet1', 'wallet2'),
+            false,
+            true,
+        );
+    
+        assert.deepEqual(errors, []);
     });
 
     it('normalizes an empty payee FSP ID to undefined', async () => {

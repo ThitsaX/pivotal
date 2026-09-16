@@ -7,3 +7,5 @@ export * from './amount-decimal-validator';
 export * from './prefix-oracle-client';
 export * from './oracle-central-registry-client';
 export * from './payer-provided-fees-validator';
+export * from './has-payee-fsp-id.constraint';
+
