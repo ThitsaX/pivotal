@@ -26,7 +26,7 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
 }
 
 
-async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false , payeeFspIdRequired: boolean = false): Promise<{
+async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false , payeeFspIdRequired: boolean = true): Promise<{
     request: SendMoneyRequest;
     errors:  ValidationError[];
 }> {
@@ -202,7 +202,7 @@ describe('SendMoneyRequest', () => {
             idValue: 'merchant-123',
         });
 
-        const {request, errors} = await validateSendMoneyRequest(body);
+        const {request, errors} = await validateSendMoneyRequest(body, false, false);
 
         assert.deepEqual(errors, []);
         assert.equal(request.to.fspId, undefined);
@@ -238,7 +238,7 @@ describe('SendMoneyRequest', () => {
             idValue: 'merchant-123',
         });
 
-        const {request, errors} = await validateSendMoneyRequest(body);
+        const {request, errors} = await validateSendMoneyRequest(body, false, false);
 
         assert.deepEqual(errors, []);
         assert.equal(request.to.fspId, undefined);

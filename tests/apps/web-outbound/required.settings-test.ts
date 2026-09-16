@@ -46,16 +46,16 @@ describe('WebOutboundSettings payer fee validation', () => {
         );
     });
 
-    it('keeps to.fspId optional by default', () => {
+    it('requires to.fspId by default', () => {
         const outboundSettings = settings().outboundSettings();
-        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, false);
+        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, true);
     });
 
-    it('reads the payee fspId required flag', () => {
+    it('allows making to.fspId optional via env', () => {
         const outboundSettings = settings({
-            POST_SENDMONEY_PAYEE_FSPID_REQUIRED: 'true',
+            POST_SENDMONEY_PAYEE_FSPID_REQUIRED: 'false',
         }).outboundSettings();
-        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, true);
+        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, false);
     });
     
     it('rejects an invalid payee fspId required flag', () => {
