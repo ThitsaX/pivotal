@@ -9,7 +9,7 @@ import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
 import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
-import { AmountDecimalValidator, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
+import { AmountDecimalValidator , HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
 import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
@@ -102,6 +102,12 @@ export class OutboundDomainModule {
                 provide: AmountTypeConstraint,
                 useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 
                     new AmountTypeConstraint(outboundSettings.strictAmountType), 
+                inject: [OutboundSettings],
+            },
+            {
+                provide: HasPayeeFspIdConstraint,
+                useFactory: (outboundSettings: OutboundSettings): HasPayeeFspIdConstraint =>
+                    new HasPayeeFspIdConstraint(outboundSettings.postSendmoneyPayeeFspIdRequired),
                 inject: [OutboundSettings],
             },
             {

@@ -81,6 +81,7 @@ export class WebOutboundSettings
             this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
             this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
+            this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
         );
     }
 

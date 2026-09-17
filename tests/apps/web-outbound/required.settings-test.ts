@@ -45,4 +45,25 @@ describe('WebOutboundSettings payer fee validation', () => {
             /Invalid environment variable CHECK_PAYER_FEE_AS_MANDATORY/,
         );
     });
+
+    it('requires to.fspId by default', () => {
+        const outboundSettings = settings().outboundSettings();
+        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, true);
+    });
+
+    it('allows making to.fspId optional via env', () => {
+        const outboundSettings = settings({
+            POST_SENDMONEY_PAYEE_FSPID_REQUIRED: 'false',
+        }).outboundSettings();
+        assert.equal(outboundSettings.postSendmoneyPayeeFspIdRequired, false);
+    });
+    
+    it('rejects an invalid payee fspId required flag', () => {
+        assert.throws(
+            () => settings({POST_SENDMONEY_PAYEE_FSPID_REQUIRED: 'ture'}).outboundSettings(),
+            /Invalid environment variable POST_SENDMONEY_PAYEE_FSPID_REQUIRED/,
+        );
+    });
 });
+
+

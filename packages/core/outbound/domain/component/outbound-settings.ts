@@ -17,6 +17,7 @@ export class OutboundSettings {
         public readonly amountDecimalPlaces: number,
         public readonly strictAmountType: boolean,
         public readonly checkPayerFeeAsMandatory: boolean,
+        public readonly postSendmoneyPayeeFspIdRequired: boolean,
     ) {
     }
 }
