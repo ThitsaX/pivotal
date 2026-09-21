@@ -30,7 +30,6 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.AUDIT_TRANSACTIONS_VIEW,
             PermissionKey.AUDIT_DASHBOARD_VIEW,
             PermissionKey.ADMIN_USERS_MANAGE,
-            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
         ],
@@ -102,7 +101,6 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
         scope:       'HUB',
         permissionKeys: [
             PermissionKey.ADMIN_USERS_MANAGE,
-            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
         ],
