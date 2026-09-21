@@ -7,7 +7,8 @@
 //   cd connection-manager-api && DATABASE_PORT=3307 docker compose --profile full up -d
 //
 // The token client needs an audience of `connection-manager-api` and a `groups`
-// claim; see trust-manager-docs/implementation/mcm-api-notes.md.
+// claim. The stock Keycloak service client ships with neither, so both have to be
+// added as protocol mappers or every call comes back 401.
 import * as assert from 'node:assert/strict';
 import {before, describe, it} from 'node:test';
 import {generateKeyPairSync} from 'node:crypto';

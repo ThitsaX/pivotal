@@ -6,7 +6,7 @@ This is the service-level counterpart to tests/integration/jws-vault-loop-test.t
 the libraries agree; this proves the deployed services do — real HTTP, the guard installed globally,
 the public key read from MySQL, and the signing key read from Vault by the service itself.
 
-Prerequisites — see trust-manager-docs/implementation/status.md:
+Prerequisites:
 
     # MySQL comes from the Mojaloop test harness; do not start a second one.
     docker compose -p pivotal-stack \

@@ -5,7 +5,7 @@
     "shows up as a failing test rather than as a rejected signature at a peer months later.",
     "",
     "'expected.protectedHeader' and 'expected.fspiopUri' are the contract, hand-written from the",
-    "reference implementation quoted in trust-manager-docs/design/hub-facing-leg.md section A2.",
+    "@mojaloop/sdk-standard-components src/lib/jws/jwsSigner.js, not from our own code.",
     "The remaining 'expected' fields are mechanical encodings of those two, not independent claims.",
     "",
     "Signatures are deliberately absent: RS256 over a fixed input is deterministic, but pinning one",

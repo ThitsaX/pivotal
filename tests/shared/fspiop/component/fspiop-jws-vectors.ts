@@ -4,8 +4,8 @@ import * as path from 'node:path';
 /**
  * Loader for the shared FSPIOP JWS conformance vectors.
  *
- * The JSON file is the artefact the Java connectors execute too — see
- * trust-manager-docs/design/hub-facing-leg.md section A6. Keep this loader thin: any logic added
+ * The JSON file is the artefact the Java connectors execute too, which makes it the
+ * contract between the two implementations. Keep this loader thin: any logic added
  * here is logic the Java side will not share.
  */
 export interface FspiopJwsVectors {
