@@ -121,6 +121,12 @@ webOutbound:
     CENTRAL_LEDGER_URL: http://host.docker.internal:3001
     CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
+    # Whether a DFSP-facing caller may arrive with no client certificate. A presented
+    # certificate is verified and bound to fspiop-source either way, so this never turns
+    # mutual TLS on or off -- it decides only whether an absent one is fatal. Off by default
+    # so the mutual-TLS endpoint can run beside the plain one while DFSPs migrate; it needs a
+    # gateway setting the XFCC header before it can be turned on.
+    DFSP_FACING_MTLS_MANDATORY: "false"
     # Private-key custody. `database` is the legacy plaintext-MySQL path; `vault-kv`
     # is the KMS-backed profile. Use the in-cluster FQDN: a bare "vault" can resolve to
     # a Docker-Compose Vault via CoreDNS host records in a local dev cluster.

@@ -84,13 +84,16 @@ export class WebOutboundSettings
     }
 
     /**
-     * Whether a verified client certificate is required on the DFSP-facing leg.
+     * Whether a caller may reach the DFSP-facing leg without a client certificate.
+     *
+     * Named for what it decides. A presented certificate is verified in full either way, so this
+     * never turns mutual TLS on or off — it only says whether arriving without one is fatal.
      *
      * Off by default so the mutual-TLS endpoint can run beside the existing one and DFSPs migrate
      * at their own pace, rather than every caller breaking on the day it is switched on.
      */
-    dfspFacingMutualTls(): boolean {
-        return this.readOptionalBoolean('DFSP_FACING_MTLS') ?? false;
+    dfspFacingMutualTlsMandatory(): boolean {
+        return this.readOptionalBoolean('DFSP_FACING_MTLS_MANDATORY') ?? false;
     }
 
     centralLedgerUrl(): string {

@@ -88,7 +88,7 @@ export class WebOutboundModule {
                     reflector: Reflector,
                 ): DfspCertificateGuard => {
                     return new DfspCertificateGuard(
-                        certificates, settings.dfspFacingMutualTls(), reflector);
+                        certificates, settings.dfspFacingMutualTlsMandatory(), reflector);
                 },
                 inject: [ParticipantCertRepository, REQUIRED_SETTINGS, Reflector],
             },
@@ -114,8 +114,8 @@ export namespace WebOutboundModule {
     export interface RequiredSettings extends ParticipantDomainModule.RequiredSettings, OutboundDomainModule.RequiredSettings {
         jwtPolicy(): JwtPolicy;
 
-        /** Whether the DFSP-facing leg requires a verified client certificate. */
-        dfspFacingMutualTls(): boolean;
+        /** Whether a caller may reach the DFSP-facing leg without a client certificate. */
+        dfspFacingMutualTlsMandatory(): boolean;
     }
 
     export type AsyncOptions = {
