@@ -103,6 +103,7 @@ describe('Audit transaction handlers', () => {
         const request = {
             quoteId: 'quote-1',
             transactionId: 'transfer-1',
+            amountType: 'SEND',
             amount: {amount: '10', currency: 'USD'},
             payer: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959250000001'}},
             payee: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959420000111'}},
@@ -154,6 +155,7 @@ describe('Audit transaction handlers', () => {
             transactionStartedAt: occurredAt,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            amountType: 'SEND',
             error: false,
             flow: 2,
             quotesRespondedAt: occurredAt,
