@@ -158,9 +158,69 @@ paths:
       - transfers
       summary: Retrieves transfer status for the payer or payee DFSP
       description: |
-        Read-only transfer recovery from the `transactions` table for the recorded
-        payer or payee. Requests use an RS256 JWS with an empty `{}` payload, signed
-        request metadata, a date within five minutes, and a one-time nonce.
+        Returns the recorded state of a transfer to either side of it. Read-only: it
+        reports what Pivotal has stored and never advances the transfer, so it is safe
+        to call after a timeout or a restart to find out how a transfer ended.
+
+        ### Who may call it
+
+        `fspiop-source` must be the payer or the payee recorded against the transfer,
+        and must have an access public key registered with Pivotal. A transfer that
+        does not exist and a transfer belonging to another DFSP both return the same
+        `TRANSFER_ID_NOT_FOUND` error, so this endpoint cannot be used to discover
+        whether a given transfer ID exists.
+
+        `homeTransactionId` in the response is the caller's own value: the payer
+        receives the payer's, the payee receives the payee's.
+
+        ### Signing a request
+
+        Every request carries a compact RS256 JWS in the `authorization` header,
+        signed with the DFSP's access private key. Send the raw token — no `Bearer`
+        prefix.
+
+        The JWS payload is the empty JSON object `{}`. All request binding lives in the protected
+        header:
+
+        | Field    | Required value                                                    |
+        | -------- | ----------------------------------------------------------------- |
+        | `alg`    | `RS256`                                                             |
+        | `typ`    | `JWT`                                                               |
+        | `uri`    | The request path exactly as sent, including the transfer ID         |
+        | `method` | `GET`                                                               |
+        | `date`   | Byte-for-byte identical to the `date` header                        |
+        | `nonce`  | Unique per call, 1 to 128 characters                                |
+
+        Example protected header:
+
+        ```json
+        {
+          "alg": "RS256",
+          "typ": "JWT",
+          "uri": "/secured/transferStatus/01JAY7K3QK9Z8W4B6N2P5R7T3M",
+          "method": "GET",
+          "date": "Mon, 25 Aug 2026 09:12:44 GMT",
+          "nonce": "9f2b7c14-3d5e-4a81-9f60-2c8d1b4e7a03"
+        }
+        ```
+
+        ### Rules each field must satisfy
+
+        - **`date` format.** An RFC 7231 HTTP-date in GMT, written exactly like the
+          example. Other spellings of the same instant — ISO-8601, a numeric offset,
+          a missing weekday — are rejected even though they parse.
+        - **`date` freshness.** Within five minutes of server time in either
+          direction. Future-dated requests are rejected too. If every call fails with
+          a valid signature, check clock synchronisation first.
+        - **`nonce` reuse.** Remembered for ten minutes per `fspiop-source`. Generate
+          a fresh value for every call, including when retrying a request that timed
+          out — replaying the previous token is rejected.
+        - **`uri` match.** Must equal the path Pivotal receives. If a gateway rewrites
+          the path before it reaches Pivotal, sign the rewritten form.
+
+        A failure in any of these returns `3105 Invalid signature` (HTTP 401). A
+        missing or duplicated header, or a malformed token or transfer ID, returns
+        HTTP 417.
       operationId: getTransferStatusByTransferId
       parameters:
       - name: transferId
