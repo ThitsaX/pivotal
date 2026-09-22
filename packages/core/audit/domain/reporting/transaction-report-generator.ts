@@ -45,6 +45,8 @@ export class TransactionReportGenerator {
         {header: 'Payee Receive Amount', key: 'payeeReceiveAmount'},
         {header: 'Transfer Amount', key: 'transferAmount'},
         {header: 'Transfer State in Hub', key: 'transferState'},
+        {header: 'Use Case', key: 'useCase'},
+        {header: 'Amount Type', key: 'amountType'},
         {header: 'Disputed', key: 'dispute'},
         {header: 'Account Lookup Error', key: 'partiesError'},
         {header: 'Quote Call Error', key: 'quotesError'},

@@ -46,6 +46,7 @@ export class TransactionRepository {
         'transaction.transactionType',
         'transaction.subScenario',
         'transaction.transferState',
+        `transaction.amountType`,
         'transaction.error',
         'transaction.possibleDispute',
         'transaction.flow',
@@ -73,6 +74,8 @@ export class TransactionRepository {
         'transaction.payeeFee',
         'transaction.payerFee',
         'transaction.schemeFee',
+        'transaction.subScenario',
+        'transaction.amountType',
         'transaction.transferState',
         'transaction.possibleDispute',
         'transaction.partiesError',
@@ -122,6 +125,7 @@ export class TransactionRepository {
             input.transactionType ?? null,
             input.subScenario ?? null,
             input.transferState ?? null,
+            input.amountType ?? null,
             input.possibleDispute ?? false,
             input.error,
             input.flow ?? null,
@@ -196,6 +200,7 @@ export class TransactionRepository {
                 transaction_type,
                 sub_scenario,
                 transfer_state,
+                amount_type,
                 possible_dispute,
                 error,
                 flow,
@@ -279,6 +284,7 @@ export class TransactionRepository {
                 transaction_type = COALESCE(VALUES(transaction_type), transactions.transaction_type),
                 sub_scenario = COALESCE(VALUES(sub_scenario), transactions.sub_scenario),
                 transfer_state = COALESCE(VALUES(transfer_state), transactions.transfer_state),
+                amount_type = COALESCE(VALUES(amount_type), transactions.amount_type),
                 possible_dispute = transactions.possible_dispute OR COALESCE(VALUES(possible_dispute), FALSE),
                 error = transactions.error OR VALUES(error),
                 flow = CASE
@@ -1117,6 +1123,7 @@ export class TransactionRepository {
             transferType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
+            amountType: record.amountType,
             error: record.error,
             dispute: record.possibleDispute,
             flow: record.flow,
@@ -1150,6 +1157,7 @@ export class TransactionRepository {
             transactionType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
+            amountType: record.amountType,
             transactionStartedAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
             possibleDispute: record.possibleDispute,
@@ -1221,6 +1229,8 @@ export class TransactionRepository {
             payeeReceiveAmount: record.payeeReceiveAmount,
             transferAmount:  record.transferAmount,
             transferState:   record.transferState,
+            useCase:         record.subScenario,
+            amountType:      record.amountType,
             dispute:         record.possibleDispute,
             partiesError:    TransactionRepository.toRawJson(record.partiesError),
             quotesError:     TransactionRepository.toRawJson(record.quotesError),
@@ -1285,6 +1295,7 @@ export namespace TransactionRepository {
         transactionType?: TransactionScenario | null;
         subScenario?: string | null;
         transferState?: TransferState | null;
+        amountType?: string | null;
         possibleDispute?: boolean | null;
         error: boolean;
         flow?: number | null;

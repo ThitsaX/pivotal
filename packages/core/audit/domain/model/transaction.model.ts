@@ -152,6 +152,9 @@ export class Transaction {
     @Column({type: 'varchar', length: 128, name: 'sub_scenario', nullable: true})
     public subScenario!: string | null;
 
+    @Column({type:'varchar', length : 128 , name:'amount_type' , nullable:true})
+    public amountType!: string | null;
+
     @Column({type: 'varchar', length: 32, name: 'transfer_state', nullable: true})
     public transferState!: TransferState | null;
 
