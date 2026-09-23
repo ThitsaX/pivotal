@@ -419,6 +419,9 @@ watch(
 
 onMounted((): void => {
     selectedMode.value = (props.mode as RangeMode | '') || detectPresetMode(props.startValue, props.endValue);
+    if (selectedMode.value === 'custom') {
+        syncCustomInputsFromProps();
+    }
 });
 
 watch(
@@ -426,6 +429,9 @@ watch(
     (mode): void => {
         if (mode != null) {
             selectedMode.value = mode as RangeMode | '';
+            if (mode === 'custom') {
+                syncCustomInputsFromProps();
+            }
         }
     },
 );

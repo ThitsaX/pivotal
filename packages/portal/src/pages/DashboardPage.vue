@@ -97,14 +97,15 @@ const appliedMode = ref<RangeMode>('today');
 
 const payerFsp = ref('');
 const payeeFsp = ref('');
+const appliedPayerFsp = ref('');
+const appliedPayeeFsp = ref('');
 const fetchedFspOptions = ref<SelectOption[]>([]);
-/** Toggles date-range controls */
 const filtersOpen = ref(false);
 
 const isHubUser = computed((): boolean => scopedFspId.value == null);
 
 const hasParticipantFilter = computed((): boolean => {
-    return payerFsp.value.trim().length > 0 || payeeFsp.value.trim().length > 0;
+    return appliedPayerFsp.value.trim().length > 0 || appliedPayeeFsp.value.trim().length > 0;
 });
 
 const fspDropdownOptions = computed((): SelectOption[] => {
@@ -118,7 +119,7 @@ const fspDropdownOptions = computed((): SelectOption[] => {
         }
     }
 
-    for (const selected of [payerFsp.value, payeeFsp.value]) {
+    for (const selected of [payerFsp.value, payeeFsp.value, appliedPayerFsp.value, appliedPayeeFsp.value]) {
         const value = selected.trim();
         if (value.length > 0 && !optionsByValue.has(value)) {
             optionsByValue.set(value, {label: value, value});
@@ -526,13 +527,13 @@ function syncLivePolling(): void {
     }
 }
 
-function loadAppliedRange(): void {
+function loadAppliedFilters(): void {
     void auditDashboardStore.load({
         from: appliedRange.value.from,
         to: appliedRange.value.to,
         timeZone: props.selectedTimeZone,
-        payerFsp: isHubUser.value ? (payerFsp.value || undefined) : undefined,
-        payeeFsp: isHubUser.value ? (payeeFsp.value || undefined) : undefined,
+        payerFsp: isHubUser.value ? (appliedPayerFsp.value || undefined) : undefined,
+        payeeFsp: isHubUser.value ? (appliedPayeeFsp.value || undefined) : undefined,
     });
     syncLivePolling();
 }
@@ -549,31 +550,41 @@ async function loadFspOptions(): Promise<void> {
     }
 }
 
-function applyRange(): void {
+function syncDraftFiltersFromApplied(): void {
+    rangeMode.value = appliedMode.value;
+    rangeStart.value = appliedRange.value.from;
+    rangeEnd.value = appliedRange.value.to;
+    payerFsp.value = appliedPayerFsp.value;
+    payeeFsp.value = appliedPayeeFsp.value;
+}
+
+function applyFilters(): void {
     if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value) {
         return;
     }
 
     appliedMode.value = rangeMode.value;
     appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
+    appliedPayerFsp.value = isHubUser.value ? payerFsp.value.trim() : '';
+    appliedPayeeFsp.value = isHubUser.value ? payeeFsp.value.trim() : '';
     filtersOpen.value = false;
-    loadAppliedRange();
+    loadAppliedFilters();
 }
 
 function refresh(): void {
-    loadAppliedRange();
+    loadAppliedFilters();
 }
 
 onMounted((): void => {
     if (canView.value) {
         void loadFspOptions();
-        loadAppliedRange();
+        loadAppliedFilters();
     }
 });
 
-watch([payerFsp, payeeFsp], (): void => {
-    if (canView.value && isHubUser.value) {
-        loadAppliedRange();
+watch(filtersOpen, (open: boolean): void => {
+    if (open) {
+        syncDraftFiltersFromApplied();
     }
 });
 
@@ -595,7 +606,7 @@ watch(
         }
 
         await nextTick();
-        applyRange();
+        applyFilters();
     },
 );
 </script>
@@ -699,32 +710,21 @@ watch(
                             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#147fc3]">
                                 Dashboard time range
                             </p>
-            <TimeRangeSelector
-                label="Dashboard time range"
+                            <TimeRangeSelector
+                                label="Dashboard time range"
                                 hide-header
-                :selected-time-zone="selectedTimeZone"
-                :mode="rangeMode"
-                :start-value="rangeStart"
-                :end-value="rangeEnd"
-                :disabled="loading"
-                compact-mode-selector
+                                :selected-time-zone="selectedTimeZone"
+                                :mode="rangeMode"
+                                :start-value="rangeStart"
+                                :end-value="rangeEnd"
+                                :disabled="loading"
+                                compact-mode-selector
                                 class="dashboard-filter-range !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
-                @update:mode="rangeMode = $event as RangeMode"
-                @update:start-value="rangeStart = $event"
-                @update:end-value="rangeEnd = $event"
-                @update:invalid="rangeInvalid = $event"
-            >
-                <template #action>
-                    <button
-                        type="button"
-                                        class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
-                        @click="applyRange"
-                    >
-                        {{ loading ? 'Applying…' : 'Apply range' }}
-                    </button>
-                </template>
-            </TimeRangeSelector>
+                                @update:mode="rangeMode = $event as RangeMode"
+                                @update:start-value="rangeStart = $event"
+                                @update:end-value="rangeEnd = $event"
+                                @update:invalid="rangeInvalid = $event"
+                            />
                         </div>
 
                         <div
@@ -756,10 +756,21 @@ watch(
                                         :options="payeeFspOptions"
                                         placeholder="(Any)"
                                         button-class="!pb-1.5 !pt-5 text-xs"
-                    :disabled="loading"
+                                        :disabled="loading"
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="ml-auto shrink-0 pb-0.5">
+                            <button
+                                type="button"
+                                class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
+                                @click="applyFilters"
+                            >
+                                {{ loading ? 'Applying…' : 'Apply' }}
+                            </button>
                         </div>
                     </div>
                 </div>
