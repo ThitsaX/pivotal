@@ -27,6 +27,57 @@ describe('DashboardAuditController', () => {
         assert.equal(dispatched.input.range?.from.toISOString(), '2026-08-01T17:00:00.000Z');
         assert.equal(dispatched.input.range?.to.toISOString(), '2026-08-02T17:00:00.000Z');
         assert.equal(dispatched.input.timeZone, 'Asia/Bangkok');
+        assert.equal(dispatched.input.payerFsp, undefined);
+        assert.equal(dispatched.input.payeeFsp, undefined);
+    });
+
+    it('passes optional payerFsp and payeeFsp filters to the query handler', async () => {
+        const dispatchedQueries: GetDashboardQuery[] = [];
+        const queryBus = {
+            async execute(query: GetDashboardQuery): Promise<never> {
+                dispatchedQueries.push(query);
+                return {} as never;
+            },
+        };
+        const controller = new DashboardAuditController(queryBus as never, {} as never);
+
+        await controller.getDashboard(
+            undefined,
+            '2026-08-01T00:00:00.000Z',
+            '2026-08-02T00:00:00.000Z',
+            'UTC',
+            'DemoDFSP1',
+            'DemoDFSP2',
+        );
+
+        const dispatched = dispatchedQueries[0];
+        assert.equal(dispatched.input.accessScope, undefined);
+        assert.equal(dispatched.input.payerFsp, 'DemoDFSP1');
+        assert.equal(dispatched.input.payeeFsp, 'DemoDFSP2');
+    });
+
+    it('treats blank payerFsp and payeeFsp as Any (undefined)', async () => {
+        const dispatchedQueries: GetDashboardQuery[] = [];
+        const queryBus = {
+            async execute(query: GetDashboardQuery): Promise<never> {
+                dispatchedQueries.push(query);
+                return {} as never;
+            },
+        };
+        const controller = new DashboardAuditController(queryBus as never, {} as never);
+
+        await controller.getDashboard(
+            undefined,
+            '2026-08-01T00:00:00.000Z',
+            '2026-08-02T00:00:00.000Z',
+            'UTC',
+            '   ',
+            '',
+        );
+
+        const dispatched = dispatchedQueries[0];
+        assert.equal(dispatched.input.payerFsp, undefined);
+        assert.equal(dispatched.input.payeeFsp, undefined);
     });
 
     it('rejects incomplete, reversed and invalid-timezone ranges', async () => {

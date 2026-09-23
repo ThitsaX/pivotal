@@ -12,6 +12,8 @@ export namespace GetDashboardQuery {
             public readonly accessScope?: AccessScope,
             public readonly range?: DateRange,
             public readonly timeZone: string = 'UTC',
+            public readonly payerFsp?: string,
+            public readonly payeeFsp?: string,
         ) {
         }
     }

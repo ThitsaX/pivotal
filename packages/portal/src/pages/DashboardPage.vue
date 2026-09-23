@@ -7,6 +7,9 @@ import type {ApexChart, ApexFill, ApexGrid, ApexLegend, ApexOptions, ApexYAxis} 
 import VueApexCharts from 'vue3-apexcharts';
 import TimeRangeSelector from '../components/TimeRangeSelector.vue';
 import TimeZoneSelector from '../components/TimeZoneSelector.vue';
+import CustomDropdown from '../components/CustomDropdown.vue';
+import {fetchAuditFspOptions} from '../modules/audit/fsp-options-api';
+import type {SelectOption} from '../modules/audit/types';
 import type {MenuGroup} from '../stores/menu.store';
 import {authStore} from '../stores/auth.store';
 import {auditDashboardStore} from '../stores/audit-dashboard.store';
@@ -85,13 +88,57 @@ function todayRange(timeZone: string): {from: string; to: string} {
 }
 
 const initialRange = todayRange(props.selectedTimeZone);
+const appliedRange = ref({...initialRange});
 const rangeMode = ref<RangeMode>('today');
 const rangeStart = ref(initialRange.from);
 const rangeEnd = ref(initialRange.to);
 const rangeInvalid = ref(false);
 const appliedMode = ref<RangeMode>('today');
-const appliedRange = ref({...initialRange});
-const rangeEditorOpen = ref(true);
+
+const payerFsp = ref('');
+const payeeFsp = ref('');
+const fetchedFspOptions = ref<SelectOption[]>([]);
+/** Toggles date-range controls */
+const filtersOpen = ref(false);
+
+const isHubUser = computed((): boolean => scopedFspId.value == null);
+
+const hasParticipantFilter = computed((): boolean => {
+    return payerFsp.value.trim().length > 0 || payeeFsp.value.trim().length > 0;
+});
+
+const fspDropdownOptions = computed((): SelectOption[] => {
+    const optionsByValue = new Map<string, SelectOption>();
+    optionsByValue.set('', {label: '(Any)', value: ''});
+
+    for (const option of fetchedFspOptions.value) {
+        const value = option.value.trim();
+        if (value.length > 0) {
+            optionsByValue.set(value, {label: option.label.trim() || value, value});
+        }
+    }
+
+    for (const selected of [payerFsp.value, payeeFsp.value]) {
+        const value = selected.trim();
+        if (value.length > 0 && !optionsByValue.has(value)) {
+            optionsByValue.set(value, {label: value, value});
+        }
+    }
+
+    return Array.from(optionsByValue.values());
+});
+
+const payerFspOptions = computed((): SelectOption[] => {
+    return fspDropdownOptions.value.filter(
+        (option) => option.value === '' || option.value !== payeeFsp.value,
+    );
+});
+
+const payeeFspOptions = computed((): SelectOption[] => {
+    return fspDropdownOptions.value.filter(
+        (option) => option.value === '' || option.value !== payerFsp.value,
+    );
+});
 
 const rangeModeLabel = computed((): string => ({
     today: 'Today',
@@ -484,8 +531,22 @@ function loadAppliedRange(): void {
         from: appliedRange.value.from,
         to: appliedRange.value.to,
         timeZone: props.selectedTimeZone,
+        payerFsp: isHubUser.value ? (payerFsp.value || undefined) : undefined,
+        payeeFsp: isHubUser.value ? (payeeFsp.value || undefined) : undefined,
     });
     syncLivePolling();
+}
+
+async function loadFspOptions(): Promise<void> {
+    if (!isHubUser.value) {
+        return;
+    }
+
+    try {
+        fetchedFspOptions.value = await fetchAuditFspOptions();
+    } catch {
+        fetchedFspOptions.value = [];
+    }
 }
 
 function applyRange(): void {
@@ -495,7 +556,7 @@ function applyRange(): void {
 
     appliedMode.value = rangeMode.value;
     appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
-    rangeEditorOpen.value = false;
+    filtersOpen.value = false;
     loadAppliedRange();
 }
 
@@ -505,6 +566,13 @@ function refresh(): void {
 
 onMounted((): void => {
     if (canView.value) {
+        void loadFspOptions();
+        loadAppliedRange();
+    }
+});
+
+watch([payerFsp, payeeFsp], (): void => {
+    if (canView.value && isHubUser.value) {
         loadAppliedRange();
     }
 });
@@ -577,16 +645,70 @@ watch(
             v-if="canView"
             class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
         >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs text-slate-600">
+                    Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
+                    {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+                </p>
+                <button
+                    type="button"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition disabled:opacity-50"
+                    :class="filtersOpen || hasParticipantFilter
+                        ? 'border-accent bg-accent text-white shadow-soft'
+                        : 'border-accent/25 bg-white text-accent hover:border-accent hover:bg-[#f8fbff]'"
+                    :disabled="loading"
+                    :aria-expanded="filtersOpen"
+                    :title="filtersOpen ? 'Hide filters' : 'Show filters'"
+                    @click="filtersOpen = !filtersOpen"
+                >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path
+                            d="M3 5h14M5.5 10h9M8 15h4"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                    Filter
+                    <span
+                        v-if="hasParticipantFilter"
+                        class="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] normal-case tracking-normal"
+                    >
+                        On
+                    </span>
+                </button>
+            </div>
+
+            <Transition
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="max-h-0 -translate-y-1 opacity-0"
+                enter-to-class="max-h-[1200px] translate-y-0 opacity-100"
+                leave-active-class="overflow-hidden transition-all duration-200 ease-in"
+                leave-from-class="max-h-[1200px] translate-y-0 opacity-100"
+                leave-to-class="max-h-0 -translate-y-1 opacity-0"
+            >
+                <div
+                    v-if="filtersOpen"
+                    class="mt-2 overflow-visible rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5"
+                >
+                    <div class="flex flex-wrap items-end gap-x-4 gap-y-2.5">
+                        <div
+                            class="min-w-0 space-y-1"
+                            :class="rangeMode === 'custom' ? 'w-full basis-full' : 'shrink-0'"
+                        >
+                            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                                Dashboard time range
+                            </p>
             <TimeRangeSelector
-                v-show="rangeEditorOpen"
                 label="Dashboard time range"
+                                hide-header
                 :selected-time-zone="selectedTimeZone"
                 :mode="rangeMode"
                 :start-value="rangeStart"
                 :end-value="rangeEnd"
                 :disabled="loading"
                 compact-mode-selector
-                :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
+                                class="dashboard-filter-range !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
                 @update:mode="rangeMode = $event as RangeMode"
                 @update:start-value="rangeStart = $event"
                 @update:end-value="rangeEnd = $event"
@@ -595,7 +717,7 @@ watch(
                 <template #action>
                     <button
                         type="button"
-                        class="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                                        class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
                         @click="applyRange"
                     >
@@ -603,17 +725,45 @@ watch(
                     </button>
                 </template>
             </TimeRangeSelector>
-            <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
-                Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
-                {{ appliedRangeLabel }} ({{ selectedTimeZone }})
-                <button
-                    v-if="!rangeEditorOpen"
-                    type="button"
-                    class="ml-3 font-semibold text-accent underline disabled:opacity-50"
+                        </div>
+
+                        <div
+                            v-if="isHubUser"
+                            class="min-w-0 flex-1 basis-[18rem] space-y-1"
+                        >
+                            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                                Participant
+                            </p>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:max-w-xl">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Payer FSP
+                                    </span>
+                                    <CustomDropdown
+                                        v-model="payerFsp"
+                                        :options="payerFspOptions"
+                                        placeholder="(Any)"
+                                        button-class="!pb-1.5 !pt-5 text-xs"
+                                        :disabled="loading"
+                                    />
+                                </div>
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Payee FSP
+                                    </span>
+                                    <CustomDropdown
+                                        v-model="payeeFsp"
+                                        :options="payeeFspOptions"
+                                        placeholder="(Any)"
+                                        button-class="!pb-1.5 !pt-5 text-xs"
                     :disabled="loading"
-                    @click="rangeEditorOpen = true"
-                >Edit range</button>
-            </p>
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
         </article>
 
         <!-- No permission -->

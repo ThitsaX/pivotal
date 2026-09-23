@@ -36,13 +36,17 @@ export class DashboardAuditController {
         @Query('from') fromValue?: string,
         @Query('to') toValue?: string,
         @Query('timeZone') timeZoneValue?: string,
+        @Query('payerFsp') payerFspValue?: string,
+        @Query('payeeFsp') payeeFspValue?: string,
     ): Promise<GetDashboardQuery.Output> {
         const accessScope = DashboardAuditController.resolveAccessScope(claims);
         const range = DashboardAuditController.parseRange(fromValue, toValue);
         const timeZone = DashboardAuditController.parseTimeZone(timeZoneValue);
+        const payerFsp = QueryParamsUtil.toOptionalString(payerFspValue);
+        const payeeFsp = QueryParamsUtil.toOptionalString(payeeFspValue);
 
         return this.queryBus.execute(
-            new GetDashboardQuery(new GetDashboardQuery.Input(accessScope, range, timeZone)),
+            new GetDashboardQuery(new GetDashboardQuery.Input(accessScope, range, timeZone, payerFsp, payeeFsp)),
         );
     }
 
