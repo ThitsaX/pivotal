@@ -5,7 +5,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
 import { MdcContext } from '@shared/foundation';
-import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
+import { Extension, ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
@@ -22,7 +22,7 @@ export class PutSendMoneyRequest {
     amount?: string;
 
     @IsOptional()
-    extensionList?: ExtensionList;
+    extensionList?: Array<Extension> | ExtensionList;
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
@@ -83,6 +83,22 @@ export class SendMoneyController {
         return payerFsp;
     }
 
+    private static toExtensionList(
+        extensionList: Array<Extension> | ExtensionList | undefined,
+    ): ExtensionList | undefined {
+        if (extensionList == null) {
+            return undefined;
+        }
+
+        if (Array.isArray(extensionList)) {
+            return {
+                extension: extensionList,
+            };
+        }
+
+        return extensionList;
+    }
+
     // The request line is emitted by SendMoneyLogInterceptor, which runs before the
     // ValidationPipe and therefore also covers payloads rejected during validation.
     @Post()
@@ -124,7 +140,7 @@ export class SendMoneyController {
                             transferId,
                             request.acceptParty,
                             request.amount ?? '',
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                             SendMoneyController.toOptionalSource(source),
                         ),
                     ),
