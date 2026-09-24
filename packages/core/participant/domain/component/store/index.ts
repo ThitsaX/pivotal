@@ -2,7 +2,9 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 export * from './participant-access-key-store';
 export * from './participant-jws-private-key-store';
+export * from './participant-key-ref-store';
 export * from './participant-jws-public-key-store';
 export * from './participant-jws-policy-store';
 export * from './jws-private-key-source';
+export * from './jws-key-ref-source';
 export * from './jws-key-provisioner';

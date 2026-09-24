@@ -4,6 +4,7 @@ import {Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit} from '@nestjs
 import {FspiopVerifyMode} from '@shared/fspiop/component/fspiop-verify-mode';
 import {ParticipantKeyRepository, ParticipantRepository} from '../../repository';
 import {DatabaseJwsPrivateKeySource, JwsPrivateKeySource} from './jws-private-key-source';
+import {JwsKeyRefSource} from './jws-key-ref-source';
 
 @Injectable()
 export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +20,13 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
     private publicKeysByFspId = new Map<string, string>();
 
     private privateKeysByFspId = new Map<string, string>();
+
+    /**
+     * Populated instead of {@link privateKeysByFspId} under a custody profile that keeps keys
+     * inside a device. Exactly one of the two is ever filled: a tenant either has a key this
+     * process can read or a reference to one it cannot.
+     */
+    private keyRefsByFspId = new Map<string, string>();
 
     private accessPublicKeysByFspId = new Map<string, string>();
 
@@ -41,6 +49,12 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
          * default exists for continuity rather than as a recommendation.
          */
         private readonly privateKeySource: JwsPrivateKeySource = new DatabaseJwsPrivateKeySource(),
+        /**
+         * Set only under a device-backed profile. Left undefined otherwise, so a deployment
+         * that holds real keys does no Vault round trips looking for references that will
+         * never exist.
+         */
+        private readonly keyRefSource?: JwsKeyRefSource,
     ) {
         this.refreshIntervalMs = ParticipantSigningKeysCache.resolveRefreshIntervalMs();
     }
@@ -101,6 +115,11 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
 
     getPrivateKeyPem(fspId: string): string | undefined {
         return this.privateKeysByFspId.get(fspId);
+    }
+
+    /** The tenant's key reference, under a profile where signing happens inside a device. */
+    getKeyRef(fspId: string): string | undefined {
+        return this.keyRefsByFspId.get(fspId);
     }
 
     getAccessPublicKeyPem(fspId: string): string | undefined {
@@ -191,8 +210,16 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
                 this.privateKeysByFspId,
             );
 
+            // Same placement and the same reason: a throw leaves every map as it was, so the
+            // previously resolved references stay live rather than every tenant losing the ability
+            // to sign because one read failed.
+            const nextKeyRefsByFspId = this.keyRefSource == null
+                ? this.keyRefsByFspId
+                : await this.keyRefSource.resolve(participantKeys, this.keyRefsByFspId);
+
             this.publicKeysByFspId = nextPublicKeysByFspId;
             this.privateKeysByFspId = nextPrivateKeysByFspId;
+            this.keyRefsByFspId = nextKeyRefsByFspId;
             this.accessPublicKeysByFspId = nextAccessPublicKeysByFspId;
             this.signEnabledByFspId = nextSignEnabledByFspId;
             this.verifyModeByFspId = nextVerifyModeByFspId;

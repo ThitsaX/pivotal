@@ -3,11 +3,10 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuditProducerModule } from '@core/audit/producer';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, PrivateKeyJwsSigner, MutualTlsAgent } from '@shared/fspiop';
+import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
 import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
-import { PrivateKeyStore } from "@shared/security";
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
@@ -90,7 +89,7 @@ export class OutboundDomainModule {
                 provide: FspiopAxios,
                 useFactory: (
                     outboundSettings: OutboundSettings,
-                    privateKeyStore: PrivateKeyStore,
+                    jwsSigner: JwsSigner,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
@@ -98,8 +97,7 @@ export class OutboundDomainModule {
 
                     const interceptors =
                         fspiopSettings.useJws
-                            ? [new FspiopSigningInterceptor(
-                                new PrivateKeyJwsSigner(privateKeyStore)).build()]
+                            ? [new FspiopSigningInterceptor(jwsSigner).build()]
                             : [];
 
                     // Built through MutualTlsAgent so a renewed certificate takes effect
@@ -129,7 +127,7 @@ export class OutboundDomainModule {
                     return new FspiopAxios(
                         fspiopSettings, params, interceptors, {}, mutualTls?.httpsAgent());
                 },
-                inject: [OutboundSettings, PrivateKeyStore],
+                inject: [OutboundSettings, JwsSigner],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];

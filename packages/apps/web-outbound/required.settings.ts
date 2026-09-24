@@ -5,6 +5,7 @@ import { OutboundSettings } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
 import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
+import { Pkcs11Settings } from '@shared/pkcs11';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
@@ -218,6 +219,33 @@ export class WebOutboundSettings
             10_000,
             this.readVaultAuthMethod(),
             this.configService.get<string>('VAULT_TOKEN') ?? '',
+        );
+    }
+
+    /**
+     * Where key references live, under `KEY_PROVIDER=pkcs11`.
+     */
+    keyRefPathPrefix(): string {
+        return this.configService.get<string>('KEY_REF_PATH') ?? 'pivotal/keyref';
+    }
+
+    /**
+     * How this workload reaches its PKCS#11 device, under `KEY_PROVIDER=pkcs11`.
+     *
+     * No credential here, deliberately: it is read from Vault at the path named by
+     * `HSM_CRED_PATH`. An env-supplied one sits in the Deployment manifest, shows up in
+     * `kubectl describe`, needs a redeploy to rotate, and leaves no record of who read it.
+     *
+     * web-outbound signs as whichever tenant is the payer, so its credential is the shared
+     * `web-outbound` crypto user that every tenant's key is shared to — not a per-tenant one.
+     */
+    pkcs11Settings(): Pkcs11Settings {
+        return new Pkcs11Settings(
+            this.configService.get<string>('PKCS11_MODULE_PATH') ?? '',
+            this.configService.get<string>('PKCS11_TOKEN_LABEL') ?? '',
+            this.configService.get<string>('HSM_CRED_PATH') ?? '',
+            this.keyRefPathPrefix(),
+            this.readPositiveInteger('PKCS11_SESSION_POOL_SIZE') ?? Pkcs11Settings.DEFAULT_POOL_SIZE,
         );
     }
 

@@ -141,6 +141,27 @@ export class VaultJwsPrivateKeySource extends JwsPrivateKeySource {
     }
 }
 
+/**
+ * Yields nothing, because under this profile no private key exists outside the device.
+ *
+ * Not a stub and not a failure: a tenant on the HSM-backed profile is signing correctly while this
+ * returns an empty map for it. What identifies its key is a reference, resolved by
+ * {@link JwsKeyRefSource} instead — so the cache is populated, just in the other map.
+ */
+export class DeviceHeldJwsPrivateKeySource extends JwsPrivateKeySource {
+
+    async resolve(
+        participantKeys: ParticipantKey[],
+        previous?: ReadonlyMap<string, string>,
+    ): Promise<Map<string, string>> {
+
+        void participantKeys;
+        void previous;
+
+        return new Map<string, string>();
+    }
+}
+
 export namespace JwsPrivateKeySource {
 
     /**

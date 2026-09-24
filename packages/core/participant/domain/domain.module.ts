@@ -6,6 +6,8 @@ import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {CentralLedgerAxios, CentralLedgerAxiosParams, CentralLedgerFacade} from '@shared/central-ledger';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {KeyProvider, VaultClient, VaultSettings} from '@shared/vault';
+import {JwsSigner, PrivateKeyJwsSigner} from '@shared/fspiop';
+import {Pkcs11Bootstrap, Pkcs11JwsSigner, Pkcs11Settings} from '@shared/pkcs11';
 import {
     AddFspCurrencyHandler,
     AddHubCurrencyHandler,
@@ -35,9 +37,13 @@ import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
 import {SigningTenantPublisher} from './component/signing-tenant.publisher';
 import {
     DatabaseJwsPrivateKeySource,
+    DeviceHeldJwsPrivateKeySource,
     JwsPrivateKeySource,
     VaultJwsPrivateKeySource,
 } from './component/store/jws-private-key-source';
+import {JwsKeyRefSource, VaultJwsKeyRefSource} from './component/store/jws-key-ref-source';
+import {ParticipantKeyRefStore} from './component/store/participant-key-ref-store';
+import {ParticipantJwsPrivateKeyStore} from './component/store/participant-jws-private-key-store';
 import {
     DatabaseJwsKeyProvisioner,
     JwsKeyProvisioner,
@@ -88,14 +94,55 @@ const Components: Provider[] = [
         inject: [REQUIRED_SETTINGS],
     },
     {
+        provide: JwsKeyRefSource,
+        useFactory: (
+            settings: ParticipantDomainModule.RequiredSettings,
+        ): JwsKeyRefSource | null =>
+            ParticipantDomainModule.createKeyRefSource(settings) ?? null,
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
         provide: ParticipantSigningKeysCache,
         useFactory: (
             participantRepository: ParticipantRepository,
             participantKeyRepository: ParticipantKeyRepository,
             privateKeySource: JwsPrivateKeySource,
+            keyRefSource: JwsKeyRefSource | null,
         ): ParticipantSigningKeysCache => new ParticipantSigningKeysCache(
-            participantRepository, participantKeyRepository, privateKeySource),
-        inject: [ParticipantRepository, ParticipantKeyRepository, JwsPrivateKeySource],
+            participantRepository, participantKeyRepository, privateKeySource,
+            keyRefSource ?? undefined),
+        inject: [
+            ParticipantRepository, ParticipantKeyRepository, JwsPrivateKeySource, JwsKeyRefSource,
+        ],
+    },
+    ParticipantKeyRefStore,
+    {
+        // Null under every profile but pkcs11, so a deployment holding real keys loads no device
+        // library and opens no sessions. Its onModuleInit is what reads the crypto-user credential
+        // and logs in -- at startup, so that Vault stays off the signing path.
+        provide: Pkcs11Bootstrap,
+        useFactory: (
+            settings: ParticipantDomainModule.RequiredSettings,
+        ): Pkcs11Bootstrap | null =>
+            ParticipantDomainModule.createPkcs11Bootstrap(settings),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        // Where signing happens, decided once. Both consumers -- web-outbound signing as any
+        // payer, and a connector signing as its own tenant -- take this rather than deciding for
+        // themselves, so the two cannot drift onto different custody.
+        provide: JwsSigner,
+        useFactory: (
+            settings: ParticipantDomainModule.RequiredSettings,
+            cache: ParticipantSigningKeysCache,
+            keyRefStore: ParticipantKeyRefStore,
+            pkcs11: Pkcs11Bootstrap | null,
+        ): JwsSigner =>
+            ParticipantDomainModule.createJwsSigner(settings, cache, keyRefStore, pkcs11),
+        inject: [
+            REQUIRED_SETTINGS, ParticipantSigningKeysCache, ParticipantKeyRefStore,
+            {token: Pkcs11Bootstrap, optional: true},
+        ],
     },
     {
         // Present only where the DFSP-facing CA is configured. A deployment that does not issue
@@ -207,10 +254,10 @@ export class ParticipantDomainModule {
         }
 
         if (keyProvider === KeyProvider.Pkcs11) {
-            throw new Error(
-                `KEY_PROVIDER '${KeyProvider.Pkcs11}' is not implemented yet. `
-                + `Use '${KeyProvider.VaultKv}' or '${KeyProvider.Database}'.`,
-            );
+            // No private key exists outside the device, so there is nothing for this source to
+            // return. The tenant is not unkeyed -- its key is named by a reference that
+            // createKeyRefSource resolves instead.
+            return new DeviceHeldJwsPrivateKeySource();
         }
 
         const vaultSettings = settings.vaultSettings?.();
@@ -224,6 +271,107 @@ export class ParticipantDomainModule {
         }
 
         return new VaultJwsPrivateKeySource(new VaultClient(vaultSettings), vaultSettings);
+    }
+
+    /**
+     * Chooses where key references come from, for profiles that hold no key material.
+     *
+     * Returns `undefined` under every other profile so the refresh does no Vault round trips
+     * looking for references that will never exist.
+     */
+    static createKeyRefSource(
+        settings: ParticipantDomainModule.RequiredSettings,
+    ): JwsKeyRefSource | undefined {
+
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+
+        if (keyProvider !== KeyProvider.Pkcs11) {
+            return undefined;
+        }
+
+        const vaultSettings = settings.vaultSettings?.();
+
+        if (vaultSettings == null || !vaultSettings.isConfigured()) {
+            // Refused rather than defaulted, for the same reason the private-key side refuses: a
+            // deployment that chose hardware custody and cannot reach the store naming its keys
+            // must stop where that is visible, not sign for nobody and look healthy.
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but Vault is not configured. `
+                + 'Set VAULT_ADDRESS, plus VAULT_ROLE for Kubernetes auth or VAULT_TOKEN when '
+                + 'VAULT_AUTH_METHOD=token.',
+            );
+        }
+
+        return new VaultJwsKeyRefSource(
+            new VaultClient(vaultSettings),
+            vaultSettings,
+            settings.keyRefPathPrefix?.() ?? undefined,
+        );
+    }
+
+    /**
+     * Builds the device connection under `pkcs11`, and nothing under any other profile.
+     */
+    static createPkcs11Bootstrap(
+        settings: ParticipantDomainModule.RequiredSettings,
+    ): Pkcs11Bootstrap | null {
+
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+
+        if (keyProvider !== KeyProvider.Pkcs11) {
+            return null;
+        }
+
+        const pkcs11Settings = settings.pkcs11Settings?.();
+
+        if (pkcs11Settings == null || !pkcs11Settings.isConfigured()) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but the device is not configured. `
+                + 'Set PKCS11_MODULE_PATH and HSM_CRED_PATH.',
+            );
+        }
+
+        const vaultSettings = settings.vaultSettings?.();
+
+        if (vaultSettings == null || !vaultSettings.isConfigured()) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but Vault is not configured. The `
+                + 'crypto-user credential is read from Vault, never from configuration.',
+            );
+        }
+
+        return new Pkcs11Bootstrap(pkcs11Settings, new VaultClient(vaultSettings));
+    }
+
+    /**
+     * Chooses where signatures are produced.
+     *
+     * Mirrors {@link createPrivateKeySource}: custody decides both where a key lives and where
+     * signing happens, so the two are read from one setting and can never disagree.
+     */
+    static createJwsSigner(
+        settings: ParticipantDomainModule.RequiredSettings,
+        cache: ParticipantSigningKeysCache,
+        keyRefStore: ParticipantKeyRefStore,
+        pkcs11: Pkcs11Bootstrap | null,
+    ): JwsSigner {
+
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+
+        if (keyProvider !== KeyProvider.Pkcs11) {
+            return new PrivateKeyJwsSigner(new ParticipantJwsPrivateKeyStore(cache));
+        }
+
+        if (pkcs11 == null) {
+            // Unreachable while both factories read the same setting, and worth failing loudly if
+            // that ever stops being true: the alternative is a deployment that chose hardware
+            // custody quietly signing in software.
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but no device connection was built.`,
+            );
+        }
+
+        return new Pkcs11JwsSigner(pkcs11.keySigner, keyRefStore);
     }
 
     /**
@@ -328,8 +476,18 @@ export namespace ParticipantDomainModule {
         /** Absent means {@link KeyProvider.Database} — legacy, for continuity only. */
         keyProvider?(): KeyProvider;
 
-        /** Required when {@link keyProvider} returns {@link KeyProvider.VaultKv}. */
+        /** Required when {@link keyProvider} returns {@link KeyProvider.VaultKv} or
+         * {@link KeyProvider.Pkcs11} — both read from Vault, differing in what the path holds. */
         vaultSettings?(): VaultSettings;
+
+        /**
+         * Path prefix for key references, under {@link KeyProvider.Pkcs11}. Defaults to
+         * `pivotal/keyref` — the path the provisioning runbook writes.
+         */
+        keyRefPathPrefix?(): string;
+
+        /** Required when {@link keyProvider} returns {@link KeyProvider.Pkcs11}. */
+        pkcs11Settings?(): Pkcs11Settings;
 
         /** Absent where the deployment issues no DFSP certificates. */
         dfspCertIssuerSettings?(): DfspCertificateIssuer.Settings;
