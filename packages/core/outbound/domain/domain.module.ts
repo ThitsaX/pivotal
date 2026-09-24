@@ -3,7 +3,7 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuditProducerModule } from '@core/audit/producer';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, MutualTlsAgent } from '@shared/fspiop';
+import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, PrivateKeyJwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
 import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
@@ -97,7 +97,9 @@ export class OutboundDomainModule {
                     const params = outboundSettings.fspiopAxiosParams;
 
                     const interceptors =
-                        fspiopSettings.useJws ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+                        fspiopSettings.useJws
+                            ? [new FspiopSigningInterceptor(
+                                new PrivateKeyJwsSigner(privateKeyStore)).build()]
                             : [];
 
                     // Built through MutualTlsAgent so a renewed certificate takes effect

@@ -4,6 +4,7 @@ import { FspInboundGuard } from '../../packages/shared/fspiop/component/nest/gua
 import { FspiopSettings } from '../../packages/shared/fspiop/component/fspiop-settings';
 import { FspiopSignature } from '../../packages/shared/fspiop/component/fspiop-signature';
 import { FspiopSigningInterceptor } from '../../packages/shared/fspiop/component/axios/interceptor/fspiop-signing.interceptor';
+import { PrivateKeyJwsSigner } from '../../packages/shared/fspiop/component/jws-signer';
 import { FspiopVerifyMode } from '../../packages/shared/fspiop/component/fspiop-verify-mode';
 import { StaticJwsPolicyStore } from '../../packages/shared/fspiop/component/security/jws-policy-store';
 import { PrivateKey, PrivateKeyStore, PublicKey, PublicKeyStore } from '../../packages/shared/security/component/key';
@@ -137,7 +138,8 @@ describe('JWS over a real Vault (integration)', () => {
             ),
         );
 
-        const interceptor = new FspiopSigningInterceptor(new SingleKeyPrivateStore(privateKey)).build();
+        const interceptor = new FspiopSigningInterceptor(
+            new PrivateKeyJwsSigner(new SingleKeyPrivateStore(privateKey))).build();
 
         const config = await interceptor({
             method: 'put',

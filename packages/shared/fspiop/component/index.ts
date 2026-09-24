@@ -11,6 +11,7 @@ export * from './fspiop-pub-sub-subjects';
 export * from './fspiop-settings';
 export * from './fspiop-protected-header';
 export * from './fspiop-signature';
+export * from './jws-signer';
 export * from './fspiop-verify-mode';
 export * from './fspiop-uri';
 export * from './fspiop-status-translator';

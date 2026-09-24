@@ -47,17 +47,39 @@ export class FspiopSignature {
         payload: string,
     ): FspiopSignature.Header {
 
+        const {alg, protectedHeader, bytes} = FspiopSignature.signingInput(input, payload);
+
+        const signature = createSign(FspiopSignature.toNodeAlgorithm(alg))
+            .update(bytes)
+            .sign(privateKey.toBuffer(), 'base64url');
+
+        return { signature, protectedHeader };
+    }
+
+    /**
+     * Builds the exact bytes a signature is computed over, without signing them.
+     *
+     * Exposed for signers that cannot hold key material — one signing inside a hardware module is
+     * handed a digest, never a key, so it cannot call {@link sign} and must derive the same input
+     * itself. Deriving it separately is the failure worth designing out: a divergence here is
+     * invisible in every local test, because both sides of a local round trip would share the
+     * mistake, and surfaces only as a peer rejecting a signature.
+     */
+    static signingInput(
+        input: FspiopProtectedHeader.Input,
+        payload: string,
+    ): FspiopSignature.SigningInput {
+
         const fields = FspiopProtectedHeader.build(input);
-        const algorithm = FspiopSignature.toNodeAlgorithm(fields.alg);
 
         const protectedHeader = FspiopSignature.encode(JSON.stringify(fields));
         const encodedPayload = FspiopSignature.encode(FspiopSignature.canonicalize(payload));
 
-        const signature = createSign(algorithm)
-            .update(`${protectedHeader}.${encodedPayload}`)
-            .sign(privateKey.toBuffer(), 'base64url');
-
-        return { signature, protectedHeader };
+        return {
+            alg: fields.alg,
+            protectedHeader,
+            bytes: `${protectedHeader}.${encodedPayload}`,
+        };
     }
 
     /**
@@ -145,6 +167,19 @@ export class FspiopSignature {
 }
 
 export namespace FspiopSignature {
+
+    /** The signing input, split so a caller can sign {@link bytes} however its custody requires. */
+    export interface SigningInput {
+
+        /** Algorithm named in the protected header. RS256 — settled decision 3. */
+        alg: string;
+
+        /** base64url of the protected header JSON; returned to the caller in the header pair. */
+        protectedHeader: string;
+
+        /** `base64url(protectedHeader) + "." + base64url(canonicalPayload)`. What gets signed. */
+        bytes: string;
+    }
 
     /** The JSON value carried in the `fspiop-signature` HTTP header. */
     export interface Header {

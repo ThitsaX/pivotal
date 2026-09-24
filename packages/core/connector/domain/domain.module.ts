@@ -4,7 +4,7 @@ import * as https from 'node:https';
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {AuditProducerModule} from '@core/audit/producer';
-import {FspiopAxios, FspiopAxiosParams, FspiopSettings, FspiopSigningInterceptor,} from '@shared/fspiop';
+import {FspiopAxios, FspiopAxiosParams, FspiopSettings, FspiopSigningInterceptor, PrivateKeyJwsSigner,} from '@shared/fspiop';
 import {CaStore, ClientCertStore, PrivateKeyStore} from '@shared/security';
 import {
     PerformGetPartiesHandler,
@@ -88,7 +88,8 @@ export class ConnectorDomainModule {
                     const fspiopAxiosParams = settings.fspiopAxiosParams();
 
                     const interceptors = fspiopSettings.useJws
-                        ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+                        ? [new FspiopSigningInterceptor(
+                            new PrivateKeyJwsSigner(privateKeyStore)).build()]
                         : [];
 
                     const httpsAgent = fspiopSettings.useMutualTls
