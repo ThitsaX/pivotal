@@ -68,6 +68,7 @@ describe('Audit transaction handlers', () => {
                 occurredAt,
                 Currency.Usd,
                 '10.00',
+                'SEND',
             ),
         ));
 
@@ -85,6 +86,7 @@ describe('Audit transaction handlers', () => {
             transactionInitiatorType: TransactionInitiatorType.Consumer,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            amountType: 'SEND',
             quotingCurrency: Currency.Usd,
             quotingAmount: 10,
             payerHomeTransactionId: 'payer-home-1',
