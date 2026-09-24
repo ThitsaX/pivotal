@@ -24,6 +24,8 @@ export class GetDashboardHandler
         const now = new Date();
         const range = query.input.range ?? GetDashboardHandler.currentUtcDay(now);
         const timeZone = query.input.timeZone;
+        const payerFsp = query.input.payerFsp;
+        const payeeFsp = query.input.payeeFsp;
 
         const [
             errorByStage,
@@ -33,11 +35,15 @@ export class GetDashboardHandler
             timeBuckets,
             lastUpdatedAt,
         ] = await Promise.all([
-            this.repository.getErrorStageBreakdown(scopeFspId, range.from, range.to),
-            this.repository.getValueByCurrency(scopeFspId, range.from, range.to),
-            this.repository.getTopFsps(scopeFspId, 'payer_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT),
-            this.repository.getTopFsps(scopeFspId, 'payee_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT),
-            this.repository.getTimeBuckets(scopeFspId, range.from, range.to, timeZone),
+            this.repository.getErrorStageBreakdown(scopeFspId, range.from, range.to, payerFsp, payeeFsp),
+            this.repository.getValueByCurrency(scopeFspId, range.from, range.to, payerFsp, payeeFsp),
+            this.repository.getTopFsps(
+                scopeFspId, 'payer_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT, payerFsp, payeeFsp,
+            ),
+            this.repository.getTopFsps(
+                scopeFspId, 'payee_fsp', range.from, range.to, GetDashboardHandler.TOP_FSP_LIMIT, payerFsp, payeeFsp,
+            ),
+            this.repository.getTimeBuckets(scopeFspId, range.from, range.to, timeZone, payerFsp, payeeFsp),
             this.repository.getLastUpdatedAt(),
         ]);
 

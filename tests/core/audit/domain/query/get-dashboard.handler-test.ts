@@ -78,4 +78,77 @@ describe('GetDashboardHandler', () => {
             call.from.toISOString() === range.from.toISOString()
             && call.to.toISOString() === range.to.toISOString()));
     });
+
+    it('forwards payerFsp and payeeFsp filters to every rollup read', async () => {
+        const filterCalls: Array<{
+            method: string;
+            payerFsp: string | undefined;
+            payeeFsp: string | undefined;
+        }> = [];
+
+        const repository = {
+            async getErrorStageBreakdown(
+                _scope: string | undefined,
+                _from: Date,
+                _to: Date,
+                payerFsp?: string,
+                payeeFsp?: string,
+            ) {
+                filterCalls.push({method: 'getErrorStageBreakdown', payerFsp, payeeFsp});
+                return [];
+            },
+            async getValueByCurrency(
+                _scope: string | undefined,
+                _from: Date,
+                _to: Date,
+                payerFsp?: string,
+                payeeFsp?: string,
+            ) {
+                filterCalls.push({method: 'getValueByCurrency', payerFsp, payeeFsp});
+                return [];
+            },
+            async getTopFsps(
+                _scope: string | undefined,
+                leg: string,
+                _from: Date,
+                _to: Date,
+                _limit: number,
+                payerFsp?: string,
+                payeeFsp?: string,
+            ) {
+                filterCalls.push({method: `getTopFsps:${leg}`, payerFsp, payeeFsp});
+                return [];
+            },
+            async getTimeBuckets(
+                _scope: string | undefined,
+                _from: Date,
+                _to: Date,
+                _timeZone: string,
+                payerFsp?: string,
+                payeeFsp?: string,
+            ) {
+                filterCalls.push({method: 'getTimeBuckets', payerFsp, payeeFsp});
+                return [];
+            },
+            async getLastUpdatedAt() {
+                return null;
+            },
+        };
+
+        const handler = new GetDashboardHandler(repository as never);
+        const range = new GetDashboardQuery.DateRange(
+            new Date('2026-08-01T00:00:00.000Z'),
+            new Date('2026-08-02T00:00:00.000Z'),
+        );
+
+        await handler.execute(new GetDashboardQuery(
+            new GetDashboardQuery.Input(undefined, range, 'UTC', 'DemoDFSP1', 'DemoDFSP2'),
+        ));
+
+        assert.equal(filterCalls.length, 5);
+        for (const call of filterCalls) {
+            assert.equal(call.payerFsp, 'DemoDFSP1', call.method);
+            assert.equal(call.payeeFsp, 'DemoDFSP2', call.method);
+        }
+    });
 });
