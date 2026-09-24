@@ -88,9 +88,7 @@ packages/**/*.js
 security-scan-results/
 __pycache__/
 
-# Working notes, not deliverables. Excluded until the real JWS/mTLS
-# documentation replaces them. Operator guides live in docs/operations/.
+# Working notes, not deliverables. Operator guides live in docs/operations/.
 docs/integration/
-docs/internal/
 docs/issues/
 docs/plans/

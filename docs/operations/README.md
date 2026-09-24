@@ -66,3 +66,8 @@ takes that DFSP offline — not degraded, offline. Every rotation runbook states
 
 **Certificate renewal for DFSPs is manual, and nothing warns you.** Client certificates last a year,
 there is no expiry alerting and no contact record. Track the dates yourself.
+
+**`DFSP_FACING_MTLS_MANDATORY=false` leaves the DFSP-facing endpoint open to callers presenting no
+certificate.** It also only behaves as documented when the gateway TLS mode and the sidecar's
+`x-forwarded-client-cert` handling agree with it. See
+[`dfsp-facing-mtls.md`](./dfsp-facing-mtls.md).
