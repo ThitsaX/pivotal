@@ -147,6 +147,34 @@ const rangeModeLabel = computed((): string => ({
     custom: 'Custom Range',
 })[appliedMode.value]);
 
+const MAX_CUSTOM_RANGE_MONTHS = 4;
+
+function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
+    const from = new Date(fromIso);
+    const to = new Date(toIso);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        return false;
+    }
+
+    const limit = new Date(from.getTime());
+    limit.setUTCMonth(limit.getUTCMonth() + MAX_CUSTOM_RANGE_MONTHS);
+
+    return to.getTime() > limit.getTime();
+}
+
+const customRangeLimitError = computed((): string | null => {
+    if (rangeMode.value !== 'custom' || !rangeStart.value || !rangeEnd.value) {
+        return null;
+    }
+
+    if (!customRangeExceedsMaxMonths(rangeStart.value, rangeEnd.value)) {
+        return null;
+    }
+
+    return 'Custom range cannot exceed 4 months.';
+});
+
 const appliedRangeLabel = computed((): string => {
     const formatter = new Intl.DateTimeFormat(undefined, {
         dateStyle: 'medium',
@@ -559,7 +587,7 @@ function syncDraftFiltersFromApplied(): void {
 }
 
 function applyFilters(): void {
-    if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value) {
+    if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value || customRangeLimitError.value != null) {
         return;
     }
 
@@ -766,13 +794,28 @@ watch(
                             <button
                                 type="button"
                                 class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-                                :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
+                                :disabled="loading || rangeInvalid || customRangeLimitError != null || !rangeStart || !rangeEnd"
                                 @click="applyFilters"
                             >
                                 {{ loading ? 'Applying…' : 'Apply' }}
                             </button>
                         </div>
                     </div>
+
+                    <p
+                        v-if="customRangeLimitError"
+                        class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-600"
+                        role="alert"
+                    >
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path
+                                fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                                clip-rule="evenodd"
+                            />
+                        </svg>
+                        {{ customRangeLimitError }}
+                    </p>
                 </div>
             </Transition>
         </article>
