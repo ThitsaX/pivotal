@@ -30,6 +30,7 @@ export namespace AuditPartiesRequestCommand {
             public readonly occurredAt: Date | null = null,
             public readonly quotingCurrency: Currency | null = null,
             public readonly quotingAmount: string | null = null,
+            public readonly amountType: string | null = null,
         ) {
         }
     }
