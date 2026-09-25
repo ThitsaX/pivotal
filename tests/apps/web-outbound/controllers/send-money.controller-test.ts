@@ -113,7 +113,18 @@ describe('PutSendMoneyRequest', () => {
         assert.equal(request.amount, '12');
     });
 
-    it('keeps extensionList when acceptParty is true', async () => {
+    it('keeps direct extensionList array when acceptParty is true', async () => {
+        const extensionList = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+        const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});
+
+        assert.deepEqual(errors, []);
+        assert.deepEqual(request.extensionList, extensionList);
+    });
+
+    it('keeps legacy wrapped extensionList when acceptParty is true', async () => {
         const extensionList = {
             extension: [
                 {key: 'payerProvidedSchemeFee', value: '10'},
