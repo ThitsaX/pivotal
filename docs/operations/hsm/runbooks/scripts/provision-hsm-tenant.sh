@@ -47,8 +47,11 @@ if ! printf '%s' "$FSP" | grep -qE '^[A-Za-z0-9][A-Za-z0-9_-]{1,30}$'; then
   exit 1
 fi
 
-CU="cu-${FSP}"
-WEB_OUTBOUND_CU=${WEB_OUTBOUND_CU:-cu-web-outbound}
+# The device allows only a-z, A-Z, 0-9 and underscore in a username, so the prefix uses
+# underscores and anything else in the fspId is folded to one. An fspId carrying a hyphen
+# or a dot is otherwise rejected at user creation, several steps into onboarding.
+CU="cu_$(printf '%s' "$FSP" | tr -c 'A-Za-z0-9' '_')"
+WEB_OUTBOUND_CU=${WEB_OUTBOUND_CU:-cu_web_outbound}
 
 KV_MOUNT=${KV_MOUNT:-pivotal-kv}
 CRED_PATH="${KV_MOUNT}/pivotal/hsmcred/${FSP}"
@@ -112,7 +115,8 @@ if CLOUDHSM_ROLE=admin CLOUDHSM_PIN="$CO_PIN" cloudhsm-cli user list 2>/dev/null
   echo "  scratch, delete the user and the Vault path first, deliberately."
   CU_EXISTS=yes
 else
-  # 32 random characters. Nobody reads this; it goes straight to Vault.
+  # 32 random characters -- the device's maximum, which its slot info reports as 8/32.
+  # Nobody reads this; it goes straight to Vault.
   CU_PASS=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
 
   CLOUDHSM_ROLE=admin CLOUDHSM_PIN="$CO_PIN" \

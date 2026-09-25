@@ -82,10 +82,14 @@ Every crypto user this profile uses, and where each one is made:
 
 | User | Owns | Purpose | Created |
 | --- | --- | --- | --- |
-| `cu-web-outbound` | nothing | Every tenant's key is shared to it, so it can sign as any payer | **here** |
+| `cu_web_outbound` | nothing | Every tenant's key is shared to it, so it can sign as any payer | **here** |
 | `kmsuser` | — | Required by the KMS custom key store in section C | **here** |
-| `cu-ca-hub-root`, `cu-ca-dfsp-root` | one CA root each | One root apiece, so a compromised ceremony credential yields one trust domain rather than both | [`2-ca-ceremony.md`](./2-ca-ceremony.md) |
+| `cu_ca_hub_root`, `cu_ca_dfsp_root` | one CA root each | One root apiece, so a compromised ceremony credential yields one trust domain rather than both | [`2-ca-ceremony.md`](./2-ca-ceremony.md) |
 | `cu-<fspId>` | that tenant's signing key | One per DFSP. Ownership is conferred at creation and cannot be transferred, so generating a tenant's key as its own user is what isolates it | [`../runbooks/onboard-dfsp.md`](../runbooks/onboard-dfsp.md), once per DFSP |
+
+> **Usernames take only `a-z`, `A-Z`, `0-9` and underscore.** A hyphen is rejected, and the
+> message names the character rather than the field, so it reads like a problem with the command.
+> Passwords are 8–32 characters; the device reports the limit in its slot info.
 
 **Create the first two now.** The other two rows are listed so you can see the whole picture — do
 not create them here. The ceremony users are made during the ceremony because their credentials are
@@ -96,7 +100,7 @@ users are made one at a time as DFSPs join.
 export CLOUDHSM_ROLE=admin
 export CLOUDHSM_PIN=admin:<CO password>
 
-cloudhsm-cli user create --username cu-web-outbound  --role crypto-user
+cloudhsm-cli user create --username cu_web_outbound  --role crypto-user
 cloudhsm-cli user create --username kmsuser          --role crypto-user
 ```
 
@@ -104,11 +108,11 @@ cloudhsm-cli user create --username kmsuser          --role crypto-user
 > resets its password. Do not use it for anything else.
 
 That leaves one credential to store. `kmsuser` belongs to KMS from here on, so only
-`cu-web-outbound` goes into Vault — readable by web-outbound and nothing else:
+`cu_web_outbound` goes into Vault — readable by web-outbound and nothing else:
 
 ```bash
 vault kv put pivotal-kv/pivotal/hsmcred/web-outbound \
-  username=cu-web-outbound password=<password>
+  username=cu_web_outbound password=<password>
 ```
 
 ---
@@ -213,7 +217,7 @@ Also before go-live:
 - [ ] `cloudhsm-cli key list` succeeds from inside a pod
 - [ ] Two HSMs are running and the cluster is activated
 - [ ] Crypto Officer credentials are held by named people, and are in no service, env var or Vault
-- [ ] `cu-web-outbound` exists and its credential is in Vault
+- [ ] `cu_web_outbound` exists and its credential is in Vault
 - [ ] Vault is sealed against the custom key store
 - [ ] Both alarms fire when tested deliberately
 - [ ] A cluster restore has been performed at least once

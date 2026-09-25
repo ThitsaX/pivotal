@@ -97,7 +97,7 @@ scheduled custodian session rather than on the day.
 Portal → **Participant → Onboard FSP**. Enter name, currencies, endpoint, and the access public key.
 
 You are not asked for a signing key. One is generated **inside CloudHSM** during onboarding, as the
-crypto user from step 3, and shared with `cu-web-outbound`. No private key exists outside the HSM at
+crypto user from step 3, and shared with `cu_web_outbound`. No private key exists outside the HSM at
 any point.
 
 Check the chain completed — it takes about a second:
@@ -121,7 +121,7 @@ CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN=cu-DemoDFSP3:<password> \
   cloudhsm-cli key list --filter attr.label=<the keyRef>
 ```
 
-`key-owners` must be `[cu-DemoDFSP3]` and `shared-users` must include `cu-web-outbound`. **If the
+`key-owners` must be `[cu-DemoDFSP3]` and `shared-users` must include `cu_web_outbound`. **If the
 owner is anything else, stop** — ownership is permanent, so the key has to be destroyed and
 regenerated as the right crypto user.
 

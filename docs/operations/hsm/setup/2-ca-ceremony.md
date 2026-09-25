@@ -76,8 +76,8 @@ ordinary externally-signed-intermediate pattern.
 export CLOUDHSM_ROLE=admin
 export CLOUDHSM_PIN=admin:<CO password>
 
-cloudhsm-cli user create --username cu-ca-hub-root  --role crypto-user
-cloudhsm-cli user create --username cu-ca-dfsp-root --role crypto-user
+cloudhsm-cli user create --username cu_ca_hub_root  --role crypto-user
+cloudhsm-cli user create --username cu_ca_dfsp_root --role crypto-user
 ```
 
 > **These two credentials never go into Vault, an environment variable, or any service.** Every other
@@ -146,7 +146,7 @@ redone with separate keys.
 **The private keys cannot be exported:**
 
 ```bash
-CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN=cu-ca-hub-root:<password> \
+CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN=cu_ca_hub_root:<password> \
   cloudhsm-cli key list --filter attr.label=pki_hub_client-root
 ```
 

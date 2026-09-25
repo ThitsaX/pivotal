@@ -39,7 +39,7 @@ is updated is a hard outage for that tenant rather than a degradation.
        --private-attributes sign=true extractable=false
    ```
 
-2. **Share the new key with `cu-web-outbound`.** Sharing is a property of the key, not of the user,
+2. **Share the new key with `cu_web_outbound`.** Sharing is a property of the key, not of the user,
    so a new key is not shared just because the old one was. Miss this and web-outbound silently stops
    being able to sign as that tenant.
 
