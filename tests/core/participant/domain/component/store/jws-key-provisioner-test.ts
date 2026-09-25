@@ -59,14 +59,93 @@ describe('VaultJwsKeyProvisioner', () => {
     });
 });
 
+class FakeGenerator {
+
+    readonly calls: {username: string; label: string}[] = [];
+
+    generate(credential: {username: string; password: string}, label: string): Promise<string> {
+        this.calls.push({username: credential.username, label});
+        return Promise.resolve('-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----\n');
+    }
+}
+
+class FakeCredentials {
+
+    readonly reads: string[] = [];
+
+    credentialFor(vaultPath: string): Promise<{username: string; password: string}> {
+        this.reads.push(vaultPath);
+        const fspId = vaultPath.split('/').pop();
+        return Promise.resolve({username: `cu-${fspId}`, password: 'secret'});
+    }
+}
+
+function pkcs11Provisioner(generator = new FakeGenerator(), credentials = new FakeCredentials()) {
+    const vault = new FakeVault();
+    const provisioner = new Pkcs11JwsKeyProvisioner(
+        generator as any, credentials, vault as any,
+        'pivotal/hsmcred', 'pivotal/keyref', 'cu-web-outbound');
+
+    return {provisioner, vault, generator, credentials};
+}
+
 describe('Pkcs11JwsKeyProvisioner', () => {
 
-    it('should refuse rather than fall back to a software key', async () => {
-        // A silent downgrade would put a private key on a host in a deployment that chose hardware
-        // custody to prevent exactly that, and nothing downstream would show the difference.
-        await assert.rejects(
-            new Pkcs11JwsKeyProvisioner().provision('DemoDFSP1'),
-            /not implemented/);
+    it('should generate as the tenant, not as a service identity', async () => {
+        // The device confers ownership at creation and cannot transfer it, so whoever generates a
+        // key can always sign with it. Generating as anyone but the tenant hands that ability to
+        // whoever generated it, for every tenant it ever onboarded.
+        const {provisioner, credentials, generator} = pkcs11Provisioner();
+
+        await provisioner.provision('DemoDFSP1');
+
+        assert.deepEqual(credentials.reads, ['pivotal/hsmcred/DemoDFSP1']);
+        assert.equal(generator.calls[0].username, 'cu-DemoDFSP1');
+    });
+
+    it('should write a key reference the reader can resolve', async () => {
+        // The prefix and field have to agree with VaultJwsKeyRefSource, or provisioning succeeds
+        // and signing then reports a tenant with no key.
+        const {provisioner, vault} = pkcs11Provisioner();
+
+        await provisioner.provision('DemoDFSP1');
+
+        assert.equal(vault.writes[0].path, 'pivotal/keyref/DemoDFSP1');
+        assert.equal(vault.writes[0].field, 'keyRef');
+        assert.equal(vault.writes[0].value.startsWith('DemoDFSP1-jws-'), true);
+    });
+
+    it('should mint a new reference on every call, never reusing a label', async () => {
+        // Rotation calls this again. A reused label would leave two keys answering to one
+        // reference, and the device would sign with whichever it happened to find.
+        const {provisioner, vault} = pkcs11Provisioner();
+
+        await provisioner.provision('DemoDFSP1');
+        await new Promise(resolve => setTimeout(resolve, 1100));
+        await provisioner.provision('DemoDFSP1');
+
+        assert.notEqual(vault.writes[0].value, vault.writes[1].value);
+    });
+
+    it('should return no private key, because none exists outside the device', async () => {
+        const {provisioner} = pkcs11Provisioner();
+
+        const provisioned = await provisioner.provision('DemoDFSP1');
+
+        assert.equal(provisioned.legacyPrivateKeyPem, undefined);
+        assert.match(provisioned.publicKeyPem, /BEGIN PUBLIC KEY/);
+    });
+
+    it('should fail rather than provision a tenant whose crypto user does not exist', async () => {
+        // The crypto user is created by a custodian, because creating one needs a Crypto Officer
+        // and no service holds that. This process can be given access to a tenant; it cannot
+        // invent one.
+        const credentials = {
+            credentialFor: () => Promise.reject(new Error('No crypto-user password at Vault path')),
+        };
+        const {provisioner} = pkcs11Provisioner(new FakeGenerator(), credentials as any);
+
+        await assert.rejects(provisioner.provision('DemoDFSP1'), /No crypto-user password/);
     });
 });
 

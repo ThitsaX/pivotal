@@ -41,7 +41,16 @@ export class Pkcs11Bootstrap implements OnModuleInit, OnModuleDestroy {
 
     async onModuleInit(): Promise<void> {
 
-        const path = this.settings.credentialPath;
+        const path = this.settings.credentialPath.trim();
+
+        // No path configured means this workload has no crypto user of its own. That is the
+        // provisioning shape: trust-manager deliberately holds no identity on the device, because
+        // it generates each tenant's key as that tenant, and a standing identity of its own would
+        // be one more thing able to sign.
+        if (path.length === 0) {
+            await this.pool.start();
+            return;
+        }
 
         const password = await this.vaultClient.readKvField(path, Pkcs11Bootstrap.PASSWORD_FIELD);
 
@@ -58,12 +67,32 @@ export class Pkcs11Bootstrap implements OnModuleInit, OnModuleDestroy {
         const username =
             await this.vaultClient.readKvField(path, Pkcs11Bootstrap.USERNAME_FIELD) ?? '';
 
-        await this.pool.start(username, password);
+        await this.pool.start({username, password});
 
         this.logger.log(
             `Signing through PKCS#11 as '${username.length > 0 ? username : '(pin only)'}', `
             + `credential from Vault path '${path}'.`,
         );
+    }
+
+    /** Reads one tenant's crypto-user credential, for an operation performed as that tenant. */
+    async credentialFor(vaultPath: string): Promise<Pkcs11SessionPool.Credential> {
+
+        const password = await this.vaultClient.readKvField(
+            vaultPath, Pkcs11Bootstrap.PASSWORD_FIELD);
+
+        if (password == null || password.length === 0) {
+            throw new Error(
+                `No crypto-user password at Vault path '${vaultPath}' field `
+                + `'${Pkcs11Bootstrap.PASSWORD_FIELD}'. The crypto user is created by a custodian `
+                + 'before onboarding; this reads it, and cannot create it.',
+            );
+        }
+
+        const username =
+            await this.vaultClient.readKvField(vaultPath, Pkcs11Bootstrap.USERNAME_FIELD) ?? '';
+
+        return {username, password};
     }
 
     async onModuleDestroy(): Promise<void> {

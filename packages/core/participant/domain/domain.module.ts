@@ -7,7 +7,7 @@ import {CentralLedgerAxios, CentralLedgerAxiosParams, CentralLedgerFacade} from 
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {KeyProvider, VaultClient, VaultSettings} from '@shared/vault';
 import {JwsSigner, PrivateKeyJwsSigner} from '@shared/fspiop';
-import {Pkcs11Bootstrap, Pkcs11JwsSigner, Pkcs11Settings} from '@shared/pkcs11';
+import {Pkcs11Bootstrap, Pkcs11JwsSigner, Pkcs11KeyGenerator, Pkcs11Settings} from '@shared/pkcs11';
 import {
     AddFspCurrencyHandler,
     AddHubCurrencyHandler,
@@ -397,7 +397,25 @@ export class ParticipantDomainModule {
         }
 
         if (keyProvider === KeyProvider.Pkcs11) {
-            return new Pkcs11JwsKeyProvisioner();
+
+            const bootstrap = ParticipantDomainModule.createPkcs11Bootstrap(settings);
+            const vaultSettings = settings.vaultSettings?.();
+
+            if (bootstrap == null || vaultSettings == null) {
+                throw new Error(
+                    `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but the device or Vault is not `
+                    + 'configured, so no key can be created.',
+                );
+            }
+
+            return new Pkcs11JwsKeyProvisioner(
+                new Pkcs11KeyGenerator(bootstrap.pool),
+                bootstrap,
+                new VaultClient(vaultSettings),
+                settings.hsmCredentialPathPrefix?.() ?? 'pivotal/hsmcred',
+                settings.keyRefPathPrefix?.() ?? 'pivotal/keyref',
+                settings.sharedSigningCryptoUser?.() ?? 'cu_web_outbound',
+            );
         }
 
         const vaultSettings = settings.vaultSettings?.();
@@ -488,6 +506,18 @@ export namespace ParticipantDomainModule {
 
         /** Required when {@link keyProvider} returns {@link KeyProvider.Pkcs11}. */
         pkcs11Settings?(): Pkcs11Settings;
+
+        /**
+         * Path prefix for tenant crypto-user credentials, under {@link KeyProvider.Pkcs11}.
+         * Defaults to `pivotal/hsmcred` — where a custodian writes them at onboarding.
+         */
+        hsmCredentialPathPrefix?(): string;
+
+        /**
+         * Crypto user that signs on tenants' behalf. Named only in the reminder that a newly
+         * generated key still has to be shared with it.
+         */
+        sharedSigningCryptoUser?(): string;
 
         /** Absent where the deployment issues no DFSP certificates. */
         dfspCertIssuerSettings?(): DfspCertificateIssuer.Settings;

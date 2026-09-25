@@ -3,6 +3,7 @@
 import {Logger} from '@nestjs/common';
 import {RsaKeyPair} from '@shared/security';
 import {VaultClient, VaultSettings} from '@shared/vault';
+import {Pkcs11KeyGenerator} from '@shared/pkcs11';
 
 /**
  * Creates the signing key for a tenant Pivotal signs as, wherever that deployment keeps keys.
@@ -94,22 +95,92 @@ export class VaultJwsKeyProvisioner extends JwsKeyProvisioner {
 }
 
 /**
- * Has the HSM generate the keypair, so the private half never exists outside it.
+ * Has the device generate the keypair, so the private half never exists outside it.
  *
- * The **HSM-backed** profile, and the reason this seam returns a public key alone. Not implemented:
- * `KEY_PROVIDER=pkcs11` is declared and documented but has no signing implementation either, so a
- * deployment reaching this has chosen a profile that cannot sign yet.
+ * The **HSM-backed** profile, and the reason this contract returns a public key alone.
+ *
+ * **Generated as the tenant's own crypto user.** The device confers ownership at creation and has
+ * no transfer operation, so whoever generates a key can always use it — generating as a service
+ * identity would hand that service the ability to sign as every tenant it ever onboarded. This
+ * process therefore borrows the tenant's credential for the operation and holds none of its own.
+ *
+ * **It cannot create that crypto user.** The credential must already be in Vault, put there by a
+ * custodian, because creating users needs a Crypto Officer and no service holds one. That is the
+ * separation this profile exists to keep: this process can ask the device to make a key for a
+ * tenant it has been given access to, and cannot invent a tenant.
  */
 export class Pkcs11JwsKeyProvisioner extends JwsKeyProvisioner {
 
+    private readonly logger = new Logger(Pkcs11JwsKeyProvisioner.name);
+
+    constructor(
+        private readonly keyGenerator: Pkcs11KeyGenerator,
+        private readonly credentials: Pkcs11JwsKeyProvisioner.CredentialSource,
+        private readonly vaultClient: VaultClient,
+        /** Path prefix; the credential is read from `<prefix>/<fspId>`. */
+        private readonly credentialPathPrefix: string,
+        /** Path prefix; the reference is written to `<prefix>/<fspId>`. */
+        private readonly keyRefPathPrefix: string,
+        /** Crypto user that signs on tenants' behalf, named in the message about sharing. */
+        private readonly sharedSigningUser: string,
+    ) {
+        super();
+    }
+
     async provision(fspId: string): Promise<JwsKeyProvisioner.Provisioned> {
 
-        // Throwing rather than falling back to a software key: a silent downgrade would put a
-        // private key on a host in a deployment that chose hardware custody precisely to prevent
-        // that, and nothing downstream would reveal the difference.
-        throw new Error(
-            `Cannot provision a signing key for '${fspId}': KEY_PROVIDER 'pkcs11' is not implemented.`,
+        const tenant = fspId.trim();
+        const credential = await this.credentials.credentialFor(
+            `${this.credentialPathPrefix}/${tenant}`);
+
+        // The label is the keyRef, and it must name exactly one key for the life of that key.
+        // Minted fresh every time rather than derived from the tenant alone: rotation calls this
+        // again, and a reused label would leave two keys answering to one reference.
+        const label = Pkcs11JwsKeyProvisioner.mintLabel(tenant);
+
+        const publicKeyPem = await this.keyGenerator.generate(credential, label);
+
+        // Written before the caller records the public key, for the same reason the Vault
+        // provisioner writes first: the other order can leave a tenant marked as signing with a
+        // reference nothing can resolve. This order can at worst leave an unreferenced key in the
+        // device, which fails nothing.
+        await this.vaultClient.writeKvField(
+            `${this.keyRefPathPrefix}/${tenant}`,
+            Pkcs11JwsKeyProvisioner.KEY_REF_FIELD,
+            label,
         );
+
+        // Said loudly because nothing else will say it, and the failure it prevents is silent:
+        // until the key is shared, the tenant's own connector signs fine while anything signing on
+        // its behalf cannot -- which reads as a bug in the signing path rather than a missing step.
+        this.logger.warn(
+            `Provisioned '${tenant}' with key reference '${label}'. It is owned by that tenant's `
+            + `crypto user and is NOT yet shared with '${this.sharedSigningUser}'. Sharing is a `
+            + 'device operation with no PKCS#11 equivalent: run it from the device tooling before '
+            + 'enabling signing, or anything signing on this tenant\'s behalf will fail.',
+        );
+
+        return new JwsKeyProvisioner.Provisioned(publicKeyPem);
+    }
+
+    private static readonly KEY_REF_FIELD = 'keyRef';
+
+    /**
+     * A label carrying the tenant and the moment it was minted.
+     *
+     * The timestamp is what makes it version-inclusive — two keys for one tenant never collide,
+     * and the reference alone says which generation a signature came from.
+     */
+    private static mintLabel(fspId: string): string {
+        return `${fspId}-jws-${new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15)}`;
+    }
+}
+
+export namespace Pkcs11JwsKeyProvisioner {
+
+    /** Reads a tenant's crypto-user credential. Implemented by the device bootstrap. */
+    export interface CredentialSource {
+        credentialFor(vaultPath: string): Promise<{username: string; password: string}>;
     }
 }
 
