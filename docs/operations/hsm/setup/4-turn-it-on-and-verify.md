@@ -310,6 +310,32 @@ Look for `fspiop-signature` present on requests from **both** DFSP IDs.
 
 ---
 
+## Signing capacity
+
+> **CloudHSM only.** A software module signs locally and is far faster.
+
+Measured against hardware: **about 500 signatures per second per replica**, with a session pool of
+four. That is the ceiling for one pod, and raising the pool does not lift it — past four sessions
+throughput *falls*, because the PKCS#11 binding has no asynchronous `C_SignInit` and that call
+blocks the single JavaScript thread whichever session it runs on.
+
+**What the leg needs:** roughly six signatures per transfer, so 80–100 TPS is **480–600 per
+second** — more than one replica covers.
+
+| | |
+| --- | --- |
+| Fix | **more replicas.** Each holds its own sessions and its own login, so two give about 1,000/sec |
+| Not the fix | a larger `PKCS11_SESSION_POOL_SIZE`, or raising `UV_THREADPOOL_SIZE` — neither moved the measured rate |
+
+**Saturation does not raise an error.** Nothing logs that the pool is full and no request fails.
+Signing simply takes longer and requests queue behind it, so the symptom is **rising request
+latency while the HSM itself looks healthy** — its own metrics will show it is not busy.
+
+Watch outbound request latency against transfer rate. A signing rate that stays flat while load
+climbs is the pool saturating, and the answer is another replica.
+
+---
+
 ## Known gaps to expect
 
 - **A quote may fail on the connector's empty `extensionList`**, unrelated to any of this. The

@@ -77,6 +77,48 @@ the SoftHSM case, a token per tenant.
 **Generated passwords sit exactly at the device maximum.** 32 characters, limit 32. It works with no
 margin, and the limit was not written down anywhere before this run.
 
+## Signing throughput — measured, and it caps lower than expected
+
+Signing an existing RSA-2048 key as the shared signing user, from a pod on a cluster node.
+
+| Sessions in the pool | signatures/sec | ms per signature | longest event-loop stall |
+| --- | --- | --- | --- |
+| 1 | 345 | 2.90 | 9ms |
+| **4** | **543** | **1.84** | 14ms |
+| 8 | 281 | 3.56 | 49ms |
+| 16 | 256 | 3.90 | 98ms |
+| 32 | 271 | 3.68 | 164ms |
+
+**Throughput peaks at four sessions and then falls**, which is the opposite of how a pool normally
+behaves. The cause is that the binding offers **no asynchronous `C_SignInit`** — only `C_Sign` has
+one — and against a network-attached device that call is a round trip. So each signature blocks the
+event loop before its asynchronous half begins, and concurrent workers queue those blocking calls
+against the single thread. The stall column is the evidence: it grows roughly linearly with pool
+size.
+
+**`UV_THREADPOOL_SIZE` is not the limit here.** Raising it from 4 to 32 moved nothing — 543 to 502
+at the best pool size, within noise. Against a local software module it *was* the ceiling, which is
+why that assumption needed testing rather than carrying over.
+
+**The ceiling for one process is therefore about 500–550/sec.** At the best pool size the per-call
+cost falls from 2.9ms to 2.0ms and stops; that floor is `C_SignInit` serialising.
+
+### What this means for capacity
+
+At 80–100 TPS the hub-facing leg needs roughly **480–600 signatures/sec**, so **one replica does not
+cover the target** — measured headroom was 0.9x.
+
+**Scale horizontally.** Each replica holds its own sessions and its own login, so two replicas give
+roughly 1,000/sec. Two are wanted for availability regardless, and this is a values change rather
+than a code change.
+
+**Worker threads are the fallback**, not the first answer. They would move `C_SignInit` off the
+main thread and lift the per-process ceiling, at the cost of a real rewrite of the signing path.
+Worth it only if a single pod ever has to exceed ~500/sec.
+
+**What was NOT measured:** several tenants signing concurrently, and contention from other users of
+the same cluster. Both are plausible and neither is covered by these figures.
+
 ## Still open
 
 **Whether quorum or MFA get enabled later.** Both are off today and both would break the scripts.

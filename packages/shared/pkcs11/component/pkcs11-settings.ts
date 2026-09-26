@@ -11,17 +11,22 @@
 export class Pkcs11Settings {
 
     /**
-     * Sized to concurrency, not to tenant count.
+     * Sized to concurrency, not to tenant count — and **small on purpose**.
      *
-     * A PKCS#11 session carries **one operation at a time** — a second `C_SignInit` before the
-     * first `C_Sign` returns fails with `CKR_OPERATION_ACTIVE`. So the pool is what allows
-     * concurrent signing at all, and a pool of one serialises every tenant behind every other.
+     * A PKCS#11 session carries one operation at a time: a second `C_SignInit` before the first
+     * `C_Sign` returns fails with `CKR_OPERATION_ACTIVE`. So a pool of one serialises every tenant
+     * behind every other, and some pooling is necessary.
      *
-     * Eight covers the concurrency a single replica sees at the agreed throughput with room over.
-     * Raising it past {@link threadPoolSize} buys nothing: the calls run on libuv's thread pool,
-     * and that is the narrower limit.
+     * But more is worse past a handful, which is the opposite of what a pool usually does. The
+     * binding offers no asynchronous `C_SignInit`, and against a network-attached device that call
+     * is a round trip — so every signature blocks the event loop before its asynchronous half
+     * begins, and concurrent workers queue those blocking calls against the one thread. Measured
+     * against hardware, throughput peaked at **four** sessions and fell by half at sixteen, while
+     * the longest event-loop stall grew from 14ms to 98ms.
+     *
+     * Raise this only with a measurement showing it helps on the device in question.
      */
-    static readonly DEFAULT_POOL_SIZE = 8;
+    static readonly DEFAULT_POOL_SIZE = 4;
 
     constructor(
         /**
@@ -60,9 +65,13 @@ export class Pkcs11Settings {
      * libuv's thread pool size, which bounds how many device calls can be in flight.
      *
      * Not a setting of ours — it is read from `UV_THREADPOOL_SIZE`, which Node samples once at
-     * startup and cannot be changed afterwards. Surfaced here because it is the real ceiling on
-     * signing throughput and is otherwise invisible: measured against SoftHSM, raising it from the
-     * default of 4 to 16 nearly doubled the signatures per second with the pool size unchanged.
+     * startup and cannot be changed afterwards.
+     *
+     * It bounds how many device calls can be in flight, and against a local software module that
+     * made it the ceiling: raising it from 4 to 16 nearly doubled throughput. Against a
+     * network-attached device it is **not** the binding constraint — the synchronous `C_SignInit`
+     * on the main thread is — so raising it there changes little. Surfaced because which of the
+     * two limits applies depends on the device, and neither is visible from configuration.
      */
     static threadPoolSize(): number {
         const configured = Number(process.env.UV_THREADPOOL_SIZE);

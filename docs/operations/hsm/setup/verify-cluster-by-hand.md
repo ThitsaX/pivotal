@@ -111,11 +111,46 @@ it means "the key is listed" is not evidence of access. Only the private label m
 | --- | --- | --- |
 | 32 | `CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN=cu_web_outbound:<pw> \`<br>`cloudhsm-cli key delete --filter attr.label=DemoDFSP1-jws-1` | **Refused.** A shared user signs but must not destroy — otherwise the component signing for every tenant could take any tenant offline permanently |
 
-## J. Clean up
+## J. Measure what it can sign
+
+The sections above prove the cluster **works**. This one asks whether it is **fast enough**, which
+is a different question with a per-cluster answer — it depends on the network distance between the
+nodes and the HSMs, and on what else is using them. A figure measured on another cluster does not
+transfer.
+
+**Script:** [`scripts/cloudhsm-capacity-probe.js`](./scripts/cloudhsm-capacity-probe.js)
 
 | # | Command | Purpose |
 | --- | --- | --- |
-| 33 | `kubectl -n pivotal delete pod hsm-tools` | The pod holds the cluster certificate and a configured client. Remove it when the check is done |
+| 33 | `DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm build-essential python3` | `pkcs11js` compiles from source, so a toolchain is needed. **The variable is not optional** — `tzdata` arrives as a dependency and stops for a timezone prompt without it |
+| 34 | `mkdir -p /probe && cd /probe && npm init -y && npm install pkcs11js` | The only dependency the probe has |
+| 35 | *(from your workstation)* `kubectl -n pivotal cp cloudhsm-capacity-probe.js hsm-tools:/probe/` | The script |
+| 36 | `PKCS11_PIN='cu_web_outbound:<pw>' node cloudhsm-capacity-probe.js` | Signs an existing key at pool sizes 1, 4, 8, 16 and 32. Creates nothing |
+
+### Reading the result
+
+**A rate that falls as the pool grows is expected, not a fault.** The PKCS#11 binding has no
+asynchronous `C_SignInit`, and on a network-attached device that call is a round trip — so every
+signature blocks the single JavaScript thread before its asynchronous half begins, and more
+sessions simply queue more blocking calls against that thread.
+
+Take the pool size with the **highest rate** and set `PKCS11_SESSION_POOL_SIZE` to it. On the
+cluster measured for these guides that was **four**, at about **500 signatures per second**.
+
+**Compare against what the leg needs:** roughly six signatures per transfer, so 80–100 TPS is
+480–600 per second. If one replica does not cover it, the answer is **more replicas** — each holds
+its own sessions and its own login. It is not a larger pool, and not a larger `UV_THREADPOOL_SIZE`;
+neither moved the measured rate.
+
+Re-run after any change to where the nodes or the HSMs sit.
+
+---
+
+## K. Clean up
+
+| # | Command | Purpose |
+| --- | --- | --- |
+| 37 | `kubectl -n pivotal delete pod hsm-tools` | The pod holds the cluster certificate, a configured client and the crypto-user password used above. Remove it when the check is done |
 
 Test crypto users and keys can stay — they are useful for the next round. Delete them as their
 owner when they are not.
