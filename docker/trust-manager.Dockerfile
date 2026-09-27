@@ -37,16 +37,30 @@ ENV NODE_ENV=production
 #   softhsm  HSM-backed profile rehearsed against SoftHSM, for a development
 #            cluster with no hardware behind it
 #
-# CloudHSM is deliberately absent: its client SDK is not in any public
-# repository, it is downloaded per region and per version from AWS, and it
-# carries a cluster certificate specific to one deployment. That layer belongs
-# to the deployment that holds those, not to this file.
+# The library only. What ties a client to one cluster is its certificate and the
+# HSM address, and neither belongs in an image: the certificate is created when
+# that cluster is activated, and the address differs per environment. Both are
+# supplied at startup -- the certificate mounted where the library looks for it,
+# the address through the entrypoint below.
 ARG PKCS11_BACKEND=none
-RUN if [ "$PKCS11_BACKEND" = "softhsm" ]; then \
+ARG CLOUDHSM_SDK_URL=https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Noble/cloudhsm-pkcs11_latest_u24.04_amd64.deb
+RUN set -eu; \
+    if [ "$PKCS11_BACKEND" = "softhsm" ]; then \
       apt-get update \
    && apt-get install -y --no-install-recommends softhsm2 \
    && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$PKCS11_BACKEND" = "cloudhsm" ]; then \
+      apt-get update \
+   && apt-get install -y --no-install-recommends wget ca-certificates \
+   && wget -q -O /tmp/cloudhsm-pkcs11.deb "$CLOUDHSM_SDK_URL" \
+   && apt-get install -y --no-install-recommends /tmp/cloudhsm-pkcs11.deb \
+   && rm -f /tmp/cloudhsm-pkcs11.deb \
+   && apt-get purge -y wget && apt-get autoremove -y \
+   && rm -rf /var/lib/apt/lists/*; \
     fi
+
+COPY docker/pkcs11-entrypoint.sh /usr/local/bin/pkcs11-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/pkcs11-entrypoint.sh"]
 
 COPY package*.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules

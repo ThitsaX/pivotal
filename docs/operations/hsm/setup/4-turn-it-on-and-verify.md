@@ -44,8 +44,17 @@ Backend-specific — set the column for the device you are running against:
 | Variable | CloudHSM | SoftHSM |
 | --- | --- | --- |
 | `PKCS11_MODULE_PATH` | `/opt/cloudhsm/lib/libcloudhsm_pkcs11.so` | `/usr/lib/softhsm/libsofthsm2.so` |
-| `CLOUDHSM_CLUSTER_CERT` | mounted path of `customerCA.crt` | — not used |
+| `CLOUDHSM_IP` | the HSM's private IP | — not used |
 | `SOFTHSM2_CONF` | — not used | mounted path of the SoftHSM config |
+
+**The cluster certificate is not an environment variable.** The device library reads it from a
+fixed path of its own, so mount `customerCA.crt` at `/opt/cloudhsm/etc/customerCA.crt` — a
+ConfigMap is enough, since the certificate is public. The container refuses to start if
+`CLOUDHSM_IP` is set and that file is absent, rather than failing later at login with an error that
+says nothing about a missing file.
+
+`CLOUDHSM_IP` is consumed by the image's entrypoint, which runs the vendor's `configure-pkcs11`
+before the service starts. It is not read by the application.
 
 The credential itself is **never** an environment variable — it comes from Vault at runtime. An
 env-supplied credential sits in the Deployment manifest, shows up in `kubectl describe`, needs a
