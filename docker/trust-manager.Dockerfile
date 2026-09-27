@@ -43,7 +43,11 @@ ENV NODE_ENV=production
 # supplied at startup -- the certificate mounted where the library looks for it,
 # the address through the entrypoint below.
 ARG PKCS11_BACKEND=none
-ARG CLOUDHSM_SDK_URL=https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Noble/cloudhsm-pkcs11_latest_u24.04_amd64.deb
+# The Jammy build, not Noble. AWS builds each package against its distribution's glibc, and
+# Noble's needs 2.38 while this image is Debian 12 at 2.36 -- the mismatch is not caught at
+# install time, only when something in /opt/cloudhsm is first executed. Jammy targets 2.35,
+# which this image satisfies.
+ARG CLOUDHSM_SDK_URL=https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Jammy/cloudhsm-pkcs11_latest_u22.04_amd64.deb
 RUN set -eu; \
     if [ "$PKCS11_BACKEND" = "softhsm" ]; then \
       apt-get update \
