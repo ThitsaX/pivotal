@@ -19,7 +19,7 @@ jobs:
             # Carries the device library so one image serves both custody profiles. It is inert
             # unless KEY_PROVIDER=pkcs11, and the ~20MB is cheaper than maintaining two variants
             # that would need separate builds, scans and testing.
-            build-args: PKCS11_BACKEND=cloudhsm
+            buildArgs: PKCS11_BACKEND=cloudhsm
           - name: web-inbound
             dockerfile: docker/web-inbound.Dockerfile
           - name: app-auditor
@@ -32,7 +32,7 @@ jobs:
             dockerfile: docker/portal.Dockerfile
           - name: trust-manager
             dockerfile: docker/trust-manager.Dockerfile
-            build-args: PKCS11_BACKEND=cloudhsm
+            buildArgs: PKCS11_BACKEND=cloudhsm
 
     steps:
       - name: Checkout repository
@@ -67,7 +67,7 @@ jobs:
           context: .
           file: ${{ matrix.service.dockerfile }}
           # Empty for every service that does not set it, which the action treats as no arguments.
-          build-args: ${{ matrix.service.build-args }}
+          build-args: ${{ matrix.service.buildArgs }}
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}

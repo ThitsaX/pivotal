@@ -1,6 +1,12 @@
 # syntax=docker/dockerfile:1.7
 FROM node:22-alpine AS dependencies
 WORKDIR /app
+# The PKCS#11 binding is a root dependency and has no prebuilt binary, so every install
+# compiles it -- including here, where nothing ever calls it. The alternative is making
+# it optional, which would leave the services that DO sign silently without it whenever
+# a build host lacked a compiler. The toolchain stays in this stage; the runtime stage
+# below starts from a clean base and copies only the built node_modules.
+RUN apk add --no-cache --virtual .build python3 make g++
 COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
