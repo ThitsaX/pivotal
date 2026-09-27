@@ -40,6 +40,9 @@ export class Pkcs11SessionPool {
 
     private slot: Buffer | undefined;
 
+    /** The token actually in use. Differs from the configured label, which may be empty. */
+    private resolvedLabel = '';
+
     /** Tail of the per-tenant queue; see {@link withTenantLogin}. */
     private tenantLogin: Promise<void> = Promise.resolve();
 
@@ -79,7 +82,7 @@ export class Pkcs11SessionPool {
 
         if (credential == null) {
             this.logger.log(
-                `PKCS#11 ready on token '${this.settings.tokenLabel}' via `
+                `PKCS#11 ready on token '${this.resolvedLabel}' via `
                 + `${this.settings.modulePath}. No standing identity: this process authenticates `
                 + 'as a tenant for each operation.',
             );
@@ -106,7 +109,7 @@ export class Pkcs11SessionPool {
 
         this.logger.log(
             `PKCS#11 ready: ${this.settings.poolSize} sessions on token `
-            + `'${this.settings.tokenLabel}' via ${this.settings.modulePath} `
+            + `'${this.resolvedLabel}' via ${this.settings.modulePath} `
             + `(thread pool ${Pkcs11Settings.threadPoolSize()}).`,
         );
     }
@@ -262,6 +265,7 @@ export class Pkcs11SessionPool {
         if (wanted.length === 0) {
 
             if (slots.length === 1) {
+                this.resolvedLabel = this.pkcs11.C_GetTokenInfo(slots[0]).label.trim();
                 return slots[0];
             }
 
@@ -274,6 +278,7 @@ export class Pkcs11SessionPool {
 
         for (const slot of slots) {
             if (this.pkcs11.C_GetTokenInfo(slot).label.trim() === wanted) {
+                this.resolvedLabel = wanted;
                 return slot;
             }
         }
