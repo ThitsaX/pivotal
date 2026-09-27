@@ -1,28 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {ConfigService} from '@nestjs/config';
-import {ReportDownloadSettings} from '@core/audit/domain';
-import {CentralLedgerAxiosParams} from '@shared/central-ledger';
-import {TypeOrmSettings} from '@shared/typeorm';
-import {DfspCertificateIssuer} from '@core/participant/domain';
-import {KeyProvider, VaultAuthMethod, VaultSettings} from '@shared/vault';
-import type {WebPivotalModule} from './web-pivotal.module';
+import { ConfigService } from '@nestjs/config';
+import { ReportDownloadSettings } from '@core/audit/domain';
+import { CentralLedgerAxiosParams } from '@shared/central-ledger';
+import { TypeOrmSettings } from '@shared/typeorm';
+import { DfspCertificateIssuer } from '@core/participant/domain';
+import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
+import { Pkcs11Settings } from '@shared/pkcs11';
+import type { WebPivotalModule } from './web-pivotal.module';
 
 export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
-    private static readonly DEFAULT_ACCESS_TOKEN_TTL_SECONDS    = 900;       // 15 minutes
+    private static readonly DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 900;       // 15 minutes
 
-    private static readonly DEFAULT_REFRESH_TOKEN_TTL_DAYS      = 14;
+    private static readonly DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
 
-    private static readonly DEFAULT_BCRYPT_COST_FACTOR          = 12;
+    private static readonly DEFAULT_BCRYPT_COST_FACTOR = 12;
 
-    private static readonly DEFAULT_LOGIN_LOCKOUT_THRESHOLD     = 5;
+    private static readonly DEFAULT_LOGIN_LOCKOUT_THRESHOLD = 5;
 
-    private static readonly DEFAULT_LOGIN_LOCKOUT_MINUTES       = 15;
+    private static readonly DEFAULT_LOGIN_LOCKOUT_MINUTES = 15;
 
-    private static readonly DEFAULT_JWT_ISSUER                  = 'pivotal';
+    private static readonly DEFAULT_JWT_ISSUER = 'pivotal';
 
-    private static readonly DEFAULT_AUDIT_MAX_LIMIT            = 50_000;
+    private static readonly DEFAULT_AUDIT_MAX_LIMIT = 50_000;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
     }
@@ -240,6 +241,55 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     }
 
     /**
+     * Where key references are written, under `KEY_PROVIDER=pkcs11`.
+     *
+     * This service *writes* them, unlike the signing services which only read: onboarding creates
+     * the key and records the reference that every reader then resolves.
+     */
+    keyRefPathPrefix(): string {
+        return this.configService.get<string>('KEY_REF_PATH') ?? 'pivotal/keyref';
+    }
+
+    /**
+     * Where tenant crypto-user credentials are read from, under `KEY_PROVIDER=pkcs11`.
+     *
+     * A custodian writes each one before onboarding, because creating a crypto user needs a Crypto
+     * Officer and no service holds that. This service reads them to generate a tenant's key **as
+     * that tenant** — ownership is conferred at creation and cannot be transferred, so generating
+     * as a service identity would let that identity sign as every tenant it ever onboarded.
+     */
+    hsmCredentialPathPrefix(): string {
+        return this.configService.get<string>('HSM_CRED_PATH_PREFIX') ?? 'pivotal/hsmcred';
+    }
+
+    /**
+     * The crypto user that signs on tenants' behalf.
+     *
+     * Named only in the reminder logged after provisioning: a newly generated key is owned by its
+     * tenant and must still be shared with this user before anything can sign on that tenant's
+     * behalf. Sharing has no PKCS#11 equivalent, so it stays a manual step.
+     */
+    sharedSigningCryptoUser(): string {
+        return this.configService.get<string>('HSM_SHARED_SIGNING_USER') ?? 'cu_web_outbound';
+    }
+
+    /**
+     * How this workload reaches the device, under `KEY_PROVIDER=pkcs11`.
+     *
+     * No credential path: this service holds no standing identity on the device. It borrows each
+     * tenant's for the one operation that needs it and gives it back, so an empty path is what
+     * selects that mode rather than an oversight.
+     */
+    pkcs11Settings(): Pkcs11Settings {
+        return new Pkcs11Settings(
+            this.configService.get<string>('PKCS11_MODULE_PATH') ?? '',
+            this.configService.get<string>('PKCS11_TOKEN_LABEL') ?? '',
+            '',
+            this.keyRefPathPrefix(),
+        );
+    }
+
+    /**
      * The DFSP-facing CA, when this deployment is one.
      *
      * Absent mount means the deployment issues no DFSP certificates and the enrollment paths report
@@ -262,7 +312,7 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
             this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
             this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
             this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
-                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
             10_000,
             this.readVaultAuthMethod(),
             this.configService.get<string>('VAULT_TOKEN') ?? '',

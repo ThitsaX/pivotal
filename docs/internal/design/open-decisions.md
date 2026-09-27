@@ -21,6 +21,7 @@ retained below in full, because the reasoning that reversed it is worth keeping.
 | --- | --- | --- | --- |
 | **1** | ~~Blocking~~ — resolved 2026-09-02 | ~~**K**~~ | structural |
 | **2** | Security behaviour — must be specified before build | **G, E, B, C** (~~F~~ resolved) | policy |
+| **2** | Privilege placement — built one way, designed another | **Q** (sequenced behind C) | structural |
 | **3** | Fact checks | **N, H, I** | lookup |
 | **4** | ~~Confirm with the client~~ — resolved 2026-09-18 | ~~**L**~~, ~~**O**~~ | confirmation |
 | — | Deferred, with reason | **J** | optional capability |
@@ -164,6 +165,42 @@ a silent stall, and leaves an operator in control of restart.
 **Blocks.** The connector invalidation consumer — [`hub-facing-leg.md`](./hub-facing-leg.md) §A3.
 
 **Resolution.** *(pending)*
+
+---
+
+## Q. Which service generates a tenant's signing key
+
+**Question.** Onboarding creates a DFSP's JWS keypair. Does the operator-facing API do it directly,
+or publish an event that trust-manager acts on?
+
+**Why it is open.** The code and the architecture disagree, and nothing records which is intended.
+`architecture.md` §4.3 lists **trust-manager** as the service that drives `C_GenerateKeyPair` at
+onboarding, and the core invariants say it "generates keys in the HSM". The implementation does it
+in **web-pivotal**, because that is where `OnboardFspHandler` lives. The drift was not deliberate —
+it followed from where the handler already was.
+
+**What it costs as built.** web-pivotal needs read access to *every* tenant's crypto-user
+credential, since it cannot know which tenant it will onboard next. That is the widest privilege in
+the profile, and it sits on the service with the largest attack surface: the portal's API, IAM, CSR
+upload, reporting. trust-manager has no inbound HTTP at all.
+
+**What moving it costs.**
+
+- **Onboarding becomes asynchronous.** Today provisioning and recording the public key happen in one
+  transaction. Event-driven, onboarding returns before the key exists and the tenant is keyless until
+  trust-manager catches up. The reconcile sweep closes that eventually, but "onboarded" stops meaning
+  "ready" on the operator's screen.
+- **It depends on decision C.** An event meaning *generate a key for this fspId* on an unauthenticated
+  subject is worse than the present arrangement: forging it would mint an identity. Moving before
+  NATS authorization is settled trades a privilege problem for an authentication one.
+
+**Recommendation.** Move it, after **C**. The privilege argument is the stronger one and the design
+already assumes the outcome — but not before the transport that would carry the request can say who
+sent it.
+
+**Blocks.** Nothing today. The current arrangement works; it is wider than intended.
+
+**Resolution.** *(pending — sequenced behind C)*
 
 ---
 

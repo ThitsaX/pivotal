@@ -327,7 +327,8 @@ export class ParticipantDomainModule {
         if (pkcs11Settings == null || !pkcs11Settings.isConfigured()) {
             throw new Error(
                 `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but the device is not configured. `
-                + 'Set PKCS11_MODULE_PATH and HSM_CRED_PATH.',
+                + 'Set PKCS11_MODULE_PATH. A workload that signs also needs HSM_CRED_PATH; '
+                + 'one that only provisions leaves it unset and authenticates as each tenant.',
             );
         }
 
@@ -360,6 +361,17 @@ export class ParticipantDomainModule {
 
         if (keyProvider !== KeyProvider.Pkcs11) {
             return new PrivateKeyJwsSigner(new ParticipantJwsPrivateKeyStore(cache));
+        }
+
+        // A signer needs a standing identity on the device, and an absent credential path is what
+        // selects the provisioning mode that has none. Without this a workload meant to sign would
+        // start looking healthy and refuse every signature at request time -- a startup failure
+        // traded for a runtime one, which is the wrong way round.
+        if ((settings.pkcs11Settings?.()?.credentialPath ?? '').trim().length === 0) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' and this workload signs, so it needs its `
+                + 'own crypto user. Set HSM_CRED_PATH to the Vault path holding that credential.',
+            );
         }
 
         if (pkcs11 == null) {

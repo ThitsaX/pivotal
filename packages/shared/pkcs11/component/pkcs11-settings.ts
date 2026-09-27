@@ -57,8 +57,15 @@ export class Pkcs11Settings {
     ) {
     }
 
+    /**
+     * Whether the device can be reached at all.
+     *
+     * Only the module path is required. An empty {@link credentialPath} is not missing
+     * configuration — it selects the provisioning shape, where the workload holds no identity of
+     * its own and borrows each tenant's for the one operation that needs it.
+     */
     isConfigured(): boolean {
-        return this.modulePath.trim().length > 0 && this.credentialPath.trim().length > 0;
+        return this.modulePath.trim().length > 0;
     }
 
     /**

@@ -28,8 +28,9 @@ Pods authenticate to Vault with their own ServiceAccount token. Nothing to distr
 rotate.
 
 Enable Kubernetes auth if it is not already on, then create one policy and one role per workload.
-The signing services need to read keys; web-pivotal needs to sign DFSP CSRs; trust-manager needs to
-read the DFSP CA chain.
+The signing services need to read their own credential and every tenant's key reference;
+web-pivotal onboards tenants, so it reads every tenant's credential and writes their references, and
+it signs DFSP CSRs; trust-manager needs only the DFSP CA chain.
 
 Under this profile the Vault path holds a **crypto-user credential and a key reference**, never a
 private key — so every workload needs *two* paths rather than one, and the two have different
@@ -51,16 +52,22 @@ path "pivotal-kv/data/pivotal/keyref/DemoDFSP1"  { capabilities = ["read"] }
 path "sys/internal/ui/mounts/pivotal-kv"         { capabilities = ["read"] }
 EOF
 
-# trust-manager: reads every tenant's credential, because generating a key requires
-# authenticating as that tenant's own crypto user. That is unavoidable, so the
-# control is an alarm on reads of this prefix outside a provisioning window.
+# web-pivotal: reads every tenant's credential, because generating a key requires
+# authenticating as that tenant's own crypto user, and it cannot know in advance which
+# tenant it will onboard next. That is unavoidable, so the control is an alarm on reads
+# of this prefix outside a provisioning window -- see the note below.
+#
+# It is web-pivotal rather than trust-manager because onboarding is handled there.
+# trust-manager reads no private key and no crypto-user credential at all.
 vault policy write pivotal-hsm-provision - <<'EOF'
 path "pivotal-kv/data/pivotal/hsmcred/*" { capabilities = ["read"] }
 path "pivotal-kv/data/pivotal/keyref/*"  { capabilities = ["create", "read", "update"] }
 path "sys/internal/ui/mounts/pivotal-kv" { capabilities = ["read"] }
 EOF
 
-# web-pivotal: signs DFSP CSRs
+# web-pivotal also signs DFSP CSRs. Kept as a separate policy because the two jobs are
+# unrelated -- a deployment that issues no DFSP certificates needs this one and not the
+# other -- but both bind to the same role.
 vault policy write pivotal-dfsp-sign - <<'EOF'
 path "pki_dfsp/sign/dfsp-client" { capabilities = ["create", "update"] }
 EOF
@@ -81,8 +88,40 @@ EOF
 > any of them. The HSM does not save you here: the credential is what the HSM authenticates, so Vault
 > path policy is still the boundary that has to hold.
 
-Then bind each policy to the workload's ServiceAccount with a Kubernetes auth role, and create the
-KV v2 mount that holds the signing keys:
+Then bind each policy to the workload's ServiceAccount. **The ServiceAccount is the identity** — a
+pod presents its own token, Vault checks it with the API server and issues a token carrying that
+role's policies. Nothing is distributed and nothing is rotated, which is why each workload needs its
+own account rather than `default`.
+
+```bash
+vault write auth/kubernetes/role/web-outbound \
+  bound_service_account_names=web-outbound \
+  bound_service_account_namespaces=pivotal \
+  token_policies=pivotal-hsm-web-outbound ttl=1h
+
+# two policies, because onboarding and CSR signing are unrelated jobs on one service
+vault write auth/kubernetes/role/web-pivotal \
+  bound_service_account_names=web-pivotal \
+  bound_service_account_namespaces=pivotal \
+  token_policies=pivotal-hsm-provision,pivotal-dfsp-sign ttl=1h
+
+vault write auth/kubernetes/role/trust-manager \
+  bound_service_account_names=trust-manager \
+  bound_service_account_namespaces=pivotal \
+  token_policies=pivotal-dfsp-ca-read ttl=1h
+
+# one role per connector, each bound to its own ServiceAccount
+vault write auth/kubernetes/role/demodfsp1-connector \
+  bound_service_account_names=demodfsp1-connector \
+  bound_service_account_namespaces=pivotal \
+  token_policies=pivotal-hsm-demodfsp1 ttl=1h
+```
+
+> **`bound_service_account_names` is the whole boundary.** Bind a role to `default`, or give two
+> workloads the same account, and the per-tenant isolation above becomes decorative — any pod in the
+> namespace could take any role.
+
+Then create the KV v2 mount that holds the credentials and references:
 
 ```bash
 vault secrets enable -path=pivotal-kv -version=2 kv

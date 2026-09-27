@@ -160,12 +160,20 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
     }
 
     /**
-     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
-     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
-     * a typo must not silently decide where private keys live.
+     * web-inbound verifies; it never signs.
+     *
+     * Verification uses the sender's **public** key, which lives on `participant_key` in the
+     * registry — no private key is read here under any profile. So this is fixed rather than read
+     * from the environment: the participant domain constructs its key source eagerly, and
+     * `database` keeps that construction inert.
+     *
+     * Reading `KEY_PROVIDER` here would be worse than pointless. A deployment setting it globally
+     * would have this service open a device connection it has no use for, and fail to start if the
+     * device were unreachable — an outage on the inbound leg caused by configuration meant for the
+     * outbound one.
      */
     keyProvider(): KeyProvider {
-        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+        return KeyProvider.Database;
     }
 
     vaultSettings(): VaultSettings {
