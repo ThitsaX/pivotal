@@ -7,7 +7,7 @@ import {
     PutSendMoneyRequest,
     SendMoneyController,
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
-import {SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {PutAcceptPartyCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
@@ -519,6 +519,58 @@ describe('SendMoneyRequest', () => {
 });
 
 describe('SendMoneyController', () => {
+
+    // The wire accepts a bare array or the wrapped object; what reaches the command must always
+    // be the wrapped form, or nothing at all.
+    async function acceptPartyExtensionList(
+        extensionList: unknown,
+    ): Promise<unknown> {
+        let captured: PutAcceptPartyCommand | undefined;
+
+        const controller = new SendMoneyController({
+            async execute(command: PutAcceptPartyCommand): Promise<unknown> {
+                captured = command;
+                return {response: {}};
+            },
+        } as never);
+
+        await controller.put('wallet1', 'transfer-1', {
+            acceptParty: true,
+            amount: '12.34',
+            extensionList,
+        } as never);
+
+        return captured?.input.extensionList;
+    }
+
+    it('wraps a direct extensionList array before dispatching acceptParty', async () => {
+        const extension = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+
+        assert.deepEqual(await acceptPartyExtensionList(extension), {extension});
+    });
+
+    it('passes a wrapped extensionList through unchanged on acceptParty', async () => {
+        const extension = [{key: 'payerProvidedSchemeFee', value: '10'}];
+
+        assert.deepEqual(await acceptPartyExtensionList({extension}), {extension});
+    });
+
+    // An empty list carries no extensions but is not a valid ExtensionList, so forwarding it
+    // would have the peer reject the whole quote.
+    it('drops an empty extensionList array on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList([]), undefined);
+    });
+
+    it('drops a wrapped extensionList holding no extensions on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList({extension: []}), undefined);
+    });
+
+    it('omits an absent extensionList on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList(undefined), undefined);
+    });
 
     it('rejects POST sendmoney when fspiop-source differs from request payer FSP', async () => {
         const controller = new SendMoneyController({
