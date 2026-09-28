@@ -1,9 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { Transform, Type } from 'class-transformer';
-import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario } from '@shared/fspiop';
+import {
+    IsDefined,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    MaxLength,
+    Validate,
+    ValidateNested,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+} from 'class-validator';
+import { AmountType, Currency, FspiopMoney, IsFspiopAmount, TransactionScenario, IsAmountType } from '@shared/fspiop';
 import { FspParty } from './fsp-party';
+import { HasPayeeFspIdConstraint } from '../component/has-payee-fsp-id.constraint';
+
+@ValidatorConstraint({name: 'hasPayerFspId', async: false})
+class HasPayerFspIdConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        const fspId = (value as FspParty | undefined)?.fspId;
+        return typeof fspId === 'string' && fspId.length > 0;
+    }
+
+    defaultMessage(): string {
+        return 'from.fspId is required';
+    }
+}
 
 export class SendMoneyRequest {
     @IsNotEmpty()
@@ -13,16 +37,19 @@ export class SendMoneyRequest {
 
     @IsDefined()
     @ValidateNested()
+    @Validate(HasPayerFspIdConstraint)
     @Type(() => FspParty)
     from!: FspParty;
 
     @IsDefined()
     @ValidateNested()
+    @Validate(HasPayeeFspIdConstraint)
     @Type(() => FspParty)
     to!: FspParty;
 
     @IsDefined()
     @IsEnum(AmountType)
+    @IsAmountType()
     amountType!: AmountType;
 
     @IsDefined()
@@ -44,6 +71,7 @@ export class SendMoneyRequest {
     @MaxLength(32, {message: 'subScenario must not exceed 32 characters'})
     subScenario!: string;
 
+    @Transform(({value}) => typeof value === 'string' && value.trim().length === 0 ? undefined : value)
     @IsOptional()
     @IsString()
     @MaxLength(128, {message: 'note must not exceed 128 characters'})

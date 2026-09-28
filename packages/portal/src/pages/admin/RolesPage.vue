@@ -83,6 +83,10 @@ const createSubmitDisabled = computed((): boolean => {
     return false;
 });
 
+const adminPermissionLockedRoleCodes = new Set(['ADMIN', 'DFSP_ADMIN']);
+const locksAdminPermissions = (role: AdminRole | null): boolean => {
+    return role?.isSystem === true && adminPermissionLockedRoleCodes.has(role.code);
+};
 const normalizeRoleCode = (code: string): string => code.trim().replace(/\s+/g, ' ').toUpperCase();
 
 const openCreate = (): void => {
@@ -744,7 +748,7 @@ watch(() => editState.role, (role) => {
                                 {{ editState.role.scope }}
                             </span>
                             <span
-                                v-if="editState.role?.isSystem"
+                                v-if="locksAdminPermissions(editState.role)"
                                 class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600"
                             >
                                 system role — admin.* permissions cannot be removed
@@ -803,7 +807,7 @@ watch(() => editState.role, (role) => {
                             :available-permissions="permState.items"
                             :model-value="editState.selectedKeys"
                             :scope-filter="editState.role?.scope"
-                            :lock-admin-keys="editState.role?.isSystem === true"
+                            :lock-admin-keys="locksAdminPermissions(editState.role)"
                             :disabled="editState.submitting"
                             @update:model-value="onEditPermissionsChange"
                         />

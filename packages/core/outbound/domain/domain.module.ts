@@ -2,17 +2,28 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
+import { TypeOrmModule as NestJsTypeOrmModule } from '@nestjs/typeorm';
 import { AuditProducerModule } from '@core/audit/producer';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
-import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler } from './command';
-import { GetDfspListByUsecaseHandler, GetDfspListHandler } from './query';
-import { AmountDecimalValidator, OutboundSettings, PrefixOracleClient, RedisClient } from './component';
+import { Transaction } from '@core/audit/domain/model';
+import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
+import { AmountTypeConstraint, FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
+import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
+import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
+import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
+import * as https from "node:https";
+import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
-const CommandHandlers = [PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler];
+const CommandHandlers = [
+    PostSendMoneyHandler,
+    PutAcceptPartyHandler,
+    PutAcceptQuoteHandler,
+    RegisterMsisdnHandler,
+];
 const QueryHandlers = [
     GetDfspListByUsecaseHandler,
     GetDfspListHandler,
+    GetTransferStatusHandler,
 ];
 
 @Module({})
@@ -33,6 +44,7 @@ export class OutboundDomainModule {
                     inject: asyncOptions.inject ?? [],
                     useFactory: asyncOptions.useFactory,
                 }),
+                NestJsTypeOrmModule.forFeature([Transaction], PIVOTAL_DB_READ_CONNECTION_NAME),
                 ...(asyncOptions.imports ?? []),
             ],
             providers: [
@@ -73,6 +85,31 @@ export class OutboundDomainModule {
                 inject: [OutboundSettings],
             },
             {
+                provide: PayerProvidedFeesValidator,
+                useFactory: (
+                    outboundSettings: OutboundSettings,
+                    amountDecimalValidator: AmountDecimalValidator,
+                ): PayerProvidedFeesValidator =>
+                    new PayerProvidedFeesValidator(
+                        outboundSettings.checkPayerFeeAsMandatory,
+                        amountDecimalValidator,
+                ),
+                inject: [OutboundSettings, AmountDecimalValidator],
+            },
+            TransferStatusRepository,
+            {                                                                                                                                                                       
+                provide: AmountTypeConstraint,
+                useFactory: (outboundSettings: OutboundSettings): AmountTypeConstraint => 
+                    new AmountTypeConstraint(outboundSettings.strictAmountType), 
+                inject: [OutboundSettings],
+            },
+            {
+                provide: HasPayeeFspIdConstraint,
+                useFactory: (outboundSettings: OutboundSettings): HasPayeeFspIdConstraint =>
+                    new HasPayeeFspIdConstraint(outboundSettings.postSendmoneyPayeeFspIdRequired),
+                inject: [OutboundSettings],
+            },
+            {
                 provide: PrefixOracleClient,
                 useFactory: (outboundSettings: OutboundSettings, redisClient: RedisClient): PrefixOracleClient => {
                     return new PrefixOracleClient(
@@ -83,6 +120,16 @@ export class OutboundDomainModule {
                     );
                 },
                 inject: [OutboundSettings, RedisClient],
+            },
+            {
+                provide: OracleCentralRegistryClient,
+                useFactory: (outboundSettings: OutboundSettings): OracleCentralRegistryClient => {
+                    return new OracleCentralRegistryClient(
+                        outboundSettings.centralRegistryOracleEndpoint,
+                        outboundSettings.centralRegistryOracleAxiosParams,
+                    );
+                },
+                inject: [OutboundSettings],
             },
             ...(asyncOptions.providers ?? []),
             {

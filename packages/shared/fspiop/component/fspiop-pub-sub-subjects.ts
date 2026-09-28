@@ -37,29 +37,54 @@ export namespace FspiopPubSubSubjects {
 
     export class Parties {
 
+        // This token is only used by the local waiter map; callbacks still publish a concrete payee FSP.
+        private static readonly ANY_PAYEE = '_any_';
+
         private constructor() {
         }
 
         static forSuccess(
             payer: string,
-            payee: string,
+            payee: string | null | undefined,
             partyIdType: PartyIdType,
             partyId: string,
             subId?: string,
         ): string {
-            const base = `${PREFIX}parties:${payer}:${payee}:${partyIdType}:${partyId}`;
+            const base = `${PREFIX}parties:${payer}:${payee ?? Parties.ANY_PAYEE}:${partyIdType}:${partyId}`;
             return subId != null && subId.length > 0 ? `${base}:${subId}` : base;
         }
 
         static forError(
             payer: string,
-            payeeOrHub: string,
+            payeeOrHub: string | null | undefined,
             partyIdType: PartyIdType,
             partyId: string,
             subId?: string,
         ): string {
-            const base = `${PREFIX}parties-error:${payer}:${payeeOrHub}:${partyIdType}:${partyId}`;
+            const base = `${PREFIX}parties-error:${payer}:${payeeOrHub ?? Parties.ANY_PAYEE}:${partyIdType}:${partyId}`;
             return subId != null && subId.length > 0 ? `${base}:${subId}` : base;
+        }
+
+        static toAnyPayeeSubject(subject: string): string | null {
+            const successPrefix = `${PREFIX}parties:`;
+            const errorPrefix = `${PREFIX}parties-error:`;
+            const prefix = subject.startsWith(successPrefix)
+                ? successPrefix
+                : subject.startsWith(errorPrefix)
+                    ? errorPrefix
+                    : null;
+
+            if (prefix == null) {
+                return null;
+            }
+
+            const tokens = subject.slice(prefix.length).split(':');
+            if (tokens.length < 4) {
+                return null;
+            }
+
+            tokens[1] = Parties.ANY_PAYEE;
+            return `${prefix}${tokens.join(':')}`;
         }
     }
 

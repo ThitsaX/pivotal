@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put, UseInterceptors } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
 import { MdcContext } from '@shared/foundation';
-import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
+import { Extension, ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
-import { IsBoolean, IsOptional, ValidateIf } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
 
 export class PutSendMoneyRequest {
     @IsOptional()
@@ -21,12 +22,19 @@ export class PutSendMoneyRequest {
     amount?: string;
 
     @IsOptional()
-    extensionList?: ExtensionList;
+    extensionList?: Array<Extension> | ExtensionList;
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
     @IsBoolean()
     acceptQuote?: boolean;
+
+    @IsOptional()
+    @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(128, {message: 'homeTransactionId must not exceed 128 characters'})
+    homeTransactionId?: string;
 }
 
 @Controller('secured/sendmoney')
@@ -75,17 +83,37 @@ export class SendMoneyController {
         return payerFsp;
     }
 
+    // Accepts the bare array clients send on POST and the wrapped object this leg has always
+    // taken, so one payload shape works across both. An empty list is dropped rather than
+    // forwarded: FSPIOP requires at least one extension, so an empty one would be rejected by
+    // the peer as a malformed quote instead of being ignored as the caller intended.
+    private static toExtensionList(
+        extensionList: Array<Extension> | ExtensionList | undefined,
+    ): ExtensionList | undefined {
+        if (extensionList == null) {
+            return undefined;
+        }
+
+        const extension = Array.isArray(extensionList) ? extensionList : extensionList.extension;
+
+        if (!Array.isArray(extension) || extension.length === 0) {
+            return undefined;
+        }
+
+        return {extension};
+    }
+
+    // The request line is emitted by SendMoneyLogInterceptor, which runs before the
+    // ValidationPipe and therefore also covers payloads rejected during validation.
     @Post()
     @HttpCode(HttpStatus.OK)
+    @UseInterceptors(SendMoneyLogInterceptor)
     async post(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: SendMoneyRequest,
     ): Promise<SendMoneyResponse> {
         const correlationId = Ulid.generate();
         return MdcContext.run({[MdcContext.ID_VALUE]: request.from?.idValue,}, async () => {
-            this.logger.log(
-                `Post SendMoney Request for fromIdValue ${request.from?.idValue} toIdValue ${request.to?.idValue} : ${JSON.stringify(request)}`,
-            );
             const payerFsp = SendMoneyController.toSource(source, request);
             const input = new PostSendMoneyCommand.Input(correlationId, payerFsp, request);
 
@@ -116,7 +144,7 @@ export class SendMoneyController {
                             transferId,
                             request.acceptParty,
                             request.amount ?? '',
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                             SendMoneyController.toOptionalSource(source),
                         ),
                     ),
@@ -137,6 +165,7 @@ export class SendMoneyController {
                             transferId,
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
+                            request.homeTransactionId,
                         ),
                     ),
                 );

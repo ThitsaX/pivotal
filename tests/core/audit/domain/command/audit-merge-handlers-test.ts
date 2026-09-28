@@ -9,7 +9,7 @@ import {AuditTransfersErrorCommand} from '../../../../../packages/core/audit/dom
 import {AuditTransfersErrorHandler} from '../../../../../packages/core/audit/domain/command/transfers/audit-transfers-error.handler';
 import {DisputeTransactionCommand} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.command';
 import {DisputeTransactionHandler} from '../../../../../packages/core/audit/domain/command/transaction/dispute-transaction.handler';
-import {PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
+import {Currency, PartyIdType, QuotesPostRequest, TransactionInitiatorType} from '../../../../../packages/shared/fspiop';
 
 function createTransactionRepositoryStub() {
     let upsertInput: unknown = null;
@@ -66,6 +66,9 @@ describe('Audit transaction handlers', () => {
                 {partyIdType: PartyIdType.Msisdn, partyId: '959420000111'},
                 'payer-home-1',
                 occurredAt,
+                Currency.Usd,
+                '10.00',
+                'SEND',
             ),
         ));
 
@@ -83,6 +86,9 @@ describe('Audit transaction handlers', () => {
             transactionInitiatorType: TransactionInitiatorType.Consumer,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            amountType: 'SEND',
+            quotingCurrency: Currency.Usd,
+            quotingAmount: 10,
             payerHomeTransactionId: 'payer-home-1',
             error: false,
             partiesRequestedAt: occurredAt,
@@ -99,6 +105,7 @@ describe('Audit transaction handlers', () => {
         const request = {
             quoteId: 'quote-1',
             transactionId: 'transfer-1',
+            amountType: 'SEND',
             amount: {amount: '10', currency: 'USD'},
             payer: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959250000001'}},
             payee: {partyIdInfo: {partyIdType: PartyIdType.Msisdn, partyIdentifier: '959420000111'}},
@@ -150,6 +157,7 @@ describe('Audit transaction handlers', () => {
             transactionStartedAt: occurredAt,
             transactionType: 'TRANSFER',
             subScenario: 'SUB',
+            amountType: 'SEND',
             error: false,
             flow: 2,
             quotesRespondedAt: occurredAt,
@@ -164,7 +172,15 @@ describe('Audit transaction handlers', () => {
         const repository = createTransactionRepositoryStub();
         const handler = new AuditTransfersErrorHandler(repository.repository as never);
         const occurredAt = new Date('2026-02-01T00:00:09.000Z');
-        const request = {transferId: 'tx-1', payerFsp: 'payerfsp', payeeFsp: 'payeefsp', amount: {amount: '12', currency: 'USD'}} as const;
+        const request = {
+            transferId: 'tx-1',
+            payerFsp: 'payerfsp',
+            payeeFsp: 'payeefsp',
+            amount: {amount: '12', currency: 'USD'},
+            extensionList: {
+                extension: [{key: 'homeTransactionId', value: 'payer-home-final'}],
+            },
+        } as const;
         const error = {errorInformation: {errorCode: '3200'}} as const;
 
         await handler.execute(new AuditTransfersErrorCommand(
@@ -185,6 +201,7 @@ describe('Audit transaction handlers', () => {
             payeeFsp: 'payeefsp',
             transferCurrency: 'USD',
             transferAmount: 12,
+            payerHomeTransactionId: 'payer-home-final',
             transactionStartedAt: occurredAt,
             transactionCompletedAt: occurredAt,
             error: true,

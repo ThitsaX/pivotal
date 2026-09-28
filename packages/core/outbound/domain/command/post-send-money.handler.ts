@@ -66,7 +66,7 @@ export class PostSendMoneyHandler
         fspParty.lastName = complexName?.lastName;
         fspParty.dateOfBirth = party.personalInfo?.dateOfBirth;
         fspParty.merchantClassificationCode = party.merchantClassificationCode;
-        fspParty.fspId = partyIdInfo.fspId ?? '';
+        fspParty.fspId = PostSendMoneyHandler.toOptionalValue(partyIdInfo.fspId);
         fspParty.extensionList = partyIdInfo.extensionList?.extension;
 
         return fspParty;
@@ -93,7 +93,7 @@ export class PostSendMoneyHandler
         transferRequest.amount = request.amount;
         transferRequest.transactionType = request.transactionType;
         transferRequest.subScenario = request.subScenario;
-        transferRequest.note = request.note;
+        transferRequest.note = request.note?.trim().length ? request.note : undefined;
         transferRequest.supportedCurrencies = callback.party.supportedCurrencies;
 
         return transferRequest;
@@ -168,11 +168,30 @@ export class PostSendMoneyHandler
             : normalizedValue;
     }
 
+    private static resolveDestination(
+        callback: PartiesTypeIDPutResponse,
+        requestedDestination: string | undefined,
+    ): string {
+        const resolvedDestination = PostSendMoneyHandler.toOptionalValue(callback.party.partyIdInfo.fspId)
+            ?? requestedDestination;
+
+        if (resolvedDestination == null) {
+            throw new FspiopException(
+                FspiopErrors.MISSING_MANDATORY_ELEMENT,
+                'Party lookup response must include the resolved payee fspId.',
+            );
+        }
+
+        callback.party.partyIdInfo.fspId = resolvedDestination;
+        return resolvedDestination;
+    }
+
     async execute(command: PostSendMoneyCommand): Promise<PostSendMoneyCommand.Output> {
 
         const { correlationId, source, request } = command.input;
         const transferId = correlationId;
-        const destination = request.to.fspId;
+        const destination = PostSendMoneyHandler.toOptionalValue(request.to.fspId);
+        const auditDestination = destination ?? '';
         const type = request.to.idType;
         const id = request.to.idValue;
         const subId = PostSendMoneyHandler.toSubId(request.to.idSubValue);
@@ -190,7 +209,7 @@ export class PostSendMoneyHandler
                     {
                         correlationId,
                         payerFsp: source,
-                        payeeFsp: destination,
+                        payeeFsp: auditDestination,
                         payerIdType: request.from.idType,
                         payerId: request.from.idValue,
                         payerSubId: payerSubId ?? null,
@@ -200,7 +219,10 @@ export class PostSendMoneyHandler
                         transactionInitiatorType: request.from.type ?? null,
                         transactionType: request.transactionType,
                         subScenario: request.subScenario,
+                        amountType: request.amountType,
                         payerHomeTransactionId: request.homeTransactionId ?? null,
+                        quotingCurrency: request.currency,
+                        quotingAmount: request.amount,
                         request: {
                             partyIdType: type,
                             partyId: id,
@@ -233,6 +255,7 @@ export class PostSendMoneyHandler
             }
 
             const callback = await waitPromise;
+            const resolvedDestination = PostSendMoneyHandler.resolveDestination(callback, destination);
             const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
                 request,
                 callback,
@@ -249,7 +272,7 @@ export class PostSendMoneyHandler
                     {
                         correlationId,
                         payerFsp: source,
-                        payeeFsp: destination,
+                        payeeFsp: resolvedDestination,
                         payerIdType: request.from.idType,
                         payerId: request.from.idValue,
                         payerSubId: payerSubId ?? null,
@@ -277,7 +300,7 @@ export class PostSendMoneyHandler
                         {
                             correlationId,
                             payerFsp: source,
-                            payeeFsp: destination,
+                            payeeFsp: auditDestination,
                             payerIdType: request.from.idType,
                             payerId: request.from.idValue,
                             payerSubId: payerSubId ?? null,

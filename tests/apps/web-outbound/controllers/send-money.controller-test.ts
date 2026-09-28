@@ -7,8 +7,13 @@ import {
     PutSendMoneyRequest,
     SendMoneyController,
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
-import {SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {PutAcceptPartyCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
+import { Test, TestingModule } from '@nestjs/testing';
+import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
+import { useContainer } from 'class-validator';
+import { HasPayeeFspIdConstraint } from '../../../../packages/core/outbound/domain/component/has-payee-fsp-id.constraint';
+
 
 async function validateRequest(body: Record<string, unknown>): Promise<{
     request: PutSendMoneyRequest;
@@ -20,10 +25,25 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
     return {request, errors};
 }
 
-async function validateSendMoneyRequest(body: Record<string, unknown>): Promise<{
+
+async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false , payeeFspIdRequired: boolean = true): Promise<{
     request: SendMoneyRequest;
     errors:  ValidationError[];
 }> {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+        providers: [
+            {
+                provide: AmountTypeConstraint,
+                useValue: new AmountTypeConstraint(strictAmountType),
+            },
+            {
+                provide: HasPayeeFspIdConstraint,
+                useValue: new HasPayeeFspIdConstraint(payeeFspIdRequired),
+            },
+        ],
+    }).compile();
+    useContainer(moduleRef, { fallbackOnErrors: true });
+
     const request = plainToInstance(SendMoneyRequest, body);
     const errors = await validate(request, {whitelist: true});
 
@@ -93,11 +113,22 @@ describe('PutSendMoneyRequest', () => {
         assert.equal(request.amount, '12');
     });
 
-    it('keeps extensionList when acceptParty is true', async () => {
+    it('keeps direct extensionList array when acceptParty is true', async () => {
+        const extensionList = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+        const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});
+
+        assert.deepEqual(errors, []);
+        assert.deepEqual(request.extensionList, extensionList);
+    });
+
+    it('keeps legacy wrapped extensionList when acceptParty is true', async () => {
         const extensionList = {
             extension: [
-                {key: 'payerFee', value: '1.23'},
-                {key: 'payerFeeCurrency', value: 'USD'},
+                {key: 'payerProvidedSchemeFee', value: '10'},
+                {key: 'payerProvidedPayerFee', value: '5'},
             ],
         };
         const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});
@@ -124,6 +155,28 @@ describe('PutSendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
     });
+
+    it('accepts and trims homeTransactionId with acceptQuote', async () => {
+        const {request, errors} = await validateRequest({
+            acceptQuote: true,
+            homeTransactionId: '  payer-home-final  ',
+        });
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.homeTransactionId, 'payer-home-final');
+    });
+
+    it('rejects a blank homeTransactionId with acceptQuote', async () => {
+        const {errors} = await validateRequest({acceptQuote: true, homeTransactionId: '   '});
+
+        assert.ok(messages(errors).includes('homeTransactionId should not be empty'));
+    });
+
+    it('rejects an over-length homeTransactionId with acceptQuote', async () => {
+        const {errors} = await validateRequest({acceptQuote: true, homeTransactionId: 'h'.repeat(129)});
+
+        assert.ok(messages(errors).includes('homeTransactionId must not exceed 128 characters'));
+    });
 });
 
 describe('SendMoneyRequest', () => {
@@ -135,11 +188,94 @@ describe('SendMoneyRequest', () => {
         assert.equal(request.amount, '12');
     });
 
+    it('accepts an empty note and normalizes it to undefined', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.note = '';
+
+        const {request, errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.note, undefined);
+    });
+
     it('accepts 32-character payer and payee FSP IDs', async () => {
         const fspId = 'f'.repeat(32);
         const {errors} = await validateSendMoneyRequest(sendMoneyBody(fspId, fspId));
 
         assert.deepEqual(errors, []);
+    });
+
+    it('accepts a missing payee FSP ID for oracle-based resolution', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        delete (body.to as Record<string, unknown>).fspId;
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'merchant-123',
+        });
+
+        const {request, errors} = await validateSendMoneyRequest(body, false, false);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.to.fspId, undefined);
+    });
+
+    it('rejects a missing payee FSP ID when required by configuration', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        delete (body.to as Record<string, unknown>).fspId;
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'ALIAS',
+            idValue: 'merchant-123',
+        });
+    
+        const {errors} = await validateSendMoneyRequest(body, false, true);
+    
+        assert.ok(messages(errors).includes('to.fspId is required'));
+    });
+    
+    it('accepts a present payee FSP ID when required by configuration', async () => {
+        const {errors} = await validateSendMoneyRequest(
+            sendMoneyBody('wallet1', 'wallet2'),
+            false,
+            true,
+        );
+    
+        assert.deepEqual(errors, []);
+    });
+
+    it('normalizes an empty payee FSP ID to undefined', async () => {
+        const body = sendMoneyBody('wallet1', '');
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'merchant-123',
+        });
+
+        const {request, errors} = await validateSendMoneyRequest(body, false, false);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.to.fspId, undefined);
+    });
+
+    it('still requires the payer FSP ID', async () => {
+        const body = sendMoneyBody('', 'wallet2');
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).includes('from.fspId is required'));
+    });
+
+    it('accepts underscores and hyphens in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer_fsp-1', 'payee_fsp-2'));
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in FSP IDs', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('payer.fsp', 'payee fsp'));
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'fspId must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
     });
 
     it('rejects a 33-character payer FSP ID', async () => {
@@ -156,16 +292,117 @@ describe('SendMoneyRequest', () => {
 
     it('accepts a 128-character payer idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(128);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(128),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
         assert.deepEqual(errors, []);
     });
 
+    it('accepts international and leading-zero local MSISDN values', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '+224621234567';
+        (body.to as Record<string, unknown>).idValue = '09980702315';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects malformed and formatted MSISDN values', async () => {
+        const invalidValues = [
+            '+224 621 234 567',
+            '224-621-234-567',
+            '+09980702315',
+            '1234567890123456',
+        ];
+
+        for (const idValue of invalidValues) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.to as Record<string, unknown>).idValue = idValue;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.ok(
+                messages(errors).includes('idValue for MSISDN must contain 2 to 15 digits, with an optional leading plus sign for international numbers'),
+                `expected MSISDN validation error for ${idValue}`,
+            );
+        }
+    });
+
+    it('accepts visible Mojaloop party identifier formats', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'MSISDN',
+            idValue: '+224621234567',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'EMAIL',
+            idValue: 'person+tag@example.com',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('accepts letters, numbers, underscores, and hyphens in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'BUSINESS_123-ABC',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'LBR-MER_00012345',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('rejects unsupported characters in BUSINESS and ALIAS idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'BUSINESS',
+            idValue: 'business.example',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ALIAS',
+            idValue: 'merchant alias',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue for BUSINESS or ALIAS must contain only letters, numbers, underscores, or hyphens').length,
+            2,
+        );
+    });
+
+    it('rejects control characters in payer and payee idValue', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).idValue = '\u0003 /bin/sleep 4 \r';
+        (body.to as Record<string, unknown>).idValue = '2769\u200B200001';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.equal(
+            messages(errors).filter((message) => message === 'idValue must not contain control or formatting characters').length,
+            2,
+        );
+    });
+
     it('rejects a 129-character payer idValue (the payer_id overflow that jammed the audit consumer)', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.from as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.from as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
@@ -174,7 +411,10 @@ describe('SendMoneyRequest', () => {
 
     it('rejects a 129-character payee idValue', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
-        (body.to as Record<string, unknown>).idValue = 'x'.repeat(129);
+        Object.assign(body.to as Record<string, unknown>, {
+            idType:  'ACCOUNT_ID',
+            idValue: 'x'.repeat(129),
+        });
 
         const {errors} = await validateSendMoneyRequest(body);
 
@@ -243,9 +483,94 @@ describe('SendMoneyRequest', () => {
 
         assert.ok(messages(errors).includes('merchantClassificationCode must not exceed 4 characters'));
     });
+
+    it('rejects SEND amountType if subScenario is PERSON_TO_PERSON', async () => {
+        process.env["STRICT_AMOUNT_TYPE"] = 'true';
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_PERSON';
+        body.amountType = 'SEND'
+
+        const {errors} = await validateSendMoneyRequest(body, true);
+
+        assert.ok(messages(errors).includes('Invalid amountType value'));
+    })
+
+    it('rejects RECEIVE amountType if subScenario is PERSON_TO_BUSINESS', async () => {
+        process.env["STRICT_AMOUNT_TYPE"] = 'true';
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'RECEIVE'
+
+        const {errors} = await validateSendMoneyRequest(body, true);
+
+        assert.ok(messages(errors).includes('Invalid amountType value'));
+    })
+
+    it('does not validate amountType if STRICT_AMOUNT_TYPE is set to false', async () => {
+        const STRICT_AMOUNT_TYPE = false;
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'RECEIVE'
+
+        const {errors} = await validateSendMoneyRequest(body, STRICT_AMOUNT_TYPE);
+
+        assert.deepEqual(errors, []);
+    })
 });
 
 describe('SendMoneyController', () => {
+
+    // The wire accepts a bare array or the wrapped object; what reaches the command must always
+    // be the wrapped form, or nothing at all.
+    async function acceptPartyExtensionList(
+        extensionList: unknown,
+    ): Promise<unknown> {
+        let captured: PutAcceptPartyCommand | undefined;
+
+        const controller = new SendMoneyController({
+            async execute(command: PutAcceptPartyCommand): Promise<unknown> {
+                captured = command;
+                return {response: {}};
+            },
+        } as never);
+
+        await controller.put('wallet1', 'transfer-1', {
+            acceptParty: true,
+            amount: '12.34',
+            extensionList,
+        } as never);
+
+        return captured?.input.extensionList;
+    }
+
+    it('wraps a direct extensionList array before dispatching acceptParty', async () => {
+        const extension = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+
+        assert.deepEqual(await acceptPartyExtensionList(extension), {extension});
+    });
+
+    it('passes a wrapped extensionList through unchanged on acceptParty', async () => {
+        const extension = [{key: 'payerProvidedSchemeFee', value: '10'}];
+
+        assert.deepEqual(await acceptPartyExtensionList({extension}), {extension});
+    });
+
+    // An empty list carries no extensions but is not a valid ExtensionList, so forwarding it
+    // would have the peer reject the whole quote.
+    it('drops an empty extensionList array on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList([]), undefined);
+    });
+
+    it('drops a wrapped extensionList holding no extensions on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList({extension: []}), undefined);
+    });
+
+    it('omits an absent extensionList on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList(undefined), undefined);
+    });
 
     it('rejects POST sendmoney when fspiop-source differs from request payer FSP', async () => {
         const controller = new SendMoneyController({

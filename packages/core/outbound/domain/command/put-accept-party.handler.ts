@@ -26,7 +26,7 @@ import {
     TransactionType,
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
-import { AmountDecimalValidator, RedisClient } from '../component';
+import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient } from '../component';
 import { SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
@@ -56,6 +56,8 @@ export class PutAcceptPartyHandler
         private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(AmountDecimalValidator)
         private readonly amountDecimalValidator: AmountDecimalValidator,
+        @Inject(PayerProvidedFeesValidator)
+        private readonly payerProvidedFeesValidator: PayerProvidedFeesValidator,
     ) {
     }
 
@@ -105,6 +107,10 @@ export class PutAcceptPartyHandler
 
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
+        this.payerProvidedFeesValidator.validate(
+            acceptParty,
+            extensionList,
+        );
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         this.amountDecimalValidator.validate(transferRequest.amount);

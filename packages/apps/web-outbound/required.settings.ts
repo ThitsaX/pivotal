@@ -51,6 +51,10 @@ export class WebOutboundSettings
             socketTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_SOCKET_TIMEOUT_MS'),
             connectionTimeoutMs: this.readPositiveInteger('PREFIX_ORACLE_CONNECTION_TIMEOUT_MS'),
         };
+        const centralRegistryOracleAxiosParams = {
+            socketTimeoutMs: this.readPositiveInteger('CENTRAL_REGISTRY_ORACLE_SOCKET_TIMEOUT_MS'),
+            connectionTimeoutMs: this.readPositiveInteger('CENTRAL_REGISTRY_ORACLE_CONNECTION_TIMEOUT_MS'),
+        };
 
         const fspiopAxiosParams: FspiopAxiosParams = {
             socketTimeoutMs,
@@ -74,7 +78,12 @@ export class WebOutboundSettings
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
             prefixOracleAxiosParams,
             this.readRequiredPositiveInteger('PREFIX_ORACLE_CACHE_TTL_MS'),
-            this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0
+            this.readOptionalString('CENTRAL_REGISTRY_ORACLE_ENDPOINT'),
+            centralRegistryOracleAxiosParams,
+            this.readNonNegativeInteger('DECIMAL_PLACES') ?? 0,
+            this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
+            this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
+            this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
         );
     }
 
@@ -173,6 +182,15 @@ export class WebOutboundSettings
         return parsed;
     }
 
+    private readOptionalString(name: string): string | undefined {
+        const value = this.configService.get<string>(name);
+        if (value == null || value.trim().length === 0) {
+            return undefined;
+        }
+
+        return value;
+    }
+
     private readOptionalBoolean(name: string): boolean | undefined {
         const value = this.configService.get<string>(name);
         if (value == null || value.trim().length === 0) {
@@ -182,6 +200,20 @@ export class WebOutboundSettings
         if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
         if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
         return undefined;
+    }
+
+    private readBoolean(name: string, defaultValue: boolean): boolean {
+        const value = this.configService.get<string>(name);
+
+        if (value == null || value.trim().length === 0) {
+            return defaultValue;
+        }
+
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+        if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+
+        throw new Error(`Invalid environment variable ${name}: expected a boolean value.`);
     }
 
     private readPositiveInteger(name: string): number | undefined {

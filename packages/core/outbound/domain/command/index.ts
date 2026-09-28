@@ -6,3 +6,5 @@ export * from './put-accept-party.command';
 export * from './put-accept-party.handler';
 export * from './put-accept-quote.command';
 export * from './put-accept-quote.handler';
+export * from './register-msisdn.command';
+export * from './register-msisdn.handler';

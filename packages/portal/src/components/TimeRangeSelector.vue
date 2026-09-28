@@ -7,14 +7,24 @@ import CustomDropdown from './CustomDropdown.vue';
 
 type RangeMode = 'today' | 'last24' | 'custom';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
     label: string;
     selectedTimeZone: string;
     mode?: string;
     startValue: string;
     endValue: string;
     disabled?: boolean;
-}>();
+    compactModeSelector?: boolean;
+    showLast24?: boolean;
+    /** When false, only the header row (label + headerExtra) is shown. Default true. */
+    controlsVisible?: boolean;
+    /** Hide the title row (clock icon + label + headerExtra). */
+    hideHeader?: boolean;
+}>(), {
+    showLast24: true,
+    controlsVisible: true,
+    hideHeader: false,
+});
 
 const emit = defineEmits<{
     (event: 'update:startValue', value: string): void;
@@ -30,6 +40,12 @@ const RANGE_OPTIONS: Array<{label: string; value: string}> = [
     {label: 'Last 24 Hours', value: 'last24'},
     {label: 'Custom Range', value: 'custom'},
 ];
+
+const visibleRangeOptions = computed((): Array<{label: string; value: string}> =>
+    props.showLast24 === false
+        ? RANGE_OPTIONS.filter((option) => option.value !== 'last24')
+        : RANGE_OPTIONS,
+);
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -403,6 +419,9 @@ watch(
 
 onMounted((): void => {
     selectedMode.value = (props.mode as RangeMode | '') || detectPresetMode(props.startValue, props.endValue);
+    if (selectedMode.value === 'custom') {
+        syncCustomInputsFromProps();
+    }
 });
 
 watch(
@@ -410,6 +429,9 @@ watch(
     (mode): void => {
         if (mode != null) {
             selectedMode.value = mode as RangeMode | '';
+            if (mode === 'custom') {
+                syncCustomInputsFromProps();
+            }
         }
     },
 );
@@ -448,21 +470,37 @@ watch(
         class="time-range-selector"
         :class="props.disabled === true ? 'opacity-60' : ''"
     >
-        <div class="flex items-center gap-2 mb-3">
-            <svg class="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
+        <div
+            v-if="props.hideHeader !== true"
+            class="mb-3 flex w-full items-center gap-2"
+        >
+            <svg class="h-4 w-4 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
             </svg>
-            <span class="text-sm font-semibold text-ink">{{ label }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ label }}</span>
+            <div v-if="$slots.headerExtra" class="ml-auto shrink-0">
+                <slot name="headerExtra" />
+            </div>
         </div>
 
-        <CustomDropdown
-            :model-value="selectedMode"
-            :options="RANGE_OPTIONS"
-            placeholder="Select Range"
-            button-class="!py-2.5 !text-sm !rounded-xl"
-            :disabled="props.disabled === true"
-            @update:model-value="onModeSelected"
-        />
+        <div
+            v-show="props.controlsVisible !== false"
+            class="flex flex-col gap-2 sm:flex-row sm:items-center"
+        >
+            <div :class="props.compactModeSelector === true ? 'w-full sm:w-48' : 'w-full'">
+                <CustomDropdown
+                    :model-value="selectedMode"
+                    :options="visibleRangeOptions"
+                    placeholder="Select Range"
+                    button-class="!py-2.5 !text-sm !rounded-xl"
+                    :disabled="props.disabled === true"
+                    @update:model-value="onModeSelected"
+                />
+            </div>
+            <div v-if="selectedMode !== 'custom' && $slots.action" class="shrink-0">
+                <slot name="action" />
+            </div>
+        </div>
 
         <Transition
             enter-active-class="transition-all duration-250 ease-out"
@@ -472,7 +510,7 @@ watch(
             leave-from-class="opacity-100 translate-y-0 max-h-96"
             leave-to-class="opacity-0 -translate-y-1 max-h-0"
         >
-            <div v-if="selectedMode === 'custom'" class="mt-3">
+            <div v-if="props.controlsVisible !== false && selectedMode === 'custom'" class="mt-3">
                 <div class="datetime-cards-grid">
                     <!-- From -->
                     <div class="datetime-card">
@@ -631,6 +669,10 @@ watch(
                     </svg>
                     {{ rangeError }}
                 </p>
+
+                <div v-if="$slots.action" class="mt-3 flex justify-end">
+                    <slot name="action" />
+                </div>
             </div>
         </Transition>
     </div>

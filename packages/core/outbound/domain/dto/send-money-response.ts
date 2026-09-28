@@ -8,6 +8,7 @@ import { FspParty } from './fsp-party';
 export enum StateEnum {
     WaitingForPartyAcceptance = 'WAITING_FOR_PARTY_ACCEPTANCE',
     WaitingForQuoteAcceptance = 'WAITING_FOR_QUOTE_ACCEPTANCE',
+    Pending = 'PENDING',
     Completed = 'COMPLETED',
     Aborted = 'ABORTED',
 }

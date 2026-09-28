@@ -12,6 +12,12 @@ export class AdminErrorCode {
 
     static readonly USER_LAST_ADMIN             = 'ADMIN_USER_LAST_ADMIN';
 
+    static readonly USER_LAST_DFSP_ADMIN        = 'ADMIN_USER_LAST_DFSP_ADMIN';
+
+    static readonly USER_MANAGEMENT_SCOPE_DENIED = 'ADMIN_USER_MANAGEMENT_SCOPE_DENIED';
+
+    static readonly USER_ROLE_NOT_ASSIGNABLE    = 'ADMIN_USER_ROLE_NOT_ASSIGNABLE';
+
     static readonly USER_NOT_FOUND              = 'ADMIN_USER_NOT_FOUND';
 
     static readonly USER_ROLE_NOT_FOUND         = 'ADMIN_USER_ROLE_NOT_FOUND';
@@ -47,6 +53,9 @@ export const ADMIN_ERROR_MESSAGES: Record<string, string> = {
     [AdminErrorCode.USER_ADMIN_FORBIDS_FSP_ID]:      'A HUB-scoped role does not accept fspId.',
     [AdminErrorCode.USER_SELF_LOCK]:                 'You cannot change your own role or active status, or delete your own account.',
     [AdminErrorCode.USER_LAST_ADMIN]:                'This change would leave no active users able to manage other users.',
+    [AdminErrorCode.USER_LAST_DFSP_ADMIN]:           'This change would leave this FSP with no active DFSP administrator.',
+    [AdminErrorCode.USER_MANAGEMENT_SCOPE_DENIED]:   'You cannot manage that user.',
+    [AdminErrorCode.USER_ROLE_NOT_ASSIGNABLE]:       'You cannot assign that role.',
     [AdminErrorCode.USER_NOT_FOUND]:                 'User not found.',
     [AdminErrorCode.USER_ROLE_NOT_FOUND]:            'The specified role does not exist.',
     [AdminErrorCode.USER_FSP_ID_NOT_FOUND]:          'The specified FSP ID does not exist.',

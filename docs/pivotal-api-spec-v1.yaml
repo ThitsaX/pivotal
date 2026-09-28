@@ -102,6 +102,8 @@ paths:
           $ref: '#/components/responses/unauthorized'
         "403":
           $ref: '#/components/responses/forbidden'
+        "417":
+          $ref: '#/components/responses/payerFeeValidationError'
         "500":
           $ref: '#/components/responses/putAcceptPartyTransferServerError'
   /secured/sendmoney/{transferId} (Accept Quote):
@@ -150,6 +152,122 @@ paths:
           $ref: '#/components/responses/forbidden'
         "500":
           $ref: '#/components/responses/putAcceptQuoteTransferServerError'
+  /secured/transferStatus/{transferId}:
+    get:
+      tags:
+      - transfers
+      summary: Retrieves transfer status for the payer or payee DFSP
+      description: |
+        Returns the recorded state of a transfer to either side of it. Read-only: it
+        reports what Pivotal has stored and never advances the transfer, so it is safe
+        to call after a timeout or a restart to find out how a transfer ended.
+
+        ### Who may call it
+
+        `fspiop-source` must be the payer or the payee recorded against the transfer,
+        and must have an access public key registered with Pivotal. A transfer that
+        does not exist and a transfer belonging to another DFSP both return the same
+        `TRANSFER_ID_NOT_FOUND` error, so this endpoint cannot be used to discover
+        whether a given transfer ID exists.
+
+        `homeTransactionId` in the response is the caller's own value: the payer
+        receives the payer's, the payee receives the payee's.
+
+        ### Signing a request
+
+        Every request carries a compact RS256 JWS in the `authorization` header,
+        signed with the DFSP's access private key. Send the raw token — no `Bearer`
+        prefix.
+
+        The JWS payload is the empty JSON object `{}`. All request binding lives in the protected
+        header:
+
+        | Field    | Required value                                                    |
+        | -------- | ----------------------------------------------------------------- |
+        | `alg`    | `RS256`                                                             |
+        | `typ`    | `JWT`                                                               |
+        | `uri`    | The request path exactly as sent, including the transfer ID         |
+        | `method` | `GET`                                                               |
+        | `date`   | Byte-for-byte identical to the `date` header                        |
+        | `nonce`  | Unique per call, 1 to 128 characters                                |
+
+        Example protected header:
+
+        ```json
+        {
+          "alg": "RS256",
+          "typ": "JWT",
+          "uri": "/secured/transferStatus/01JAY7K3QK9Z8W4B6N2P5R7T3M",
+          "method": "GET",
+          "date": "Mon, 25 Aug 2026 09:12:44 GMT",
+          "nonce": "9f2b7c14-3d5e-4a81-9f60-2c8d1b4e7a03"
+        }
+        ```
+
+        ### Rules each field must satisfy
+
+        - **`date` format.** An RFC 7231 HTTP-date in GMT, written exactly like the
+          example. Other spellings of the same instant — ISO-8601, a numeric offset,
+          a missing weekday — are rejected even though they parse.
+        - **`date` freshness.** Within five minutes of server time in either
+          direction. Future-dated requests are rejected too. If every call fails with
+          a valid signature, check clock synchronisation first.
+        - **`nonce` reuse.** Remembered for ten minutes per `fspiop-source`. Generate
+          a fresh value for every call, including when retrying a request that timed
+          out — replaying the previous token is rejected.
+        - **`uri` match.** Must equal the path Pivotal receives. If a gateway rewrites
+          the path before it reaches Pivotal, sign the rewritten form.
+
+        A failure in any of these returns `3105 Invalid signature` (HTTP 401). A
+        missing or duplicated header, or a malformed token or transfer ID, returns
+        HTTP 417.
+      operationId: getTransferStatusByTransferId
+      parameters:
+      - name: transferId
+        in: path
+        description: The 26-character ULID returned by `POST /secured/sendmoney`.
+        required: true
+        schema:
+          type: string
+          minLength: 26
+          maxLength: 26
+          pattern: "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+      - name: authorization
+        in: header
+        description: Raw compact RS256 JWS with protected request metadata and `{}` payload. Do not use a Bearer prefix.
+        required: true
+        schema:
+          type: string
+      - name: date
+        in: header
+        description: RFC 7231 HTTP-date signed byte-for-byte into the protected header. Must be within five minutes of server time.
+        required: true
+        schema:
+          type: string
+          example: Mon, 25 Aug 2026 09:12:44 GMT
+      - name: fspiop-source
+        in: header
+        description: Calling DFSP. It must be the recorded payer or payee and have a registered access public key.
+        required: true
+        schema:
+          $ref: '#/components/schemas/fspId'
+      responses:
+        "200":
+          $ref: '#/components/responses/getTransferStatusSuccess'
+        "401":
+          $ref: '#/components/responses/unauthorized'
+        "417":
+          description: A mandatory header is missing, the token/transfer ID is malformed, or the transfer is unknown/out of scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
+        "500":
+          description: Internal error reading the transaction or reserving the nonce.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
   /dfsp-list-with-prefixes:
     get:
       tags:
@@ -182,6 +300,38 @@ paths:
       responses:
         "200": 
           $ref: '#/components/responses/getDfspPrefixSuccess'
+  /dfsps-with-prefixes-and-count:
+    get:
+      tags:
+      - dfsps
+      summary: Retrieves registered DFSPs with prefixes and the total DFSP count.
+      description: |
+          The `GET /dfsps-with-prefixes-and-count` endpoint retrieves a complete list of
+          registered Digital Financial Service Providers (DFSPs), including their associated
+          dialing prefixes, wrapped with the total number of returned DFSPs.
+      responses:
+        "200":
+          $ref: '#/components/responses/getDfspPrefixWithCountSuccess'
+  /dfsps-with-prefixes-and-count/{usecase}:
+    get:
+      tags:
+      - dfsps
+      summary: Retrieves filtered DFSPs with prefixes and the total DFSP count for a use case.
+      description: |
+          The `GET /dfsps-with-prefixes-and-count/{usecase}` endpoint retrieves registered
+          Digital Financial Service Providers (DFSPs), including their associated dialing
+          prefixes, filtered by use case and wrapped with the total number of returned DFSPs.
+      parameters:
+      - name: usecase
+        in: path
+        description: Specific use case.
+        required: true
+        schema:
+          type: string
+          example: "PERSON_TO_PERSON"
+      responses:
+        "200":
+          $ref: '#/components/responses/getDfspPrefixWithCountSuccess'
 
 components:
   schemas:
@@ -437,13 +587,36 @@ components:
       items:
         $ref: '#/components/schemas/extensionItem'
 
+    fspiopExtensionItem:
+      type: object
+      properties:
+        key:
+          maxLength: 32
+          minLength: 1
+          type: string
+        value:
+          oneOf:
+          - type: string
+          - type: number
+
+    fspiopExtensionList:
+      type: object
+      required:
+      - extension
+      properties:
+        extension:
+          type: array
+          items:
+            $ref: '#/components/schemas/fspiopExtensionItem'
+
     fspId:
       maxLength: 32
       minLength: 1
       type: string
       description: FSP with which the party is associated.
     homeTransactionId:
-      maxLength: 255
+      maxLength: 128
+      minLength: 1
       type: string
       description: "Transaction ID from the DFSP backend, used to reconcile transactions between the Switch and the DFSP backend systems. In Mojaloop and Pivotal, this field is mandatory. However, most Core Banking Systems (CBS) generate the transaction ID only once the transaction stage is reached. Therefore, during the payer integration, the DFSP can provide a UUID in the initial call (e.g., KYC) and later override it with the actual transaction ID (homeTransactionId) in the subsequent transaction confirmation call."
     idSubValue:
@@ -568,7 +741,21 @@ Allowed values:
             Confirmed transfer amount, accepted as either a JSON string (canonical FSPIOP Amount, e.g. `"10"`) or a JSON number (e.g. `10`). The number of decimal places permitted is governed by the scheme's `DECIMAL_PLACES` configuration (see the `amount` schema) — for example, with Guinea's `DECIMAL_PLACES=0`, `"10"` and `10` are accepted but `"10.01"` is rejected.
           example: "10"
         extensionList:
-          $ref: '#/components/schemas/extensionList'
+          allOf:
+          - $ref: '#/components/schemas/fspiopExtensionList'
+          description: |
+            Deployment-specific extensions forwarded to the quote request. When
+            `CHECK_PAYER_FEE_AS_MANDATORY=true`, this
+            list must contain the exact, case-sensitive keys
+            `payerProvidedSchemeFee` and `payerProvidedPayerFee`. Each fee accepts a JSON string or number, is
+            normalized to a canonical FSPIOP Amount string, and must not exceed
+            the deployment's configured `DECIMAL_PLACES`.
+          example:
+            extension:
+            - key: payerProvidedSchemeFee
+              value: "10"
+            - key: payerProvidedPayerFee
+              value: 5
     acceptQuoteRequest:
       required:
       - acceptQuote
@@ -579,17 +766,20 @@ Allowed values:
           enum:
           - true
           - false
+        homeTransactionId:
+          allOf:
+          - $ref: '#/components/schemas/homeTransactionId'
+          description: Optional final payer DFSP transaction ID. When supplied, it replaces the homeTransactionId from the initial POST /secured/sendmoney call. When omitted, the initial value is retained. The effective value is propagated to Mojaloop in POST /transfers extensionList using the homeTransactionId key.
         extensionList:
           $ref: '#/components/schemas/extensionList'
     transferId:
 
       type: string
       description: A Mojaloop API transfer identifier (ULID).
-    FspParty:
+    FspPartyBase:
       required:
       - idType
       - idValue
-      - fspId
       type: object
       properties:
         type:
@@ -612,10 +802,35 @@ Allowed values:
           $ref: '#/components/schemas/dateOfBirth'
         merchantClassificationCode:
           $ref: '#/components/schemas/merchantClassificationCode'
-        fspId:
-          $ref: '#/components/schemas/fspId'
         extensionList:
           $ref: '#/components/schemas/extensionList'
+    FspParty:
+      description: A party with a known FSP. The `fspId` is required for payer requests and resolved response data.
+      allOf:
+      - $ref: '#/components/schemas/FspPartyBase'
+      - type: object
+        required:
+        - fspId
+        properties:
+          fspId:
+            $ref: '#/components/schemas/fspId'
+    PayeeFspPartyRequest:
+      description: |
+        The payee party to look up. `fspId` may be omitted or blank when the
+        payee DFSP is unknown. In that case, Pivotal sends an undirected party
+        lookup and uses the `fspId` returned by the Hub/Oracle for the quote and
+        transfer stages. If supplied, `fspId` continues to direct the lookup to
+        that DFSP.
+      allOf:
+      - $ref: '#/components/schemas/FspPartyBase'
+      - type: object
+        properties:
+          fspId:
+            description: Optional payee FSP identifier. An empty string is treated as omitted.
+            oneOf:
+            - $ref: '#/components/schemas/fspId'
+            - type: string
+              maxLength: 0
     postSendMoneyRequest:
       required:
       - amount
@@ -633,7 +848,7 @@ Allowed values:
         from:
           $ref: '#/components/schemas/FspParty'
         to:
-          $ref: '#/components/schemas/FspParty'
+          $ref: '#/components/schemas/PayeeFspPartyRequest'
         amountType:
           $ref: '#/components/schemas/amountType'
         currency:
@@ -652,6 +867,20 @@ Allowed values:
       type: array
       items:
         $ref: '#/components/schemas/dfspList'
+
+    getDfspPrefixWithCountResponse:
+      type: object
+      required:
+      - totalNumberOfDfsp
+      - dfspList
+      properties:
+        totalNumberOfDfsp:
+          type: integer
+          example: 1
+        dfspList:
+          type: array
+          items:
+            $ref: '#/components/schemas/dfspList'
 
     postSendMoneyResponse:
       type: object
@@ -706,13 +935,52 @@ Allowed values:
         Below are the allowed values for the enumeration.
         - WAITING_FOR_PARTY_ACCEPTANCE `AUTO_ACCEPT_PARTY` is set to "false" and party information has been returned, waiting to be accepted by the Payer DFSP using a `PUT /sendmoney/{transferId}` request.
         - WAITING_FOR_QUOTE_ACCEPTANCE `AUTO_ACCEPT_QUOTE` is set to "false" and quote information has been returned, waiting to be accepted by the Payer DFSP using a `PUT /sendmoney/{transferId}` request.
+        - PENDING The transaction is actively progressing through quote or transfer processing.
         - COMPLETED The transfer has completed successfully.
         - ABORTED The transfer has been ABORTED.
       enum:
       - WAITING_FOR_PARTY_ACCEPTANCE
       - WAITING_FOR_QUOTE_ACCEPTANCE
+      - PENDING
       - ABORTED
       - COMPLETED
+
+    transferStatusResponse:
+      type: object
+      required:
+      - transferId
+      - homeTransactionId
+      - currentState
+      - possibleDispute
+      - amount
+      - currency
+      - initiatedTimestamp
+      - errorInformation
+      properties:
+        transferId:
+          $ref: '#/components/schemas/transferId'
+        homeTransactionId:
+          type: string
+          nullable: true
+          description: The payer or payee home reference selected according to the calling DFSP.
+        currentState:
+          $ref: '#/components/schemas/transferStatus'
+        possibleDispute:
+          type: boolean
+        amount:
+          type: string
+          nullable: true
+          description: Original transaction amount, serialized as a decimal string.
+        currency:
+          allOf:
+          - $ref: '#/components/schemas/currency'
+          nullable: true
+        initiatedTimestamp:
+          $ref: '#/components/schemas/initiatedTimestamp'
+        errorInformation:
+          allOf:
+          - $ref: '#/components/schemas/errorResponse'
+          nullable: true
 
     acceptPartyResponse:
       type: object
@@ -833,16 +1101,27 @@ Allowed values:
             message: Generic validation error.
             localeMessage: Generic validation error.
             detailedDescription: "fspiop-source header or request.from.fspId is required."
-    unauthorized:
-      description: Authentication failed - the `Authorization` JWT is missing, malformed, or its signature/payload does not verify against the request body.
+    payerFeeValidationError:
+      description: Required payer-provided fee extensions were not supplied.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/errorResponse'
           example:
-            statusCode: "3100"
-            message: Authentication error.
-            localeMessage: Authentication error.
+            statusCode: "3107"
+            message: Please fill out the complete and correct information.
+            localeMessage: Please fill out the complete and correct information.
+            detailedDescription: Fee validation failed. Required fee information was not provided by the Payer DFSP.
+    unauthorized:
+      description: Authentication failed because the signature or signed request metadata is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/errorResponse'
+          example:
+            statusCode: "3105"
+            message: Payment is not successful. Please contact your service provider.
+            localeMessage: Payment is not successful. Please contact your service provider.
             detailedDescription: "Authorization signature verification failed."
     forbidden:
       description: The caller is not authorized to act for the specified payer FSP.
@@ -880,6 +1159,42 @@ Allowed values:
         application/json:
           schema:
             $ref: '#/components/schemas/getDfspPrefixResponse'
+    getDfspPrefixWithCountSuccess:
+      description: DFSP prefix list and count retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/getDfspPrefixWithCountResponse'
+          example:
+            totalNumberOfDfsp: 1
+            dfspList:
+            - id: 2
+              prefix: 101
+              fspId: wallet2
+              createdAt: "2025-06-10T12:52:37.000Z"
+              status: active
+              localeName: Demo wallet2
+              dfspType: wallet
+              additionalInfo: "{\"employees\": 10000, \"country\": \"USD\" }"
+              logoDataType: ""
+              logoBase64: ""
+              name: Demo Wallet 2
+
+    getTransferStatusSuccess:
+      description: Transfer status retrieved successfully from the audit transaction record.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/transferStatusResponse'
+          example:
+            transferId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+            homeTransactionId: TXN-2026-08-25-000417
+            currentState: COMPLETED
+            possibleDispute: false
+            amount: "10000"
+            currency: LRD
+            initiatedTimestamp: "2026-08-25T09:12:31.204Z"
+            errorInformation: null
 
     postTransferServerError:
       description: An error occurred processing the transfer

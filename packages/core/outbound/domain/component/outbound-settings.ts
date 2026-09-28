@@ -12,7 +12,12 @@ export class OutboundSettings {
         public readonly prefixOracleEndpoint: string,
         public readonly prefixOracleAxiosParams: AxiosClientBuilderParams,
         public readonly prefixOracleCacheTtlMs: number,
-        public readonly amountDecimalPlaces: number
+        public readonly centralRegistryOracleEndpoint: string | undefined,
+        public readonly centralRegistryOracleAxiosParams: AxiosClientBuilderParams,
+        public readonly amountDecimalPlaces: number,
+        public readonly strictAmountType: boolean,
+        public readonly checkPayerFeeAsMandatory: boolean,
+        public readonly postSendmoneyPayeeFspIdRequired: boolean,
     ) {
     }
 }

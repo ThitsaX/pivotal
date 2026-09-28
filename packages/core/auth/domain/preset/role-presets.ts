@@ -31,6 +31,7 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_CERT_REVOKE,
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
             PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+            PermissionKey.AUDIT_DASHBOARD_VIEW,
             PermissionKey.ADMIN_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
@@ -85,6 +86,19 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
         permissionKeys: [
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
             PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+            PermissionKey.AUDIT_DASHBOARD_VIEW,
+        ],
+    },
+    {
+        key:         'dfsp-admin',
+        label:       'DFSP Administrator',
+        description: 'Audit visibility and user management scoped to a single FSP. Equivalent to the seeded DFSP_ADMIN role.',
+        scope:       'DFSP',
+        permissionKeys: [
+            PermissionKey.AUDIT_TRANSACTIONS_LIST,
+            PermissionKey.AUDIT_TRANSACTIONS_VIEW,
+            PermissionKey.AUDIT_DASHBOARD_VIEW,
+            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
         ],
     },
     {

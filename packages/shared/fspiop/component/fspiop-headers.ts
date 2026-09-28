@@ -69,7 +69,11 @@ export namespace FspiopHeaders {
 
             static readonly CONTENT_TYPE = 'application/vnd.interoperability.parties+json;version=2.0';
 
-            static forRequest(traceparent: string | null, payer: string, payee: string): FspiopHeadersMap {
+            static forRequest(
+                traceparent: string | null,
+                payer: string,
+                payee?: string | null,
+            ): FspiopHeadersMap {
                 return createHeaders(traceparent, Parties.ACCEPT, Parties.CONTENT_TYPE, payer, payee);
             }
 

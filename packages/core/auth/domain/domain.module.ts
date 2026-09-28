@@ -38,6 +38,7 @@ import {
     PasswordService,
     TempPasswordService,
     TokenService,
+    UserManagementPolicy,
 } from './service';
 
 const Entities = [
@@ -64,6 +65,7 @@ const Services = [
     PasswordService,
     TempPasswordService,
     TokenService,
+    UserManagementPolicy,
 ];
 
 const Seeders = [
