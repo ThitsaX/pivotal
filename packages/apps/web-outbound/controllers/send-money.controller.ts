@@ -83,6 +83,10 @@ export class SendMoneyController {
         return payerFsp;
     }
 
+    // Accepts the bare array clients send on POST and the wrapped object this leg has always
+    // taken, so one payload shape works across both. An empty list is dropped rather than
+    // forwarded: FSPIOP requires at least one extension, so an empty one would be rejected by
+    // the peer as a malformed quote instead of being ignored as the caller intended.
     private static toExtensionList(
         extensionList: Array<Extension> | ExtensionList | undefined,
     ): ExtensionList | undefined {
@@ -90,13 +94,13 @@ export class SendMoneyController {
             return undefined;
         }
 
-        if (Array.isArray(extensionList)) {
-            return {
-                extension: extensionList,
-            };
+        const extension = Array.isArray(extensionList) ? extensionList : extensionList.extension;
+
+        if (!Array.isArray(extension) || extension.length === 0) {
+            return undefined;
         }
 
-        return extensionList;
+        return {extension};
     }
 
     // The request line is emitted by SendMoneyLogInterceptor, which runs before the
