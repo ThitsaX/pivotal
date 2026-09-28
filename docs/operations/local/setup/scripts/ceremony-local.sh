@@ -71,7 +71,7 @@ ceremony() {
   #    with the same label. The engine then matches ambiguously and reports
   #    "PKCS11_get_private_key returned NULL". Only initialise if absent.
   if ! softhsm2-util --show-slots 2>/dev/null | grep -q "Label: *$label"; then
-    softhsm2-util --init-token --free --label "$label" --so-pin "$SO_PIN" --pin "$PIN" >/dev/null 2>&1
+    softhsm2-util --init-token --free --label "$label" --so-pin "$SO_PIN" --pin "$PIN" >/dev/null
   fi
 
   # 2. root keypair, generated IN the device. --sensitive marks the private half
@@ -80,7 +80,7 @@ ceremony() {
         --list-objects 2>/dev/null | grep -q "label:      ${mount}-root"; then
     pkcs11-tool --module "$MOD" --token-label "$label" --login --pin "$PIN" \
       --keypairgen --key-type rsa:2048 --label "${mount}-root" --id 01 \
-      --private --sensitive >/dev/null 2>&1
+      --private --sensitive >/dev/null
   fi
   echo "  root keypair in HSM (non-extractable)"
 
@@ -101,7 +101,7 @@ keyUsage=critical,keyCertSign,cRLSign
 subjectKeyIdentifier=hash
 EOF
   openssl req -new -x509 -days 3650 -engine pkcs11 -keyform engine -key "$KEYURI" \
-    -sha256 -config "$out/root.cnf" -out "$out/root.pem" 2>/dev/null
+    -sha256 -config "$out/root.cnf" -out "$out/root.pem"
   echo "  root cert signed by HSM: $(openssl x509 -in "$out/root.pem" -noout -subject | sed 's/subject=//')"
 
   # 4. Vault intermediate — private half generated in Vault and stays there
@@ -119,7 +119,7 @@ authorityKeyIdentifier=keyid:always
 EOF
   openssl x509 -req -engine pkcs11 -CAkeyform engine -CAkey "$KEYURI" \
     -CA "$out/root.pem" -in "$out/inter.csr" -set_serial 2 -days 1825 \
-    -sha256 -extfile "$out/inter.ext" -out "$out/inter.pem" 2>/dev/null
+    -sha256 -extfile "$out/inter.ext" -out "$out/inter.pem"
   echo "  intermediate signed by HSM root"
 
   # 6. signed intermediate back into Vault
@@ -160,10 +160,22 @@ crlnumber=$out/ca/crlnumber
 default_md=sha256
 default_crl_days=30
 EOF
-  openssl ca -gencrl -config "$out/ca/ca.cnf" -engine pkcs11 -keyform engine \
-    -keyfile "$KEYURI" -cert "$out/root.pem" -out "$out/root.crl" 2>/dev/null \
-    && echo "  root CRL signed by HSM: $(openssl crl -in "$out/root.crl" -noout -lastupdate | sed 's/.*=//')" \
-    || echo "  root CRL: FAILED"
+  if openssl ca -gencrl -config "$out/ca/ca.cnf" -engine pkcs11 -keyform engine \
+       -keyfile "$KEYURI" -cert "$out/root.pem" -out "$out/root.crl"; then
+    echo "  root CRL signed by HSM: $(openssl crl -in "$out/root.crl" -noout -lastupdate | sed 's/.*=//')"
+  else
+    echo "  root CRL: FAILED -- fix this now, not during an incident" >&2
+    return 1
+  fi
+
+  # Prove the chain before anyone relies on it. The rehearsal is worthless if it
+  # reports success on a root and an intermediate that do not actually chain.
+  if openssl verify -CAfile "$out/root.pem" -partial_chain "$out/inter.pem" >/dev/null 2>&1; then
+    echo "  chain verified: intermediate -> root"
+  else
+    echo "  chain verification FAILED" >&2
+    return 1
+  fi
 }
 
 ceremony pki_hub_client pivotal-hub-client "Pivotal Hub Client CA"
