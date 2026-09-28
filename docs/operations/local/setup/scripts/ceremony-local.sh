@@ -126,7 +126,13 @@ EOF
   v "cat > /tmp/i.crt; vault write $mount/intermediate/set-signed certificate=@/tmp/i.crt" < "$out/inter.pem" >/dev/null
   echo "  intermediate installed in Vault mount '$mount'"
 
-  # 6b. Re-create the issuing role. Step 4 above disables and re-enables the
+  # 6b. Re-create the issuing role.
+  #
+  #     use_csr_common_name and use_csr_sans are pinned false, matching the CloudHSM
+  #     ceremony. Vault defaults both to true, which takes the subject from the submitted
+  #     request -- letting a DFSP name itself anything it likes and defeating the one check
+  #     that binds a certificate to the participant it claims to be. A rehearsal that left
+  #     them at the default would not be rehearsing what production does. Step 4 above disables and re-enables the
   #     mount, which destroys every role on it — so the ceremony must put back
   #     what it removed, or cert-manager fails with "unknown role".
   case "$mount" in
@@ -136,7 +142,8 @@ EOF
            client_flag=true server_flag=false \
            key_bits=2048 max_ttl=2160h ttl=2160h \
            organization='ThitsaWorks' ou='Pivotal' \
-           no_store=true require_cn=false" >/dev/null
+           no_store=true require_cn=false \
+           use_csr_common_name=false use_csr_sans=false" >/dev/null
       echo "  role restored: $mount/roles/pivotal-client" ;;
     pki_dfsp)
       v "vault write $mount/roles/dfsp-client \
@@ -144,7 +151,8 @@ EOF
            client_flag=true server_flag=false \
            key_bits=2048 max_ttl=8760h ttl=8760h \
            organization='ThitsaWorks' ou='DFSP' \
-           no_store=true require_cn=true" >/dev/null
+           no_store=true require_cn=true \
+           use_csr_common_name=false use_csr_sans=false" >/dev/null
       echo "  role restored: $mount/roles/dfsp-client" ;;
   esac
 

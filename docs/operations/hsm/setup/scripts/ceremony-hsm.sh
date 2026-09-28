@@ -46,6 +46,19 @@ MOD=${PKCS11_MODULE:-/opt/cloudhsm/lib/libcloudhsm_pkcs11.so}
 export OPENSSL_ENGINES=${OPENSSL_ENGINES:-/usr/lib/x86_64-linux-gnu/engines-3}
 export PKCS11_MODULE_PATH=${PKCS11_MODULE_PATH:-$MOD}
 
+# How to reach Vault. Two ways, because the ceremony host differs by environment.
+#
+#   VAULT_ADDR set    talk to Vault over the network, using the vault CLI on this
+#                     host. This is the one to use from a pod inside the cluster:
+#                     Vault is a Service away, and the host needs no kubectl and no
+#                     permission to exec into another namespace's pods.
+#
+#   VAULT_ADDR unset  fall back to `kubectl exec` into the Vault pod, for a ceremony
+#                     run from a workstation that has cluster access but no route to
+#                     Vault's Service and no CloudHSM client of its own.
+#
+# The token is the same either way, and is prompted for rather than passed in.
+VAULT_ADDR=${VAULT_ADDR:-}
 VAULT_NS=${VAULT_NS:-vault}
 VAULT_POD=${VAULT_POD:-vault-0}
 VAULT_TOKEN=${VAULT_TOKEN:-}
@@ -105,8 +118,14 @@ chmod 700 "$HERE"
 # ---------------------------------------------------------------------------
 
 v() {
-  kubectl exec -n "$VAULT_NS" -i "$VAULT_POD" -- sh -c \
-    "export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$VAULT_TOKEN; $1"
+  if [ -n "$VAULT_ADDR" ]; then
+    # Directly. stdin is passed through unchanged so the `set-signed` step can
+    # still pipe the certificate in, exactly as it does through kubectl.
+    VAULT_ADDR="$VAULT_ADDR" VAULT_TOKEN="$VAULT_TOKEN" sh -c "$1"
+  else
+    kubectl exec -n "$VAULT_NS" -i "$VAULT_POD" -- sh -c \
+      "export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$VAULT_TOKEN; $1"
+  fi
 }
 
 # Does a key with this label already exist? Re-running the ceremony must never
