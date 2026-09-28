@@ -19,3 +19,12 @@ regexes = [
     '''^pivotal/jwskey$''',
     '''^jws_sign_enabled=1$''',
 ]
+
+[[allowlists]]
+description = """
+A TypeScript field declaration, where the matched "secret" is the type name. The rule fires on the word "key" in the identifier and scores the type's entropy. Allowlisted by value rather than by path, so a real secret in the same file is still reported."""
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+    '''^Pkcs11KeySigner$''',
+]
