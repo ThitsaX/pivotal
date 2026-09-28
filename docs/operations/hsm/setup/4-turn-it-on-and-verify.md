@@ -48,6 +48,12 @@ Backend-specific — set the column for the device you are running against:
 | `CLOUDHSM_IP` | the HSM's private IP | — not used |
 | `SOFTHSM2_CONF` | — not used | mounted path of the SoftHSM config |
 
+**The `PKCS11_*` settings are read only by the TypeScript services.** The Java connectors reach the
+device through the vendor's JCE provider, which finds its own library and writes its own
+configuration from `CLOUDHSM_IP` at startup — so setting a module path on a connector does nothing,
+silently. They also read the Vault address as `VAULT_URL` rather than `VAULT_ADDRESS`, noted again
+below because the two are easy to cross.
+
 **The cluster certificate is not an environment variable.** The device library reads it from a
 fixed path of its own, so mount `customerCA.crt` at `/opt/cloudhsm/etc/customerCA.crt` — a
 ConfigMap is enough, since the certificate is public. The container refuses to start if

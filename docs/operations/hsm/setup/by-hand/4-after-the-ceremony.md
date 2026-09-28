@@ -222,6 +222,55 @@ Startup reads the CA file, logs into Vault as `pivotal-trust-manager-role`, and 
 token. Each failure names its own cause; none of them degrade quietly, which is why all three
 inputs must exist before it is enabled.
 
+## 7. Register the participants in MCM
+
+trust-manager addresses MCM per participant — `/dfsps/{dfspId}/enrollments/inbound` to enrol
+Pivotal's own server certificate, `/dfsps/{dfspId}/jwscerts` to publish each tenant's public
+signing key. A participant with no record in MCM's register produces:
+
+```
+404 POST /api/dfsps/pivotal/enrollments/inbound
+{"message":"DFSP with id pivotal not found"}
+```
+
+**Pivotal itself first**, under whatever `PIVOTAL_DFSP_ID` names:
+
+| # | Command | Purpose |
+| --- | --- | --- |
+| 30 | `wget -qO- --header='Content-Type: application/json' --post-data='{"dfspId":"pivotal","name":"pivotal","email":"<ops address>","monetaryZoneId":"<zone>"}' http://<mcm>:3001/api/dfsps` | Creates the record. Returns `{"id":"pivotal"}` |
+| 31 | `wget -qO- http://<mcm>:3001/api/dfsps` | Lists the register, to confirm |
+
+**Then every tenant Pivotal signs for.** Each needs its own record, or its key publish fails the
+same way. The per-DFSP runbook covers this as part of onboarding —
+[`../../runbooks/onboard-dfsp.md`](../../runbooks/onboard-dfsp.md) — so an environment with
+existing participants has to backfill them once.
+
+### Four things that cost time here
+
+**`email` is required**, though MCM's swagger omits it. Without it the call fails with
+`ValidationError: email is required`, which reads like the field is unknown rather than missing.
+
+**`monetaryZoneId` is a single value, not a list**, and nothing in Pivotal reads it. One zone per
+record; pick the primary one.
+
+**The client pod may have no `curl`.** `wget` does the same job:
+`wget -qO- --header='Content-Type: application/json' --post-data='...' <url>`. Note `-q` hides the
+error body on failure, so confirm with a follow-up GET rather than trusting a silent return.
+
+**Call MCM in-cluster.** The public host routes `/api/*` to an authorization proxy expecting a
+browser session, so the same call from outside fails in a way that looks like an auth problem.
+
+### Then make it retry
+
+`HubServerCertEnroller` runs **every 24 hours**, so it will not pick up the new record on its own
+in any useful timeframe. Every scheduler also runs once at startup, so restart rather than wait:
+
+```bash
+kubectl -n pivotal rollout restart deploy/trust-manager
+```
+
+Safe at any time — it is a background reconciler with nothing on the traffic path.
+
 ---
 
 **Next:** [`../4-turn-it-on-and-verify.md`](../4-turn-it-on-and-verify.md) — every environment
