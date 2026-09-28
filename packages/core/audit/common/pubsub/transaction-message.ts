@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario} from '@shared/fspiop';
+import {AmountType, Currency, PartyIdType, TransactionInitiatorType, TransactionScenario} from '@shared/fspiop';
 
 export class TransactionMessage<TContent = TransactionMessage.Content> {
 
@@ -90,6 +90,7 @@ export namespace TransactionMessage {
         transactionInitiatorType?: TransactionInitiatorType | null;
         transactionType?: TransactionScenario | null;
         subScenario?: string | null;
+        amountType?: AmountType | string | null;
         payerHomeTransactionId?: string | null;
         quotingCurrency?: Currency | null;
         quotingAmount?: string | null;

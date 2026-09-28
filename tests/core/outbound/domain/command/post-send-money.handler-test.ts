@@ -111,6 +111,7 @@ describe('PostSendMoneyHandler optional payee FSP', () => {
         assert.equal(output.response.to?.fspId, 'resolvedfsp');
         assert.equal(auditMessages.length, 2);
         assert.equal(auditMessages[0]?.content.payeeFsp, '');
+        assert.equal((auditMessages[0]?.content as {amountType?: string}).amountType, AmountType.Send);
         assert.equal(auditMessages[1]?.content.payeeFsp, 'resolvedfsp');
     });
 });
