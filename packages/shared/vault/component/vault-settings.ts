@@ -17,7 +17,12 @@ export enum KeyProvider {
 
     /**
      * The Vault KV path holds an opaque `keyRef` plus crypto-user credentials, and signing happens
-     * inside CloudHSM. The **HSM-backed** profile. Not implemented yet.
+     * inside the device. The **HSM-backed** profile: no private key exists in this process, or
+     * anywhere outside the hardware, so isolation rests on a boundary the host cannot cross rather
+     * than on path policy alone.
+     *
+     * Costs the portability the other two have. The device must be reachable, its client library
+     * is glibc-only, and a software module cannot stand in for it locally.
      */
     Pkcs11 = 'pkcs11',
 
