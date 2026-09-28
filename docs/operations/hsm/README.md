@@ -37,6 +37,12 @@ Read *What a clean local rehearsal does not prove* below before reporting it as 
 | 3 | [`setup/3-services-and-gateways.md`](./setup/3-services-and-gateways.md) | both | Vault auth roles per workload, cert-manager, MCM, trust-manager, and both gateways |
 | 4 | [`setup/4-turn-it-on-and-verify.md`](./setup/4-turn-it-on-and-verify.md) | both | Every environment variable, the order to switch the four controls on in, and how to prove each one works |
 
+**A companion walkthrough, done by hand.** [`setup/by-hand/`](./setup/by-hand/) records what was
+actually run against a real environment, in four ordered steps that interleave with the sequence
+above: prove the device, lay the identity and Vault foundation, prepare for the ceremony, then
+everything that needs a certificate authority. Start there when bringing up a new environment —
+it carries the failures as well as the commands.
+
 **The SoftHSM path skips step 2.** A development cluster already has certificate authorities, and
 re-rooting them in SoftHSM would be churn for no gain.
 

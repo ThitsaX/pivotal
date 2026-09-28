@@ -1,4 +1,6 @@
-# Verify a CloudHSM Cluster by Hand
+# 1. Verify the Cluster
+
+> First of four. See [`README.md`](./README.md) for the sequence.
 
 > ### ⚠ CloudHSM backend only
 >
@@ -157,7 +159,10 @@ owner when they are not.
 
 ---
 
-**Next:** [`1-cloudhsm-cluster.md`](./1-cloudhsm-cluster.md) for the real once-per-environment setup,
-then [`2-ca-ceremony.md`](./2-ca-ceremony.md). Per-DFSP provisioning is
-[`../runbooks/onboard-dfsp.md`](../runbooks/onboard-dfsp.md), which scripts what section F does here
-by hand.
+**Next:** [`2-identities-and-vault.md`](./2-identities-and-vault.md), which lays the identity and
+Vault foundation. That phase needs no certificate authority, so it can run while the ceremony is
+still being scheduled.
+
+The generic once-per-environment setup is [`1-cloudhsm-cluster.md`](../1-cloudhsm-cluster.md).
+Per-DFSP provisioning is [`../runbooks/onboard-dfsp.md`](../../runbooks/onboard-dfsp.md), which
+scripts what section F does here by hand.

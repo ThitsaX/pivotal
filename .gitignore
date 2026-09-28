@@ -92,3 +92,8 @@ __pycache__/
 docs/integration/
 docs/issues/
 docs/plans/
+
+# Ceremony output copied out of a cluster: one environment's CA certificates and CRLs.
+# Public material, but environment-specific rather than source -- it belongs wherever that
+# environment's material is kept, not here.
+ceremony-out/
