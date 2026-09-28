@@ -160,8 +160,10 @@ export class TransactionRollupRepository {
         scopeFspId: string | undefined,
         from: Date,
         to: Date,
+        payerFsp?: string,
+        payeeFsp?: string,
     ): Promise<TransactionRollupRepository.StageCount[]> {
-        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to, payerFsp, payeeFsp);
         const rows = await this.readRepository.query(
             `SELECT COALESCE(SUM(parties_error_count), 0)   AS parties,
                     COALESCE(SUM(quotes_error_count), 0)    AS quotes,
@@ -184,8 +186,10 @@ export class TransactionRollupRepository {
         scopeFspId: string | undefined,
         from: Date,
         to: Date,
+        payerFsp?: string,
+        payeeFsp?: string,
     ): Promise<TransactionRollupRepository.CurrencyValue[]> {
-        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to, payerFsp, payeeFsp);
         // Value that moved, per currency: committed (incl. disputed) transfers only. 'XXX' is the
         // no-currency placeholder for pre-financial failures (e.g. party-lookup) — never money.
         const rows = await this.readRepository.query(
@@ -215,8 +219,10 @@ export class TransactionRollupRepository {
         from: Date,
         to: Date,
         limit: number,
+        payerFsp?: string,
+        payeeFsp?: string,
     ): Promise<TransactionRollupRepository.FspCount[]> {
-        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to);
+        const source = TransactionRollupRepository.rangeSource(scopeFspId, from, to, payerFsp, payeeFsp);
         // `leg` is a fixed enum literal (never user input), safe to interpolate as a column.
         // Counts and values use the same committed-or-disputed population.
         // Keep amounts separated by currency; summing unlike currencies would be misleading.
@@ -258,11 +264,15 @@ export class TransactionRollupRepository {
         from: Date,
         to: Date,
         timeZone: string = 'UTC',
+        payerFsp?: string,
+        payeeFsp?: string,
     ): Promise<TransactionRollupRepository.TimeBucket[]> {
         // A UTC hour can straddle local midnight (e.g. 17:00–18:00 UTC in Yangon).
         // Split those hours into exact raw intervals before assigning them to a day.
         const sources = TransactionRollupRepository.localDayRanges(from, to, timeZone)
-            .map((range) => TransactionRollupRepository.rangeSource(scopeFspId, range.from, range.to));
+            .map((range) => TransactionRollupRepository.rangeSource(
+                scopeFspId, range.from, range.to, payerFsp, payeeFsp,
+            ));
         const rows = await this.readRepository.query(
             `SELECT bucket_hour,
                     COALESCE(SUM(txn_count), 0)        AS count,
@@ -460,13 +470,22 @@ export class TransactionRollupRepository {
         }));
     }
 
-    private static rangeSource(scopeFspId: string | undefined, from: Date, to: Date): {
+    private static rangeSource(
+        scopeFspId: string | undefined,
+        from: Date,
+        to: Date,
+        payerFsp?: string,
+        payeeFsp?: string,
+    ): {
         sql: string; params: unknown[];
     } {
         const hourMs = 3_600_000;
         const fullStart = Math.ceil(from.getTime() / hourMs) * hourMs;
         const fullEnd = Math.floor(to.getTime() / hourMs) * hourMs;
         const scope = TransactionRollupRepository.scopeClause(scopeFspId);
+        const filter = TransactionRollupRepository.participantFilterClause(payerFsp, payeeFsp);
+        const extraClause = `${scope.clause}${filter.clause}`;
+        const extraParams = [...scope.params, ...filter.params];
         const selects: string[] = [];
         const params: unknown[] = [];
 
@@ -476,8 +495,8 @@ export class TransactionRollupRepository {
                 transfers_error_count, patch_error_count, committed_amount, committed_count,
                 latency_count, sum_latency_ms
                 FROM transaction_hourly_rollup
-                WHERE bucket_hour >= ? AND bucket_hour < ?${scope.clause}`);
-            params.push(new Date(fullStart), new Date(fullEnd), ...scope.params);
+                WHERE bucket_hour >= ? AND bucket_hour < ?${extraClause}`);
+            params.push(new Date(fullStart), new Date(fullEnd), ...extraParams);
         }
 
         // Disjoint half-open intervals: no missing or duplicated transactions at boundaries.
@@ -506,8 +525,8 @@ export class TransactionRollupRepository {
                 TIMESTAMPDIFF(MICROSECOND, transaction_started_at, transaction_completed_at) / 1000
                     AS sum_latency_ms
                 FROM transactions
-                WHERE transaction_started_at >= ? AND transaction_started_at < ?${scope.clause}`);
-            params.push(new Date(start), new Date(start), new Date(end), ...scope.params);
+                WHERE transaction_started_at >= ? AND transaction_started_at < ?${extraClause}`);
+            params.push(new Date(start), new Date(start), new Date(end), ...extraParams);
         }
 
         return {sql: selects.join(' UNION ALL '), params};
@@ -519,6 +538,30 @@ export class TransactionRollupRepository {
         }
 
         return {clause: ' AND (payer_fsp = ? OR payee_fsp = ?)', params: [scopeFspId, scopeFspId]};
+    }
+
+    /** Optional UI filters (AND). Undefined = Any. Separate from JWT `scopeClause`. */
+    private static participantFilterClause(
+        payerFsp: string | undefined,
+        payeeFsp: string | undefined,
+    ): {clause: string; params: unknown[]} {
+        const parts: string[] = [];
+        const params: unknown[] = [];
+
+        if (payerFsp != null) {
+            parts.push('payer_fsp = ?');
+            params.push(payerFsp);
+        }
+        if (payeeFsp != null) {
+            parts.push('payee_fsp = ?');
+            params.push(payeeFsp);
+        }
+
+        if (parts.length === 0) {
+            return {clause: '', params: []};
+        }
+
+        return {clause: ` AND ${parts.join(' AND ')}`, params};
     }
 
     private static toIsoTimestamp(value: unknown): string {

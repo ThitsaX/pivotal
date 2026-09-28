@@ -7,6 +7,9 @@ import type {ApexChart, ApexFill, ApexGrid, ApexLegend, ApexOptions, ApexYAxis} 
 import VueApexCharts from 'vue3-apexcharts';
 import TimeRangeSelector from '../components/TimeRangeSelector.vue';
 import TimeZoneSelector from '../components/TimeZoneSelector.vue';
+import CustomDropdown from '../components/CustomDropdown.vue';
+import {fetchAuditFspOptions} from '../modules/audit/fsp-options-api';
+import type {SelectOption} from '../modules/audit/types';
 import type {MenuGroup} from '../stores/menu.store';
 import {authStore} from '../stores/auth.store';
 import {auditDashboardStore} from '../stores/audit-dashboard.store';
@@ -85,19 +88,92 @@ function todayRange(timeZone: string): {from: string; to: string} {
 }
 
 const initialRange = todayRange(props.selectedTimeZone);
+const appliedRange = ref({...initialRange});
 const rangeMode = ref<RangeMode>('today');
 const rangeStart = ref(initialRange.from);
 const rangeEnd = ref(initialRange.to);
 const rangeInvalid = ref(false);
 const appliedMode = ref<RangeMode>('today');
-const appliedRange = ref({...initialRange});
-const rangeEditorOpen = ref(true);
+
+const payerFsp = ref('');
+const payeeFsp = ref('');
+const appliedPayerFsp = ref('');
+const appliedPayeeFsp = ref('');
+const fetchedFspOptions = ref<SelectOption[]>([]);
+const filtersOpen = ref(false);
+
+const isHubUser = computed((): boolean => scopedFspId.value == null);
+
+const hasParticipantFilter = computed((): boolean => {
+    return appliedPayerFsp.value.trim().length > 0 || appliedPayeeFsp.value.trim().length > 0;
+});
+
+const fspDropdownOptions = computed((): SelectOption[] => {
+    const optionsByValue = new Map<string, SelectOption>();
+    optionsByValue.set('', {label: '(Any)', value: ''});
+
+    for (const option of fetchedFspOptions.value) {
+        const value = option.value.trim();
+        if (value.length > 0) {
+            optionsByValue.set(value, {label: option.label.trim() || value, value});
+        }
+    }
+
+    for (const selected of [payerFsp.value, payeeFsp.value, appliedPayerFsp.value, appliedPayeeFsp.value]) {
+        const value = selected.trim();
+        if (value.length > 0 && !optionsByValue.has(value)) {
+            optionsByValue.set(value, {label: value, value});
+        }
+    }
+
+    return Array.from(optionsByValue.values());
+});
+
+const payerFspOptions = computed((): SelectOption[] => {
+    return fspDropdownOptions.value.filter(
+        (option) => option.value === '' || option.value !== payeeFsp.value,
+    );
+});
+
+const payeeFspOptions = computed((): SelectOption[] => {
+    return fspDropdownOptions.value.filter(
+        (option) => option.value === '' || option.value !== payerFsp.value,
+    );
+});
 
 const rangeModeLabel = computed((): string => ({
     today: 'Today',
     last24: 'Last 24 Hours',
     custom: 'Custom Range',
 })[appliedMode.value]);
+
+const MAX_CUSTOM_RANGE_MONTHS = 4;
+
+function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
+    const from = new Date(fromIso);
+    const to = new Date(toIso);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        return false;
+    }
+
+    const limit = new Date(from.getTime());
+    limit.setUTCMonth(limit.getUTCMonth() + MAX_CUSTOM_RANGE_MONTHS);
+
+    return to.getTime() > limit.getTime();
+}
+
+const customRangeLimitError = computed((): string | null => {
+    if (rangeMode.value !== 'custom' || !rangeStart.value || !rangeEnd.value) {
+        return null;
+    }
+
+    if (!customRangeExceedsMaxMonths(rangeStart.value, rangeEnd.value)) {
+        return null;
+    }
+
+    return 'Custom range cannot exceed 4 months.';
+});
 
 const appliedRangeLabel = computed((): string => {
     const formatter = new Intl.DateTimeFormat(undefined, {
@@ -479,33 +555,64 @@ function syncLivePolling(): void {
     }
 }
 
-function loadAppliedRange(): void {
+function loadAppliedFilters(): void {
     void auditDashboardStore.load({
         from: appliedRange.value.from,
         to: appliedRange.value.to,
         timeZone: props.selectedTimeZone,
+        payerFsp: isHubUser.value ? (appliedPayerFsp.value || undefined) : undefined,
+        payeeFsp: isHubUser.value ? (appliedPayeeFsp.value || undefined) : undefined,
     });
     syncLivePolling();
 }
 
-function applyRange(): void {
-    if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value) {
+async function loadFspOptions(): Promise<void> {
+    if (!isHubUser.value) {
+        return;
+    }
+
+    try {
+        fetchedFspOptions.value = await fetchAuditFspOptions();
+    } catch {
+        fetchedFspOptions.value = [];
+    }
+}
+
+function syncDraftFiltersFromApplied(): void {
+    rangeMode.value = appliedMode.value;
+    rangeStart.value = appliedRange.value.from;
+    rangeEnd.value = appliedRange.value.to;
+    payerFsp.value = appliedPayerFsp.value;
+    payeeFsp.value = appliedPayeeFsp.value;
+}
+
+function applyFilters(): void {
+    if (rangeInvalid.value || !rangeStart.value || !rangeEnd.value || customRangeLimitError.value != null) {
         return;
     }
 
     appliedMode.value = rangeMode.value;
     appliedRange.value = {from: rangeStart.value, to: rangeEnd.value};
-    rangeEditorOpen.value = false;
-    loadAppliedRange();
+    appliedPayerFsp.value = isHubUser.value ? payerFsp.value.trim() : '';
+    appliedPayeeFsp.value = isHubUser.value ? payeeFsp.value.trim() : '';
+    filtersOpen.value = false;
+    loadAppliedFilters();
 }
 
 function refresh(): void {
-    loadAppliedRange();
+    loadAppliedFilters();
 }
 
 onMounted((): void => {
     if (canView.value) {
-        loadAppliedRange();
+        void loadFspOptions();
+        loadAppliedFilters();
+    }
+});
+
+watch(filtersOpen, (open: boolean): void => {
+    if (open) {
+        syncDraftFiltersFromApplied();
     }
 });
 
@@ -527,7 +634,7 @@ watch(
         }
 
         await nextTick();
-        applyRange();
+        applyFilters();
     },
 );
 </script>
@@ -577,43 +684,140 @@ watch(
             v-if="canView"
             class="border border-accent/20 bg-[linear-gradient(135deg,rgba(20,127,195,0.08),rgba(255,255,255,0.98))] px-4 py-3 shadow-soft"
         >
-            <TimeRangeSelector
-                v-show="rangeEditorOpen"
-                label="Dashboard time range"
-                :selected-time-zone="selectedTimeZone"
-                :mode="rangeMode"
-                :start-value="rangeStart"
-                :end-value="rangeEnd"
-                :disabled="loading"
-                compact-mode-selector
-                :class="rangeMode === 'custom' ? 'max-w-4xl' : 'max-w-lg'"
-                @update:mode="rangeMode = $event as RangeMode"
-                @update:start-value="rangeStart = $event"
-                @update:end-value="rangeEnd = $event"
-                @update:invalid="rangeInvalid = $event"
-            >
-                <template #action>
-                    <button
-                        type="button"
-                        class="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                        :disabled="loading || rangeInvalid || !rangeStart || !rangeEnd"
-                        @click="applyRange"
-                    >
-                        {{ loading ? 'Applying…' : 'Apply range' }}
-                    </button>
-                </template>
-            </TimeRangeSelector>
-            <p class="mt-3 border-t border-accent/10 pt-2 text-xs text-slate-600">
-                Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
-                {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs text-slate-600">
+                    Showing <span class="font-semibold text-ink">{{ rangeModeLabel }}</span>:
+                    {{ appliedRangeLabel }} ({{ selectedTimeZone }})
+                </p>
                 <button
-                    v-if="!rangeEditorOpen"
                     type="button"
-                    class="ml-3 font-semibold text-accent underline disabled:opacity-50"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition disabled:opacity-50"
+                    :class="filtersOpen || hasParticipantFilter
+                        ? 'border-accent bg-accent text-white shadow-soft'
+                        : 'border-accent/25 bg-white text-accent hover:border-accent hover:bg-[#f8fbff]'"
                     :disabled="loading"
-                    @click="rangeEditorOpen = true"
-                >Edit range</button>
-            </p>
+                    :aria-expanded="filtersOpen"
+                    :title="filtersOpen ? 'Hide filters' : 'Show filters'"
+                    @click="filtersOpen = !filtersOpen"
+                >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                        <path
+                            d="M3 5h14M5.5 10h9M8 15h4"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                    Filter
+                    <span
+                        v-if="hasParticipantFilter"
+                        class="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] normal-case tracking-normal"
+                    >
+                        On
+                    </span>
+                </button>
+            </div>
+
+            <Transition
+                enter-active-class="transition-all duration-200 ease-out"
+                enter-from-class="max-h-0 -translate-y-1 opacity-0"
+                enter-to-class="max-h-[1200px] translate-y-0 opacity-100"
+                leave-active-class="overflow-hidden transition-all duration-200 ease-in"
+                leave-from-class="max-h-[1200px] translate-y-0 opacity-100"
+                leave-to-class="max-h-0 -translate-y-1 opacity-0"
+            >
+                <div
+                    v-if="filtersOpen"
+                    class="mt-2 overflow-visible rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5"
+                >
+                    <div class="flex flex-wrap items-end gap-x-4 gap-y-2.5">
+                        <div
+                            class="min-w-0 space-y-1"
+                            :class="rangeMode === 'custom' ? 'w-full basis-full' : 'shrink-0'"
+                        >
+                            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                                Dashboard time range
+                            </p>
+                            <TimeRangeSelector
+                                label="Dashboard time range"
+                                hide-header
+                                :selected-time-zone="selectedTimeZone"
+                                :mode="rangeMode"
+                                :start-value="rangeStart"
+                                :end-value="rangeEnd"
+                                :disabled="loading"
+                                compact-mode-selector
+                                class="dashboard-filter-range !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
+                                @update:mode="rangeMode = $event as RangeMode"
+                                @update:start-value="rangeStart = $event"
+                                @update:end-value="rangeEnd = $event"
+                                @update:invalid="rangeInvalid = $event"
+                            />
+                        </div>
+
+                        <div
+                            v-if="isHubUser"
+                            class="min-w-0 flex-1 basis-[18rem] space-y-1"
+                        >
+                            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                                Participant
+                            </p>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:max-w-xl">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Payer FSP
+                                    </span>
+                                    <CustomDropdown
+                                        v-model="payerFsp"
+                                        :options="payerFspOptions"
+                                        placeholder="(Any)"
+                                        button-class="!pb-1.5 !pt-5 text-xs"
+                                        :disabled="loading"
+                                    />
+                                </div>
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                        Payee FSP
+                                    </span>
+                                    <CustomDropdown
+                                        v-model="payeeFsp"
+                                        :options="payeeFspOptions"
+                                        placeholder="(Any)"
+                                        button-class="!pb-1.5 !pt-5 text-xs"
+                                        :disabled="loading"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ml-auto shrink-0 pb-0.5">
+                            <button
+                                type="button"
+                                class="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="loading || rangeInvalid || customRangeLimitError != null || !rangeStart || !rangeEnd"
+                                @click="applyFilters"
+                            >
+                                {{ loading ? 'Applying…' : 'Apply' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <p
+                        v-if="customRangeLimitError"
+                        class="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-600"
+                        role="alert"
+                    >
+                        <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path
+                                fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                                clip-rule="evenodd"
+                            />
+                        </svg>
+                        {{ customRangeLimitError }}
+                    </p>
+                </div>
+            </Transition>
         </article>
 
         <!-- No permission -->
