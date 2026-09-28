@@ -171,8 +171,12 @@ kubectl -n pivotal create secret generic pivotal-hub-client-ca \
 
 ```bash
 curl -s -X POST http://<mcm>/api/dfsps -H 'Content-Type: application/json' \
-  -d '{"dfspId":"pivotal","name":"pivotal","monetaryZoneId":"USD"}'
+  -d '{"dfspId":"pivotal","name":"pivotal","email":"<ops contact>","monetaryZoneId":"USD"}'
 ```
+
+`email` is required even though MCM's swagger omits it — without it the call fails with
+`ValidationError: email is required`. `monetaryZoneId` is optional, is a single value rather than a
+list, and nothing here reads it.
 
 Note the `/api` prefix, and call MCM **in-cluster** — the public host sends `/api/*` to an
 authorization proxy that expects a browser session.
