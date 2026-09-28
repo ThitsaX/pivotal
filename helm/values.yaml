@@ -4,6 +4,18 @@ fullnameOverride: ""
 global:
   imagePullPolicy: IfNotPresent
 
+  # Hub CA trust bundle. Authoritative store, written by trust-manager after it
+  # pulls GET /hub/ca. Mounted optional so a cluster without it still starts;
+  # mTLS is what needs it, and mTLS is not on yet.
+  hubCaSecretName: hub-ca-bundle
+
+  # The Hub-signed server certificate, obtained through MCM enrollment. Holds both
+  # tls.crt and tls.key, so it is the one Secret here that is genuinely secret.
+  hubServerCertSecretName: hub-server-cert
+  # Client leaf web-outbound presents to the Hub, issued from the Pivotal
+  # client trust domain -- never the same material as the server cert above.
+  hubClientCertSecretName: web-outbound-hub-client-tls
+
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
     FSPIOP_QUOTES_URL: http://web-inbound:3201
@@ -88,6 +100,11 @@ redis:
 
 webOutbound:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-outbound
   replicaCount: 1
   image:
     repository: pivotal-web-outbound
@@ -106,6 +123,23 @@ webOutbound:
     CENTRAL_LEDGER_URL: http://host.docker.internal:3001
     CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
+    # Whether a DFSP-facing caller may arrive with no client certificate. A presented
+    # certificate is verified and bound to fspiop-source either way, so this never turns
+    # mutual TLS on or off -- it decides only whether an absent one is fatal. Off by default
+    # so the mutual-TLS endpoint can run beside the plain one while DFSPs migrate; it needs a
+    # gateway setting the XFCC header before it can be turned on.
+    DFSP_FACING_MTLS_MANDATORY: "false"
+    # Private-key custody. `database` is the legacy plaintext-MySQL path; `vault-kv`
+    # is the KMS-backed profile. Use the in-cluster FQDN: a bare "vault" can resolve to
+    # a Docker-Compose Vault via CoreDNS host records in a local dev cluster.
+    KEY_PROVIDER: vault-kv
+    VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    VAULT_AUTH_METHOD: kubernetes
+    VAULT_KUBERNETES_AUTH_PATH: kubernetes
+    VAULT_KV_MOUNT: secret
+    VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
+    VAULT_ROLE: web-outbound
+
     # Optional: blank disables POST /secured/registry/msisdn.
     CENTRAL_REGISTRY_ORACLE_ENDPOINT: ""
     CENTRAL_REGISTRY_ORACLE_SOCKET_TIMEOUT_MS: "10000"
@@ -113,6 +147,11 @@ webOutbound:
 
 webInbound:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-inbound
   replicaCount: 1
   image:
     repository: pivotal-web-inbound
@@ -129,6 +168,11 @@ webInbound:
 
 appAuditor:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: app-auditor
   replicaCount: 1
   image:
     repository: pivotal-app-auditor
@@ -140,6 +184,11 @@ appAuditor:
 
 reportWorker:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: report-worker
   replicaCount: 1
   image:
     repository: pivotal-report-worker
@@ -164,6 +213,11 @@ reportWorker:
 
 webPivotal:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: web-pivotal
   replicaCount: 1
   image:
     repository: pivotal-web-pivotal
@@ -187,8 +241,38 @@ webPivotal:
     REPORT_S3_PREFIX: reports/
     REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
 
+trustManager:
+  # Publishing the DFSP-facing CA to the ingress gateway. Off by default: a deployment that
+  # fronts no DFSP-facing mutual TLS endpoint has no gateway to give a trust anchor to.
+  # `secretName` must match the Gateway's own `credentialName`.
+  dfspCaGateway:
+    enabled: false
+    namespace: ""
+    secretName: ""
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: pivotal-trust-manager
+    tag: local
+  # Own identity: it writes the Hub CA Secret, so it needs a name RBAC can bind to.
+  serviceAccount:
+    create: true
+    name: trust-manager
+  env:
+    PEER_JWS_SYNC_INTERVAL_SECONDS: "300"
+    HUB_CA_SYNC_INTERVAL_SECONDS: "3600"
+    MCM_BASE_URL: ""
+    MCM_TOKEN_URL: ""
+    MCM_CLIENT_ID: ""
+    MCM_CLIENT_SECRET: ""
+
 portal:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: portal
   replicaCount: 1
   image:
     repository: pivotal-portal
@@ -199,6 +283,11 @@ portal:
 
 wallet1Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet1-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet1-connector
@@ -214,6 +303,11 @@ wallet1Connector:
 
 wallet2Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet2-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet2-connector
@@ -229,6 +323,11 @@ wallet2Connector:
 
 wallet3Connector:
   enabled: true
+  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
+  # "default" account would make per-tenant key scoping impossible.
+  serviceAccount:
+    create: true
+    name: wallet3-connector
   replicaCount: 1
   image:
     repository: pivotal-wallet3-connector

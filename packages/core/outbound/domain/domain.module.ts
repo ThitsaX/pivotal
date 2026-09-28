@@ -6,11 +6,10 @@ import { TypeOrmModule as NestJsTypeOrmModule } from '@nestjs/typeorm';
 import { AuditProducerModule } from '@core/audit/producer';
 import { Transaction } from '@core/audit/domain/model';
 import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
+import { AmountTypeConstraint, FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
-import { AmountDecimalValidator , HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
-import { AmountTypeConstraint } from '@shared/fspiop';
+import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 
@@ -137,36 +136,45 @@ export class OutboundDomainModule {
                 provide: FspiopAxios,
                 useFactory: (
                     outboundSettings: OutboundSettings,
-                    privateKeyStore: PrivateKeyStore,
-                    caStore: CaStore,
-                    clientCertStore: ClientCertStore,
+                    jwsSigner: JwsSigner,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
                     const params = outboundSettings.fspiopAxiosParams;
 
                     const interceptors =
-                        fspiopSettings.useJws ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+                        fspiopSettings.useJws
+                            ? [new FspiopSigningInterceptor(jwsSigner).build()]
                             : [];
 
-                    const httpsAgent =
-                        fspiopSettings.useMutualTls ?
-                            new https.Agent(
-                                {
-                                    ca: caStore.get()?.toBuffer(),
-                                    cert: clientCertStore.get()?.certBuffer(),
-                                    key: clientCertStore.get()?.keyBuffer(),
-                                    rejectUnauthorized: params.verifyServerCertificate,
-                                    timeout: params.connectionTimeoutMs,
-                                    ...(params.verifyDomain === false
-                                        ? { checkServerIdentity: () => undefined }
-                                        : {}),
-                                })
-                            : undefined;
+                    // Built through MutualTlsAgent so a renewed certificate takes effect
+                    // without a restart. cert-manager rewrites the mounted Secret every
+                    // few weeks; an agent constructed once would keep presenting the
+                    // certificate it started with until the pod was recycled.
+                    let mutualTls: MutualTlsAgent | null = null;
 
-                    return new FspiopAxios(fspiopSettings, params, interceptors, {}, httpsAgent);
+                    if (fspiopSettings.useMutualTls) {
+                        mutualTls = MutualTlsAgent.create({
+                            rejectUnauthorized: params.verifyServerCertificate ?? true,
+                            connectionTimeoutMs: params.connectionTimeoutMs,
+                            verifyDomain: params.verifyDomain,
+                        });
+
+                        // Refusing to start beats starting without a client certificate:
+                        // the request would otherwise leave unauthenticated and fail at
+                        // the peer as an opaque handshake error, far from the cause.
+                        if (mutualTls == null) {
+                            throw new Error(
+                                'Mutual TLS is enabled but no certificate or trust anchor is configured.');
+                        }
+
+                        mutualTls.start();
+                    }
+
+                    return new FspiopAxios(
+                        fspiopSettings, params, interceptors, {}, mutualTls?.httpsAgent());
                 },
-                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore],
+                inject: [OutboundSettings, JwsSigner],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];

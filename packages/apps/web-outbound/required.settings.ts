@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { OutboundSettings } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
+import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
+import { Pkcs11Settings } from '@shared/pkcs11';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
@@ -89,6 +91,19 @@ export class WebOutboundSettings
         return {
             enabled: this.readOptionalBoolean('ACCESS_JWT_ENABLED') ?? true,
         };
+    }
+
+    /**
+     * Whether a caller may reach the DFSP-facing leg without a client certificate.
+     *
+     * Named for what it decides. A presented certificate is verified in full either way, so this
+     * never turns mutual TLS on or off — it only says whether arriving without one is fatal.
+     *
+     * Off by default so the mutual-TLS endpoint can run beside the existing one and DFSPs migrate
+     * at their own pace, rather than every caller breaking on the day it is switched on.
+     */
+    dfspFacingMutualTlsMandatory(): boolean {
+        return this.readOptionalBoolean('DFSP_FACING_MTLS_MANDATORY') ?? false;
     }
 
     centralLedgerUrl(): string {
@@ -214,4 +229,80 @@ export class WebOutboundSettings
 
         return parsed;
     }
+
+    /**
+     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
+     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
+     * a typo must not silently decide where private keys live.
+     */
+    keyProvider(): KeyProvider {
+        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            10_000,
+            this.readVaultAuthMethod(),
+            this.configService.get<string>('VAULT_TOKEN') ?? '',
+        );
+    }
+
+    /**
+     * Where key references live, under `KEY_PROVIDER=pkcs11`.
+     */
+    keyRefPathPrefix(): string {
+        return this.configService.get<string>('KEY_REF_PATH') ?? 'pivotal/keyref';
+    }
+
+    /**
+     * How this workload reaches its PKCS#11 device, under `KEY_PROVIDER=pkcs11`.
+     *
+     * No credential here, deliberately: it is read from Vault at the path named by
+     * `HSM_CRED_PATH`. An env-supplied one sits in the Deployment manifest, shows up in
+     * `kubectl describe`, needs a redeploy to rotate, and leaves no record of who read it.
+     *
+     * web-outbound signs as whichever tenant is the payer, so its credential is the shared
+     * `web-outbound` crypto user that every tenant's key is shared to — not a per-tenant one.
+     */
+    pkcs11Settings(): Pkcs11Settings {
+        return new Pkcs11Settings(
+            this.configService.get<string>('PKCS11_MODULE_PATH') ?? '',
+            this.configService.get<string>('PKCS11_TOKEN_LABEL') ?? '',
+            this.configService.get<string>('HSM_CRED_PATH') ?? '',
+            this.keyRefPathPrefix(),
+            this.readPositiveInteger('PKCS11_SESSION_POOL_SIZE') ?? Pkcs11Settings.DEFAULT_POOL_SIZE,
+        );
+    }
+
+    /**
+     * How this workload authenticates to Vault. Defaults to Kubernetes ServiceAccount auth; the
+     * token method exists only so a Vault running outside Kubernetes can be reached during local
+     * development, where there is no kubelet to project a ServiceAccount token.
+     */
+    private readVaultAuthMethod(): VaultAuthMethod {
+        const value = this.configService.get<string>('VAULT_AUTH_METHOD');
+
+        if (value == null || value.trim().length === 0) {
+            return VaultAuthMethod.Kubernetes;
+        }
+
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized !== VaultAuthMethod.Kubernetes && normalized !== VaultAuthMethod.Token) {
+            throw new Error(
+                `Invalid VAULT_AUTH_METHOD: '${value}'. Expected `
+                + `${VaultAuthMethod.Kubernetes} or ${VaultAuthMethod.Token}.`,
+            );
+        }
+
+        return normalized as VaultAuthMethod;
+    }
+
 }

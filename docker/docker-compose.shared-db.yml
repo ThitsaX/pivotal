@@ -1,0 +1,62 @@
+# Overlay: run the Pivotal services against an already-running MySQL rather than the one in
+# docker-compose.yml.
+#
+# The Mojaloop test harness (`ml-core-test-harness`) already provides a MySQL holding the `pivotal`
+# database, so starting a second one duplicates state and competes for port 3306. This overlay drops
+# the dependency on the bundled `mysql` service and points every Pivotal service at the shared one.
+#
+#   docker compose -p pivotal-stack \
+#       -f docker/docker-compose.yml -f docker/docker-compose.shared-db.yml \
+#       --profile vault up -d vault vault-seed web-inbound web-outbound
+#
+# `!override` replaces the inherited depends_on (rather than merging into it) so compose does not
+# start the bundled MySQL; `!reset {}` clears it entirely where nothing else is depended on.
+
+x-shared-db-env: &shared_db_env
+  DB_WRITE_HOST: ${DB_WRITE_HOST:-host.docker.internal}
+  DB_WRITE_PORT: ${DB_WRITE_PORT:-3306}
+  DB_WRITE_USERNAME: ${DB_WRITE_USERNAME:-central_ledger}
+  DB_WRITE_PASSWORD: ${DB_WRITE_PASSWORD:-password}
+  DB_WRITE_NAME: ${DB_WRITE_NAME:-pivotal}
+  DB_READ_HOST: ${DB_READ_HOST:-host.docker.internal}
+  DB_READ_PORT: ${DB_READ_PORT:-3306}
+  DB_READ_USERNAME: ${DB_READ_USERNAME:-central_ledger}
+  DB_READ_PASSWORD: ${DB_READ_PASSWORD:-password}
+  DB_READ_NAME: ${DB_READ_NAME:-pivotal}
+
+services:
+
+  web-outbound:
+    depends_on: !override
+      web-inbound:
+        condition: service_started
+      nats:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      <<: *shared_db_env
+
+  web-inbound:
+    depends_on: !override
+      nats:
+        condition: service_started
+    environment:
+      <<: *shared_db_env
+
+  web-pivotal:
+    depends_on: !reset {}
+    environment:
+      <<: *shared_db_env
+
+  app-auditor:
+    depends_on: !override
+      nats:
+        condition: service_started
+    environment:
+      <<: *shared_db_env
+
+  report-worker:
+    depends_on: !reset {}
+    environment:
+      <<: *shared_db_env

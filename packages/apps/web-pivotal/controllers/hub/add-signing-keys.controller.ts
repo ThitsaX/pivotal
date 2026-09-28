@@ -11,10 +11,6 @@ export class AddHubSigningKeysRequest {
     @IsString()
     @IsNotEmpty()
     jwsPublicKey!: string;
-
-    @IsString()
-    @IsNotEmpty()
-    jwsPrivateKey!: string;
 }
 
 @Controller('hub')
@@ -35,10 +31,13 @@ export class AddHubSigningKeysController {
     ): Promise<AddSigningKeysCommand.Output> {
         return this.commandBus.execute(
             new AddSigningKeysCommand(
+                // Public key only. The Hub is a peer: Pivotal verifies what it signs and never
+                // signs as it, so a private key here would be material with no use, and supplying
+                // one would classify the Hub as a tenant this deployment signs for.
                 new AddSigningKeysCommand.Input(
                     AddHubSigningKeysController.HUB_NAME,
                     request.jwsPublicKey,
-                    request.jwsPrivateKey,
+                    undefined,
                 ),
             ),
         );

@@ -1,0 +1,106 @@
+{{/*
+trust-manager writes the Hub CA trust bundle as a Secret, so it needs its own
+Kubernetes identity and permission to do exactly that and nothing else.
+
+Deliberately narrow: one named Secret, one namespace, three verbs. Whoever can write
+this bundle can insert their own CA and be trusted as the Hub, so the grant is scoped
+to the single object rather than to Secrets in general.
+*/}}
+{{- if .Values.trustManager.enabled }}
+{{- $serviceAccount := .Values.trustManager.serviceAccount | default dict }}
+{{- $name := $serviceAccount.name | default "trust-manager" }}
+{{- if $serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-hub-ca
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ .Values.global.hubCaSecretName | quote }}
+      - {{ .Values.global.hubServerCertSecretName | quote }}
+    verbs: ["get", "patch"]
+  # `create` cannot be restricted by resourceName: the name is not known to the
+  # authorizer until the object exists. Scoped to this namespace only.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-hub-ca
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-hub-ca
+
+{{- with .Values.trustManager.dfspCaGateway }}
+{{- if and .enabled .namespace .secretName }}
+---
+{{/*
+Publishing the DFSP-facing CA means writing into the ingress gateway's namespace, because Istio
+reads a gateway's credentials only from the namespace that gateway runs in.
+
+That boundary is the point, not an inconvenience: whoever can write this Secret decides which
+authority the gateway will trust, and therefore whose client certificates are accepted. The grant
+is a separate Role in that namespace, named to the single object, rather than anything inherited
+from the workload namespace.
+
+`create` is not granted here. The Secret is expected to exist — created alongside the gateway —
+so trust-manager only ever updates it. A missing Secret surfaces as a failed sync rather than as
+this job quietly minting a trust anchor of its own.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ .secretName | quote }}
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-dfsp-ca
+{{- end }}
+{{- end }}
+{{- end }}

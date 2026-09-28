@@ -5,7 +5,6 @@
 import {computed, reactive, ref} from 'vue';
 import CurrencySelector from '../../components/CurrencySelector.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
-import {SIGNING_KEYS_UI_ENABLED} from '../../configs/pivotal-runtime-config';
 import {VIEW_BY_KEY} from '../../modules/audit/view-definitions';
 import {
     PARTICIPANT_CURRENCY_OPTIONS,
@@ -28,15 +27,10 @@ const selectedCurrencies = ref<string[]>([]);
 const form = reactive({
     name: '',
     endpoint: '',
-    jwsPublicKey: '',
-    jwsPrivateKey: '',
     accessPublicKey: '',
 });
 
 const loading = ref(false);
-const keyGenerationLoading = ref(false);
-const keyGenerationMessage = ref<string | null>(null);
-const keyGenerationError = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const responsePayload = ref<unknown>({
@@ -44,30 +38,19 @@ const responsePayload = ref<unknown>({
 });
 const lastSubmittedAt = ref<string | null>(null);
 
-const requestPreview = computed(() => {
-    const jwsPublicKey = form.jwsPublicKey.trim();
-    const jwsPrivateKey = form.jwsPrivateKey.trim();
-
-    return {
-        name: form.name.trim(),
-        currencies: selectedCurrencies.value,
-        endpoint: form.endpoint.trim(),
-        ...(SIGNING_KEYS_UI_ENABLED && jwsPublicKey.length > 0 ? {jwsPublicKey} : {}),
-        ...(SIGNING_KEYS_UI_ENABLED && jwsPrivateKey.length > 0 ? {jwsPrivateKey} : {}),
-        accessPublicKey: form.accessPublicKey.trim(),
-    };
-});
+// No signing keys here. Onboarding provisions them into whatever custody the deployment uses --
+// Vault, or an HSM they never leave -- so there is nothing for an operator to enter or to see.
+const requestPreview = computed(() => ({
+    name: form.name.trim(),
+    currencies: selectedCurrencies.value,
+    endpoint: form.endpoint.trim(),
+    accessPublicKey: form.accessPublicKey.trim(),
+}));
 
 const canSubmit = computed((): boolean => {
     return form.name.trim().length > 0
         && form.endpoint.trim().length > 0
-        && (!SIGNING_KEYS_UI_ENABLED
-            || (
-                form.jwsPublicKey.trim().length > 0
-                && form.jwsPrivateKey.trim().length > 0
-            ))
         && form.accessPublicKey.trim().length > 0
-        && !keyGenerationLoading.value
         && !loading.value;
 });
 
@@ -95,69 +78,13 @@ const removeCurrency = (currency: string): void => {
 const resetForm = (): void => {
     form.name = '';
     form.endpoint = '';
-    form.jwsPublicKey = '';
-    form.jwsPrivateKey = '';
     form.accessPublicKey = '';
     currencyPicker.value = '';
     selectedCurrencies.value = [];
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
     errorMessage.value = null;
     successMessage.value = null;
     responsePayload.value = {status: 'idle'};
 };
-
-const generateSigningKeys = async (modulusLength: number): Promise<void> => {
-    keyGenerationLoading.value = true;
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
-
-    try {
-        const result = await executeParticipantAction('POST', '/participant/signing-key', {
-            size: modulusLength,
-        });
-        const generatedKeyPair = result.payload as {publicKey?: string; privateKey?: string};
-
-        if (generatedKeyPair.publicKey == null || generatedKeyPair.privateKey == null) {
-            throw new Error('Generated key pair payload is incomplete.');
-        }
-
-        form.jwsPublicKey = generatedKeyPair.publicKey;
-        form.jwsPrivateKey = generatedKeyPair.privateKey;
-        keyGenerationMessage.value = `Generated ${modulusLength}-bit PEM signing key pair.`;
-    } catch (error) {
-        keyGenerationError.value = error instanceof Error ? error.message : String(error);
-    } finally {
-        keyGenerationLoading.value = false;
-    }
-};
-
-const closeKeyGenerationDialog = (): void => {
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
-};
-
-const isKeyGenerationDialogOpen = computed((): boolean => {
-    return keyGenerationMessage.value != null || keyGenerationError.value != null;
-});
-
-const keyGenerationDialogTone = computed((): 'error' | 'success' => {
-    return keyGenerationError.value != null ? 'error' : 'success';
-});
-
-const keyGenerationDialogEyebrow = computed((): string => {
-    return keyGenerationError.value != null ? 'Key Generation Failed' : 'Key Generation Completed';
-});
-
-const keyGenerationDialogTitle = computed((): string => {
-    return keyGenerationError.value != null
-        ? 'Signing key generation could not be completed'
-        : 'Signing key pair generated';
-});
-
-const keyGenerationDialogMessage = computed((): string | null => {
-    return keyGenerationError.value ?? keyGenerationMessage.value;
-});
 
 const submit = async (): Promise<void> => {
     if (!canSubmit.value) {
@@ -301,72 +228,6 @@ const submit = async (): Promise<void> => {
                     </div>
                 </section>
 
-                <section
-                    v-if="SIGNING_KEYS_UI_ENABLED"
-                    class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5"
-                >
-                    <div class="flex flex-col gap-3 border-b border-accent/15 pb-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                            <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
-                                For FSPIOP Signature
-                            </h3>
-                            <p class="mt-1 text-sm text-slate-600">
-                                Provide your own JWS keys, or generate a PEM key pair here for signing FSPIOP messages.
-                            </p>
-                        </div>
-
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                class="rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                                :disabled="keyGenerationLoading"
-                                @click="generateSigningKeys(2048)"
-                            >
-                                {{ keyGenerationLoading ? 'Generating...' : 'Generate 2048' }}
-                            </button>
-
-                            <button
-                                type="button"
-                                class="rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                                :disabled="keyGenerationLoading"
-                                @click="generateSigningKeys(4096)"
-                            >
-                                {{ keyGenerationLoading ? 'Generating...' : 'Generate 4096' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 xl:grid-cols-2">
-                        <label class="block">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                    JWS Public Key
-                                </span>
-                                <textarea
-                                    v-model="form.jwsPublicKey"
-                                    class="field-input min-h-32 !pb-2 !pt-5 font-mono text-xs"
-                                    placeholder="-----BEGIN PUBLIC KEY-----"
-                                    spellcheck="false"
-                                ></textarea>
-                            </div>
-                        </label>
-
-                        <label class="block">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute left-3 top-1.5 z-10 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                    JWS Private Key
-                                </span>
-                                <textarea
-                                    v-model="form.jwsPrivateKey"
-                                    class="field-input min-h-32 !pb-2 !pt-5 font-mono text-xs"
-                                    placeholder="-----BEGIN PRIVATE KEY-----"
-                                    spellcheck="false"
-                                ></textarea>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-
                 <section class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5">
                     <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
                         Access
@@ -414,12 +275,4 @@ const submit = async (): Promise<void> => {
 
     </ActionPage>
 
-    <StatusDialog
-        :open="isKeyGenerationDialogOpen"
-        :tone="keyGenerationDialogTone"
-        :eyebrow="keyGenerationDialogEyebrow"
-        :title="keyGenerationDialogTitle"
-        :message="keyGenerationDialogMessage"
-        @close="closeKeyGenerationDialog"
-    />
 </template>

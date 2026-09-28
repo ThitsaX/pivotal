@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
+import { FspiopVerifyMode } from './fspiop-verify-mode';
+
 /**
  * FSPIOP runtime settings.
  *
@@ -17,6 +19,7 @@
  *     process.env['FSPIOP_TRANSFERS_URL']   ?? '',
  *     process.env['FSPIOP_USE_JWS']         === 'true',
  *     process.env['FSPIOP_USE_MUTUAL_TLS']  === 'true',
+ *     FspiopVerifyMode.parse(process.env['FSPIOP_JWS_VERIFY_MODE']),
  *   ),
  * }
  */
@@ -29,6 +32,15 @@ export class FspiopSettings {
         public readonly transfersUrl: string,
         public readonly useJws: boolean,
         public readonly useMutualTls: boolean,
+
+        /**
+         * Verification mode for sources with no `participant_key` row of their own.
+         *
+         * Per-source rows override this. It stays `Off` by default so that enabling `useJws` turns
+         * on *signing* without silently starting to reject inbound traffic — the two directions
+         * cut over on different schedules and must be switched independently.
+         */
+        public readonly defaultJwsVerifyMode: FspiopVerifyMode = FspiopVerifyMode.Off,
     ) {
     }
 }

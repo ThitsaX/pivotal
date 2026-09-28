@@ -12,6 +12,15 @@ export class NatsClientService implements OnModuleInit, OnModuleDestroy {
     constructor(private readonly natsUrl: string) {}
 
     async onModuleInit(): Promise<void> {
+
+        if (this.natsUrl.trim().length === 0) {
+            // No URL configured. Left unconnected rather than throwing, so a service whose use of
+            // NATS is an optimisation still starts; `isConnected` lets those callers stand down
+            // instead of failing. A service that genuinely requires NATS asks for `nc` and gets a
+            // clear error rather than a confused connection failure.
+            return;
+        }
+
         this.connection = await connect({servers: this.natsUrl});
     }
 
@@ -19,9 +28,17 @@ export class NatsClientService implements OnModuleInit, OnModuleDestroy {
         await this.connection?.drain();
     }
 
+    /** Whether there is a connection to use, so optional consumers can skip themselves. */
+    get isConnected(): boolean {
+        return this.connection != null;
+    }
+
     get nc(): NatsConnection {
         if (!this.connection) {
-            throw new Error('NATS connection is not established yet.');
+            throw new Error(
+                'NATS connection is not established. Set NATS_URL, or check that this service '
+                + 'should be using NATS at all.',
+            );
         }
         return this.connection;
     }

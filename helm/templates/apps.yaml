@@ -18,6 +18,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-inbound
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webInbound "default" "web-inbound") }}
       containers:
         - name: web-inbound
           image: "{{ .Values.webInbound.image.repository }}:{{ .Values.webInbound.image.tag }}"
@@ -27,9 +28,31 @@ spec:
               containerPort: {{ .Values.webInbound.service.port }}
               protocol: TCP
           env:
-            {{- include "pivotal-stack.envVars" .Values.webInbound.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.webInbound.env) .Values.global.commonDbEnv .Values.global.commonFspiopEnv) | nindent 12 }}
+          volumeMounts:
+            - name: hub-ca-bundle
+              mountPath: /etc/pivotal/hub-ca
+              readOnly: true
+            - name: hub-server-cert
+              mountPath: /etc/pivotal/hub-server-cert
+              readOnly: true
+      volumes:
+        # Authoritative store for the Hub CA — NOT a projection of MySQL.
+        # Connectors have no MySQL access, so the bundle cannot live there;
+        # one Secret serves every consumer.
+        - name: hub-ca-bundle
+          secret:
+            secretName: {{ .Values.global.hubCaSecretName }}
+            optional: true
+        # Enrolled with the Hub and renewed by trust-manager, not by cert-manager:
+        # the Hub signs what this listener presents, so the Hub is where it comes from.
+        - name: hub-server-cert
+          secret:
+            secretName: {{ .Values.global.hubServerCertSecretName }}
+            optional: true
 ---
 apiVersion: v1
 kind: Service
@@ -70,6 +93,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-outbound
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webOutbound "default" "web-outbound") }}
       containers:
         - name: web-outbound
           image: "{{ .Values.webOutbound.image.repository }}:{{ .Values.webOutbound.image.tag }}"
@@ -79,9 +103,31 @@ spec:
               containerPort: {{ .Values.webOutbound.service.port }}
               protocol: TCP
           env:
-            {{- include "pivotal-stack.envVars" .Values.webOutbound.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.webOutbound.env) .Values.global.commonDbEnv .Values.global.commonFspiopEnv) | nindent 12 }}
+          volumeMounts:
+            - name: hub-ca-bundle
+              mountPath: /etc/pivotal/hub-ca
+              readOnly: true
+            - name: hub-client-tls
+              mountPath: /etc/pivotal/hub-client-tls
+              readOnly: true
+      volumes:
+        # Authoritative store for the Hub CA — NOT a projection of MySQL.
+        # Connectors have no MySQL access, so the bundle cannot live there;
+        # one Secret serves every consumer.
+        - name: hub-ca-bundle
+          secret:
+            secretName: {{ .Values.global.hubCaSecretName }}
+            optional: true
+        # Renewed in place by cert-manager. The kubelet rewrites the mounted files,
+        # and the service picks them up without a restart.
+        - name: hub-client-tls
+          secret:
+            secretName: {{ .Values.global.hubClientCertSecretName }}
+            optional: true
 ---
 apiVersion: v1
 kind: Service
@@ -122,13 +168,16 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: app-auditor
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.appAuditor "default" "app-auditor") }}
       containers:
         - name: app-auditor
           image: "{{ .Values.appAuditor.image.repository }}:{{ .Values.appAuditor.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            {{- include "pivotal-stack.envVars" .Values.appAuditor.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.appAuditor.env) .Values.global.commonDbEnv) | nindent 12 }}
 {{- end }}
 {{- if .Values.reportWorker.enabled }}
 ---
@@ -151,13 +200,16 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: report-worker
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.reportWorker "default" "report-worker") }}
       containers:
         - name: report-worker
           image: "{{ .Values.reportWorker.image.repository }}:{{ .Values.reportWorker.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            {{- include "pivotal-stack.envVars" .Values.reportWorker.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.reportWorker.env) .Values.global.commonDbEnv) | nindent 12 }}
 {{- end }}
 {{- if .Values.webPivotal.enabled }}
 ---
@@ -180,6 +232,7 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: web-pivotal
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.webPivotal "default" "web-pivotal") }}
       containers:
         - name: web-pivotal
           image: "{{ .Values.webPivotal.image.repository }}:{{ .Values.webPivotal.image.tag }}"
@@ -189,8 +242,10 @@ spec:
               containerPort: {{ .Values.webPivotal.service.port }}
               protocol: TCP
           env:
-            {{- include "pivotal-stack.envVars" .Values.webPivotal.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonDbEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.webPivotal.env) .Values.global.commonDbEnv) | nindent 12 }}
 ---
 apiVersion: v1
 kind: Service
@@ -231,14 +286,25 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: portal
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.portal "default" "portal") }}
       containers:
         - name: portal
           image: "{{ .Values.portal.image.repository }}:{{ .Values.portal.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: http
-              containerPort: 80
+              # nginx in this image listens on 8080, not 80: the config in
+              # docker/portal.nginx.conf binds it there so the container needs no
+              # privileged port. The Service targets this name, so the two must agree.
+              containerPort: 8080
               protocol: TCP
+          {{- with .Values.portal.env }}
+          # Read at container start by docker/portal-runtime-config.sh, which writes
+          # config.js for the browser. The bundle is built once and configured here, so
+          # the same image serves every environment.
+          env:
+            {{- include "pivotal-stack.envVars" . | nindent 12 }}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -279,13 +345,16 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet1-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet1Connector "default" "wallet1-connector") }}
       containers:
         - name: wallet1-connector
           image: "{{ .Values.wallet1Connector.image.repository }}:{{ .Values.wallet1Connector.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            {{- include "pivotal-stack.envVars" .Values.wallet1Connector.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.wallet1Connector.env) .Values.global.commonFspiopEnv) | nindent 12 }}
 {{- end }}
 {{- if .Values.wallet2Connector.enabled }}
 ---
@@ -308,13 +377,16 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet2-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet2Connector "default" "wallet2-connector") }}
       containers:
         - name: wallet2-connector
           image: "{{ .Values.wallet2Connector.image.repository }}:{{ .Values.wallet2Connector.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            {{- include "pivotal-stack.envVars" .Values.wallet2Connector.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.wallet2Connector.env) .Values.global.commonFspiopEnv) | nindent 12 }}
 {{- end }}
 {{- if .Values.wallet3Connector.enabled }}
 ---
@@ -337,11 +409,14 @@ spec:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: wallet3-connector
     spec:
+      serviceAccountName: {{ include "pivotal-stack.serviceAccountName" (dict "component" .Values.wallet3Connector "default" "wallet3-connector") }}
       containers:
         - name: wallet3-connector
           image: "{{ .Values.wallet3Connector.image.repository }}:{{ .Values.wallet3Connector.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            {{- include "pivotal-stack.envVars" .Values.wallet3Connector.env | nindent 12 }}
-            {{- include "pivotal-stack.envVars" .Values.global.commonFspiopEnv | nindent 12 }}
+            {{- /* Component env is merged over the shared blocks rather than appended
+                 after them: a duplicate name is rejected outright on apply, so this is
+                 what lets one service turn a shared flag on ahead of the others. */}}
+            {{- include "pivotal-stack.envVars" (merge (deepCopy .Values.wallet3Connector.env) .Values.global.commonFspiopEnv) | nindent 12 }}
 {{- end }}

@@ -17,6 +17,7 @@ export const KNOWN_VIEW_KEYS: readonly ViewKey[] = [
     'participant-add-signing-keys',
     'participant-add-new-currency',
     'participant-register-endpoint',
+    'participant-certificates',
     'transactions',
     'admin-users',
     'admin-roles',

@@ -5,31 +5,25 @@ import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {
     FspiopJwsPrivateKeyStore,
     FspiopJwsPublicKeyStore,
-    FspiopMtlsCaStore,
-    FspiopMtlsClientCertStore,
     FspiopSettings,
+    FspiopVerifyMode,
 } from '@shared/fspiop';
 import {
-    CaStore,
-    ClientCertStore,
     PrivateKeyStore,
     PublicKeyStore,
 } from '@shared/security';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {KeyProvider, VaultAuthMethod, VaultSettings} from '@shared/vault';
 import type {WebInboundModule} from './web-inbound.module';
 
 export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
     private readonly inboundPublicKeyStore: PublicKeyStore;
     private readonly inboundPrivateKeyStore: PrivateKeyStore;
-    private readonly inboundCaStore: CaStore;
-    private readonly inboundClientCertStore: ClientCertStore;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
         this.inboundPublicKeyStore = new FspiopJwsPublicKeyStore().load();
         this.inboundPrivateKeyStore = new FspiopJwsPrivateKeyStore().load();
-        this.inboundCaStore = new FspiopMtlsCaStore().load();
-        this.inboundClientCertStore = new FspiopMtlsClientCertStore().load();
     }
 
     natsUrl(): string {
@@ -78,7 +72,32 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
             this.readRequiredString('FSPIOP_TRANSFERS_URL'),
             this.readRequiredBoolean('FSPIOP_USE_JWS'),
             this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS'),
+            this.readVerifyMode('FSPIOP_JWS_VERIFY_MODE'),
         );
+    }
+
+    /**
+     * Default inbound verification mode. Optional: an absent value means `off`, which is the
+     * correct state for a deployment that has enabled signing but not yet verification.
+     *
+     * A *present but unrecognised* value throws rather than falling back — a typo here would
+     * silently disable verification across every source that has no row of its own.
+     */
+    private readVerifyMode(name: string): FspiopVerifyMode {
+        const value = this.configService.get<string>(name);
+
+        if (value == null || value.trim().length === 0) {
+            return FspiopVerifyMode.Off;
+        }
+
+        if (!FspiopVerifyMode.isValid(value)) {
+            throw new Error(
+                `Invalid ${name}: '${value}'. Expected one of `
+                + `${FspiopVerifyMode.Off}, ${FspiopVerifyMode.VerifyIfPresent}, ${FspiopVerifyMode.Require}.`,
+            );
+        }
+
+        return FspiopVerifyMode.parse(value);
     }
 
     publicKeyStore(): PublicKeyStore {
@@ -87,14 +106,6 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
     privateKeyStore(): PrivateKeyStore {
         return this.inboundPrivateKeyStore;
-    }
-
-    caStore(): CaStore {
-        return this.inboundCaStore;
-    }
-
-    clientCertStore(): ClientCertStore {
-        return this.inboundClientCertStore;
     }
 
     private readRequiredString(name: string): string {
@@ -147,4 +158,61 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
         return parsed;
     }
+
+    /**
+     * web-inbound verifies; it never signs.
+     *
+     * Verification uses the sender's **public** key, which lives on `participant_key` in the
+     * registry — no private key is read here under any profile. So this is fixed rather than read
+     * from the environment: the participant domain constructs its key source eagerly, and
+     * `database` keeps that construction inert.
+     *
+     * Reading `KEY_PROVIDER` here would be worse than pointless. A deployment setting it globally
+     * would have this service open a device connection it has no use for, and fail to start if the
+     * device were unreachable — an outage on the inbound leg caused by configuration meant for the
+     * outbound one.
+     */
+    keyProvider(): KeyProvider {
+        return KeyProvider.Database;
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            10_000,
+            this.readVaultAuthMethod(),
+            this.configService.get<string>('VAULT_TOKEN') ?? '',
+        );
+    }
+
+    /**
+     * How this workload authenticates to Vault. Defaults to Kubernetes ServiceAccount auth; the
+     * token method exists only so a Vault running outside Kubernetes can be reached during local
+     * development, where there is no kubelet to project a ServiceAccount token.
+     */
+    private readVaultAuthMethod(): VaultAuthMethod {
+        const value = this.configService.get<string>('VAULT_AUTH_METHOD');
+
+        if (value == null || value.trim().length === 0) {
+            return VaultAuthMethod.Kubernetes;
+        }
+
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized !== VaultAuthMethod.Kubernetes && normalized !== VaultAuthMethod.Token) {
+            throw new Error(
+                `Invalid VAULT_AUTH_METHOD: '${value}'. Expected `
+                + `${VaultAuthMethod.Kubernetes} or ${VaultAuthMethod.Token}.`,
+            );
+        }
+
+        return normalized as VaultAuthMethod;
+    }
+
 }

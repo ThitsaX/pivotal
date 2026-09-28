@@ -16,16 +16,26 @@ jobs:
         service:
           - name: web-outbound
             dockerfile: docker/web-outbound.Dockerfile
+            # Carries the device library so one image serves both custody profiles. It is inert
+            # unless KEY_PROVIDER=pkcs11, and the ~20MB is cheaper than maintaining two variants
+            # that would need separate builds, scans and testing.
+            buildArgs: PKCS11_BACKEND=cloudhsm
           - name: web-inbound
             dockerfile: docker/web-inbound.Dockerfile
           - name: app-auditor
             dockerfile: docker/app-auditor.Dockerfile
           - name: web-pivotal
             dockerfile: docker/web-pivotal.Dockerfile
+            # Generates each tenant's key during onboarding, so it needs the device library
+            # even though it never signs.
+            buildArgs: PKCS11_BACKEND=cloudhsm
           - name: report-worker
             dockerfile: docker/report-worker.Dockerfile
           - name: portal
             dockerfile: docker/portal.Dockerfile
+          - name: trust-manager
+            dockerfile: docker/trust-manager.Dockerfile
+            buildArgs: PKCS11_BACKEND=cloudhsm
 
     steps:
       - name: Checkout repository
@@ -59,6 +69,8 @@ jobs:
         with:
           context: .
           file: ${{ matrix.service.dockerfile }}
+          # Empty for every service that does not set it, which the action treats as no arguments.
+          build-args: ${{ matrix.service.buildArgs }}
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
