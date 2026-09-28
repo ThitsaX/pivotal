@@ -26,6 +26,9 @@ jobs:
             dockerfile: docker/app-auditor.Dockerfile
           - name: web-pivotal
             dockerfile: docker/web-pivotal.Dockerfile
+            # Generates each tenant's key during onboarding, so it needs the device library
+            # even though it never signs.
+            buildArgs: PKCS11_BACKEND=cloudhsm
           - name: report-worker
             dockerfile: docker/report-worker.Dockerfile
           - name: portal
