@@ -46,6 +46,21 @@ endpoint — it is reached over private IP from within the VPC — so a laptop c
 | 14 | `apt-get install -y opensc` | `pkcs11-tool`, for exercising the library without application code |
 | 15 | `pkcs11-tool --module /opt/cloudhsm/lib/libcloudhsm_pkcs11.so --list-slots` | **Records the token label and PIN limits.** The device names its single token itself; the label cannot be chosen |
 
+> **Count the HSMs that step 10 lists.** The client refuses to create *or use* a key that does not
+> exist on at least two of them, so against a one-HSM cluster every key operation fails with
+> `the key must be available on at least 2 HSMs`. A cluster can quietly lose an HSM between
+> environments being set up and being used, so count them here rather than discovering it at the
+> first signature.
+>
+> With one HSM, add `--disable-key-availability-check` to **both** step 8 and step 13 — the CLI and
+> the library carry separate configurations, and provisioning uses the first while signing uses the
+> second. The deployed services get it from `CLOUDHSM_DISABLE_KEY_AVAILABILITY_CHECK`, which the
+> image entrypoint passes on; a change made by hand inside a pod dies with that pod.
+>
+> This is a staging accommodation. The keys are created `extractable=false`, so a single device
+> holding them means losing it costs every key provisioned since the last cluster backup. Run two
+> HSMs in production.
+
 ## D. Check the account model
 
 | # | Command | Purpose |

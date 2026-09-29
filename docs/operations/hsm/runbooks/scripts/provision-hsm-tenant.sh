@@ -29,6 +29,11 @@ MODE=${2:-}
 
 if [ -z "$FSP" ]; then
   echo "usage: $0 <fspId> [--generate-key]" >&2
+  echo >&2
+  echo "  VAULT_ADDR    reach Vault directly instead of via kubectl exec" >&2
+  echo "  VAULT_TOKEN   required either way" >&2
+  echo "  CRYPTO_USER   override the derived crypto-user name, for a tenant whose" >&2
+  echo "                user was created before this script existed" >&2
   exit 1
 fi
 
@@ -50,13 +55,24 @@ fi
 # The device allows only a-z, A-Z, 0-9 and underscore in a username, so the prefix uses
 # underscores and anything else in the fspId is folded to one. An fspId carrying a hyphen
 # or a dot is otherwise rejected at user creation, several steps into onboarding.
-CU="cu_$(printf '%s' "$FSP" | tr -c 'A-Za-z0-9' '_')"
+#
+# Overridable, because an environment that created its crypto users before this script
+# existed will have named them by some other convention -- lower case, say. The derived
+# name is right for a new tenant and wrong for an existing one, and creating a second user
+# for a tenant is worse than either: ownership is conferred at creation, so whichever user
+# generated the key is the only one that can ever manage it.
+CU=${CRYPTO_USER:-cu_$(printf '%s' "$FSP" | tr -c 'A-Za-z0-9' '_')}
 WEB_OUTBOUND_CU=${WEB_OUTBOUND_CU:-cu_web_outbound}
 
 KV_MOUNT=${KV_MOUNT:-pivotal-kv}
 CRED_PATH="${KV_MOUNT}/pivotal/hsmcred/${FSP}"
 KEYREF_PATH="${KV_MOUNT}/pivotal/keyref/${FSP}"
 
+# How to reach Vault. VAULT_ADDR set talks to it over the network using the vault CLI on
+# this host -- the one to use from a pod inside the cluster, which needs no kubectl and no
+# permission to exec into another namespace. Unset falls back to `kubectl exec` into the
+# Vault pod, for a run from a workstation with cluster access but no route to the Service.
+VAULT_ADDR=${VAULT_ADDR:-}
 VAULT_NS=${VAULT_NS:-vault}
 VAULT_POD=${VAULT_POD:-vault-0}
 VAULT_TOKEN=${VAULT_TOKEN:-}
@@ -64,13 +80,27 @@ VAULT_TOKEN=${VAULT_TOKEN:-}
 MOD=${PKCS11_MODULE:-/opt/cloudhsm/lib/libcloudhsm_pkcs11.so}
 
 v() {
-  kubectl exec -n "$VAULT_NS" -i "$VAULT_POD" -- sh -c \
-    "export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$VAULT_TOKEN; $1"
+  if [ -n "$VAULT_ADDR" ]; then
+    VAULT_ADDR="$VAULT_ADDR" VAULT_TOKEN="$VAULT_TOKEN" sh -c "$1"
+  else
+    kubectl exec -n "$VAULT_NS" -i "$VAULT_POD" -- sh -c \
+      "export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=$VAULT_TOKEN; $1"
+  fi
 }
 
+# cloudhsm-cli reports failures as JSON on stdout, not stderr, so a call whose output
+# is discarded fails under `set -e` with nothing printed at all. Hold the output and
+# print it when the exit status is non-zero -- callers that discard stdout then still
+# get the reason.
 hsm() {
   local pin=$1; shift
-  CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN="$pin" cloudhsm-cli "$@"
+  local out status
+  out=$(CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN="$pin" cloudhsm-cli "$@" 2>&1); status=$?
+  if [ $status -ne 0 ]; then
+    printf '%s\n' "$out" >&2
+    return $status
+  fi
+  printf '%s\n' "$out"
 }
 
 cleanup() { unset CO_PIN CU_PASS CU_PIN VAULT_TOKEN 2>/dev/null || true; }
@@ -214,7 +244,11 @@ echo "  keyRef recorded: ${KEYREF_PATH} = ${LABEL}"
 
 echo
 echo "── verification ─────────────────────────────────"
-hsm "$CU_PIN" key list --filter "attr.label=${LABEL}" || true
+# --verbose, because the default prints only the reference and the label -- not
+# key-owners or shared-users, which are the two things the closing note asks the
+# operator to confirm. It has no effect when run by an Admin, so this must stay a
+# crypto-user call.
+hsm "$CU_PIN" key list --filter "attr.label=${LABEL}" --verbose || true
 echo
 echo "keyRef in Vault: $(v "vault kv get -field=keyRef ${KEYREF_PATH}")"
 echo
