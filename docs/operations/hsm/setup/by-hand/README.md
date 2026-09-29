@@ -1,6 +1,6 @@
 # Bringing an Environment Up, by Hand
 
-The numbered documents beside this folder say what has to exist. These four say **what was actually
+The numbered documents beside this folder say what has to exist. These six say **what was actually
 run against a real environment** — in order, with what proved each step, and what was not obvious
 at the time.
 
@@ -13,8 +13,11 @@ Read them in sequence. Each depends on the one before, with a single exception n
 | 3 | [`3-prepare-for-ceremony.md`](./3-prepare-for-ceremony.md) | 1 and 2 | two crypto users, a host that can run the ceremony, a token proven to work |
 | — | **[`../2-ca-ceremony.md`](../2-ca-ceremony.md)** | 3 | **both certificate authorities, rooted in hardware** |
 | 4 | [`4-after-the-ceremony.md`](./4-after-the-ceremony.md) | the ceremony | trust-manager running, trust material published |
+| 5 | [`5-turn-on-dfsp-mtls.md`](./5-turn-on-dfsp-mtls.md) | 4 | the DFSP-facing leg verifying client certificates |
+| 6 | [`6-turn-on-hub-jws.md`](./6-turn-on-hub-jws.md) | 4 | Pivotal signing to the Hub, per participant |
 
-**Commands are numbered once across all four**, so document 3 opens at 5 and document 4 at 25.
+**Commands are numbered once across all six**, so document 3 opens at 5, document 4 at 25,
+document 5 at 30 and document 6 at 34.
 That is deliberate — it is one walkthrough — and not a sign that anything is missing.
 
 ## What blocks what
@@ -32,6 +35,9 @@ The order is not arbitrary, and the sequence is easier to hold if you know why:
   fixable — only replaceable.
 - **4 after the ceremony.** Everything in it addresses mounts that do not exist until then; start
   early and the operator simply retries against nothing.
+
+**5 and 6 are independent.** Both need step 4; neither needs the other. The DFSP-facing leg and
+hub-facing signing can be turned on in either order, or at the same time.
 
 ## The one thing to start early
 
