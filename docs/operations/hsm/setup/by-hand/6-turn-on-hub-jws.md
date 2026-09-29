@@ -30,6 +30,7 @@ and re-onboarding a live DFSP is not an option — so section B does by hand wha
 | `PKCS11_SESSION_POOL_SIZE` | `4` | Measured: ~543 signatures/sec at 4, ~256 at 16. `pkcs11js` has no async `C_SignInit`, so that call blocks Node's thread and more sessions make it worse. Scale with replicas |
 | `PKCS11_TOKEN_LABEL` | unset | CloudHSM names its single token itself; the lookup takes the only one present |
 | `CLOUDHSM_IP` | the cluster's private IP | Consumed by the image entrypoint, which runs the vendor's `configure-pkcs11` |
+| `CLOUDHSM_DISABLE_KEY_AVAILABILITY_CHECK` | `true` **only on a one-HSM cluster** | The client refuses to create *or use* a key held by fewer than two HSMs, so without this every signature fails — see [`1-verify-cluster.md`](./1-verify-cluster.md) section C |
 | `VAULT_*` | as for any workload | It still reads Vault — for the credential and the key reference |
 
 **The cluster certificate is not an environment variable.** The library reads it from a fixed path

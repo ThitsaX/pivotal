@@ -22,8 +22,22 @@ if [ -n "${CLOUDHSM_IP:-}" ]; then
         exit 1
     fi
 
-    /opt/cloudhsm/bin/configure-pkcs11 -a "$CLOUDHSM_IP"
-    echo "CloudHSM client configured for $CLOUDHSM_IP."
+    # The client refuses to use a key that does not exist on at least two HSMs, so against a
+    # single-HSM cluster every signature fails -- not just key creation, despite the name. A
+    # cluster's HSM count is a property of the environment and cannot be inferred here, hence the
+    # setting; it is off by default so a deployment only loses the check by asking for it.
+    #
+    # Asking for it means accepting that a key lives on exactly one device, and these keys are
+    # created extractable=false: if that HSM is lost, the only recovery is restoring the whole
+    # cluster from a backup, losing anything provisioned since. Run two HSMs in production.
+    if [ "${CLOUDHSM_DISABLE_KEY_AVAILABILITY_CHECK:-false}" = "true" ]; then
+        /opt/cloudhsm/bin/configure-pkcs11 -a "$CLOUDHSM_IP" --disable-key-availability-check
+        echo "CloudHSM client configured for $CLOUDHSM_IP."
+        echo "WARNING: key availability check disabled -- keys may exist on a single HSM." >&2
+    else
+        /opt/cloudhsm/bin/configure-pkcs11 -a "$CLOUDHSM_IP"
+        echo "CloudHSM client configured for $CLOUDHSM_IP."
+    fi
 fi
 
 # exec, so the service is PID 1 and receives the signals Kubernetes sends it. Without this a
