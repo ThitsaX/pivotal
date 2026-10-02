@@ -2,6 +2,7 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { AxiosClientBuilderParams } from '@shared/axios/component';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
+import { SuspiciousTransactionMatchField } from './suspicious-transaction-monitor';
 
 export class OutboundSettings {
     constructor(
@@ -18,6 +19,19 @@ export class OutboundSettings {
         public readonly strictAmountType: boolean,
         public readonly checkPayerFeeAsMandatory: boolean,
         public readonly postSendmoneyPayeeFspIdRequired: boolean,
+        /** Master switch for suspicious-pattern monitoring. */
+        public readonly suspiciousTxnMonitoringEnabled: boolean,
+        /** Monitoring window in minutes (Redis TTL). 0 disables the check. */
+        public readonly suspiciousTxnWindowMinutes: number,
+        /** Allowed matching attempts in the window. 0 disables the check. */
+        public readonly suspiciousTxnThreshold: number,
+        /** Ordered fields used to build the Redis pattern key. */
+        public readonly suspiciousTxnMatchingFields: readonly SuspiciousTransactionMatchField[],
     ) {
+    }
+
+    /** Redis TTL for the suspicious-pattern counter. */
+    get suspiciousTxnWindowMs(): number {
+        return this.suspiciousTxnWindowMinutes * 60_000;
     }
 }
