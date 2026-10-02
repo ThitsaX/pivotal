@@ -137,4 +137,32 @@ describe('DashboardAuditController', () => {
         assert.equal(dispatchedQueries[0].input.range?.from.toISOString(), '2026-01-01T00:00:00.000Z');
         assert.equal(dispatchedQueries[0].input.range?.to.toISOString(), '2026-05-01T00:00:00.000Z');
     });
+
+    it('clamps month overflow so 31 May + 4 months is 30 Sep, not 1 Oct', async () => {
+        const queryBus = {
+            async execute(): Promise<never> {
+                return {} as never;
+            },
+        };
+        const controller = new DashboardAuditController(queryBus as never, {} as never);
+
+        // 31 May 17:30Z is 1 Jun 00:00 Asia/Rangoon; +4 months clamped → 30 Sep 17:30Z
+        // (1 Oct 00:00 Rangoon). 2 Oct 00:00 Rangoon (1 Oct 17:30Z) must reject.
+        await assert.rejects(
+            () => controller.getDashboard(
+                undefined,
+                '2026-05-31T17:30:00.000Z',
+                '2026-10-01T17:30:00.000Z',
+                'Asia/Rangoon',
+            ),
+            /Custom range cannot exceed 4 months/,
+        );
+
+        await controller.getDashboard(
+            undefined,
+            '2026-05-31T17:30:00.000Z',
+            '2026-09-30T17:30:00.000Z',
+            'Asia/Rangoon',
+        );
+    });
 });
