@@ -149,6 +149,27 @@ const rangeModeLabel = computed((): string => ({
 
 const MAX_CUSTOM_RANGE_MONTHS = 4;
 
+/**
+ * Adds calendar months in UTC without Date#setUTCMonth day overflow
+ * (e.g. 31 May + 4 months must become 30 Sep, not 1 Oct).
+ */
+function addUtcMonths(date: Date, months: number): Date {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth() + months;
+    const day = date.getUTCDate();
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+    return new Date(Date.UTC(
+        year,
+        month,
+        Math.min(day, lastDay),
+        date.getUTCHours(),
+        date.getUTCMinutes(),
+        date.getUTCSeconds(),
+        date.getUTCMilliseconds(),
+    ));
+}
+
 function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
     const from = new Date(fromIso);
     const to = new Date(toIso);
@@ -157,8 +178,7 @@ function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
         return false;
     }
 
-    const limit = new Date(from.getTime());
-    limit.setUTCMonth(limit.getUTCMonth() + MAX_CUSTOM_RANGE_MONTHS);
+    const limit = addUtcMonths(from, MAX_CUSTOM_RANGE_MONTHS);
 
     return to.getTime() > limit.getTime();
 }

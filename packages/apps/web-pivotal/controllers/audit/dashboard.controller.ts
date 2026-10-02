@@ -85,6 +85,27 @@ export class DashboardAuditController {
 
     private static readonly MAX_RANGE_MONTHS = 4;
 
+    /**
+     * Adds calendar months in UTC without {@code Date#setUTCMonth} day overflow
+     * (e.g. 31 May + 4 months must become 30 Sep, not 1 Oct).
+     */
+    private static addUtcMonths(date: Date, months: number): Date {
+        const year = date.getUTCFullYear();
+        const month = date.getUTCMonth() + months;
+        const day = date.getUTCDate();
+        const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+        return new Date(Date.UTC(
+            year,
+            month,
+            Math.min(day, lastDay),
+            date.getUTCHours(),
+            date.getUTCMinutes(),
+            date.getUTCSeconds(),
+            date.getUTCMilliseconds(),
+        ));
+    }
+
     private static parseRange(
         fromValue: string | undefined,
         toValue: string | undefined,
@@ -104,8 +125,7 @@ export class DashboardAuditController {
             throw new BadRequestException('from must be before to.');
         }
 
-        const limit = new Date(from.getTime());
-        limit.setUTCMonth(limit.getUTCMonth() + DashboardAuditController.MAX_RANGE_MONTHS);
+        const limit = DashboardAuditController.addUtcMonths(from, DashboardAuditController.MAX_RANGE_MONTHS);
         if (to.getTime() > limit.getTime()) {
             throw new BadRequestException('Custom range cannot exceed 4 months.');
         }
