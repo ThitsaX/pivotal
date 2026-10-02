@@ -26,7 +26,7 @@ import {
     TransactionType,
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
-import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient } from '../component';
+import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient, SuspiciousTransactionMonitor } from '../component';
 import { SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
@@ -58,6 +58,8 @@ export class PutAcceptPartyHandler
         private readonly amountDecimalValidator: AmountDecimalValidator,
         @Inject(PayerProvidedFeesValidator)
         private readonly payerProvidedFeesValidator: PayerProvidedFeesValidator,
+        @Inject(SuspiciousTransactionMonitor)
+        private readonly suspiciousTransactionMonitor: SuspiciousTransactionMonitor,
     ) {
     }
 
@@ -115,6 +117,20 @@ export class PutAcceptPartyHandler
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         this.amountDecimalValidator.validate(transferRequest.amount);
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
+
+        // Reject repetitive patterns after amount is confirmed and before Hub quote,
+        // so a blocked transfer never posts /quotes.
+        if (acceptParty) {
+            await this.suspiciousTransactionMonitor.assertNotSuspicious({
+                payerFsp: source,
+                payerId: transferRequest.payer.partyIdInfo.partyIdentifier,
+                payeeFsp: destination,
+                payeeId: transferRequest.payee.partyIdInfo.partyIdentifier,
+                currency: transferRequest.currency,
+                amount: transferRequest.amount,
+            });
+        }
+
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest, extensionList);
         const { quoteId } = quoteRequest;
         const { quotesUrl } = this.fspiopAxios.settings;

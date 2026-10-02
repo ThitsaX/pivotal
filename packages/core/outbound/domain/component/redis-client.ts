@@ -21,6 +21,13 @@ export class RedisClient implements OnModuleInit, OnModuleDestroy {
     private static readonly RELEASE_LOCK_SCRIPT =
         "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
 
+    // Atomic INCR + PEXPIRE-on-create so the first writer sets the monitoring window
+    // and concurrent acceptParty calls cannot race past a missing TTL.
+    private static readonly INCREMENT_WITH_TTL_SCRIPT =
+        "local count = redis.call('INCR', KEYS[1]) " +
+        "if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end " +
+        "return count";
+
     private readonly logger = new Logger(RedisClient.name);
     private readonly client: RedisClientType;
     private readonly defaultTtlMs: number;
@@ -112,6 +119,24 @@ export class RedisClient implements OnModuleInit, OnModuleDestroy {
 
     async delete(key: string): Promise<void> {
         await this.client.del(key);
+    }
+
+    /**
+     * Atomically increments a counter and sets `ttlMs` only when the key is created
+     * (count becomes 1). Used for short-window pattern tracking (e.g. suspicious
+     * repetitive sendmoney). Returns the value after increment.
+     */
+    async incrementWithTtl(key: string, ttlMs: number): Promise<number> {
+        if (ttlMs <= 0) {
+            throw new Error(`incrementWithTtl requires a positive ttlMs; got ${ttlMs}`);
+        }
+
+        const count = await this.client.eval(RedisClient.INCREMENT_WITH_TTL_SCRIPT, {
+            keys: [key],
+            arguments: [String(ttlMs)],
+        });
+
+        return Number(count);
     }
 
     /**
