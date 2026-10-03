@@ -16,6 +16,16 @@ export class HttpLoggerInterceptor {
         'logoBase64',
     ]);
 
+    /**
+     * Credentials, matched case-insensitively because header names are. The request line is
+     * logged after every other interceptor has run, so a header one of them adds — a bearer
+     * token for the Hub, say — would otherwise be written to the log verbatim.
+     */
+    private static readonly LOG_SECRET_FIELDS = new Set([
+        'authorization',
+        'proxy-authorization',
+    ]);
+
 
     constructor(context = HttpLoggerInterceptor.name) {
         this.logger = new Logger(context);
@@ -106,6 +116,10 @@ export class HttpLoggerInterceptor {
     }
 
     private static redactLogValue(key: string, value: unknown): unknown {
+        if (HttpLoggerInterceptor.LOG_SECRET_FIELDS.has(key.toLowerCase())) {
+            return '[redacted]';
+        }
+
         if (HttpLoggerInterceptor.LOG_REDACTED_FIELDS.has(key)) {
             if (typeof value === 'string') {
                 return `[redacted base64 length=${value.length}]`;

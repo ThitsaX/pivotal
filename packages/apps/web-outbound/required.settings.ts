@@ -6,7 +6,7 @@ import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
 import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
 import { Pkcs11Settings } from '@shared/pkcs11';
-import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
+import { FspiopAccessTokenProvider, FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
 
@@ -84,7 +84,33 @@ export class WebOutboundSettings
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
             this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
             this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
+            this.hubAccessToken(socketTimeoutMs),
         );
+    }
+
+    /**
+     * The Hub's token credentials: all three settings, or none.
+     *
+     * None means the Hub is reached where no token is checked. A partial set is refused at startup
+     * rather than read as none, because that is a typo, and taken as "off" it would surface only as
+     * every transfer being rejected by the Hub's gateway.
+     */
+    private hubAccessToken(timeoutMs: number | undefined): FspiopAccessTokenProvider.Settings | undefined {
+        const tokenUrl = this.readOptionalString('FSPIOP_OAUTH_TOKEN_URL');
+        const clientId = this.readOptionalString('FSPIOP_OAUTH_CLIENT_ID');
+        const clientSecret = this.readOptionalString('FSPIOP_OAUTH_CLIENT_SECRET');
+
+        if (tokenUrl == null && clientId == null && clientSecret == null) {
+            return undefined;
+        }
+
+        if (tokenUrl == null || clientId == null || clientSecret == null) {
+            throw new Error(
+                'FSPIOP_OAUTH_TOKEN_URL, FSPIOP_OAUTH_CLIENT_ID and FSPIOP_OAUTH_CLIENT_SECRET '
+                + 'must be set together, or not at all.');
+        }
+
+        return {tokenUrl, clientId, clientSecret, timeoutMs};
     }
 
     jwtPolicy(): JwtPolicy {

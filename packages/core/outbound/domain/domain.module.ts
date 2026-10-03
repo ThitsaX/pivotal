@@ -6,7 +6,7 @@ import { TypeOrmModule as NestJsTypeOrmModule } from '@nestjs/typeorm';
 import { AuditProducerModule } from '@core/audit/producer';
 import { Transaction } from '@core/audit/domain/model';
 import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
-import { AmountTypeConstraint, FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
+import { AmountTypeConstraint, FspiopAccessTokenProvider, FspiopAxios, FspiopBearerTokenInterceptor, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
 import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
@@ -142,10 +142,15 @@ export class OutboundDomainModule {
                     const fspiopSettings = outboundSettings.fspiopSettings;
                     const params = outboundSettings.fspiopAxiosParams;
 
-                    const interceptors =
-                        fspiopSettings.useJws
+                    const interceptors = [
+                        ...(outboundSettings.hubAccessToken != null
+                            ? [new FspiopBearerTokenInterceptor(
+                                new FspiopAccessTokenProvider(outboundSettings.hubAccessToken)).build()]
+                            : []),
+                        ...(fspiopSettings.useJws
                             ? [new FspiopSigningInterceptor(jwsSigner).build()]
-                            : [];
+                            : []),
+                    ];
 
                     // Built through MutualTlsAgent so a renewed certificate takes effect
                     // without a restart. cert-manager rewrites the mounted Secret every

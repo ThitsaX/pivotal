@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { AxiosClientBuilderParams } from '@shared/axios/component';
-import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
+import { FspiopAccessTokenProvider, FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 
 export class OutboundSettings {
     constructor(
@@ -18,6 +18,11 @@ export class OutboundSettings {
         public readonly strictAmountType: boolean,
         public readonly checkPayerFeeAsMandatory: boolean,
         public readonly postSendmoneyPayeeFspIdRequired: boolean,
+        /**
+         * Credentials for the Hub's bearer token. Absent when the Hub is reached without its API
+         * gateway — directly on the internal service addresses — where no token is checked.
+         */
+        public readonly hubAccessToken?: FspiopAccessTokenProvider.Settings,
     ) {
     }
 }

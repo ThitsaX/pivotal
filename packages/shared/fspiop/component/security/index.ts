@@ -10,3 +10,4 @@ export * from './pem-pair';
 export * from './fspiop-mtls-server-cert-store';
 export * from './mutual-tls-server';
 export * from './xfcc';
+export * from './fspiop-access-token-provider';

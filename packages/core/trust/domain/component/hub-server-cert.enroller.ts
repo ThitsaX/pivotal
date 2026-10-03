@@ -142,8 +142,13 @@ export class HubServerCertEnroller implements OnModuleInit, OnModuleDestroy {
         csr.setSubject([{name: 'commonName', value: commonName}, {name: 'organizationName', value: 'ThitsaWorks'}]);
         csr.sign(keys.privateKey, forge.md.sha256.create());
 
+        // PKCS#8 rather than forge's default PKCS#1. The Java connectors read this key
+        // with a loader that accepts only PKCS#8, and Node accepts either, so PKCS#8 is
+        // the one encoding every consumer of the Secret can use.
+        const privateKeyInfo = forge.pki.wrapRsaPrivateKey(forge.pki.privateKeyToAsn1(keys.privateKey));
+
         return {
-            privateKeyPem: forge.pki.privateKeyToPem(keys.privateKey),
+            privateKeyPem: forge.pki.privateKeyInfoToPem(privateKeyInfo),
             csrPem: forge.pki.certificationRequestToPem(csr),
         };
     }

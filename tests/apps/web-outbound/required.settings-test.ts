@@ -67,3 +67,32 @@ describe('WebOutboundSettings payer fee validation', () => {
 });
 
 
+
+describe('WebOutboundSettings Hub access token', () => {
+    const OAUTH = {
+        FSPIOP_OAUTH_TOKEN_URL: 'https://idp.example/token',
+        FSPIOP_OAUTH_CLIENT_ID: 'pivotal',
+        FSPIOP_OAUTH_CLIENT_SECRET: 'secret',
+    };
+
+    it('leaves the token off when none of the settings are given', () => {
+        assert.equal(settings().outboundSettings().hubAccessToken, undefined);
+    });
+
+    it('reads all three settings', () => {
+        const token = settings({...OAUTH, FSPIOP_SOCKET_TIMEOUT_MS: '5000'}).outboundSettings().hubAccessToken;
+
+        assert.deepEqual(token, {
+            tokenUrl: 'https://idp.example/token',
+            clientId: 'pivotal',
+            clientSecret: 'secret',
+            timeoutMs: 5000,
+        });
+    });
+
+    it('refuses a partial set instead of silently sending no token', () => {
+        const {FSPIOP_OAUTH_CLIENT_SECRET: _omitted, ...partial} = OAUTH;
+
+        assert.throws(() => settings(partial).outboundSettings(), /must be set together/);
+    });
+});
