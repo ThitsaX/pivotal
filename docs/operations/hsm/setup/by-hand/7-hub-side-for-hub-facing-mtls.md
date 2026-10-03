@@ -16,8 +16,10 @@
 | B | Oathkeeper rule for extapi | extapi accepting DFSP tokens |
 | C | IP allowlist | extapi accepting connections from Pivotal |
 | D | Callback leg: Pivotal CA, Hub CSR, onboard | the Hub holding a client certificate for calling Pivotal, and its egress configured |
+| E | Repoint a tenant's callbacks | the Hub calling that tenant back over mutual TLS |
 
-What still remains — the public host for web-inbound and repointing callbacks — is listed at the end.
+E needs web-inbound's public host to exist first. That host is Pivotal's configuration, so it is in
+[`8-turn-on-hub-facing-mtls.md`](./8-turn-on-hub-facing-mtls.md), section E.
 
 ---
 
@@ -157,8 +159,10 @@ Delete `hub.csr` and `hub-client.crt` afterwards and `unset VAULT_TOKEN`.
 
 **Not obvious:**
 
-- **Nothing uses the new egress path yet.** It applies only to `web-inbound.<domain>`, which has no
-  DNS record and which no callback is addressed to. Tenants' callbacks are unaffected.
+- **Onboarding changes no traffic by itself.** The egress path applies only to calls addressed to
+  `web-inbound.<domain>`, and none are until web-inbound's public host exists (doc 8, E) and a
+  tenant's callbacks are repointed (E below). Until then the egress gateway answers `503 no healthy
+  upstream` for that name, because it does not resolve.
 - **The certificate expires a year from signing and MCM will not renew it.** Renewal is steps 55–58
   again — a new CSR from `POST $MCM/dfsps/pivotal/enrollments/outbound/csr` — and `/onboard` picks
   the newest signed certificate. Automating this in trust-manager is open.
@@ -166,12 +170,44 @@ Delete `hub.csr` and `hub-client.crt` afterwards and `unset VAULT_TOKEN`.
 
 ---
 
+## E. Repoint a tenant's callbacks
+
+**Why.** The Hub calls each participant back at the endpoints the ledger holds for it, and they
+pointed at web-inbound's internal Service. The egress configuration from D applies only to calls
+addressed to `web-inbound.<domain>`; anything else bypasses it and arrives as plain HTTP.
+
+**Only after** web-inbound's public host answers through the Hub's egress — doc 8, section E. Then
+one tenant at a time, each followed by a test transfer.
+
+The script changes the base of every endpoint and keeps each path and its `{{placeholders}}`. The
+new base is plain `http` with no port: the egress gateway upgrades it to mutual TLS, so an `https`
+URL would bypass that and fail.
+
+| # | Command | Purpose |
+| --- | --- | --- |
+| 60 | `kubectl -n mojaloop port-forward svc/moja-centralledger-service 3001:80` | The central ledger's admin API |
+| 61 | `../scripts/repoint-callbacks.sh <fspId> http://web-inbound.pivotal.svc.cluster.local:3201 http://web-inbound.<domain>` | Dry run. Check every `->` line: one mistyped character points the tenant's callbacks at a host that does not exist |
+| 62 | the same with `--apply` | Writes each endpoint, then reads them back. Expect `0 endpoints still start with ...; 0 writes failed` |
+| 63 | the same with the two bases swapped, and `--apply` | Rollback. Immediate apart from the cache below |
+
+**Not obvious:**
+
+- **The Hub caches participant endpoints.** Allow about five minutes before the first test
+  transfer, in either direction.
+- **Repointing is per tenant and optional.** A tenant left on the internal address keeps working;
+  the Hub chooses the callback per participant, so a transfer between a repointed tenant and one
+  that is not uses each side's own path.
+- **The dry run makes one request** — a single `Handling connection` line from the port-forward.
+  `--apply` makes one per endpoint, 26 per tenant.
+
+---
+
 ## What remains on the Hub side
 
-- **A public mutual-TLS host for web-inbound** — DNS for `web-inbound.<domain>` to
-  `<cluster-public-ip>`; a `MUTUAL` server on the external ingress gateway trusting Pivotal's CA;
-  a **serverAuth** certificate from Pivotal's CA, which needs a server role on `pki_hub_client`.
-  Check the WAF and the DENY policies on that gateway do not refuse the Hub's own traffic.
-- **Repoint each tenant's callback endpoints** in the ledger to `http://web-inbound.<domain>`.
-  Plain `http` is right — the egress gateway upgrades it. This is the cutover; do it per tenant.
-- **Record the role from step 52 in the ceremony's setup**, so a rebuild recreates it.
+- **Repoint the remaining tenants** with E, one at a time.
+- **Renew the Hub's callback certificate before it expires** — a year from signing. MCM will not:
+  steps 55–58 again, with a new CSR from `POST $MCM/dfsps/pivotal/enrollments/outbound/csr`, then
+  `/onboard`. Automating this in trust-manager is planned.
+- The role from step 52 is now also declared in `apps/vault-pki-setup/pivotal-trust-pki.yaml`
+  (`hub-callback-client`), so a rebuilt Vault gets it back. Note the declared `keyType` is `rsa`,
+  not the hand-made `any`; MCM's CSRs are RSA 2048, so nothing changes in practice.

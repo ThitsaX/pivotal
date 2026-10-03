@@ -1,6 +1,6 @@
 # Status — HSM-Backed Staging Rollout
 
-> Where this environment actually is, as of **2026-09-29**. The numbered documents beside this one
+> Where this environment actually is, as of **2026-10-04**. The numbered documents beside this one
 > say *how*; this one says *how far*. Programme-wide status for the KMS-backed environment is
 > [`../../../../internal/implementation/status.md`](../../../../internal/implementation/status.md) —
 > a different environment, do not merge the two.
@@ -8,7 +8,7 @@
 **Substitute throughout:** `<gitops>` the staging gitops repository, `<domain>` the staging domain,
 `<HSM_IP>` the cluster's private address, `<CO>` the Crypto Officer username.
 
-**Versions deployed:** pivotal `v0.2.85`, the ThitsaWallet connector image `v0.0.16`. The six
+**Versions deployed:** pivotal `v0.2.86`, the ThitsaWallet connector image `v0.0.17` (framework `v0.0.36`). The six
 connectors on other images are untouched.
 
 ---
@@ -21,7 +21,7 @@ connectors on other images are untouched.
 | Hub-facing JWS — web-outbound | **Done.** Signs through PKCS#11 as `cu_web_outbound` |
 | Hub-facing JWS — connectors | DemoDFSP1 **on**; DemoDFSP2 configured, flag still `false` |
 | DFSP-facing mTLS | **Done.** Certificate verified and bound to `fspiop-source`; impersonation refused |
-| Hub-facing mTLS | **Hub side partly done** — see [`7-hub-side-for-hub-facing-mtls.md`](./7-hub-side-for-hub-facing-mtls.md). Hub CA re-rooted, extapi accepts DFSP tokens and Pivotal's address, the Hub holds a callback certificate (expires one year from signing). Open: web-inbound's public mTLS host, repointing callbacks, and Pivotal's own configuration. Pivotal still reaches the Hub on its internal addresses |
+| Hub-facing mTLS | **Done for DemoDFSP1 and DemoDFSP2, both directions** — docs [7](./7-hub-side-for-hub-facing-mtls.md) and [8](./8-turn-on-hub-facing-mtls.md). web-outbound reaches the Hub over mutual TLS for every tenant. Other tenants' callbacks and their client-owned connectors are still on the internal path |
 
 ## What exists per tenant
 
@@ -96,30 +96,22 @@ Decide the internal route's fate before flipping that flag.
 
 1. **Flip `FSPIOP_USE_JWS: "true"` on the DemoDFSP2 connector.** One connector at a time, checking
    it loads its key from the device before moving on.
-2. **Hub-facing mTLS** — the last leg, below. All the certificate material already exists.
+2. **Hub-facing mTLS** — done for the demo tenants; what is left is below.
 3. `DFSP_FACING_MTLS_MANDATORY=true` once every caller is seen presenting a certificate **and** the
    internal route is resolved, since that route can never carry one.
 4. Optional: issue DemoDFSP2 a client certificate, only needed to run the accepted/accepted rows of
    the three-row test rather than the rejection alone.
 
-## Hub-facing mTLS — what it needs
+## Hub-facing mTLS — what is left
 
-The Hub already exposes a `MUTUAL` host on 443, so the endpoint is not the work. What is:
+- **Repoint the remaining tenants' callbacks**, one at a time — doc 7, E.
+- **Client-owned connectors** call the Hub on its internal addresses. Moving them needs their images
+  to take the token and certificate settings that the ThitsaWallet image does.
+- **The Hub's callback certificate expires a year from signing** and MCM does not renew it. Until
+  trust-manager does, renew it by hand — doc 7, D and the closing list.
 
-- A client certificate for Pivotal signed by whatever CA the Hub's gateway trusts — its
-  `<credential>-cacert` companion decides that, and it was not readable from the switch's namespace
-- That certificate and key mounted on web-outbound **and** each connector
-- The Hub's server CA for verification — a `hub-ca-bundle` Secret already exists, likely this
-- `FSPIOP_PARTIES_URL` / `QUOTES_URL` / `TRANSFERS_URL` repointed from the in-cluster `http://`
-  Service addresses to the `https://` mTLS host
-- `FSPIOP_USE_MUTUAL_TLS=true` on web-outbound and connectors — **never on web-inbound**, where the
-  same name means "demand a certificate and serve TLS" and will crash it
-
-Two things to know before scheduling it. Pivotal and the switch are in the **same cluster**, talking
-over ClusterIP, so here this rehearses the mechanism rather than adding a control — it matters where
-the Hub is a separate party across a real network. And one existing connector already does mTLS
-through a `cc-keystore.p12` / `cc-truststore.p12` pair, not the PEM paths the current framework
-reads, so there are two mechanisms to reconcile rather than one to extend.
+Pivotal and the Hub are in the same cluster here, so this rehearses the mechanism rather than adding
+a control across a real network.
 
 ---
 
@@ -163,8 +155,4 @@ same shape as the tunnel problem in the other environment.
 
 ## Uncommitted
 
-`pivotal` (on `main`): `6-turn-on-hub-jws.md` — corrects the claim that a connector without Vault
-settings sends unsigned, and records why the flag cannot live in a shared env block. Plus this file
-and the README link to it.
-
-Everything else is committed and synced.
+Nothing in this environment's configuration. These documents are updated alongside it.
