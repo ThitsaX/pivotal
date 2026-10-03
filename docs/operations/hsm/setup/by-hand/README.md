@@ -15,9 +15,14 @@ Read them in sequence. Each depends on the one before, with a single exception n
 | 4 | [`4-after-the-ceremony.md`](./4-after-the-ceremony.md) | the ceremony | trust-manager running, trust material published |
 | 5 | [`5-turn-on-dfsp-mtls.md`](./5-turn-on-dfsp-mtls.md) | 4 | the DFSP-facing leg verifying client certificates |
 | 6 | [`6-turn-on-hub-jws.md`](./6-turn-on-hub-jws.md) | 4 | Pivotal signing to the Hub, per participant |
+| 7 | [`7-hub-side-for-hub-facing-mtls.md`](./7-hub-side-for-hub-facing-mtls.md) | 4, and Hub access | the Hub ready for mutual TLS from Pivotal, and holding a certificate to call Pivotal back |
+
+**[`status.md`](./status.md) says how far this environment actually got** — which legs are live,
+what is provisioned per tenant, the open findings, and what to do next. Read it before running
+anything; these six say *how*, it says *where we are*.
 
 **Commands are numbered once across all six**, so document 3 opens at 5, document 4 at 25,
-document 5 at 30 and document 6 at 34.
+document 5 at 30, document 6 at 34 and document 7 at 40.
 That is deliberate — it is one walkthrough — and not a sign that anything is missing.
 
 ## What blocks what
