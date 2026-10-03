@@ -10,8 +10,10 @@ cluster after the fact; excerpts are quoted from the named pod, trimmed only whe
 
 `<domain>` is the staging domain and `<cluster-public-ip>` the cluster's public address.
 
-**Read the limitations at the end before citing any of this.** Two controls are configured but not
-shown by the logs on this transfer.
+A second transfer, `01M420F4PK3BF8NNZZXPQ10ADD` thirty-five minutes later, adds web-inbound
+verifying the Hub-facing signatures (§6). Nothing else changed between the two.
+
+**Read the limitations at the end before citing any of this.**
 
 ---
 
@@ -26,6 +28,7 @@ shown by the logs on this transfer.
 | Hub-facing mTLS + token, payee side | connector → Hub | §3 |
 | Hub-facing JWS, payee side, signed in the HSM | connector → Hub | §3, §5 |
 | Hub-facing mTLS, Hub calling back | Hub → web-inbound | §4 |
+| Hub-facing JWS **verification** of peer signatures | Hub → web-inbound | §6 (second transfer) |
 
 ---
 
@@ -174,15 +177,78 @@ holds a crypto-user credential and a key reference, and the signature is produce
 
 ---
 
+## 6. Hub → Pivotal — web-inbound verifying the signatures
+
+**Transfer:** `01M420F4PK3BF8NNZZXPQ10ADD` · `DemoDFSP2 → DemoDFSP1` · 2026-10-03 23:09:27–23:09:50 UTC
+
+Two changes after the first transfer, and nothing else:
+
+- web-inbound `FSPIOP_USE_JWS` `false` → `true`, which installs the guard
+- `participant_key.jws_verify_mode` `off` → `verify-if-present` for DemoDFSP1 and DemoDFSP2 only
+
+```
+participant_key (non-off rows)
+[{"fsp_id":"DemoDFSP1","jws_verify_mode":"verify-if-present"},
+ {"fsp_id":"DemoDFSP2","jws_verify_mode":"verify-if-present"}]
+```
+
+Every other sender, `hub` included, stays `off` and is not checked.
+
+```
+web-inbound (both replicas)
+2026-10-03 23:06:53 INFO  Bootstrap : FspInboundGuard is enabled.
+2026-10-03 23:07:21 INFO  Bootstrap : FspInboundGuard is enabled.
+```
+
+The Hub's calls to web-inbound for the transfer, all accepted:
+
+| Time (UTC) | Status | Request | fspiop-source | Signed by |
+| --- | --- | --- | --- | --- |
+| 23:09:27.729 | 202 | `GET /parties/MSISDN/1000931486390` | DemoDFSP2 | — (no body; never signed) |
+| 23:09:31.740 | 200 | `PUT /parties/MSISDN/1000931486390` | DemoDFSP1 | connector, CloudHSM |
+| 23:09:39.064 | 202 | `POST /quotes` | DemoDFSP2 | web-outbound, PKCS#11 |
+| 23:09:40.188 | 200 | `PUT /quotes/01M420F4PK3BF8NNZZXPQ10ADD` | DemoDFSP1 | connector, CloudHSM |
+| 23:09:45.977 | 202 | `POST /transfers` | DemoDFSP2 | web-outbound, PKCS#11 |
+| 23:09:49.981 | 200 | `PUT /transfers/01M420F4PK3BF8NNZZXPQ10ADD` | DemoDFSP1 | connector, CloudHSM |
+| 23:09:49.997 | 200 | `PATCH /transfers/01M420F4PK3BF8NNZZXPQ10ADD` | hub | — (`off`) |
+
+```
+web-inbound
+2026-10-03 23:09:39 … QuotesController : Post Quote Request for TransferId 01M420F4PK3BF8NNZZXPQ10ADD
+2026-10-03 23:09:40 … QuotesController : Put Quote Request for TransferId 01M420F4PK3BF8NNZZXPQ10ADD
+2026-10-03 23:09:45 … TransfersController : Post Transfer Request for TransferId 01M420F4PK3BF8NNZZXPQ10ADD
+2026-10-03 23:09:50 … TransfersController : Patch Transfer Request for TransferId 01M420F4PK3BF8NNZZXPQ10ADD
+```
+
+**Why acceptance here means verification.** Under `verify-if-present` a request with a body from
+DemoDFSP1 or DemoDFSP2 can go only three ways:
+
+1. signature present, valid, and its protected header matching this request — accepted
+2. signature present but invalid or not matching — rejected, always
+3. no signature — accepted, and the guard logs, the first time for each sender,
+   `Accepting unsigned FSPIOP requests from '<source>' under verify-if-present.`
+
+Every one was accepted, neither replica logged a rejection, and **neither logged the unsigned-accepted
+warning**. So each carried a signature, and each verified against the sender's public key in
+`participant_key` — the public half of the key held in CloudHSM.
+
+That also shows the Hub forwards the signature headers intact: had it stripped or altered them, these
+would have been counted as unsigned or rejected.
+
+---
+
 ## Limitations
 
 - **DFSP-facing certificate on the admitted request is not shown.** `DfspCertificateGuard` logs
   refusals, not admissions, and the endpoint runs `OPTIONAL_MUTUAL` (`DFSP_FACING_MTLS_MANDATORY=false`)
   — a caller without a certificate is admitted too. §1 proves the binding is enforced when a
   certificate is presented, not that one was presented at 22:33:34.
-- **web-inbound does not verify Hub-facing signatures yet.** `FSPIOP_USE_JWS=false` on web-inbound and
-  no participant has a verify mode raised, so callbacks reach it signed but unverified. Nothing in the
-  logs shows the Hub verifying Pivotal's signatures either.
+- **Verification on web-inbound is `verify-if-present`, not `require`,** and only for the two demo
+  tenants. An unsigned request from them would still be accepted (and logged); none was. The guard
+  logs refusals and the first unsigned acceptance, not each successful verification, so §6 proves
+  verification by elimination rather than by a per-request line.
+- **The Hub's own verification of Pivotal's signatures is not shown.** Nothing in the logs records the
+  Hub checking them.
 - **The connector's signature is inferred, not logged.** The connector logs that it signs through
   CloudHSM and that signing is on; it does not log outgoing headers.
 - **Same cluster.** Pivotal and the Hub share a cluster, so every hop goes out and back in through
