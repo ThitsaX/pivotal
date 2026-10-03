@@ -49,6 +49,7 @@ from the MySQL `transactions` table, not the TTL-bound Redis transfer cache.
 - `FSPIOP_*_URL`: Hub parties, quotes, and transfers endpoints.
 - `FSPIOP_SWITCH_ID`: Hub FSP ID expected in FSPIOP headers.
 - `FSPIOP_USE_JWS`, `FSPIOP_USE_MUTUAL_TLS`: outbound Hub security switches.
+- `FSPIOP_OAUTH_TOKEN_URL`, `FSPIOP_OAUTH_CLIENT_ID`, `FSPIOP_OAUTH_CLIENT_SECRET`: optional, all three or none. When set, every Hub request carries a client-credentials bearer token, as the Hub's API gateway requires.
 - `PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME`: must match `web-inbound`.
 - `ACCESS_JWT_ENABLED`: protects send-money API with payer JWTs.
 - `DECIMAL_PLACES`: amount scale validation.

@@ -114,9 +114,21 @@ A tenant with no key logs a warning and sends **unsigned** rather than failing, 
 turn on early and proves nothing by itself. Per-participant `jws_sign_enabled` decides who actually
 signs, which is how DFSPs migrate one at a time.
 
-**Check where the flag lands.** If it sits in a shared env block it reaches the connectors too.
-Connectors on images predating the setting ignore it; newer ones will try to sign, and without their
-own Vault settings they log a warning and send unsigned. Render per workload rather than grepping:
+> ### ⚠ This flag must not live in a shared env block
+>
+> A Java connector with signing enabled and no Vault settings **throws from
+> `afterPropertiesSet` and never starts** — `fspiopUseJws is enabled but Vault is not
+> configured`. It is a misconfiguration the framework refuses to degrade through, so a shared
+> block turns one intended change into a crash-loop of every connector in the deployment.
+>
+> Set it per service: `true` on web-outbound, `false` on web-inbound until a peer is seen
+> signing, and absent on the connectors, which default it to `false`.
+>
+> Watch the ordering if it is ever in both places. The shared block is rendered **after** each
+> service's own env and Kubernetes takes the last duplicate, so the shared value wins and a
+> per-service override is silently ignored.
+
+**Check where the flag lands.** Render per workload rather than grepping:
 
 ```bash
 helm template . | ruby -ryaml -e 'YAML.load_stream(STDIN.read){|d| next unless d&&d["kind"]=="Deployment";
