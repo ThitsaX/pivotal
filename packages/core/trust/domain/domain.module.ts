@@ -9,6 +9,7 @@ import {NatsClientService, NatsClientServiceModule} from '@shared/nats';
 import {VaultClient, VaultSettings} from '@shared/vault';
 import {
     DfspCaPublishScheduler,
+    HubCallbackCertEnroller,
     HubCaSyncScheduler,
     HubServerCertEnroller,
     JwsKeyPublishScheduler,
@@ -24,6 +25,7 @@ const CA_REGISTRATION_LOCK = Symbol('TrustDomainCaRegistrationLock');
 const JWS_PUBLISH_LOCK = Symbol('TrustDomainJwsPublishLock');
 const SERVER_CERT_LOCK = Symbol('TrustDomainServerCertLock');
 const DFSP_CA_LOCK = Symbol('TrustDomainDfspCaLock');
+const CALLBACK_CERT_LOCK = Symbol('TrustDomainCallbackCertLock');
 
 const Components: Provider[] = [
     {
@@ -110,9 +112,21 @@ const Components: Provider[] = [
             participantKeys: ParticipantKeyRepository,
             lock: RollupLock,
             settings: TrustDomainModule.RequiredSettings,
-        ): McmCaRegistrationScheduler => new McmCaRegistrationScheduler(
-            mcm, participantKeys, lock, settings.pivotalCaPath(), settings.mcmCaReconcileIntervalMs(),
-        ),
+        ): McmCaRegistrationScheduler => {
+            const vault = new VaultClient(settings.vaultSettings());
+            const mount = settings.hubClientPkiMount();
+
+            return new McmCaRegistrationScheduler(
+                mcm,
+                participantKeys,
+                lock,
+                settings.pivotalCaPath(),
+                // No mount configured registers the root alone, as before intermediates were sent.
+                mount.length === 0 ? () => Promise.resolve(null) : () => vault.readPkiCaChain(mount),
+                settings.pivotalDfspId(),
+                settings.mcmCaReconcileIntervalMs(),
+            );
+        },
         inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS],
     },
     {
@@ -171,6 +185,29 @@ const Components: Provider[] = [
         ),
         inject: [McmAxios, KubernetesSecretWriter, SERVER_CERT_LOCK, REQUIRED_SETTINGS],
     },
+    {
+        provide: CALLBACK_CERT_LOCK,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
+            new RollupLock(settings.redisUrl(), 'pivotal:trust:hub-callback-cert'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
+        // Null where the Hub does not call Pivotal back over mutual TLS: there is no certificate
+        // to keep, and signing one would publish a callback address nothing serves.
+        provide: HubCallbackCertEnroller,
+        useFactory: (
+            mcm: McmAxios,
+            lock: RollupLock,
+            settings: TrustDomainModule.RequiredSettings,
+        ): HubCallbackCertEnroller | null => {
+            const callback = settings.hubCallbackCertSettings();
+
+            return callback == null
+                ? null
+                : new HubCallbackCertEnroller(mcm, new VaultClient(settings.vaultSettings()), lock, callback);
+        },
+        inject: [McmAxios, CALLBACK_CERT_LOCK, REQUIRED_SETTINGS],
+    },
 ];
 
 @Module({})
@@ -208,6 +245,7 @@ export class TrustDomainModule {
             McmCaRegistrationScheduler,
             JwsKeyPublishScheduler,
             HubServerCertEnroller,
+            HubCallbackCertEnroller,
         ],
         };
     }
@@ -260,6 +298,12 @@ export namespace TrustDomainModule {
         hubServerCertSecretName(): string;
 
         hubServerCertCheckIntervalMs(): number;
+
+        /** The mount Pivotal's Hub-facing CA issues from; its public chain is registered with MCM. */
+        hubClientPkiMount(): string;
+
+        /** Null where the Hub does not call Pivotal back over mutual TLS. */
+        hubCallbackCertSettings(): HubCallbackCertEnroller.Settings | null;
     }
 
     export interface AsyncOptions {

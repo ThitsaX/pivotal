@@ -11,4 +11,13 @@ export class PostDfspCaRequest {
 
     @ApiProperty({type: String})
     rootCertificate!: string;
+
+    /**
+     * The intermediates between the root and the leaves, issuer-first. Needed wherever the Hub
+     * verifies a certificate Pivotal's CA issued from an intermediate: MCM passes root and chain
+     * together to the Hub's egress gateway as its trust anchor, and the root alone cannot complete
+     * a path to a leaf.
+     */
+    @ApiProperty({type: String, required: false})
+    intermediateChain?: string;
 }
