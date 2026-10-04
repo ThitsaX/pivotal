@@ -11,6 +11,7 @@ import {
     InboundEnrollment,
     JwsCert,
     McmDfsp,
+    OutboundEnrollment,
     PostDfspCaRequest,
     PostDfspRequest,
     PostJwsCertRequest,
@@ -157,6 +158,40 @@ export class McmAxios {
             + `${McmAxios.encodePathSegment(String(enrollmentId))}/sign`,
             {},
         );
+    }
+
+    // ── outbound enrollment ──────────────────────────────────────────────────
+
+    /** Every outbound enrollment for this DFSP, newest last. Certificates included once signed. */
+    async listOutboundEnrollments(dfspId: string): Promise<Array<OutboundEnrollment>> {
+        return this.get(`/dfsps/${McmAxios.encodePathSegment(dfspId)}/enrollments/outbound`);
+    }
+
+    /** Has MCM generate a fresh key and CSR for the Hub. The key stays in MCM. */
+    async createOutboundCsr(dfspId: string): Promise<OutboundEnrollment> {
+        return this.post(`/dfsps/${McmAxios.encodePathSegment(dfspId)}/enrollments/outbound/csr`, {});
+    }
+
+    /** Hands back the signed leaf. MCM appends the registered CA chain when it builds the bundle. */
+    async uploadOutboundCertificate(
+        dfspId: string,
+        enrollmentId: number | string,
+        certificatePem: string,
+    ): Promise<OutboundEnrollment> {
+        return this.post(
+            `/dfsps/${McmAxios.encodePathSegment(dfspId)}/enrollments/outbound/`
+            + `${McmAxios.encodePathSegment(String(enrollmentId))}/certificate`,
+            {certificate: certificatePem},
+        );
+    }
+
+    /**
+     * Publishes the DFSP's newest signed outbound certificate and CA to the Hub's egress
+     * configuration. Also rewrites the Hub's IP allowlist from every DFSP's registered egress
+     * addresses, so it is called only when the certificate has changed.
+     */
+    async onboard(dfspId: string): Promise<void> {
+        await this.post(`/dfsps/${McmAxios.encodePathSegment(dfspId)}/onboard`, {});
     }
 
     // ── credentials ──────────────────────────────────────────────────────────
