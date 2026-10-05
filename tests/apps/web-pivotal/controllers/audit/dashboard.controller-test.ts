@@ -138,7 +138,7 @@ describe('DashboardAuditController', () => {
         assert.equal(dispatchedQueries[0].input.range?.to.toISOString(), '2026-05-01T00:00:00.000Z');
     });
 
-    it('clamps month overflow so 31 May + 4 months is 30 Sep, not 1 Oct', async () => {
+    it('adds months in the selected time zone so 1 Jun → 1 Oct Rangoon is exact limit', async () => {
         const queryBus = {
             async execute(): Promise<never> {
                 return {} as never;
@@ -146,8 +146,8 @@ describe('DashboardAuditController', () => {
         };
         const controller = new DashboardAuditController(queryBus as never, {} as never);
 
-        // 31 May 17:30Z is 1 Jun 00:00 Asia/Rangoon; +4 months clamped → 30 Sep 17:30Z
-        // (1 Oct 00:00 Rangoon). 2 Oct 00:00 Rangoon (1 Oct 17:30Z) must reject.
+        // 31 May 17:30Z is 1 Jun 00:00 Asia/Rangoon; +4 months → 1 Oct 00:00 Rangoon.
+        // 2 Oct 00:00 Rangoon (1 Oct 17:30Z) must reject.
         await assert.rejects(
             () => controller.getDashboard(
                 undefined,
@@ -162,6 +162,49 @@ describe('DashboardAuditController', () => {
             undefined,
             '2026-05-31T17:30:00.000Z',
             '2026-09-30T17:30:00.000Z',
+            'Asia/Rangoon',
+        );
+    });
+
+    it('accepts exact 4 months in Asia/Rangoon (1 Jul → 1 Nov local)', async () => {
+        const dispatchedQueries: GetDashboardQuery[] = [];
+        const queryBus = {
+            async execute(query: GetDashboardQuery): Promise<never> {
+                dispatchedQueries.push(query);
+                return {} as never;
+            },
+        };
+        const controller = new DashboardAuditController(queryBus as never, {} as never);
+
+        // 1 Jul 00:00 → 1 Nov 00:00 Asia/Rangoon (exactly 4 months); must not use UTC day 30 Jun.
+        await controller.getDashboard(
+            undefined,
+            '2026-06-30T17:30:00.000Z',
+            '2026-10-31T17:30:00.000Z',
+            'Asia/Rangoon',
+        );
+
+        assert.equal(dispatchedQueries.length, 1);
+    });
+
+    it('rejects 31 May → 1 Oct Asia/Rangoon (4 months + 1 day after local clamp)', async () => {
+        const controller = new DashboardAuditController({execute: async () => ({})} as never, {} as never);
+
+        // 31 May 00:00 + 4 months clamps to 30 Sep 00:00 Rangoon; 1 Oct 00:00 must reject.
+        await assert.rejects(
+            () => controller.getDashboard(
+                undefined,
+                '2026-05-30T17:30:00.000Z',
+                '2026-09-30T17:30:00.000Z',
+                'Asia/Rangoon',
+            ),
+            /Custom range cannot exceed 4 months/,
+        );
+
+        await controller.getDashboard(
+            undefined,
+            '2026-05-30T17:30:00.000Z',
+            '2026-09-29T17:30:00.000Z',
             'Asia/Rangoon',
         );
     });

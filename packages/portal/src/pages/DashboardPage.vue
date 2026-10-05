@@ -149,28 +149,66 @@ const rangeModeLabel = computed((): string => ({
 
 const MAX_CUSTOM_RANGE_MONTHS = 4;
 
-/**
- * Adds calendar months in UTC without Date#setUTCMonth day overflow
- * (e.g. 31 May + 4 months must become 30 Sep, not 1 Oct).
- */
-function addUtcMonths(date: Date, months: number): Date {
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth() + months;
-    const day = date.getUTCDate();
-    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+function zonedDateTimeParts(date: Date, timeZone: string): {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+} {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes): number =>
+        Number(parts.find((part) => part.type === type)?.value ?? 0);
 
-    return new Date(Date.UTC(
-        year,
-        month,
-        Math.min(day, lastDay),
-        date.getUTCHours(),
-        date.getUTCMinutes(),
-        date.getUTCSeconds(),
-        date.getUTCMilliseconds(),
-    ));
+    return {
+        year: value('year'),
+        month: value('month'),
+        day: value('day'),
+        hour: value('hour'),
+        minute: value('minute'),
+        second: value('second'),
+    };
 }
 
-function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
+function zonedLocalToUtc(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+    timeZone: string,
+): Date {
+    const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second, 0);
+    const first = utcGuess - offsetMinutesForTimeZone(new Date(utcGuess), timeZone) * 60_000;
+    const resolved = utcGuess - offsetMinutesForTimeZone(new Date(first), timeZone) * 60_000;
+
+    return new Date(resolved);
+}
+
+
+function addMonthsInTimeZone(date: Date, months: number, timeZone: string): Date {
+    const parts = zonedDateTimeParts(date, timeZone);
+    const totalMonths = parts.year * 12 + (parts.month - 1) + months;
+    const year = Math.floor(totalMonths / 12);
+    const month = (totalMonths % 12) + 1;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const day = Math.min(parts.day, lastDay);
+
+    return zonedLocalToUtc(year, month, day, parts.hour, parts.minute, parts.second, timeZone);
+}
+
+function customRangeExceedsMaxMonths(fromIso: string, toIso: string, timeZone: string): boolean {
     const from = new Date(fromIso);
     const to = new Date(toIso);
 
@@ -178,7 +216,7 @@ function customRangeExceedsMaxMonths(fromIso: string, toIso: string): boolean {
         return false;
     }
 
-    const limit = addUtcMonths(from, MAX_CUSTOM_RANGE_MONTHS);
+    const limit = addMonthsInTimeZone(from, MAX_CUSTOM_RANGE_MONTHS, timeZone);
 
     return to.getTime() > limit.getTime();
 }
@@ -188,7 +226,7 @@ const customRangeLimitError = computed((): string | null => {
         return null;
     }
 
-    if (!customRangeExceedsMaxMonths(rangeStart.value, rangeEnd.value)) {
+    if (!customRangeExceedsMaxMonths(rangeStart.value, rangeEnd.value, props.selectedTimeZone)) {
         return null;
     }
 
