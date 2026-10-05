@@ -9,7 +9,12 @@ import {McmAxios} from '@shared/mcm-client';
 
 /**
  * Keeps Pivotal's Hub-facing CA registered with the Connection Manager, under every
- * tenant Pivotal fronts.
+ * tenant Pivotal fronts and under the DFSP Pivotal itself is registered as.
+ *
+ * Under Pivotal's own DFSP it is what the Hub's egress gateway verifies web-inbound
+ * against when it calls back: MCM hands root and intermediates to the gateway together
+ * on onboarding. That is why the intermediates are registered too -- every leaf here is
+ * issued from an intermediate, and a root alone cannot complete a path to one.
  *
  * It is **one certificate registered N times**, not N certificates. MCM's model
  * assumes one DFSP is one organisation with one CA; Pivotal is one organisation
@@ -51,6 +56,13 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
          * by the ceremony, not fetched from anywhere at runtime.
          */
         private readonly caPath: string,
+        /**
+         * The intermediates between that root and the leaves, as PEM; null when there are none.
+         * Read from the issuing mount's public chain, so no credential is involved.
+         */
+        private readonly readIntermediates: () => Promise<string | null>,
+        /** The DFSP Pivotal is registered as, in addition to its tenants. Null to skip it. */
+        private readonly pivotalDfspId: string | null,
         private readonly intervalMs: number = McmCaRegistrationScheduler.DEFAULT_INTERVAL_MS,
     ) {}
 
@@ -71,9 +83,17 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
     /** Exposed for tests and for an operator-triggered reconcile. */
     async reconcile(): Promise<McmCaRegistrationScheduler.Result> {
         const certificate = await this.readPivotalCa();
-        const tenants = (await this.participantKeys.findAll())
-            .filter(key => key.role === ParticipantKeyRole.Self)
-            .map(key => key.fspId);
+        // A failed read throws and abandons the tick rather than registering the root alone:
+        // that would overwrite a complete registration with an incomplete one, then flip it
+        // back on the next good read.
+        const intermediateChain = McmCaRegistrationScheduler.withoutCertificate(
+            await this.readIntermediates(), certificate);
+        const tenants = [...new Set([
+            ...(await this.participantKeys.findAll())
+                .filter(key => key.role === ParticipantKeyRole.Self)
+                .map(key => key.fspId),
+            ...(this.pivotalDfspId == null ? [] : [this.pivotalDfspId]),
+        ])];
 
         let registered = 0;
         let alreadyCorrect = 0;
@@ -86,12 +106,16 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
                 // second copy to drift against the thing it is describing.
                 const current = await this.mcm.getDfspCa(fspId).catch(() => null);
 
-                if (McmCaRegistrationScheduler.samePem(current?.rootCertificate, certificate)) {
+                if (McmCaRegistrationScheduler.samePem(current?.rootCertificate, certificate)
+                    && McmCaRegistrationScheduler.samePem(current?.intermediateChain ?? '', intermediateChain ?? '')) {
                     alreadyCorrect += 1;
                     continue;
                 }
 
-                await this.mcm.registerCa(fspId, {rootCertificate: certificate});
+                await this.mcm.registerCa(fspId, {
+                    rootCertificate: certificate,
+                    ...(intermediateChain == null ? {} : {intermediateChain}),
+                });
                 registered += 1;
 
                 this.logger.log(`Registered the Pivotal CA with MCM for '${fspId}'.`);
@@ -116,6 +140,17 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
         }
 
         return pem;
+    }
+
+    /**
+     * Drops the root from a chain read off the issuing mount, should that mount include it, so the
+     * root is registered once, in its own field. Null when nothing else is left.
+     */
+    private static withoutCertificate(chain: string | null, certificate: string): string | null {
+        const blocks = (chain ?? '').match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) ?? [];
+        const kept = blocks.filter(block => !McmCaRegistrationScheduler.samePem(block, certificate));
+
+        return kept.length === 0 ? null : kept.join('\n');
     }
 
     /** PEMs differ harmlessly in trailing whitespace; compare the content. */

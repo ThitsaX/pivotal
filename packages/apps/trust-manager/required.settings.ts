@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {ConfigService} from '@nestjs/config';
-import {TrustDomainModule, DfspCaPublishScheduler} from '@core/trust/domain';
+import {TrustDomainModule, DfspCaPublishScheduler, HubCallbackCertEnroller} from '@core/trust/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {McmSettings} from '@shared/mcm-client';
 import {TypeOrmSettings} from '@shared/typeorm';
@@ -16,6 +16,10 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
     private static readonly DEFAULT_JWS_KEY_PUBLISH_INTERVAL_SECONDS = 3600;
     private static readonly DEFAULT_HUB_SERVER_CERT_SECRET_NAME = 'hub-server-cert';
     private static readonly DEFAULT_HUB_SERVER_CERT_CHECK_INTERVAL_SECONDS = 86400;
+    private static readonly DEFAULT_HUB_CLIENT_PKI_MOUNT = 'pki_hub_client';
+    private static readonly DEFAULT_HUB_CALLBACK_CERT_PKI_ROLE = 'hub-callback-client';
+    private static readonly DEFAULT_HUB_CALLBACK_CERT_CHECK_INTERVAL_SECONDS = 86400;
+    private static readonly HUB_CALLBACK_CERT_RENEW_BEFORE_DAYS = 30;
 
     constructor(private readonly configService: ConfigService) {}
 
@@ -155,6 +159,47 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
         return configured == null || configured.trim().length === 0
             ? TrustManagerSettings.DEFAULT_HUB_SERVER_CERT_SECRET_NAME
             : configured;
+    }
+
+    /**
+     * Pivotal's Hub-facing CA mount. Its public chain is registered with MCM alongside the root.
+     * Empty where Vault is not configured, which registers the root alone, as before.
+     */
+    hubClientPkiMount(): string {
+        return this.read('HUB_CLIENT_PKI_MOUNT')
+            ?? (this.read('VAULT_ADDRESS') == null ? '' : TrustManagerSettings.DEFAULT_HUB_CLIENT_PKI_MOUNT);
+    }
+
+    /**
+     * Null unless HUB_CALLBACK_CERT_COMMON_NAME is set: a deployment where the Hub does not call
+     * Pivotal back over mutual TLS has no callback certificate to keep.
+     */
+    hubCallbackCertSettings(): HubCallbackCertEnroller.Settings | null {
+        const commonName = this.read('HUB_CALLBACK_CERT_COMMON_NAME');
+
+        if (commonName == null) {
+            return null;
+        }
+
+        if (this.read('VAULT_ADDRESS') == null) {
+            throw new Error('HUB_CALLBACK_CERT_COMMON_NAME is set, but signing needs Vault: set VAULT_ADDRESS.');
+        }
+
+        const seconds = Number(this.read('HUB_CALLBACK_CERT_CHECK_INTERVAL_SECONDS')
+            ?? TrustManagerSettings.DEFAULT_HUB_CALLBACK_CERT_CHECK_INTERVAL_SECONDS);
+
+        if (!Number.isInteger(seconds) || seconds <= 0) {
+            throw new Error('Invalid HUB_CALLBACK_CERT_CHECK_INTERVAL_SECONDS: expected a positive integer.');
+        }
+
+        return {
+            dfspId: this.pivotalDfspId(),
+            commonName,
+            pkiMount: this.read('HUB_CLIENT_PKI_MOUNT') ?? TrustManagerSettings.DEFAULT_HUB_CLIENT_PKI_MOUNT,
+            pkiRole: this.read('HUB_CALLBACK_CERT_PKI_ROLE') ?? TrustManagerSettings.DEFAULT_HUB_CALLBACK_CERT_PKI_ROLE,
+            renewBeforeDays: TrustManagerSettings.HUB_CALLBACK_CERT_RENEW_BEFORE_DAYS,
+            intervalMs: seconds * 1000,
+        };
     }
 
     hubServerCertCheckIntervalMs(): number {

@@ -7,3 +7,4 @@ export * from './jws-cert';
 export * from './mcm-dfsp';
 export * from './post-dfsp-ca-request';
 export * from './post-dfsp-request';
+export * from './outbound-enrollment';
