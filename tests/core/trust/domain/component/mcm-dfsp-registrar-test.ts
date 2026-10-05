@@ -5,31 +5,39 @@ import {
     McmDfspRegistrar,
 } from '../../../../../packages/core/trust/domain/component/mcm-dfsp.registrar';
 
+/**
+ * Shaped like MCM v3.7: `GET /dfsps` lists DFSPs with the identifier as `id`, and there is no
+ * `GET /dfsps/{dfspId}` -- calling it fails the test.
+ */
 class FakeMcm {
 
     readonly calls: string[] = [];
     readonly created: Record<string, unknown>[] = [];
-    getFailure: McmException | null = null;
+    listFailure: McmException | null = null;
     createFails = false;
+    onCreate: ((dfspId: string) => void) | null = null;
 
     constructor(private readonly dfsps: Set<string> = new Set()) {
     }
 
-    getDfsp(dfspId: string): Promise<{dfspId: string}> {
-        this.calls.push(`get:${dfspId}`);
+    listDfsps(): Promise<{id: string; name: string}[]> {
+        this.calls.push('list');
 
-        if (this.getFailure != null) {
-            return Promise.reject(this.getFailure);
+        if (this.listFailure != null) {
+            return Promise.reject(this.listFailure);
         }
 
-        return this.dfsps.has(dfspId)
-            ? Promise.resolve({dfspId})
-            : Promise.reject(new McmException('MCM_REQUEST_FAILED', 'not found', 404));
+        return Promise.resolve([...this.dfsps].map(id => ({id, name: id})));
+    }
+
+    getDfsp(): Promise<never> {
+        return Promise.reject(new McmException('MCM_REQUEST_FAILED', 'GET method not allowed', 405));
     }
 
     createDfsp(body: {dfspId: string}): Promise<{id: string}> {
         this.calls.push(`create:${body.dfspId}`);
         this.created.push(body);
+        this.onCreate?.(body.dfspId);
 
         if (this.createFails) {
             return Promise.reject(new McmException('MCM_REQUEST_FAILED', 'duplicate', 500));
@@ -53,17 +61,18 @@ describe('McmDfspRegistrar', () => {
         assert.deepEqual(mcm.calls, []);
     });
 
-    it('leaves a DFSP MCM already has alone, and does not ask again', async () => {
-        const mcm = new FakeMcm(new Set(['DemoDFSP1']));
+    it('finds an existing DFSP on the list, and answers for every listed DFSP from that one read', async () => {
+        const mcm = new FakeMcm(new Set(['DemoDFSP1', 'DemoDFSP2', 'pivotal']));
         const subject = registrar(mcm);
 
         assert.equal(await subject.ensureRegistered('DemoDFSP1'), 'present');
-        assert.equal(await subject.ensureRegistered('DemoDFSP1'), 'present');
-        assert.deepEqual(mcm.calls, ['get:DemoDFSP1']);
+        assert.equal(await subject.ensureRegistered('DemoDFSP2'), 'present');
+        assert.equal(await subject.ensureRegistered('pivotal'), 'present');
+        assert.deepEqual(mcm.calls, ['list']);
     });
 
     it('creates a DFSP MCM does not have, named after its id', async () => {
-        const mcm = new FakeMcm();
+        const mcm = new FakeMcm(new Set(['pivotal']));
         const subject = registrar(mcm);
 
         assert.equal(await subject.ensureRegistered('GreenBank'), 'created');
@@ -71,7 +80,7 @@ describe('McmDfspRegistrar', () => {
 
         // Remembered once created, so the next job to need it costs nothing.
         assert.equal(await subject.ensureRegistered('GreenBank'), 'present');
-        assert.deepEqual(mcm.calls, ['get:GreenBank', 'create:GreenBank']);
+        assert.deepEqual(mcm.calls, ['list', 'create:GreenBank']);
     });
 
     it('sends the contact address and monetary zone only when they are configured', async () => {
@@ -85,16 +94,10 @@ describe('McmDfspRegistrar', () => {
     it('treats a refused create as success when the DFSP turns out to exist', async () => {
         const mcm = new FakeMcm();
         mcm.createFails = true;
-        const subject = registrar(mcm);
-
         // Another replica created it between the check and the create.
-        const original = mcm.createDfsp.bind(mcm);
-        mcm.createDfsp = (body: {dfspId: string}) => {
-            (mcm as any).dfsps.add(body.dfspId);
-            return original(body);
-        };
+        mcm.onCreate = dfspId => (mcm as any).dfsps.add(dfspId);
 
-        assert.equal(await subject.ensureRegistered('GreenBank'), 'present');
+        assert.equal(await registrar(mcm).ensureRegistered('GreenBank'), 'present');
     });
 
     it('surfaces a create that fails for any other reason', async () => {
@@ -104,9 +107,9 @@ describe('McmDfspRegistrar', () => {
         await assert.rejects(registrar(mcm).ensureRegistered('GreenBank'), /duplicate/);
     });
 
-    it('does not create anything when it cannot tell whether the DFSP exists', async () => {
+    it('does not create anything when it cannot read the list', async () => {
         const mcm = new FakeMcm();
-        mcm.getFailure = new McmException('MCM_REQUEST_FAILED', 'MCM unavailable', 503);
+        mcm.listFailure = new McmException('MCM_REQUEST_FAILED', 'MCM unavailable', 503);
 
         await assert.rejects(registrar(mcm).ensureRegistered('GreenBank'), /MCM unavailable/);
         assert.equal(mcm.created.length, 0);

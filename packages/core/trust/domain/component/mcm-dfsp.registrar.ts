@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Logger} from '@nestjs/common';
-import {McmAxios, McmException, PostDfspRequest} from '@shared/mcm-client';
+import {McmAxios, PostDfspRequest} from '@shared/mcm-client';
 
 /**
  * Makes sure MCM knows a DFSP before anything is registered under it.
@@ -18,8 +18,6 @@ import {McmAxios, McmException, PostDfspRequest} from '@shared/mcm-client';
  * to keep, and Pivotal adding to it would be overstepping.
  */
 export class McmDfspRegistrar {
-
-    private static readonly NOT_FOUND = 404;
 
     private readonly logger = new Logger(McmDfspRegistrar.name);
 
@@ -44,7 +42,6 @@ export class McmDfspRegistrar {
         }
 
         if (await this.exists(dfspId)) {
-            this.known.add(dfspId);
             return 'present';
         }
 
@@ -54,7 +51,6 @@ export class McmDfspRegistrar {
             // Two replicas, or the event and the sweep, can reach a new DFSP at the same moment, and
             // the slower create is refused. What matters is that the DFSP exists, not who made it.
             if (await this.exists(dfspId)) {
-                this.known.add(dfspId);
                 return 'present';
             }
 
@@ -67,18 +63,21 @@ export class McmDfspRegistrar {
         return 'created';
     }
 
-    /** A 404 is the answer "no such DFSP"; anything else is a failure to find out, and is thrown. */
+    /**
+     * Read from MCM's full list rather than by id: MCM v3.7 has no `GET /dfsps/{dfspId}`. Every DFSP
+     * on the list is remembered while it is at hand, so one read answers for all of them and a sweep
+     * over many tenants costs a single request.
+     */
     private async exists(dfspId: string): Promise<boolean> {
-        try {
-            await this.mcm.getDfsp(dfspId);
-            return true;
-        } catch (error: unknown) {
-            if (error instanceof McmException && error.status === McmDfspRegistrar.NOT_FOUND) {
-                return false;
-            }
+        for (const dfsp of await this.mcm.listDfsps()) {
+            const id = dfsp.id ?? dfsp.dfspId;
 
-            throw error;
+            if (id != null && id.length > 0) {
+                this.known.add(id);
+            }
         }
+
+        return this.known.has(dfspId);
     }
 
     private request(dfspId: string): PostDfspRequest {
