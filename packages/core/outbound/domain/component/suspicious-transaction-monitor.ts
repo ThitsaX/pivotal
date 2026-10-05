@@ -69,11 +69,11 @@ export class SuspiciousTransactionMonitor {
         }
 
         this.logger.warn(
-            `Suspicious transaction pattern rejected key=${key} count=${count} threshold=${this.threshold} windowMs=${this.windowMs}`,
+            `Suspicious transaction pattern rejected code=4240 key=${key} count=${count} threshold=${this.threshold} windowMs=${this.windowMs}`,
         );
 
         throw new FspiopException(
-            FspiopErrors.PAYER_LIMIT_ERROR,
+            FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN,
             'Suspicious repetitive transaction pattern detected within the monitoring window.',
         );
     }

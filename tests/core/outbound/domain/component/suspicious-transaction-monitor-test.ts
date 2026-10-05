@@ -17,9 +17,9 @@ const PATTERN: SuspiciousTransactionMonitor.Pattern = {
 
 const DEFAULT_KEY = 'suspicious:wallet1|2769100001|wallet2|2769200001|10';
 
-function isPayerLimitError(error: unknown): boolean {
+function isSuspiciousTransactionPattern(error: unknown): boolean {
     return error instanceof FspiopException
-        && error.errorDefinition.errorType.code === FspiopErrors.PAYER_LIMIT_ERROR.errorType.code;
+        && error.errorDefinition.errorType.code === FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN.errorType.code;
 }
 
 function fakeRedis(counts: number[]): {
@@ -96,7 +96,7 @@ describe('SuspiciousTransactionMonitor', () => {
 
         await assert.rejects(
             () => monitor.assertNotSuspicious(PATTERN),
-            isPayerLimitError,
+            isSuspiciousTransactionPattern,
         );
         assert.equal(redis.calls.length, 1);
     });

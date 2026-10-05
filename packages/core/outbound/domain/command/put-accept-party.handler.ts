@@ -118,19 +118,6 @@ export class PutAcceptPartyHandler
         this.amountDecimalValidator.validate(transferRequest.amount);
         const destination = PutAcceptPartyHandler.getFspId(transferRequest.payee, 'payee');
 
-        // Reject repetitive patterns after amount is confirmed and before Hub quote,
-        // so a blocked transfer never posts /quotes.
-        if (acceptParty) {
-            await this.suspiciousTransactionMonitor.assertNotSuspicious({
-                payerFsp: source,
-                payerId: transferRequest.payer.partyIdInfo.partyIdentifier,
-                payeeFsp: destination,
-                payeeId: transferRequest.payee.partyIdInfo.partyIdentifier,
-                currency: transferRequest.currency,
-                amount: transferRequest.amount,
-            });
-        }
-
         const quoteRequest = PutAcceptPartyHandler.toQuotesPostRequest(transferId, transferRequest, extensionList);
         const { quoteId } = quoteRequest;
         const { quotesUrl } = this.fspiopAxios.settings;
@@ -157,6 +144,18 @@ export class PutAcceptPartyHandler
                     'Payer rejected party confirmation.',
                 );
             }
+
+            // Reject repetitive patterns after amount is confirmed and before Hub quote,
+            // so a blocked transfer never posts /quotes. Inside try so Quotes errors are
+            // audited and the transfer cache is cleared on rejection.
+            await this.suspiciousTransactionMonitor.assertNotSuspicious({
+                payerFsp: source,
+                payerId: transferRequest.payer.partyIdInfo.partyIdentifier,
+                payeeFsp: destination,
+                payeeId: transferRequest.payee.partyIdInfo.partyIdentifier,
+                currency: transferRequest.currency,
+                amount: transferRequest.amount,
+            });
 
             const headers = FspiopHeaders.Values.Quotes.forRequest(quoteId, source, destination);
             const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);

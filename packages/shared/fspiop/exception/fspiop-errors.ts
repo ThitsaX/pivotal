@@ -47,6 +47,10 @@ export class FspiopErrors {
     static readonly PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE = new ErrorDefinition(FspiopErrorType.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE, 'Transaction type not supported by Payer FSP.');
     static readonly PAYER_UNSUPPORTED_CURRENCY = new ErrorDefinition(FspiopErrorType.PAYER_UNSUPPORTED_CURRENCY, 'Payer does not support requested currency.');
     static readonly PAYER_LIMIT_ERROR = new ErrorDefinition(FspiopErrorType.PAYER_LIMIT_ERROR, 'Payment amount/frequency exceeds limits.');
+    static readonly SUSPICIOUS_TRANSACTION_PATTERN = new ErrorDefinition(
+        FspiopErrorType.SUSPICIOUS_TRANSACTION_PATTERN,
+        'Repetitive transaction pattern blocked.',
+    );
     static readonly PAYER_PERMISSION_ERROR = new ErrorDefinition(FspiopErrorType.PAYER_PERMISSION_ERROR, 'Payer lacks permission to perform operation.');
     static readonly GENERIC_PAYER_BLOCKED_ERROR = new ErrorDefinition(FspiopErrorType.GENERIC_PAYER_BLOCKED_ERROR, 'Payer is blocked or failed regulatory screening.');
     static readonly GENERIC_PAYEE_ERROR = new ErrorDefinition(FspiopErrorType.GENERIC_PAYEE_ERROR, 'Generic error related to payee or payee FSP.');
@@ -110,6 +114,8 @@ export class FspiopErrors {
         [FspiopErrors.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE.errorType.code]: FspiopErrors.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE,
         [FspiopErrors.PAYER_UNSUPPORTED_CURRENCY.errorType.code]: FspiopErrors.PAYER_UNSUPPORTED_CURRENCY,
         [FspiopErrors.PAYER_LIMIT_ERROR.errorType.code]: FspiopErrors.PAYER_LIMIT_ERROR,
+        [FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN.errorType.code]:
+            FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN,
         [FspiopErrors.PAYER_PERMISSION_ERROR.errorType.code]: FspiopErrors.PAYER_PERMISSION_ERROR,
         [FspiopErrors.GENERIC_PAYER_BLOCKED_ERROR.errorType.code]: FspiopErrors.GENERIC_PAYER_BLOCKED_ERROR,
         [FspiopErrors.GENERIC_PAYEE_ERROR.errorType.code]: FspiopErrors.GENERIC_PAYEE_ERROR,

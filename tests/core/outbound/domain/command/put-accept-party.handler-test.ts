@@ -261,7 +261,7 @@ describe('PutAcceptPartyHandler', () => {
                 async assertNotSuspicious(pattern: typeof monitoredPattern): Promise<void> {
                     monitoredPattern = pattern;
                     throw new FspiopException(
-                        FspiopErrors.PAYER_LIMIT_ERROR,
+                        FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN,
                         'Suspicious repetitive transaction pattern detected within the monitoring window.',
                     );
                 },
@@ -273,7 +273,7 @@ describe('PutAcceptPartyHandler', () => {
                 new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, '10.00', undefined, 'wallet1')),
             ),
             (error: unknown) => error instanceof FspiopException
-                && error.errorDefinition.errorType.code === FspiopErrors.PAYER_LIMIT_ERROR.errorType.code,
+                && error.errorDefinition.errorType.code === FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN.errorType.code,
         );
 
         assert.equal(postQuotesCalled, false);
