@@ -244,3 +244,56 @@ describe('JwsKeyPublishScheduler.reconcile', () => {
         assert.equal(healthy.jwsSignEnabled, true);
     });
 });
+
+describe('JwsKeyPublishScheduler with DFSP registration', () => {
+
+    /** Records the order in which the DFSP is ensured and the key is read and published. */
+    function recording(order: string[]) {
+        const mcm = new FakeMcm();
+        const original = mcm.getJwsKey.bind(mcm);
+        mcm.getJwsKey = (fspId: string) => {
+            order.push(`read:${fspId}`);
+            return original(fspId);
+        };
+        const registrar = {
+            ensureRegistered: (fspId: string) => {
+                order.push(`ensure:${fspId}`);
+                return Promise.resolve('created');
+            },
+        };
+
+        return {mcm, registrar};
+    }
+
+    it('creates the tenant\'s DFSP before reading or publishing its key, on announcement', async () => {
+        const order: string[] = [];
+        const {mcm, registrar} = recording(order);
+
+        await new JwsKeyPublishScheduler(mcm as any, new FakeKeys([tenant()]) as any, lock, undefined, registrar as any)
+            .publishAndEnable('DemoDFSP1');
+
+        assert.deepEqual(order, ['ensure:DemoDFSP1', 'read:DemoDFSP1']);
+        assert.equal(mcm.published.length, 1);
+    });
+
+    it('creates the tenant\'s DFSP before reading or publishing its key, on the sweep', async () => {
+        const order: string[] = [];
+        const {mcm, registrar} = recording(order);
+
+        await new JwsKeyPublishScheduler(mcm as any, new FakeKeys([tenant()]) as any, lock, undefined, registrar as any)
+            .reconcile();
+
+        assert.deepEqual(order, ['ensure:DemoDFSP1', 'read:DemoDFSP1']);
+    });
+
+    it('does not publish a key when the DFSP could not be created, and retries next time', async () => {
+        const mcm = new FakeMcm();
+        const registrar = {ensureRegistered: () => Promise.reject(new Error('MCM unavailable'))};
+
+        const result = await new JwsKeyPublishScheduler(
+            mcm as any, new FakeKeys([tenant()]) as any, lock, undefined, registrar as any).reconcile();
+
+        assert.equal(result.failed, 1);
+        assert.equal(mcm.published.length, 0);
+    });
+});

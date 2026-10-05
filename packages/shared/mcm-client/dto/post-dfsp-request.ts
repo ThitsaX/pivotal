@@ -11,11 +11,13 @@ export class PostDfspRequest {
     name!: string;
 
     /**
-     * Required by MCM despite being absent from its swagger and from every design
-     * document here. Omitting it fails with `ValidationError: email is required`.
+     * Required only where MCM creates Keycloak accounts for new DFSPs
+     * (`KEYCLOAK_ENABLED` with `KEYCLOAK_AUTO_CREATE_ACCOUNTS`): it then validates the
+     * address and creates a user for it, and omitting it fails with
+     * `ValidationError: email is required`. Otherwise MCM ignores it.
      */
-    @ApiProperty({type: String})
-    email!: string;
+    @ApiProperty({type: String, required: false})
+    email?: string;
 
     @ApiProperty({type: String, required: false})
     monetaryZoneId?: string;

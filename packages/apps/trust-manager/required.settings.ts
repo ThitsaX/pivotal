@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {ConfigService} from '@nestjs/config';
-import {TrustDomainModule, DfspCaPublishScheduler, HubCallbackCertEnroller} from '@core/trust/domain';
+import {TrustDomainModule, DfspCaPublishScheduler, HubCallbackCertEnroller, McmDfspRegistrar} from '@core/trust/domain';
 import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {McmSettings} from '@shared/mcm-client';
 import {TypeOrmSettings} from '@shared/typeorm';
@@ -174,6 +174,28 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
      * Null unless HUB_CALLBACK_CERT_COMMON_NAME is set: a deployment where the Hub does not call
      * Pivotal back over mutual TLS has no callback certificate to keep.
      */
+    /**
+     * Off unless MCM_AUTO_REGISTER_DFSPS is true. A value that is neither true nor false refuses
+     * to start rather than reading as off: switched off by a typo, onboarding would go back to
+     * needing a manual MCM step without anything saying so.
+     */
+    mcmDfspRegistrationSettings(): McmDfspRegistrar.Settings {
+        const configured = this.read('MCM_AUTO_REGISTER_DFSPS')?.toLowerCase();
+
+        if (configured != null && configured !== 'true' && configured !== 'false') {
+            throw new Error('Invalid MCM_AUTO_REGISTER_DFSPS: expected true or false.');
+        }
+
+        const contactEmail = this.read('MCM_DFSP_CONTACT_EMAIL');
+        const monetaryZoneId = this.read('MCM_DFSP_MONETARY_ZONE');
+
+        return {
+            enabled: configured === 'true',
+            ...(contactEmail == null ? {} : {contactEmail}),
+            ...(monetaryZoneId == null ? {} : {monetaryZoneId}),
+        };
+    }
+
     hubCallbackCertSettings(): HubCallbackCertEnroller.Settings | null {
         const commonName = this.read('HUB_CALLBACK_CERT_COMMON_NAME');
 

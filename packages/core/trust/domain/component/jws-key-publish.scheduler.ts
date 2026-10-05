@@ -3,6 +3,7 @@
 import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantKey, ParticipantKeyRole} from '@core/participant/domain/model';
+import {McmDfspRegistrar} from './mcm-dfsp.registrar';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios} from '@shared/mcm-client';
 import {DbTarget} from '@shared/typeorm';
@@ -46,6 +47,8 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
         private readonly participantKeys: ParticipantKeyRepository,
         private readonly lock: RollupLock,
         private readonly intervalMs: number = JwsKeyPublishScheduler.DEFAULT_INTERVAL_MS,
+        /** Creates the tenant's DFSP in MCM first, where that is switched on. */
+        private readonly registrar: McmDfspRegistrar | null = null,
     ) {}
 
     onModuleInit(): void {
@@ -103,6 +106,10 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
             // finished, or the row has since been removed.
             throw new PermanentPublishError(`No self-role public key held for '${fspId}'.`);
         }
+
+        // Before reading the key back: for a DFSP MCM does not know, that read and the publish
+        // after it both fail with a 404, and the tenant could never sign.
+        await this.registrar?.ensureRegistered(fspId);
 
         const stored = await this.mcm.getJwsKey(fspId).catch(() => null);
         const storedKey = stored?.publicKey;
@@ -181,6 +188,8 @@ export class JwsKeyPublishScheduler implements OnModuleInit, OnModuleDestroy {
             const fspId = tenant.fspId;
 
             try {
+                await this.registrar?.ensureRegistered(fspId);
+
                 const stored = await this.mcm.getJwsKey(fspId).catch(() => null);
                 const storedKey = stored?.publicKey;
 

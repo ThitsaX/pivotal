@@ -15,6 +15,7 @@ import {
     JwsKeyPublishScheduler,
     KubernetesSecretWriter,
     McmCaRegistrationScheduler,
+    McmDfspRegistrar,
     PeerJwsSyncScheduler,
     SigningTenantConsumer,
 } from './component';
@@ -33,6 +34,14 @@ const Components: Provider[] = [
         useFactory: (settings: TrustDomainModule.RequiredSettings): McmAxios =>
             new McmAxios(settings.mcmSettings()),
         inject: [REQUIRED_SETTINGS],
+    },
+    {
+        // One instance, shared by every job that registers under a DFSP, so a DFSP confirmed by
+        // one is not checked again by the other.
+        provide: McmDfspRegistrar,
+        useFactory: (mcm: McmAxios, settings: TrustDomainModule.RequiredSettings): McmDfspRegistrar =>
+            new McmDfspRegistrar(mcm, settings.mcmDfspRegistrationSettings()),
+        inject: [McmAxios, REQUIRED_SETTINGS],
     },
     {
         // Named for its first caller; it is a generic Redis SET-NX lock and takes the
@@ -112,6 +121,7 @@ const Components: Provider[] = [
             participantKeys: ParticipantKeyRepository,
             lock: RollupLock,
             settings: TrustDomainModule.RequiredSettings,
+            registrar: McmDfspRegistrar,
         ): McmCaRegistrationScheduler => {
             const vault = new VaultClient(settings.vaultSettings());
             const mount = settings.hubClientPkiMount();
@@ -125,9 +135,10 @@ const Components: Provider[] = [
                 mount.length === 0 ? () => Promise.resolve(null) : () => vault.readPkiCaChain(mount),
                 settings.pivotalDfspId(),
                 settings.mcmCaReconcileIntervalMs(),
+                registrar,
             );
         },
-        inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS],
+        inject: [McmAxios, ParticipantKeyRepository, CA_REGISTRATION_LOCK, REQUIRED_SETTINGS, McmDfspRegistrar],
     },
     {
         provide: JWS_PUBLISH_LOCK,
@@ -142,10 +153,11 @@ const Components: Provider[] = [
             participantKeys: ParticipantKeyRepository,
             lock: RollupLock,
             settings: TrustDomainModule.RequiredSettings,
+            registrar: McmDfspRegistrar,
         ): JwsKeyPublishScheduler => new JwsKeyPublishScheduler(
-            mcm, participantKeys, lock, settings.jwsKeyPublishIntervalMs(),
+            mcm, participantKeys, lock, settings.jwsKeyPublishIntervalMs(), registrar,
         ),
-        inject: [McmAxios, ParticipantKeyRepository, JWS_PUBLISH_LOCK, REQUIRED_SETTINGS],
+        inject: [McmAxios, ParticipantKeyRepository, JWS_PUBLISH_LOCK, REQUIRED_SETTINGS, McmDfspRegistrar],
     },
     {
         // Turns a newly provisioned tenant into a published one without waiting for the sweep.
@@ -304,6 +316,9 @@ export namespace TrustDomainModule {
 
         /** Null where the Hub does not call Pivotal back over mutual TLS. */
         hubCallbackCertSettings(): HubCallbackCertEnroller.Settings | null;
+
+        /** Whether Pivotal creates its DFSPs in MCM itself, and with what. */
+        mcmDfspRegistrationSettings(): McmDfspRegistrar.Settings;
     }
 
     export interface AsyncOptions {
