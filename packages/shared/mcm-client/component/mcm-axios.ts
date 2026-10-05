@@ -53,6 +53,10 @@ export class McmAxios {
 
     // ── tenants ──────────────────────────────────────────────────────────────
 
+    /**
+     * Every DFSP MCM knows. The way to find out whether one exists: MCM v3.7 has no
+     * `GET /dfsps/{dfspId}` and answers it 405.
+     */
     async listDfsps(): Promise<Array<McmDfsp>> {
         return this.get('/dfsps');
     }
@@ -61,10 +65,6 @@ export class McmAxios {
         return this.post('/dfsps', body);
     }
 
-    /** One DFSP. Rejects with an {@link McmException} of status 404 when MCM has none by that id. */
-    async getDfsp(dfspId: string): Promise<McmDfsp> {
-        return this.get(`/dfsps/${McmAxios.encodePathSegment(dfspId)}`);
-    }
 
     // ── certificate authority ────────────────────────────────────────────────
 
