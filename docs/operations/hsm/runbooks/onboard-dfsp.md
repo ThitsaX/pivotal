@@ -33,7 +33,14 @@ with the same key, as its owner.
 
 ## 1. Register the DFSP in MCM — do this FIRST
 
-MCM is not exposed outside the cluster, so reach it with a port-forward:
+> **Skip this step where trust-manager registers DFSPs itself** (`MCM_AUTO_REGISTER_DFSPS=true`).
+> It then creates the DFSP in MCM before publishing the tenant's key — on the onboarding event, and
+> on its hourly sweep for anything that event missed. Check with
+> `kubectl -n pivotal logs deploy/trust-manager | grep "as a DFSP in MCM"`.
+> Where MCM creates a Keycloak account per DFSP, also set `MCM_DFSP_CONTACT_EMAIL`, or MCM refuses
+> the registration for want of an address.
+
+Otherwise, by hand. MCM is not exposed outside the cluster, so reach it with a port-forward:
 
 ```bash
 kubectl -n mcm port-forward svc/mcm-connection-manager-api 3001:3001

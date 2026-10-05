@@ -10,3 +10,4 @@ export * from './dfsp-ca-publish.scheduler';
 export * from './signing-tenant.consumer';
 export * from './signing-tenant.error';
 export * from './hub-callback-cert.enroller';
+export * from './mcm-dfsp.registrar';

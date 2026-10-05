@@ -61,6 +61,11 @@ export class McmAxios {
         return this.post('/dfsps', body);
     }
 
+    /** One DFSP. Rejects with an {@link McmException} of status 404 when MCM has none by that id. */
+    async getDfsp(dfspId: string): Promise<McmDfsp> {
+        return this.get(`/dfsps/${McmAxios.encodePathSegment(dfspId)}`);
+    }
+
     // ── certificate authority ────────────────────────────────────────────────
 
     /**

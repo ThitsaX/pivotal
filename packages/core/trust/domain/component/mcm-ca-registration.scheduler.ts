@@ -6,6 +6,7 @@ import {RollupLock} from '@core/audit/domain/component';
 import {ParticipantKeyRole} from '@core/participant/domain/model';
 import {ParticipantKeyRepository} from '@core/participant/domain/repository';
 import {McmAxios} from '@shared/mcm-client';
+import {McmDfspRegistrar} from './mcm-dfsp.registrar';
 
 /**
  * Keeps Pivotal's Hub-facing CA registered with the Connection Manager, under every
@@ -64,6 +65,8 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
         /** The DFSP Pivotal is registered as, in addition to its tenants. Null to skip it. */
         private readonly pivotalDfspId: string | null,
         private readonly intervalMs: number = McmCaRegistrationScheduler.DEFAULT_INTERVAL_MS,
+        /** Creates each DFSP in MCM first, where that is switched on. */
+        private readonly registrar: McmDfspRegistrar | null = null,
     ) {}
 
     onModuleInit(): void {
@@ -101,6 +104,8 @@ export class McmCaRegistrationScheduler implements OnModuleInit, OnModuleDestroy
 
         for (const fspId of tenants) {
             try {
+                await this.registrar?.ensureRegistered(fspId);
+
                 // MCM is authoritative for what MCM holds, so the current state is read
                 // from MCM rather than from a local mirror. A mirror would only add a
                 // second copy to drift against the thing it is describing.

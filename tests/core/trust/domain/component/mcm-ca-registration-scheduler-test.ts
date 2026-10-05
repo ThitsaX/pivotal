@@ -106,4 +106,31 @@ describe('McmCaRegistrationScheduler', () => {
         await assert.rejects(scheduler(mcm, () => Promise.reject(new Error('vault down'))).reconcile(), /vault down/);
         assert.equal(mcm.registered.length, 0);
     });
+
+    it('creates each DFSP, Pivotal\'s own included, before registering the CA under it', async () => {
+        const mcm = new FakeMcm();
+        const order: string[] = [];
+        const original = mcm.registerCa.bind(mcm);
+        mcm.registerCa = (dfspId: string, body: Ca) => {
+            order.push(`register:${dfspId}`);
+            return original(dfspId, body);
+        };
+        const registrar = {
+            ensureRegistered: (dfspId: string) => {
+                order.push(`ensure:${dfspId}`);
+                return Promise.resolve('created');
+            },
+        };
+
+        await new McmCaRegistrationScheduler(
+            mcm as any, participantKeys, lock, caPath, () => Promise.resolve(INTERMEDIATE), 'pivotal',
+            undefined, registrar as any).reconcile();
+
+        assert.deepEqual(order, [
+            'ensure:DemoDFSP1', 'register:DemoDFSP1',
+            'ensure:DemoDFSP2', 'register:DemoDFSP2',
+            'ensure:pivotal', 'register:pivotal',
+        ]);
+    });
 });
+
