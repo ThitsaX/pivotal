@@ -127,6 +127,7 @@ async function dispatch(
         method,
         headers,
         credentials: 'include',
+        ...(path.startsWith('/auth/') ? {signal: AbortSignal.timeout(15_000)} : {}),
     };
 
     if (body !== undefined && body !== null) {

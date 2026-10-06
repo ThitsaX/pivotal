@@ -8,6 +8,8 @@ export class AuthErrorCode {
 
     static readonly INVALID_REFRESH_TOKEN       = 'AUTH_INVALID_REFRESH_TOKEN';
 
+    static readonly SESSION_EXPIRED             = 'AUTH_SESSION_EXPIRED';
+
     static readonly REFRESH_TOKEN_REUSE         = 'AUTH_REFRESH_TOKEN_REUSE_DETECTED';
 
     static readonly PASSWORD_SAME_AS_CURRENT    = 'AUTH_PASSWORD_SAME_AS_CURRENT';
@@ -23,6 +25,7 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
     [AuthErrorCode.INVALID_CREDENTIALS]:      'Email or password is incorrect.',
     [AuthErrorCode.ACCOUNT_LOCKED]:           'Your account is temporarily locked due to multiple failed sign-in attempts. Please try again later.',
     [AuthErrorCode.INVALID_REFRESH_TOKEN]:    'Invalid or expired refresh token.',
+    [AuthErrorCode.SESSION_EXPIRED]:          'Your session has expired. Please sign in again.',
     [AuthErrorCode.REFRESH_TOKEN_REUSE]:      'Invalid or expired refresh token.',
     [AuthErrorCode.PASSWORD_SAME_AS_CURRENT]: 'New password must differ from the current password.',
     [AuthErrorCode.UNKNOWN_ROLE]:             'Invalid email or password.',

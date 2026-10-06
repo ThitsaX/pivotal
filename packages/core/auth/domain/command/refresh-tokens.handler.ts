@@ -41,6 +41,14 @@ export class RefreshTokensHandler
 
         const now = new Date();
 
+        if (existing.sessionExpiresAt == null || existing.sessionExpiresAt <= now || existing.expiresAt <= now) {
+            await this.refreshTokenRepository.revokeFamily(existing.familyId);
+            throw new UnauthorizedException({
+                ...authError(AuthErrorCode.SESSION_EXPIRED),
+                reason: existing.sessionExpiresAt == null || existing.sessionExpiresAt <= now ? 'absolute' : 'idle',
+            });
+        }
+
         if (existing.revokedAt != null) {
             // Reuse of a previously-rotated token => assume theft, revoke the whole family.
             RefreshTokensHandler.LOGGER.warn(
@@ -48,11 +56,6 @@ export class RefreshTokensHandler
             );
             await this.refreshTokenRepository.revokeFamily(existing.familyId);
             throw new UnauthorizedException(authError(AuthErrorCode.REFRESH_TOKEN_REUSE));
-        }
-
-        if (existing.expiresAt <= now) {
-            await this.refreshTokenRepository.markRevoked(existing.id);
-            throw new UnauthorizedException(authError(AuthErrorCode.INVALID_REFRESH_TOKEN));
         }
 
         const user = await this.userRepository.findById(existing.userId, DbTarget.Write);
@@ -70,12 +73,13 @@ export class RefreshTokensHandler
         }
 
         // Issue the new access + refresh tokens in the same family
-        const issued = this.tokenService.issueRefreshToken();
+        const issued = this.tokenService.issueRefreshToken(existing.sessionExpiresAt);
         const newRefreshToken = new RefreshToken(
             user.id,
             existing.familyId,
             issued.hash,
             issued.expiresAt,
+            issued.sessionExpiresAt,
         );
         const savedNew = await this.refreshTokenRepository.save(newRefreshToken);
 
@@ -90,6 +94,7 @@ export class RefreshTokensHandler
             fspId:              user.fspId,
             mustChangePassword: user.mustChangePassword,
             permissions,
+            sessionExpiresAt: issued.sessionExpiresAt,
         });
 
         return new RefreshTokensCommand.Output(
@@ -98,6 +103,8 @@ export class RefreshTokensHandler
             issued.expiresAt,
             permissions,
             user.mustChangePassword,
+            issued.sessionExpiresAt,
+            existing.familyId,
         );
     }
 }
