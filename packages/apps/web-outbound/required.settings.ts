@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { ConfigService } from '@nestjs/config';
-import { OutboundSettings } from '@core/outbound/domain';
+import { OutboundSettings, SuspiciousTransactionMonitor } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
 import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
@@ -84,6 +84,10 @@ export class WebOutboundSettings
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
             this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
             this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
+            this.readBoolean('SUSPICIOUS_TRANSACTION_MONITORING_ENABLED', true),
+            this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES', 3),
+            this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_THRESHOLD', 10),
+            this.readSuspiciousTransactionMatchingFields(),
             this.hubAccessToken(socketTimeoutMs),
         );
     }
@@ -206,6 +210,18 @@ export class WebOutboundSettings
         }
 
         return parsed;
+    }
+
+    private readNonNegativeIntegerOrDefault(name: string, defaultValue: number): number {
+        return this.readNonNegativeInteger(name) ?? defaultValue;
+    }
+
+    private readSuspiciousTransactionMatchingFields(): ReturnType<typeof SuspiciousTransactionMonitor.parseMatchingFields> {
+        const raw = this.configService.get<string>('SUSPICIOUS_TRANSACTION_MATCHING_FIELDS');
+        if (raw == null || raw.trim().length === 0) {
+            return [...SuspiciousTransactionMonitor.DEFAULT_MATCHING_FIELDS];
+        }
+        return SuspiciousTransactionMonitor.parseMatchingFields(raw);
     }
 
     private readOptionalString(name: string): string | undefined {
