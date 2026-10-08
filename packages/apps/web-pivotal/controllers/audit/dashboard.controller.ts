@@ -40,8 +40,8 @@ export class DashboardAuditController {
         @Query('payeeFsp') payeeFspValue?: string,
     ): Promise<GetDashboardQuery.Output> {
         const accessScope = DashboardAuditController.resolveAccessScope(claims);
-        const range = DashboardAuditController.parseRange(fromValue, toValue);
         const timeZone = DashboardAuditController.parseTimeZone(timeZoneValue);
+        const range = DashboardAuditController.parseRange(fromValue, toValue, timeZone);
         const payerFsp = QueryParamsUtil.toOptionalString(payerFspValue);
         const payeeFsp = QueryParamsUtil.toOptionalString(payeeFspValue);
 
@@ -85,9 +85,96 @@ export class DashboardAuditController {
 
     private static readonly MAX_RANGE_MONTHS = 4;
 
+    private static offsetMinutesForTimeZone(date: Date, timeZone: string): number {
+        const offset = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            timeZoneName: 'shortOffset',
+        }).formatToParts(date).find((part) => part.type === 'timeZoneName')?.value ?? 'GMT';
+        const match = offset.match(/GMT([+\-])(\d{1,2})(?::?(\d{2}))?/i);
+
+        if (match == null) {
+            return 0;
+        }
+
+        const sign = match[1] === '-' ? -1 : 1;
+
+        return sign * (Number(match[2]) * 60 + Number(match[3] ?? 0));
+    }
+
+    private static zonedDateTimeParts(date: Date, timeZone: string): {
+        year: number;
+        month: number;
+        day: number;
+        hour: number;
+        minute: number;
+        second: number;
+    } {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hourCycle: 'h23',
+        }).formatToParts(date);
+        const value = (type: Intl.DateTimeFormatPartTypes): number =>
+            Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+        return {
+            year: value('year'),
+            month: value('month'),
+            day: value('day'),
+            hour: value('hour'),
+            minute: value('minute'),
+            second: value('second'),
+        };
+    }
+
+    private static zonedLocalToUtc(
+        year: number,
+        month: number,
+        day: number,
+        hour: number,
+        minute: number,
+        second: number,
+        timeZone: string,
+    ): Date {
+        const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second, 0);
+        const first = utcGuess - DashboardAuditController.offsetMinutesForTimeZone(new Date(utcGuess), timeZone) * 60_000;
+        const resolved = utcGuess - DashboardAuditController.offsetMinutesForTimeZone(new Date(first), timeZone) * 60_000;
+
+        return new Date(resolved);
+    }
+
+    /**
+     * Adds calendar months in the given IANA time zone without day overflow
+     * (e.g. 31 May + 4 months → 30 Sep in that zone, not 1 Oct).
+     */
+    private static addMonthsInTimeZone(date: Date, months: number, timeZone: string): Date {
+        const parts = DashboardAuditController.zonedDateTimeParts(date, timeZone);
+        const totalMonths = parts.year * 12 + (parts.month - 1) + months;
+        const year = Math.floor(totalMonths / 12);
+        const month = (totalMonths % 12) + 1;
+        const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+        const day = Math.min(parts.day, lastDay);
+
+        return DashboardAuditController.zonedLocalToUtc(
+            year,
+            month,
+            day,
+            parts.hour,
+            parts.minute,
+            parts.second,
+            timeZone,
+        );
+    }
+
     private static parseRange(
         fromValue: string | undefined,
         toValue: string | undefined,
+        timeZone: string,
     ): GetDashboardQuery.DateRange | undefined {
         const from = QueryParamsUtil.toOptionalDate(fromValue, 'from');
         const to = QueryParamsUtil.toOptionalDate(toValue, 'to');
@@ -104,8 +191,11 @@ export class DashboardAuditController {
             throw new BadRequestException('from must be before to.');
         }
 
-        const limit = new Date(from.getTime());
-        limit.setUTCMonth(limit.getUTCMonth() + DashboardAuditController.MAX_RANGE_MONTHS);
+        const limit = DashboardAuditController.addMonthsInTimeZone(
+            from,
+            DashboardAuditController.MAX_RANGE_MONTHS,
+            timeZone,
+        );
         if (to.getTime() > limit.getTime()) {
             throw new BadRequestException('Custom range cannot exceed 4 months.');
         }
