@@ -52,7 +52,7 @@ export class AuthController {
 
         return new LoginResponseDto(
             output.accessToken,
-            this.settings.accessTokenTtlSeconds(),
+            this.accessTokenExpiresIn(output.sessionExpiresAt),
             new AuthUserDto(
                 output.user.id,
                 output.user.email,
@@ -61,6 +61,9 @@ export class AuthController {
             ),
             output.permissions,
             output.user.mustChangePassword,
+            this.settings.sessionIdleTimeoutMinutes(),
+            output.sessionExpiresAt.toISOString(),
+            output.sessionId,
         );
     }
 
@@ -90,9 +93,12 @@ export class AuthController {
 
         return new RefreshResponseDto(
             output.accessToken,
-            this.settings.accessTokenTtlSeconds(),
+            this.accessTokenExpiresIn(output.sessionExpiresAt),
             output.permissions,
             output.mustChangePassword,
+            this.settings.sessionIdleTimeoutMinutes(),
+            output.sessionExpiresAt.toISOString(),
+            output.sessionId,
         );
     }
 
@@ -132,6 +138,10 @@ export class AuthController {
 
         // All refresh tokens are revoked by the handler; clear the cookie too.
         this.clearRefreshCookie(response);
+    }
+
+    private accessTokenExpiresIn(deadline: Date): number {
+        return Math.max(0, Math.min(this.settings.accessTokenTtlSeconds(), Math.floor((deadline.getTime() - Date.now()) / 1000)));
     }
 
     private readRefreshCookie(request: Request): string | null {

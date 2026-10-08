@@ -13,7 +13,9 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
 
     private static readonly DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 900;       // 15 minutes
 
-    private static readonly DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
+    private static readonly DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES = 30;
+
+    private static readonly DEFAULT_SESSION_ABSOLUTE_TIMEOUT_HOURS = 12;
 
     private static readonly DEFAULT_BCRYPT_COST_FACTOR = 12;
 
@@ -26,6 +28,7 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     private static readonly DEFAULT_AUDIT_MAX_LIMIT = 50_000;
 
     constructor(private readonly configService: ConfigService = new ConfigService()) {
+        this.validateSessionTimeouts();
     }
 
     writeTypeOrmSettings(): TypeOrmSettings {
@@ -85,13 +88,40 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     }
 
     accessTokenTtlSeconds(): number {
-        return this.readOptionalPositiveInteger('PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS')
+        return this.readSessionPositiveInteger('PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS')
             ?? WebPivotalSettings.DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
     }
 
-    refreshTokenTtlDays(): number {
-        return this.readOptionalPositiveInteger('PIVOTAL_IAM_REFRESH_TOKEN_TTL_DAYS')
-            ?? WebPivotalSettings.DEFAULT_REFRESH_TOKEN_TTL_DAYS;
+    sessionIdleTimeoutMinutes(): number {
+        return this.readSessionPositiveInteger('PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES')
+            ?? WebPivotalSettings.DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES;
+    }
+
+    sessionAbsoluteTimeoutHours(): number {
+        return this.readSessionPositiveInteger('PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS')
+            ?? WebPivotalSettings.DEFAULT_SESSION_ABSOLUTE_TIMEOUT_HOURS;
+    }
+
+    private validateSessionTimeouts(): void {
+        const idleSeconds = this.sessionIdleTimeoutMinutes() * 60;
+        if (idleSeconds <= this.accessTokenTtlSeconds()) {
+            throw new Error('PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES must be longer than PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS.');
+        }
+        if (this.sessionAbsoluteTimeoutHours() * 3600 < idleSeconds) {
+            throw new Error('PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS must not be shorter than PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES.');
+        }
+    }
+
+    private readSessionPositiveInteger(name: string): number | undefined {
+        const value = this.configService.get<string>(name);
+        if (value == null) {
+            return undefined;
+        }
+        const parsed = Number(value);
+        if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > Number.MAX_SAFE_INTEGER / 3_600_000) {
+            throw new Error(`Invalid environment variable ${name}: expected a positive integer within the supported duration range.`);
+        }
+        return parsed;
     }
 
     bcryptCostFactor(): number {
