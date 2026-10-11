@@ -50,6 +50,19 @@ export class TransactionMessage<TContent = TransactionMessage.Content> {
             content,
         );
     }
+
+    static resolved<TContent>(
+        phase: TransactionMessage.InvocationPhase,
+        gateway: TransactionMessage.InvocationGateway,
+        content: TContent,
+    ): TransactionMessage<TContent> {
+        return new TransactionMessage(
+            phase,
+            TransactionMessage.InvocationAction.Resolved,
+            gateway,
+            content,
+        );
+    }
 }
 
 export namespace TransactionMessage {
@@ -65,6 +78,7 @@ export namespace TransactionMessage {
         Request = 'REQUEST',
         Response = 'RESPONSE',
         Error = 'ERROR',
+        Resolved = 'RESOLVED',
     }
 
     export enum InvocationGateway {
@@ -118,5 +132,10 @@ export namespace TransactionMessage {
         homeTransactionId?: string | null;
     }
 
-    export type Content = PartiesContent | QuotesContent | TransfersContent | PatchContent;
+    export interface PatchResolvedContent {
+        correlationId: string;
+        occurredAt?: Date | string | null;
+    }
+
+    export type Content = PartiesContent | QuotesContent | TransfersContent | PatchContent | PatchResolvedContent;
 }

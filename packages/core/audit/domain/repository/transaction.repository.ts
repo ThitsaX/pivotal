@@ -486,6 +486,21 @@ export class TransactionRepository {
         return this.writeRepository.save(existing);
     }
 
+    async resolveDispute(correlationId: string, occurredAt: Date): Promise<boolean> {
+        const result = await this.writeRepository.query(
+            `UPDATE transactions
+             SET possible_dispute = 0,
+                 dispute_resolved_at = ?,
+                 updated_at = NOW()
+             WHERE correlation_id = ?`,
+            [occurredAt, correlationId],
+        );
+        const queryResult = Array.isArray(result) ? result[0] : result;
+        const affectedRows = Number((queryResult as {affectedRows?: number} | undefined)?.affectedRows ?? 0);
+
+        return affectedRows > 0;
+    }
+
     /**
      * Keyset (cursor) pagination. Replaces offset + getManyAndCount + select-*.
      *
@@ -1200,6 +1215,7 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            disputeResolvedAt: record.disputeResolvedAt,
             payerHomeTransactionId: record.payerHomeTransactionId,
             payeeHomeTransactionId: record.payeeHomeTransactionId,
             createdAt: record.createdAt,

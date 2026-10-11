@@ -8,6 +8,7 @@ import {
     AuditPartiesRequestCommand,
     AuditPartiesResponseCommand,
     AuditPatchErrorCommand,
+    AuditPatchResolvedCommand,
     AuditPatchRequestCommand,
     AuditPatchResponseCommand,
     AuditQuotesErrorCommand,
@@ -428,9 +429,48 @@ export class AuditTransactionConsumer implements OnModuleInit {
                 );
 
                 return;
+            case TransactionMessage.InvocationAction.Resolved:
+                if (message.gateway !== TransactionMessage.InvocationGateway.Connector) {
+                    this.logger.warn(
+                        `Ignoring resolved patch audit message from gateway=${String(message.gateway)}.`,
+                    );
+
+                    return;
+                }
+
+                await this.dispatchPatchResolved(message.content as TransactionMessage.PatchResolvedContent);
+
+                return;
             default:
                 throw new Error(`Unsupported patch action: ${String(message.action)}`);
         }
+    }
+
+    private async dispatchPatchResolved(content: TransactionMessage.PatchResolvedContent): Promise<void> {
+        if (typeof content?.correlationId !== 'string' || content.correlationId.trim() === '') {
+            this.logger.warn('Ignoring resolved patch audit message with missing correlationId.');
+
+            return;
+        }
+
+        const occurredAt = AuditTransactionConsumer.toRequiredOccurredAt(content.occurredAt);
+
+        if (occurredAt == null) {
+            this.logger.warn(
+                `Ignoring resolved patch audit message with invalid occurredAt for transferId='${content.correlationId}'.`,
+            );
+
+            return;
+        }
+
+        await this.commandBus.execute(
+            new AuditPatchResolvedCommand(
+                new AuditPatchResolvedCommand.Input(
+                    content.correlationId,
+                    occurredAt,
+                ),
+            ),
+        );
     }
 
     /**
@@ -443,6 +483,10 @@ export class AuditTransactionConsumer implements OnModuleInit {
             return;
         }
 
+        if (!AuditTransactionConsumer.shouldRecordLiveStats(message)) {
+            return;
+        }
+
         const correlationId = (message.content as {correlationId?: string} | undefined)?.correlationId;
 
         if (correlationId == null) {
@@ -452,11 +496,36 @@ export class AuditTransactionConsumer implements OnModuleInit {
         await this.liveStats.onTransactionEvent(correlationId);
     }
 
+    private static shouldRecordLiveStats(message: TransactionMessage): boolean {
+        if (
+            message.phase !== TransactionMessage.InvocationPhase.Patch ||
+            message.action !== TransactionMessage.InvocationAction.Resolved
+        ) {
+            return true;
+        }
+
+        const content = message.content as TransactionMessage.PatchResolvedContent | undefined;
+        const occurredAt = AuditTransactionConsumer.toRequiredOccurredAt(content?.occurredAt);
+
+        return (
+            message.gateway === TransactionMessage.InvocationGateway.Connector &&
+            typeof content?.correlationId === 'string' &&
+            content.correlationId.trim() !== '' &&
+            occurredAt != null
+        );
+    }
+
     private static toOccurredAt(value: Date | string | null | undefined): Date | null {
         if (value == null) {
             return null;
         }
 
         return value instanceof Date ? value : new Date(value);
+    }
+
+    private static toRequiredOccurredAt(value: Date | string | null | undefined): Date | null {
+        const occurredAt = AuditTransactionConsumer.toOccurredAt(value);
+
+        return occurredAt != null && !Number.isNaN(occurredAt.getTime()) ? occurredAt : null;
     }
 }
