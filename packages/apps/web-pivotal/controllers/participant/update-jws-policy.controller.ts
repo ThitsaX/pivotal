@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Body, Controller, Inject, Put} from '@nestjs/common';
-import {CommandBus} from '@nestjs/cqrs';
+import {Body, Controller, Get, Inject, Put, Query} from '@nestjs/common';
+import {CommandBus, QueryBus} from '@nestjs/cqrs';
 import {IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString} from 'class-validator';
 import {PermissionKey, RequiresPermission} from '@core/auth/domain';
-import {UpdateJwsPolicyCommand} from '@core/participant/domain';
+import {GetJwsPolicyQuery, UpdateJwsPolicyCommand} from '@core/participant/domain';
 import {FspiopVerifyMode} from '@shared/fspiop';
 
 export class UpdateJwsPolicyRequest {
@@ -39,7 +39,23 @@ export class UpdateJwsPolicyController {
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
+        @Inject(QueryBus)
+        private readonly queryBus: QueryBus,
     ) {
+    }
+
+    /**
+     * The current switches, so a screen can show them before an operator changes one. Gated on
+     * the update permission: reading them is only useful to someone who can change them.
+     */
+    @Get('jws-policy')
+    @RequiresPermission(PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE)
+    async getJwsPolicy(
+        @Query('fspId') fspId: string,
+    ): Promise<GetJwsPolicyQuery.Output> {
+        return this.queryBus.execute(
+            new GetJwsPolicyQuery(new GetJwsPolicyQuery.Input(fspId ?? '')),
+        );
     }
 
     @Put('jws-policy')

@@ -6,3 +6,5 @@ export * from './list-dfsp-certificates.query';
 export * from './list-dfsp-certificates.handler';
 export * from './get-dfsp-certificate.query';
 export * from './get-dfsp-certificate.handler';
+export * from './get-jws-policy.query';
+export * from './get-jws-policy.handler';

@@ -4,7 +4,10 @@
 #
 # The CA root ceremony against AWS CloudHSM. Run ONCE per deployment.
 #
-#   ./ceremony-hsm.sh
+#   WEB_INBOUND_HOST=web-inbound.example.com ./ceremony-hsm.sh
+#
+# WEB_INBOUND_HOST is web-inbound's public callback host. It is required: the ceremony re-creates
+# the Hub-facing mount, and the two roles that sign for that host are restored with it.
 #
 # This is the PKCS#11 counterpart of ../../kms/scripts/ceremony-kms.js and the
 # production counterpart of ../../local/scripts/ceremony-local.sh. All three do the
@@ -65,6 +68,16 @@ VAULT_TOKEN=${VAULT_TOKEN:-}
 
 ROOT_DAYS=${ROOT_DAYS:-3650}
 INTER_DAYS=${INTER_DAYS:-1825}
+
+# web-inbound's public callback host. Checked before any credential is asked for: a ceremony that
+# cannot restore every role it destroys must not start, because the missing roles surface only at
+# the next certificate renewal.
+WEB_INBOUND_HOST=${WEB_INBOUND_HOST:-}
+if [ -z "$WEB_INBOUND_HOST" ]; then
+  echo "WEB_INBOUND_HOST is not set. Set it to web-inbound's public callback host," >&2
+  echo "for example web-inbound.example.com." >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Engines
@@ -271,6 +284,27 @@ ceremony pki_hub_client "Pivotal Hub Client CA" "$CU_HUB" \
    key_bits=2048 max_ttl=2160h ttl=2160h organization='ThitsaWorks' ou='Pivotal' \
    no_store=true require_cn=false use_csr_common_name=false use_csr_sans=false" \
   pivotal-client
+
+# The Hub-facing mount carries two more roles, both for web-inbound's one host. The ceremony above
+# destroyed them with the mount, so they are put back here. The name on both certificates comes
+# from the request, never the CSR: MCM's callback CSR has an empty subject, and cert-manager's
+# request names the host itself.
+web_inbound_name_args="allow_any_name=false allowed_domains=$WEB_INBOUND_HOST \
+   allow_bare_domains=true allow_subdomains=false enforce_hostnames=true allow_ip_sans=false \
+   require_cn=true use_csr_common_name=false use_csr_sans=false key_bits=2048"
+
+# The server certificate web-inbound presents to the Hub. Signed by cert-manager.
+v "vault write pki_hub_client/roles/web-inbound-server $web_inbound_name_args \
+   server_flag=true client_flag=false max_ttl=2160h ttl=2160h \
+   ou='Pivotal' organization='ThitsaWorks' no_store=true" >/dev/null
+echo "  role restored: pki_hub_client/roles/web-inbound-server"
+
+# The client certificate the Hub presents when it calls web-inbound. Signed by trust-manager from
+# the CSR MCM generates.
+v "vault write pki_hub_client/roles/hub-callback-client $web_inbound_name_args \
+   server_flag=false client_flag=true max_ttl=8760h ttl=8760h \
+   organization='Mojaloop' key_type=rsa" >/dev/null
+echo "  role restored: pki_hub_client/roles/hub-callback-client"
 
 ceremony pki_dfsp "Pivotal DFSP-Facing CA" "$CU_DFSP" \
   "allow_any_name=true enforce_hostnames=false client_flag=true server_flag=false \

@@ -15,6 +15,8 @@ export class ParticipantErrorCode {
     static readonly CERT_ALREADY_REVOKED         = 'PARTICIPANT_CERT_ALREADY_REVOKED';
 
     static readonly CERT_STATUS_UNKNOWN          = 'PARTICIPANT_CERT_STATUS_UNKNOWN';
+
+    static readonly KEY_NOT_FOUND                = 'PARTICIPANT_KEY_NOT_FOUND';
 }
 
 export const PARTICIPANT_ERROR_MESSAGES: Record<string, string> = {
@@ -25,6 +27,7 @@ export const PARTICIPANT_ERROR_MESSAGES: Record<string, string> = {
     [ParticipantErrorCode.CERT_NOT_FOUND]:       'No certificate was found.',
     [ParticipantErrorCode.CERT_ALREADY_REVOKED]: 'That certificate has already been revoked.',
     [ParticipantErrorCode.CERT_STATUS_UNKNOWN]:  'That certificate status is not recognised.',
+    [ParticipantErrorCode.KEY_NOT_FOUND]:        'No JWS key record exists for that participant.',
 };
 
 export function participantError(code: string): { code: string; message: string } {

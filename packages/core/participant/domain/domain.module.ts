@@ -22,6 +22,7 @@ import {
 import {Participant, ParticipantCert, ParticipantCertStatus, ParticipantKey} from './model';
 import {
     GetDfspCertificateHandler,
+    GetJwsPolicyHandler,
     ListCentralLedgerParticipantsHandler,
     ListDfspCertificatesHandler,
 } from './query';
@@ -174,6 +175,7 @@ const QueryHandlers = [
     ListCentralLedgerParticipantsHandler,
     ListDfspCertificatesHandler,
     GetDfspCertificateHandler,
+    GetJwsPolicyHandler,
 ];
 
 @Module({})

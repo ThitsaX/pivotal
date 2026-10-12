@@ -91,8 +91,12 @@ cloudhsm-cli user create --username cu_ca_dfsp_root --role crypto-user
 
 ```bash
 cd docs/operations/hsm/setup/scripts
-./ceremony-hsm.sh
+WEB_INBOUND_HOST=<web-inbound public host> ./ceremony-hsm.sh
 ```
+
+`WEB_INBOUND_HOST` is required. The ceremony re-creates the `pki_hub_client` mount, which deletes
+every role on it, and puts back the two roles that sign for web-inbound's host: `web-inbound-server`
+and `hub-callback-client`. The script stops before asking for any credential if it is not set.
 
 It prompts for both crypto-user credentials and the Vault token. Nothing is passed on the command
 line, because a password in `argv` lands in shell history and in the process list.
