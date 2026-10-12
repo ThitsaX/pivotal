@@ -64,6 +64,50 @@ describe('WebOutboundSettings payer fee validation', () => {
             /Invalid environment variable POST_SENDMONEY_PAYEE_FSPID_REQUIRED/,
         );
     });
+
+    it('defaults suspicious transaction monitoring to documented examples', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.equal(outboundSettings.suspiciousTxnMonitoringEnabled, true);
+        assert.equal(outboundSettings.suspiciousTxnWindowMinutes, 3);
+        assert.equal(outboundSettings.suspiciousTxnThreshold, 10);
+        assert.equal(outboundSettings.suspiciousTxnWindowMs, 180_000);
+        assert.deepEqual(outboundSettings.suspiciousTxnMatchingFields, [
+            'payerFspId',
+            'payerIdValue',
+            'payeeFspId',
+            'payeeIdValue',
+            'amount',
+        ]);
+    });
+
+    it('reads suspicious transaction monitoring env overrides', () => {
+        const outboundSettings = settings({
+            SUSPICIOUS_TRANSACTION_MONITORING_ENABLED: 'false',
+            SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES: '5',
+            SUSPICIOUS_TRANSACTION_THRESHOLD: '20',
+            SUSPICIOUS_TRANSACTION_MATCHING_FIELDS: 'payerIdValue,amount,currency',
+        }).outboundSettings();
+
+        assert.equal(outboundSettings.suspiciousTxnMonitoringEnabled, false);
+        assert.equal(outboundSettings.suspiciousTxnWindowMinutes, 5);
+        assert.equal(outboundSettings.suspiciousTxnThreshold, 20);
+        assert.equal(outboundSettings.suspiciousTxnWindowMs, 300_000);
+        assert.deepEqual(outboundSettings.suspiciousTxnMatchingFields, [
+            'payerIdValue',
+            'amount',
+            'currency',
+        ]);
+    });
+
+    it('rejects invalid suspicious transaction matching fields', () => {
+        assert.throws(
+            () => settings({
+                SUSPICIOUS_TRANSACTION_MATCHING_FIELDS: 'payerFspId,notAField',
+            }).outboundSettings(),
+            /Invalid SUSPICIOUS_TRANSACTION_MATCHING_FIELDS value 'notAField'/,
+        );
+    });
 });
 
 

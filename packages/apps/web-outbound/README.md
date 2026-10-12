@@ -54,6 +54,10 @@ from the MySQL `transactions` table, not the TTL-bound Redis transfer cache.
 - `ACCESS_JWT_ENABLED`: protects send-money API with payer JWTs.
 - `DECIMAL_PLACES`: amount scale validation.
 - `CHECK_PAYER_FEE_AS_MANDATORY`: requires the exact `payerProvidedSchemeFee` and `payerProvidedPayerFee` extension keys when accepting a party; their string or number values are normalized and checked against `DECIMAL_PLACES`; defaults to `false`.
+- `SUSPICIOUS_TRANSACTION_MONITORING_ENABLED`: master switch for repetitive-pattern checks on acceptParty before Hub quote; defaults to `true`.
+- `SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES`: Redis counter window (TTL) in minutes; `0` disables; defaults to `3`.
+- `SUSPICIOUS_TRANSACTION_THRESHOLD`: matching attempts allowed in the window before rejection; `0` disables; defaults to `10`.
+- `SUSPICIOUS_TRANSACTION_MATCHING_FIELDS`: comma-separated allowlisted fields for the Redis pattern key (`payerFspId`, `payerIdValue`, `payeeFspId`, `payeeIdValue`, `amount`, optional `currency`).
 
 ## Debug Checklist
 
