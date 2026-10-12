@@ -10,7 +10,9 @@ export interface AuthDomainSettings {
 
     accessTokenTtlSeconds(): number;
 
-    refreshTokenTtlDays(): number;
+    sessionIdleTimeoutMinutes(): number;
+
+    sessionAbsoluteTimeoutHours(): number;
 
     bcryptCostFactor(): number;
 

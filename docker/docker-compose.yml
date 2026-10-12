@@ -281,6 +281,8 @@ services:
       # IAM bootstrap. Development values: the seeded administrator is expected to change the
       # temporary password on first sign-in, and the JWT secret must be replaced per deployment.
       PIVOTAL_IAM_JWT_SECRET: ${PIVOTAL_IAM_JWT_SECRET:-local-development-secret-change-me}
+      PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES: ${PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES:-30}
+      PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS: ${PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS:-12}
       PIVOTAL_IAM_ADMIN_SEED_EMAIL: ${PIVOTAL_IAM_ADMIN_SEED_EMAIL:-admin@example.com}
       PIVOTAL_IAM_ADMIN_SEED_TEMP_PASSWORD: ${PIVOTAL_IAM_ADMIN_SEED_TEMP_PASSWORD:-ChangeMe123!}
       <<: [*common_db_env, *report_storage_env, *common_key_env]

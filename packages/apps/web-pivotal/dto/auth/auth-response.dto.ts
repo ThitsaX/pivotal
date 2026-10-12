@@ -19,6 +19,9 @@ export class LoginResponseDto {
         public readonly user: AuthUserDto,
         public readonly permissions: string[],
         public readonly mustChangePassword: boolean,
+        public readonly sessionIdleTimeoutMinutes: number,
+        public readonly sessionExpiresAt: string,
+        public readonly sessionId: string,
     ) {
     }
 }
@@ -30,6 +33,9 @@ export class RefreshResponseDto {
         public readonly accessTokenExpiresIn: number,
         public readonly permissions: string[],
         public readonly mustChangePassword: boolean,
+        public readonly sessionIdleTimeoutMinutes: number,
+        public readonly sessionExpiresAt: string,
+        public readonly sessionId: string,
     ) {
     }
 }

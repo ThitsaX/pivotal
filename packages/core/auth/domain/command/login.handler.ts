@@ -82,20 +82,22 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
         const permissions = await this.rolePermissionRepository.findPermissionKeysByRoleId(role.id, DbTarget.Write);
 
         const familyId = RefreshToken.newFamilyId();
+        const issued = this.tokenService.issueRefreshToken();
         const accessToken = await this.tokenService.signAccessToken({
             userId:             user.id,
             roleCode:           role.code,
             fspId:              user.fspId,
             mustChangePassword: user.mustChangePassword,
             permissions,
+            sessionExpiresAt: issued.sessionExpiresAt,
         });
 
-        const issued = this.tokenService.issueRefreshToken();
         const refreshTokenEntity = new RefreshToken(
             user.id,
             familyId,
             issued.hash,
             issued.expiresAt,
+            issued.sessionExpiresAt,
         );
         await this.refreshTokenRepository.save(refreshTokenEntity);
 
@@ -111,6 +113,8 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginCommand.
                 mustChangePassword: user.mustChangePassword,
             },
             permissions,
+            issued.sessionExpiresAt,
+            familyId,
         );
     }
 

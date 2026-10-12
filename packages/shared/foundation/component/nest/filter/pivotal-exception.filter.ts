@@ -8,6 +8,7 @@ import {PivotalStatusTranslator} from '../../pivotal-status-translator';
 interface PivotalErrorResponse {
     code: string;
     message: string;
+    reason?: 'idle' | 'absolute';
 }
 
 @Catch()
@@ -55,12 +56,14 @@ export class PivotalExceptionFilter implements ExceptionFilter {
         const fallbackCode = PivotalExceptionFilter.codeForHttpStatus(status);
 
         if (body != null && typeof body === 'object') {
-            const obj = body as {code?: unknown; message?: unknown};
+            const obj = body as {code?: unknown; message?: unknown; reason?: unknown};
             const code = typeof obj.code === 'string' && obj.code.trim().length > 0 ? obj.code : fallbackCode;
             const message = typeof obj.message === 'string' && obj.message.trim().length > 0
                 ? obj.message
                 : exception.message;
-            return {code, message};
+            const reason = code === 'AUTH_SESSION_EXPIRED' && (obj.reason === 'idle' || obj.reason === 'absolute')
+                ? obj.reason : undefined;
+            return {code, message, ...(reason != null ? {reason} : {})};
         }
 
         if (typeof body === 'string' && body.trim().length > 0) {

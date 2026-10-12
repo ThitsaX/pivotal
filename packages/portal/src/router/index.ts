@@ -45,7 +45,8 @@ const buildLoginRedirect = (to: RouteLocationNormalized): RouteLocationRaw => {
         return '/login';
     }
 
-    return {path: '/login', query: {next: to.fullPath}};
+    const reason = authStore.sessionEndReason;
+    return {path: '/login', query: {next: to.fullPath, ...(reason === 'idle' || reason === 'expired' ? {reason} : {})}};
 };
 
 router.beforeEach((to): boolean | RouteLocationRaw => {
@@ -69,8 +70,11 @@ router.beforeEach((to): boolean | RouteLocationRaw => {
     return true;
 });
 
-authStore.onSessionExpired((): void => {
+authStore.onSessionExpired((reason): void => {
     const current = router.currentRoute.value;
 
-    void router.replace(buildLoginRedirect(current));
+    void router.replace({path: '/login', query: {
+        ...(current.path !== '/login' ? {next: current.fullPath} : {}),
+        ...(reason === 'idle' || reason === 'expired' ? {reason} : {}),
+    }});
 });

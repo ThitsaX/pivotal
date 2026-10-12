@@ -20,6 +20,8 @@ export namespace RefreshTokensCommand {
             public readonly refreshTokenExpiresAt: Date,
             public readonly permissions: string[],
             public readonly mustChangePassword: boolean,
+            public readonly sessionExpiresAt: Date,
+            public readonly sessionId: string,
         ) {
         }
     }

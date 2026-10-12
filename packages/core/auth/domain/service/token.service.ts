@@ -22,6 +22,7 @@ export interface IssuedRefreshToken {
     plaintext: string;
     hash: string;
     expiresAt: Date;
+    sessionExpiresAt: Date;
 }
 
 @Injectable()
@@ -44,6 +45,7 @@ export class TokenService {
         fspId: string | null;
         mustChangePassword: boolean;
         permissions: string[];
+        sessionExpiresAt?: Date;
     }): Promise<string> {
 
         const ttl = this.settings.accessTokenTtlSeconds();
@@ -58,7 +60,8 @@ export class TokenService {
             permissions:        input.permissions,
             mustChangePassword: input.mustChangePassword,
             iat:                now,
-            exp:                now + ttl,
+            exp:                Math.min(now + ttl, input.sessionExpiresAt == null
+                ? now + ttl : Math.floor(input.sessionExpiresAt.getTime() / 1000)),
             jti:                TokenService.SNOWFLAKE.nextId().toString(),
         };
 
@@ -84,14 +87,15 @@ export class TokenService {
         }
     }
 
-    issueRefreshToken(): IssuedRefreshToken {
+    issueRefreshToken(sessionExpiresAt?: Date): IssuedRefreshToken {
 
         const plaintext = randomBytes(TokenService.REFRESH_TOKEN_BYTES).toString('base64url');
         const hash = TokenService.hashRefreshToken(plaintext);
-        const ttlDays = this.settings.refreshTokenTtlDays();
-        const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+        const now = Date.now();
+        const deadline = sessionExpiresAt ?? new Date(now + this.settings.sessionAbsoluteTimeoutHours() * 3_600_000);
+        const expiresAt = new Date(Math.min(now + this.settings.sessionIdleTimeoutMinutes() * 60_000, deadline.getTime()));
 
-        return {plaintext, hash, expiresAt};
+        return {plaintext, hash, expiresAt, sessionExpiresAt: deadline};
     }
 
     static hashRefreshToken(plaintext: string): string {

@@ -15,6 +15,12 @@ const password = ref('');
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const lockoutMessage = ref<string | null>(null);
+const sessionMessage = computed(() => {
+    const reason = route.query.reason ?? authStore.sessionEndReason;
+    if (reason === 'idle') return 'You were signed out for inactivity. Please sign in again.';
+    if (reason === 'expired') return 'Your session has expired. Please sign in again.';
+    return null;
+});
 
 const submitDisabled = computed((): boolean => {
 
@@ -84,6 +90,10 @@ const handleSubmit = async (): Promise<void> => {
                 <h1 class="mt-2 text-2xl font-semibold text-ink">Sign in</h1>
                 <p class="mt-1 text-sm text-slate-500">Enter your credentials to continue.</p>
             </header>
+
+            <p v-if="sessionMessage" role="status" class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {{ sessionMessage }}
+            </p>
 
             <form class="space-y-4" @submit.prevent="handleSubmit">
                 <div>
