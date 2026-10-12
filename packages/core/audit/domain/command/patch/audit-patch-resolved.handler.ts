@@ -18,6 +18,10 @@ export class AuditPatchResolvedHandler
     }
 
     async execute(command: AuditPatchResolvedCommand): Promise<AuditPatchResolvedCommand.Output> {
+        this.logger.log(
+            `Processing PATCH RESOLVED audit transferId='${command.input.correlationId}' occurredAt='${command.input.occurredAt.toISOString()}'.`,
+        );
+
         const resolved = await this.transactionRepository.resolveDispute(
             command.input.correlationId,
             command.input.occurredAt,
@@ -26,6 +30,10 @@ export class AuditPatchResolvedHandler
         if (!resolved) {
             this.logger.error(
                 `No transaction found for resolved patch transferId='${command.input.correlationId}'.`,
+            );
+        } else {
+            this.logger.log(
+                `Resolved dispute in transactions table for transferId='${command.input.correlationId}'.`,
             );
         }
 

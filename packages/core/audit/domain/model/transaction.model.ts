@@ -284,7 +284,7 @@ export class Transaction {
     @Column({type: 'text', name: 'patch_error', nullable: true})
     public patchError!: string | null;
 
-    @Column({type: 'datetime', precision: 3, name: 'dispute_resolved_at', nullable: true})
+    @Column({type: 'datetime', precision: 6, name: 'dispute_resolved_at', nullable: true})
     public disputeResolvedAt!: Date | null;
 
     @Column({type: 'varchar', length: 128, name: 'payer_home_transaction_id', nullable: true})

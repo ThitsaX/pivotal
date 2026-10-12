@@ -430,6 +430,10 @@ export class AuditTransactionConsumer implements OnModuleInit {
 
                 return;
             case TransactionMessage.InvocationAction.Resolved:
+                this.logger.log(
+                    `Received PATCH RESOLVED audit message gateway=${String(message.gateway)}.`,
+                );
+
                 if (message.gateway !== TransactionMessage.InvocationGateway.Connector) {
                     this.logger.warn(
                         `Ignoring resolved patch audit message from gateway=${String(message.gateway)}.`,
@@ -454,19 +458,24 @@ export class AuditTransactionConsumer implements OnModuleInit {
         }
 
         const occurredAt = AuditTransactionConsumer.toRequiredOccurredAt(content.occurredAt);
+        const transferId = content.correlationId.trim();
 
         if (occurredAt == null) {
             this.logger.warn(
-                `Ignoring resolved patch audit message with invalid occurredAt for transferId='${content.correlationId}'.`,
+                `Ignoring resolved patch audit message with invalid occurredAt for transferId='${transferId}'.`,
             );
 
             return;
         }
 
+        this.logger.log(
+            `Dispatching PATCH RESOLVED audit message transferId='${transferId}' occurredAt='${occurredAt.toISOString()}'.`,
+        );
+
         await this.commandBus.execute(
             new AuditPatchResolvedCommand(
                 new AuditPatchResolvedCommand.Input(
-                    content.correlationId,
+                    transferId,
                     occurredAt,
                 ),
             ),
