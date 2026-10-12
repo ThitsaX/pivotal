@@ -8,6 +8,7 @@ import {
     AuditPartiesRequestCommand,
     AuditPartiesResponseCommand,
     AuditPatchErrorCommand,
+    AuditPatchResolvedCommand,
     AuditPatchRequestCommand,
     AuditPatchResponseCommand,
     AuditQuotesErrorCommand,
@@ -428,9 +429,57 @@ export class AuditTransactionConsumer implements OnModuleInit {
                 );
 
                 return;
+            case TransactionMessage.InvocationAction.Resolved:
+                this.logger.log(
+                    `Received PATCH RESOLVED audit message gateway=${String(message.gateway)}.`,
+                );
+
+                if (message.gateway !== TransactionMessage.InvocationGateway.Connector) {
+                    this.logger.warn(
+                        `Ignoring resolved patch audit message from gateway=${String(message.gateway)}.`,
+                    );
+
+                    return;
+                }
+
+                await this.dispatchPatchResolved(message.content as TransactionMessage.PatchResolvedContent);
+
+                return;
             default:
                 throw new Error(`Unsupported patch action: ${String(message.action)}`);
         }
+    }
+
+    private async dispatchPatchResolved(content: TransactionMessage.PatchResolvedContent): Promise<void> {
+        if (typeof content?.correlationId !== 'string' || content.correlationId.trim() === '') {
+            this.logger.warn('Ignoring resolved patch audit message with missing correlationId.');
+
+            return;
+        }
+
+        const occurredAt = AuditTransactionConsumer.toRequiredOccurredAt(content.occurredAt);
+        const transferId = content.correlationId.trim();
+
+        if (occurredAt == null) {
+            this.logger.warn(
+                `Ignoring resolved patch audit message with invalid occurredAt for transferId='${transferId}'.`,
+            );
+
+            return;
+        }
+
+        this.logger.log(
+            `Dispatching PATCH RESOLVED audit message transferId='${transferId}' occurredAt='${occurredAt.toISOString()}'.`,
+        );
+
+        await this.commandBus.execute(
+            new AuditPatchResolvedCommand(
+                new AuditPatchResolvedCommand.Input(
+                    transferId,
+                    occurredAt,
+                ),
+            ),
+        );
     }
 
     /**
@@ -458,5 +507,11 @@ export class AuditTransactionConsumer implements OnModuleInit {
         }
 
         return value instanceof Date ? value : new Date(value);
+    }
+
+    private static toRequiredOccurredAt(value: Date | string | null | undefined): Date | null {
+        const occurredAt = AuditTransactionConsumer.toOccurredAt(value);
+
+        return occurredAt != null && !Number.isNaN(occurredAt.getTime()) ? occurredAt : null;
     }
 }
