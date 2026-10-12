@@ -492,10 +492,6 @@ export class AuditTransactionConsumer implements OnModuleInit {
             return;
         }
 
-        if (!AuditTransactionConsumer.shouldRecordLiveStats(message)) {
-            return;
-        }
-
         const correlationId = (message.content as {correlationId?: string} | undefined)?.correlationId;
 
         if (correlationId == null) {
@@ -503,25 +499,6 @@ export class AuditTransactionConsumer implements OnModuleInit {
         }
 
         await this.liveStats.onTransactionEvent(correlationId);
-    }
-
-    private static shouldRecordLiveStats(message: TransactionMessage): boolean {
-        if (
-            message.phase !== TransactionMessage.InvocationPhase.Patch ||
-            message.action !== TransactionMessage.InvocationAction.Resolved
-        ) {
-            return true;
-        }
-
-        const content = message.content as TransactionMessage.PatchResolvedContent | undefined;
-        const occurredAt = AuditTransactionConsumer.toRequiredOccurredAt(content?.occurredAt);
-
-        return (
-            message.gateway === TransactionMessage.InvocationGateway.Connector &&
-            typeof content?.correlationId === 'string' &&
-            content.correlationId.trim() !== '' &&
-            occurredAt != null
-        );
     }
 
     private static toOccurredAt(value: Date | string | null | undefined): Date | null {
