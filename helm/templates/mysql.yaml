@@ -8,6 +8,9 @@ metadata:
     app.kubernetes.io/component: mysql
 spec:
   replicas: {{ .Values.mysql.replicaCount }}
+  revisionHistoryLimit: {{ .Values.global.revisionHistoryLimit }}
+  strategy:
+    {{- toYaml .Values.global.deploymentStrategy | nindent 4 }}
   selector:
     matchLabels:
       {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
@@ -17,10 +20,32 @@ spec:
       labels:
         {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mysql
+      {{- with .Values.global.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      {{- include "pivotal-stack.imagePullSecrets" . | nindent 6 }}
+      {{- with .Values.global.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.global.terminationGracePeriodSeconds }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: mysql
-          image: "{{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}"
+          image: {{ include "pivotal-stack.image" (dict "global" .Values.global "image" .Values.mysql.image "component" "mysql") | quote }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: mysql
@@ -28,26 +53,17 @@ spec:
               protocol: TCP
           env:
             {{- include "pivotal-stack.envVars" .Values.mysql.env | nindent 12 }}
+            {{- include "pivotal-stack.mysqlSecretEnv" . | nindent 12 }}
+          securityContext:
+            {{- toYaml (default .Values.global.containerSecurityContext .Values.mysql.securityContext) | nindent 12 }}
+          resources:
+            {{- toYaml (default .Values.global.defaultResources .Values.mysql.resources) | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.mysql.startupProbe | nindent 12 }}
           readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
-            initialDelaySeconds: 5
-            timeoutSeconds: 5
-            periodSeconds: 10
-            failureThreshold: 6
+            {{- toYaml .Values.mysql.readinessProbe | nindent 12 }}
           livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
-            initialDelaySeconds: 20
-            timeoutSeconds: 5
-            periodSeconds: 10
-            failureThreshold: 6
+            {{- toYaml .Values.mysql.livenessProbe | nindent 12 }}
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql

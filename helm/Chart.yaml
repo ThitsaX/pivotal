@@ -1,6 +1,6 @@
 apiVersion: v2
 name: pivotal-stack
-description: Helm chart for the pivotal docker-compose stack
+description: Pivotal services, DFSP connectors, and optional Istio and cert-manager resources
 type: application
-version: 0.1.0
-appVersion: "1.0.0"
+version: 0.2.0
+appVersion: "1.3.0"

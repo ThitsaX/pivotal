@@ -1,0 +1,38 @@
+{{- /*
+  cert-manager resources for the certificates cert-manager renews, chiefly the server certificate
+  the Pivotal callback gateway presents to the Hub. Each item's spec is passed through as written,
+  because issuers and certificates differ per environment (Vault address, auth role, host name).
+
+  Not here: the "<credentialName>-cacert" Secrets an Istio gateway reads its trust anchor from.
+  trust-manager keeps the DFSP-facing one up to date, and a Secret rendered by Helm would be
+  reset on every upgrade. Create those once by hand.
+*/}}
+{{- if .Values.certManager.clusterIssuers.enabled }}
+{{- range $issuer := .Values.certManager.clusterIssuers.items }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ required "certManager.clusterIssuers.items[].name is required" $issuer.name }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  {{- toYaml (required (printf "certManager.clusterIssuers.items[%s].spec is required" $issuer.name) $issuer.spec) | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- if .Values.certManager.certificates.enabled }}
+{{- range $cert := .Values.certManager.certificates.items }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ required "certManager.certificates.items[].name is required" $cert.name }}
+  {{- with $cert.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  {{- toYaml (required (printf "certManager.certificates.items[%s].spec is required" $cert.name) $cert.spec) | nindent 2 }}
+{{- end }}
+{{- end }}
