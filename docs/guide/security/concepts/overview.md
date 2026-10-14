@@ -14,25 +14,33 @@ Hub's certificates.
 
 ```mermaid
 flowchart LR
-    DFSP["DFSP system"]
+    DFSP["DFSP System"]
+
     subgraph Pivotal
-        DGW["DFSP-facing gateway"]
-        WO["web-outbound"]
+        DGW["DFSP-facing Gateway"]
+        WO["Web Outbound"]
         CON["Connector"]
-        CGW["Pivotal callback gateway"]
-        WI["web-inbound"]
-    end
-    subgraph Hub
-        HGW["Hub API gateway"]
-        HUB["Hub services"]
+        CGW["Callback Gateway"]
+        WI["Web Inbound"]
     end
 
-    DFSP -- "Leg 1: mTLS + DFSP access key JWS" --> DGW --> WO
-    WO -- "Leg 2: mTLS + Hub JWS signature (payer)" --> HGW
-    CON -- "Leg 3: mTLS + Hub JWS signature (payee)" --> HGW
-    HGW --> HUB
-    HUB -- "Leg 4: mTLS + JWS signature (sender)" --> CGW --> WI
+    subgraph Hub["Mojaloop Hub"]
+        HGW["Hub API Gateway"]
+        HS["Hub Services"]
+    end
+
+    DFSP -->|"Leg 1<br/>mTLS + DFSP Access Key JWS"| DGW
+    DGW --> WO
+
+    WO -->|"Leg 2 (Payer)<br/>mTLS + Hub JWS"| HGW
+    CON -->|"Leg 3 (Payee)<br/>mTLS + Hub JWS"| HGW
+
+    HGW --> HS
+
+    HS -->|"Leg 4 (Sender)<br/>mTLS + JWS"| CGW
+    CGW --> WI
 ```
+
 
 | Leg | Direction | mTLS: who presents what | JWS: who signs, who verifies |
 |---|---|---|---|
