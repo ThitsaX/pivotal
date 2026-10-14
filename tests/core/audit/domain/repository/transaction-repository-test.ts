@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
+import {Transaction} from '../../../../../packages/core/audit/domain/model/transaction.model';
 import {FindTransactionsQuery} from '../../../../../packages/core/audit/domain/query/find-transactions.query';
 import {TransactionRepository} from '../../../../../packages/core/audit/domain/repository/transaction.repository';
 
@@ -104,7 +105,7 @@ describe('TransactionRepository', () => {
             },
         };
 
-        await repository.upsert({
+        const id = await repository.upsert({
             correlationId: 'corr-1',
             payerFsp: 'payerfsp',
             payeeFsp: 'payeefsp',
@@ -117,7 +118,14 @@ describe('TransactionRepository', () => {
         });
 
         assert.equal(queries.length, 2);
+        assert.equal(id, 'txn-1');
         assert.match(queries[0]?.sql ?? '', /INSERT INTO transactions/);
+        const columns = /INSERT INTO transactions\s*\(([\s\S]*?)\)\s*VALUES/.exec(queries[0]?.sql ?? '')?.[1]
+            .split(',').map((column) => column.trim());
+        assert.ok(columns);
+        assert.equal(columns[0], 'correlation_id');
+        assert.ok(!columns.includes('id'));
+        assert.equal(queries[0]?.params[0], 'corr-1');
         assert.match(
             queries[0]?.sql ?? '',
             /WHEN transactions\.payer_id IS NOT NULL AND VALUES\(payer_id\) IS NULL THEN transactions\.payer_fsp/,
@@ -127,9 +135,31 @@ describe('TransactionRepository', () => {
             /WHEN transactions\.payee_id IS NOT NULL AND VALUES\(payee_id\) IS NULL THEN transactions\.payee_fsp/,
         );
         assert.equal(
-            queries[0]?.params[31],
+            queries[0]?.params[30],
             JSON.stringify(partiesResponse),
         );
+    });
+
+    it('saves new entities by correlation ID and preserves database BIGINT IDs exactly', async () => {
+        const writeRepository = {
+            async query(sql: string): Promise<Array<{id: string}>> {
+                return sql.startsWith('SELECT id FROM transactions') ? [{id: '887906513165762561'}] : [];
+            },
+            async save(): Promise<never> {
+                throw new Error('Must not use ORM-generated BIGINT insert IDs');
+            },
+        };
+        const repository = new TransactionRepository(writeRepository as never, {} as never);
+        const entity = Object.assign(new Transaction(), {
+            correlationId: 'new-transfer',
+            payerFsp: 'payer',
+            payeeFsp: 'payee',
+            transactionStartedAt: new Date('2026-09-15T21:13:29.246Z'),
+            error: false,
+        });
+
+        assert.equal(await repository.save(entity), entity);
+        assert.equal(entity.id, '887906513165762561');
     });
 
     it('resolves disputes with a direct idempotent update by correlation ID', async () => {
