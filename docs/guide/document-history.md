@@ -21,6 +21,9 @@ Document versions:
 
 ### 1.0 (draft)
 
+- **Corrected:** diagrams. The labels in Overview and trust-manager no longer overlap, and three
+  diagrams now match the code exactly: trust-manager's use of Redis, the access-key check in the
+  leg 1 flow, and the two-step Hub client certificate enrollment.
 - **Added:** Security section: mutual TLS and JWS on the DFSP-facing and Hub-facing sides, for the
   `vault-kv` and `pkcs11` key profiles. Concepts, setup, runbooks, reference, troubleshooting and
   known limitations.
