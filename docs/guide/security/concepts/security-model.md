@@ -56,7 +56,7 @@ flowchart TD
     D -- "No" --> X3["Rejected"]
     D -- "Yes" --> E{"Certificate belongs to the DFSP in FSPIOP-Source?"}
     E -- "No" --> X4["Rejected"]
-    E -- "Yes" --> G{"authorization JWS valid for that DFSP's access key, and matches the body?"}
+    E -- "Yes" --> G{"authorization JWS valid for that DFSP's access key? (unless ACCESS_JWT_ENABLED=false)"}
     G -- "No" --> X5["Rejected"]
     G -- "Yes" --> OK["Accepted"]
 ```

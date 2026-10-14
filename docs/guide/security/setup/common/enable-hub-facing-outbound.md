@@ -27,12 +27,12 @@ sequenceDiagram
     participant O as web-outbound / connector
     participant H as Hub API gateway
     T->>T: Generate RSA 4096 key and CSR
-    T->>M: Inbound enrollment (CSR)
+    T->>M: Submit the CSR, then ask for it to be signed (inbound enrollment)
     M-->>T: Certificate signed by the Hub CA
     T->>S: pivotal-hub-client-cert (tls.crt, tls.key)
     T->>M: GET /hub/ca
     T->>S: hub-ca-bundle (hub-ca.pem)
-    O->>S: Read files (reloaded every 60 s)
+    O->>S: Read the mounted Secret files (re-read every 60 s)
     O->>H: TLS with Hub client certificate + signed request
 ```
 

@@ -29,13 +29,16 @@ flowchart LR
     MCM["MCM (Hub)"]
     V["Vault"]
     K["Kubernetes Secrets"]
-    DB["Pivotal database"]
+    DB["Pivotal Database"]
     N["NATS"]
-    TM <-->|"certificates, CAs, public JWS keys"| MCM
-    TM -->|"signs the Hub callback certificate; reads CA chains"| V
-    TM -->|"writes named Secrets"| K
-    TM <-->|"tenant and peer public keys, signing settings"| DB
-    N -->|"new tenant announced"| TM
+    R["Redis"]
+
+    TM <-->|"Certificates, CAs,<br/>Public JWS Keys"| MCM
+    TM -->|"Sign Hub Callback Certificate<br/>Read CA Chains"| V
+    TM -->|"Write Named Secrets"| K
+    TM <-->|"Tenant and Peer Public Keys<br/>Signing Settings"| DB
+    N -->|"New Tenant Announced"| TM
+    TM <-->|"Job Locks<br/>Pending Callback Handover"| R
 ```
 
 ## What it does
