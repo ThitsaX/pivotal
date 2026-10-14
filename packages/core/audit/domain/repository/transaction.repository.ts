@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {BadRequestException, Injectable} from '@nestjs/common';
+import {BadRequestException, Injectable, Logger} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';
 import {Snowflake} from '@shared/snowflake';
@@ -13,6 +13,8 @@ import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from 
 
 @Injectable()
 export class TransactionRepository {
+
+    private readonly logger = new Logger(TransactionRepository.name);
 
     private static readonly SNOWFLAKE = Snowflake.get();
     private static readonly DEFAULT_SIZE = 20;
@@ -484,6 +486,29 @@ export class TransactionRepository {
         existing.updatedAt = new Date();
 
         return this.writeRepository.save(existing);
+    }
+
+    async resolveDispute(correlationId: string, occurredAt: Date): Promise<boolean> {
+        this.logger.log(
+            `Updating transaction dispute resolution transferId='${correlationId}' occurredAt='${occurredAt.toISOString()}'.`,
+        );
+
+        const result = await this.writeRepository.query(
+            `UPDATE transactions
+             SET possible_dispute = 0,
+                 dispute_resolved_at = ?,
+                 updated_at = NOW()
+             WHERE correlation_id = ?`,
+            [occurredAt, correlationId],
+        );
+        const queryResult = Array.isArray(result) ? result[0] : result;
+        const affectedRows = Number((queryResult as {affectedRows?: number} | undefined)?.affectedRows ?? 0);
+
+        this.logger.log(
+            `Transaction dispute resolution update finished transferId='${correlationId}' affectedRows=${affectedRows}.`,
+        );
+
+        return affectedRows > 0;
     }
 
     /**
@@ -1200,6 +1225,7 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            disputeResolvedAt: record.disputeResolvedAt,
             payerHomeTransactionId: record.payerHomeTransactionId,
             payeeHomeTransactionId: record.payeeHomeTransactionId,
             createdAt: record.createdAt,

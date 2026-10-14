@@ -127,8 +127,44 @@ describe('TransactionRepository', () => {
             /WHEN transactions\.payee_id IS NOT NULL AND VALUES\(payee_id\) IS NULL THEN transactions\.payee_fsp/,
         );
         assert.equal(
-            queries[0]?.params[30],
+            queries[0]?.params[31],
             JSON.stringify(partiesResponse),
         );
+    });
+
+    it('resolves disputes with a direct idempotent update by correlation ID', async () => {
+        const queries: Array<{sql: string; params: unknown[]}> = [];
+        const writeRepository = {
+            async query(sql: string, params: unknown[]): Promise<{affectedRows: number}> {
+                queries.push({sql, params});
+
+                return {affectedRows: 1};
+            },
+        };
+        const repository = new TransactionRepository(writeRepository as never, {} as never);
+        const occurredAt = new Date('2026-10-07T10:15:30.123Z');
+
+        const resolved = await repository.resolveDispute('transfer-1', occurredAt);
+
+        assert.equal(resolved, true);
+        assert.equal(queries.length, 1);
+        assert.match(queries[0]?.sql ?? '', /UPDATE transactions/);
+        assert.match(queries[0]?.sql ?? '', /possible_dispute = 0/);
+        assert.match(queries[0]?.sql ?? '', /dispute_resolved_at = \?/);
+        assert.match(queries[0]?.sql ?? '', /WHERE correlation_id = \?/);
+        assert.deepEqual(queries[0]?.params, [occurredAt, 'transfer-1']);
+    });
+
+    it('reports unresolved when the direct dispute update matches no transaction', async () => {
+        const writeRepository = {
+            async query(): Promise<{affectedRows: number}> {
+                return {affectedRows: 0};
+            },
+        };
+        const repository = new TransactionRepository(writeRepository as never, {} as never);
+
+        const resolved = await repository.resolveDispute('missing-transfer', new Date());
+
+        assert.equal(resolved, false);
     });
 });
