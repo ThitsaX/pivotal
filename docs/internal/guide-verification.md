@@ -12,7 +12,9 @@
 
 Staging gitops (`stg-liberia-gitops`) was used only as an example of a real deployment, never as the truth.
 
-**Date:** 2026-10-13
+**Date:** 2026-10-13, updated 2026-10-14
+
+**HSM checks in staging (read-only, 2026-10-14):** the HSM admin pod runs cloudhsm-cli, cloudhsm-pkcs11 and cloudhsm-jce 5.18.0, opensc 0.25.0, Vault CLI 1.13.1; `cluster hsm-info` lists 2 HSMs. `cloudhsm-cli user create` prompts for the password when `--password` is omitted; `key generate-file --encoding pem` exports a public key without a PIN in argv.
 
 **Result values:**
 
@@ -59,7 +61,7 @@ Paths are relative to the repo root. `connector:` means `pivotal-connector/imple
 | | • web-inbound and trust-manager are hard-coded to `database`. | | |
 | | • The Java connector reads it with default `vault-kv`, and accepts only `vault-kv` or `pkcs11`. | | |
 | A3 | Under `pkcs11`, **web-pivotal is expected to fail at startup.** Its `JwsSigner` factory requires `HSM_CRED_PATH`, but web-pivotal always passes an empty credential path. Staging leaves web-pivotal unset (`database`), deliberately. | **Unresolved: test needed** | `core/participant/domain/domain.module.ts:134-146,370-375`; `apps/web-pivotal/required.settings.ts:283-290` |
-| A3 | **Consequence:** under `pkcs11`, onboarding a DFSP in the portal provisions a **plaintext database key** (web-pivotal runs `database`). The correct HSM path is the manual `provision-hsm-tenant.sh`. Which is the supported HSM onboarding path? | **Unresolved: decision needed** | `onboard-fsp.handler.ts:82-92`; `docs/operations/hsm/runbooks/scripts/provision-hsm-tenant.sh` |
+| A3 | **Consequence:** under `pkcs11`, onboarding a DFSP in the portal provisions a **plaintext database key** (web-pivotal runs `database`). The correct HSM path is the manual `provision-hsm-tenant.sh`. Which is the supported HSM onboarding path? | **Decided: see D3** | `onboard-fsp.handler.ts:82-92`; `docs/operations/hsm/runbooks/scripts/provision-hsm-tenant.sh` |
 | A4 | Java connector under `pkcs11`: | Verified | `connector: …/key/CloudHsmJwsKeyProvider.java:142-190`; `wallet: docker-entrypoint.sh:10-29,61-80`; `wallet: Dockerfile:42-64` |
 | | • Uses the **AWS CloudHSM JCE provider**, not PKCS#11. | | |
 | | • Needs `CLOUDHSM_IP`, `HSM_CRED_PATH`, and `KEY_REF_PATH`/`<CONNECTOR_ID>`. | | |
@@ -120,7 +122,7 @@ Paths are relative to the repo root. `connector:` means `pivotal-connector/imple
 | A14 | `FSPIOP_JWS_VERIFY_MODE` (web-inbound) is `off` (default), `verify-if-present` or `require`. | Corrected | `participant-jws-policy-store.ts:34-35`; `peer-jws-sync.scheduler.ts:94`; `onboard-fsp.handler.ts:100` |
 | | • **It is only the fallback for a source with no `participant_key` row.** | | |
 | | • Peer rows (trust-manager) and own-tenant rows (onboarding) are created with `jws_verify_mode='off'`, so the per-row setting is what turns verification on. | | |
-| A14 | web-inbound **logs nothing when it rejects a signature.** Rejections are visible only in the response (3105 → HTTP 401; 3101/3102 → HTTP 400). | Verified | `fspiop-exception.filter.ts:37-47` |
+| A14 | web-inbound **logs nothing when it rejects a signature.** Rejections are visible only in the response (3105 → HTTP 401; 3101/3102 → HTTP 417, from `fspiop-status-translator.ts`). | Verified | `fspiop-exception.filter.ts:37-47` |
 | A17 | A new peer key takes effect at web-inbound within about `PEER_JWS_SYNC_INTERVAL_SECONDS` (300) + 5 s. | Verified | `peer-jws-sync.scheduler.ts`; `participant-signing-keys-cache.ts` |
 | A18 | web-outbound mTLS: | Verified | `apps/web-outbound/required.settings.ts:48-75`; `mutual-tls-agent.ts:31,79,91-126`; `outbound/domain/domain.module.ts:160-176` |
 | | • `FSPIOP_USE_MUTUAL_TLS`, `FSPIOP_MTLS_CLIENT_CERT_PATH`, `FSPIOP_MTLS_CLIENT_KEY_PATH`, `FSPIOP_MTLS_CA_PATH`. | | |
@@ -222,7 +224,7 @@ They are transcribed into `reference/` in phase 4, each table re-checked against
 |---|---|---|
 | D1 | Supported version | **v1.0.1–v1.2.0** (verified, no difference), or also v1.3.0 (staging runs it; the tag has to be fetched and checked) |
 | D2 | **The chart does not deploy trust-manager or any gateway/certificate resources** | (a) Fix the chart first (add trust-manager Deployment plus optional gateway and certificate templates), release, then document `helm install`. (b) Document the resources as YAML for the operator to apply, taken from the staging chart. |
-| D3 | **HSM onboarding path:** web-pivotal is expected to fail on `pkcs11`, and portal onboarding makes a database key | Test it, then either fix the code or document `provision-hsm-tenant.sh` as the only HSM onboarding path. **The `pkcs11` setup is not published until this is settled.** |
+| D3 | **HSM onboarding path:** web-pivotal is expected to fail on `pkcs11`, and portal onboarding makes a database key | **Decided 2026-10-14:** redesign. A custodian runs `provision-hsm-tenant.sh` inside the HSM admin pod; it creates the crypto user, the key, the sharing, and writes the keyRef and public key to Vault. Portal onboarding then only records the public key. `KEY_PROVIDER` becomes required. The guide's pkcs11 onboarding page and web-pivotal's pkcs11 settings are written once this ships. |
 | D4 | Defects found: | Fix before publishing, or document as-is with workarounds and known limitations |
 | | • ceremony scripts destroy two Vault roles; | |
 | | • KMS `dfsp-client` role is missing CSR settings; | |
@@ -231,3 +233,27 @@ They are transcribed into `reference/` in phase 4, each table re-checked against
 | | • no offboarding; | |
 | | • web-inbound does not log signature rejections. | |
 | D5 | `docs/operations/` conflicts (section 3) | Correct them as well, or retire them once the guide exists |
+
+---
+
+## 7. Found while writing the guide (2026-10-14)
+
+| # | Finding | Result | Evidence |
+|---|---|---|---|
+| W1 | `DFSP_CA_ROOT_PKI_MOUNT` cannot be turned off: an empty value falls back to `pki_dfsp_root`, which no ceremony creates. trust-manager publishes **only the intermediate** to the DFSP-facing gateway. Staging's `istio-ingress-ext/lets-enc-external-tls-cacert` holds one certificate, "Pivotal DFSP-Facing CA Intermediate". **Updated 2026-10-14:** the bundle also ends with `{"errors":["permission denied"]}` (see W12). Whether Envoy accepts a DFSP certificate against an intermediate-only trust anchor is **untested**. | **Unresolved: handshake test needed** (staging gateway is `OPTIONAL_MUTUAL`, mandatory=false); guide: known-limitations "The DFSP-facing trust anchor is not yet proven" **Fixed on branch (2026-10-14):** `DFSP_CA_ROOT_PKI_MOUNT` now defaults to empty (intermediate alone, as staging and dev2 intended).  **Resolved (2026-10-14):** Envoy documents `X509_V_FLAG_PARTIAL_CHAIN` set by default, so an intermediate in `trusted_ca` is a trust anchor (docs for v1.34.1 checked). Staging DFSP-facing gateway: Istio proxyv2 1.26.0 / Envoy 1.34.1-dev (BoringSSL), no custom validator in config_dump. A handshake test stays a normal verification step (enable-dfsp-facing Step 7). | `apps/trust-manager/required.settings.ts:74`; staging Secret read 2026-10-14 |
+| W2 | 3101/3102 map to HTTP 417, not 400, in both web-inbound and web-outbound. | Corrected (A14) | `shared/fspiop/component/fspiop-status-translator.ts:49-55` |
+| W3 | web-pivotal `POST /participant/signing-key` generates a key pair and returns the private key in the response. `POST /participant/signing-keys` (legacy) overwrites `participant_key.jws_public_key` and can store a private key in the database, without changing the signing key under `vault-kv`/`pkcs11`; trust-manager then reports divergence from MCM. (Merged with W15.) | Security review needed; guide: known-limitations rotation section says do not use either | `apps/web-pivotal/controllers/participant/generate-signing-key.controller.ts:29-46`; `add-signing-keys.controller.ts:33-48`; `core/participant/domain/command/add-signing-keys.handler.ts:35-55` |
+| W4 | `ceremony-hsm.sh` passes the HSM PIN inside the PKCS#11 URI on OpenSSL's command line; `ceremony-kms.js` passes the Vault token inside `kubectl exec sh -c`. Both contradict the scripts' own comments. | Defect (exposure inside the pod / on the operator machine) | `ceremony-hsm.sh` (`-key "$keyuri"`); `ceremony-kms.js` (`VAULT_DEV_ROOT_TOKEN`) |
+| W5 | Unshared HSM key: web-outbound **fails** the request (`No private key labelled '…' on this token`); it does not send unsigned. | Corrected | `shared/pkcs11/` `Pkcs11KeySigner` |
+| W6 | Stale log/comment text: `hub-ca-sync.scheduler.ts:88-92` says Java connectors need a restart after a Hub CA change (they reload, A18); `fspiop-mtls-client-cert-store.ts` says the client certificate is signed by Pivotal's CA; `mcm-ca-registration.scheduler.ts` "registering is not distributing". | Wrong text, no behaviour impact | as named |
+| W7 | `pki_hub_client/roles/pivotal-client` (and staging's `pivotal-hub-client-issuer`) is created by both ceremonies but used by nothing in the trust-manager design. | Decision: keep or drop | ceremony scripts; staging Certificates |
+| W8 | trust-manager RBAC has no `create` on the DFSP gateway `-cacert` Secret, so a deleted Secret must be re-created by hand. | Verified (by design) | `helm/templates/trust-manager-rbac.yaml` |
+| W9 | Chart 0.2.0: a connector with no `serviceAccount` block runs as `default`. | Verified | `helm/templates/serviceaccounts.yaml` |
+| W10 | Staging values still say "single HSM" and set `CLOUDHSM_DISABLE_KEY_AVAILABILITY_CHECK: "true"`; `cluster hsm-info` now lists 2 HSMs. | Staging change to consider | staging values; hsm-tools 2026-10-14 |
+| W11 | Ceremony scripts live in `docs/operations/`, which the client copy excludes. | Decision: where the scripts ship | plan section 8 |
+| W12 | Vault answers **403** (not 404) to trust-manager's unauthenticated read of `pki_dfsp_root/ca_chain`. `readPkiCaChain` treats only 404 as absent, so the JSON error body is appended to the DFSP-facing `-cacert` bundle and no warning is logged. Confirmed in staging 2026-10-14: `curl` from the HSM admin pod returns 403, and the bundle ends with `{"errors":["permission denied"]}`. | **Defect.** Fix: treat any non-200 as absent, and allow an empty `DFSP_CA_ROOT_PKI_MOUNT` to mean "no root" **Fixed on branch (2026-10-14):** `readPkiCaChain` returns null only for 404 or an empty body, and throws on any other status or a body with no certificate; the job then leaves the anchor unchanged. Tests added. Staging's Secret still holds the error text until trust-manager runs the fixed version (or the Secret is re-created). | `shared/vault/component/vault-client.ts` (`readPkiCaChain`); `dfsp-ca-publish.scheduler.ts:101-113`; staging read-only check |
+| W13 | The DFSP CA publish job never releases its Redis lock (no `finally`/`release` in `tick()`); every other job does. The lock lives `interval + 30 s`, so on one replica the job runs about every two hours, and a restart within that window skips it. | **Defect.** Guide states "within about two hours; a restart does not force it" **Fixed on branch (2026-10-14):** lock released in `finally`. Tests added. | `core/trust/domain/component/dfsp-ca-publish.scheduler.ts:116-138` vs `hub-ca-sync.scheduler.ts:102` |
+| W14 | Hub callback certificate: when onboarding fails after upload, the retry depends on the in-memory `onboardPending` flag. A restart loses it; the uploaded certificate is then "current" and is not published until the next renewal (about 11 months). | **Defect.** Guide: do not restart; the Hub operator runs `POST /dfsps/<id>/onboard` **Fixed on branch (2026-10-14):** pending flag also kept in Redis (`pivotal:trust:hub-callback-cert:onboard-pending`, `RedisFlag`), so a restart still retries. Test added. | `core/trust/domain/component/hub-callback-cert.enroller.ts:36-41,80-98,165-177` |
+| W15 | Merged into W3. | — | — |
+| W16 | KMS ceremony `pki_hub_client/roles/pivotal-client` lacks `use_csr_common_name=false use_csr_sans=false` (HSM ceremony sets them), so CSR names are honoured on a role with `allow_any_name=true`. Related to W7 (role unused). | Defect (low impact while unused) | `ceremony-kms.js` role write vs `ceremony-hsm.sh` |
+| W17 | Java connector booleans accept only `true` (any case) or `1`; `yes` silently means false. Node services accept `true/1/yes`. | Verified; guide's env reference states it | `connector: CoreConnectorConfiguration.java:320-324` |
