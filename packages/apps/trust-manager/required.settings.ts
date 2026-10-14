@@ -272,10 +272,10 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
     /**
      * trust-manager reads no private key on this path — the peer sync handles public
      * halves only. Declared because the participant domain constructs its key source
-     * eagerly; `database` keeps that construction inert.
+     * eagerly; `none` keeps that construction inert and loads no private key.
      */
     keyProvider(): KeyProvider {
-        return KeyProvider.Database;
+        return KeyProvider.None;
     }
 
     /**

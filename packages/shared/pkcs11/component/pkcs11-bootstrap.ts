@@ -43,13 +43,9 @@ export class Pkcs11Bootstrap implements OnModuleInit, OnModuleDestroy {
 
         const path = this.settings.credentialPath.trim();
 
-        // No path configured means this workload has no crypto user of its own. That is the
-        // provisioning shape: trust-manager deliberately holds no identity on the device, because
-        // it generates each tenant's key as that tenant, and a standing identity of its own would
-        // be one more thing able to sign.
+        // Only a workload that signs is given a device connection, and signing needs a crypto user.
         if (path.length === 0) {
-            await this.pool.start();
-            return;
+            throw new Error('No crypto-user credential path is set, so this workload cannot sign.');
         }
 
         const password = await this.vaultClient.readKvField(path, Pkcs11Bootstrap.PASSWORD_FIELD);
@@ -73,26 +69,6 @@ export class Pkcs11Bootstrap implements OnModuleInit, OnModuleDestroy {
             `Signing through PKCS#11 as '${username.length > 0 ? username : '(pin only)'}', `
             + `credential from Vault path '${path}'.`,
         );
-    }
-
-    /** Reads one tenant's crypto-user credential, for an operation performed as that tenant. */
-    async credentialFor(vaultPath: string): Promise<Pkcs11SessionPool.Credential> {
-
-        const password = await this.vaultClient.readKvField(
-            vaultPath, Pkcs11Bootstrap.PASSWORD_FIELD);
-
-        if (password == null || password.length === 0) {
-            throw new Error(
-                `No crypto-user password at Vault path '${vaultPath}' field `
-                + `'${Pkcs11Bootstrap.PASSWORD_FIELD}'. The crypto user is created by a custodian `
-                + 'before onboarding; this reads it, and cannot create it.',
-            );
-        }
-
-        const username =
-            await this.vaultClient.readKvField(vaultPath, Pkcs11Bootstrap.USERNAME_FIELD) ?? '';
-
-        return {username, password};
     }
 
     async onModuleDestroy(): Promise<void> {

@@ -6,8 +6,8 @@ import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
 import {CentralLedgerAxios, CentralLedgerAxiosParams, CentralLedgerFacade} from '@shared/central-ledger';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {KeyProvider, VaultClient, VaultSettings} from '@shared/vault';
-import {JwsSigner, PrivateKeyJwsSigner} from '@shared/fspiop';
-import {Pkcs11Bootstrap, Pkcs11JwsSigner, Pkcs11KeyGenerator, Pkcs11Settings} from '@shared/pkcs11';
+import {JwsSigner, NoKeyJwsSigner, PrivateKeyJwsSigner} from '@shared/fspiop';
+import {Pkcs11Bootstrap, Pkcs11JwsSigner, Pkcs11Settings} from '@shared/pkcs11';
 import {
     AddFspCurrencyHandler,
     AddHubCurrencyHandler,
@@ -40,6 +40,7 @@ import {
     DatabaseJwsPrivateKeySource,
     DeviceHeldJwsPrivateKeySource,
     JwsPrivateKeySource,
+    NoJwsPrivateKeySource,
     VaultJwsPrivateKeySource,
 } from './component/store/jws-private-key-source';
 import {JwsKeyRefSource, VaultJwsKeyRefSource} from './component/store/jws-key-ref-source';
@@ -48,6 +49,7 @@ import {ParticipantJwsPrivateKeyStore} from './component/store/participant-jws-p
 import {
     DatabaseJwsKeyProvisioner,
     JwsKeyProvisioner,
+    NoJwsKeyProvisioner,
     Pkcs11JwsKeyProvisioner,
     VaultJwsKeyProvisioner,
 } from './component/store/jws-key-provisioner';
@@ -240,16 +242,19 @@ export class ParticipantDomainModule {
     /**
      * Chooses where private keys come from.
      *
-     * A deployment that has not declared a `KEY_PROVIDER` keeps the database source, so this change
-     * is not a breaking one — but that source is legacy and stores keys in plaintext. Declaring
-     * `vault-kv` without configuring Vault **throws**: falling back would leave keys in the database
-     * while an operator believed otherwise.
+     * A deployment that has not declared a `KEY_PROVIDER` holds no signing keys, so it reads none.
+     * Declaring `vault-kv` without configuring Vault **throws**: falling back would leave keys
+     * somewhere an operator believed they were not.
      */
     static createPrivateKeySource(
         settings: ParticipantDomainModule.RequiredSettings,
     ): JwsPrivateKeySource {
 
-        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.None;
+
+        if (keyProvider === KeyProvider.None) {
+            return new NoJwsPrivateKeySource();
+        }
 
         if (keyProvider === KeyProvider.Database) {
             return new DatabaseJwsPrivateKeySource();
@@ -285,7 +290,7 @@ export class ParticipantDomainModule {
         settings: ParticipantDomainModule.RequiredSettings,
     ): JwsKeyRefSource | undefined {
 
-        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.None;
 
         if (keyProvider !== KeyProvider.Pkcs11) {
             return undefined;
@@ -312,15 +317,19 @@ export class ParticipantDomainModule {
     }
 
     /**
-     * Builds the device connection under `pkcs11`, and nothing under any other profile.
+     * Builds the device connection for a workload that signs under `pkcs11`, and nothing otherwise.
+     *
+     * A workload with no crypto-user credential path does not sign. It reads key references and
+     * public keys from Vault and never needs the device, so it loads no device library at all.
      */
     static createPkcs11Bootstrap(
         settings: ParticipantDomainModule.RequiredSettings,
     ): Pkcs11Bootstrap | null {
 
-        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.None;
 
-        if (keyProvider !== KeyProvider.Pkcs11) {
+        if (keyProvider !== KeyProvider.Pkcs11
+            || (settings.pkcs11Settings?.()?.credentialPath ?? '').trim().length === 0) {
             return null;
         }
 
@@ -328,9 +337,8 @@ export class ParticipantDomainModule {
 
         if (pkcs11Settings == null || !pkcs11Settings.isConfigured()) {
             throw new Error(
-                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but the device is not configured. `
-                + 'Set PKCS11_MODULE_PATH. A workload that signs also needs HSM_CRED_PATH; '
-                + 'one that only provisions leaves it unset and authenticates as each tenant.',
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' and HSM_CRED_PATH is set, but the device `
+                + 'is not configured. Set PKCS11_MODULE_PATH.',
             );
         }
 
@@ -359,21 +367,21 @@ export class ParticipantDomainModule {
         pkcs11: Pkcs11Bootstrap | null,
     ): JwsSigner {
 
-        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.None;
+
+        if (keyProvider === KeyProvider.None) {
+            return new NoKeyJwsSigner();
+        }
 
         if (keyProvider !== KeyProvider.Pkcs11) {
             return new PrivateKeyJwsSigner(new ParticipantJwsPrivateKeyStore(cache));
         }
 
-        // A signer needs a standing identity on the device, and an absent credential path is what
-        // selects the provisioning mode that has none. Without this a workload meant to sign would
-        // start looking healthy and refuse every signature at request time -- a startup failure
-        // traded for a runtime one, which is the wrong way round.
+        // No crypto-user credential means this workload does not sign: it holds no standing identity
+        // on the device. A workload that is configured to sign refuses to start without one, in its
+        // own settings, where it knows that it signs.
         if ((settings.pkcs11Settings?.()?.credentialPath ?? '').trim().length === 0) {
-            throw new Error(
-                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' and this workload signs, so it needs its `
-                + 'own crypto user. Set HSM_CRED_PATH to the Vault path holding that credential.',
-            );
+            return new NoKeyJwsSigner();
         }
 
         if (pkcs11 == null) {
@@ -396,15 +404,18 @@ export class ParticipantDomainModule {
      * provisioning into the wrong custody is worse than failing, because it succeeds visibly while
      * putting a private key somewhere an operator believes it is not.
      *
-     * Unlike the read side, `pkcs11` throws from the provisioner rather than from this factory. A
-     * deployment on that profile can still start and serve traffic for tenants keyed elsewhere; it
-     * simply cannot create new ones until the HSM path exists.
+     * Under `pkcs11` nothing is created here: a custodian creates the key in the HSM beforehand,
+     * and the provisioner only reads back what the custodian recorded in Vault.
      */
     static createKeyProvisioner(
         settings: ParticipantDomainModule.RequiredSettings,
     ): JwsKeyProvisioner {
 
-        const keyProvider = settings.keyProvider?.() ?? KeyProvider.Database;
+        const keyProvider = settings.keyProvider?.() ?? KeyProvider.None;
+
+        if (keyProvider === KeyProvider.None) {
+            return new NoJwsKeyProvisioner();
+        }
 
         if (keyProvider === KeyProvider.Database) {
             return new DatabaseJwsKeyProvisioner();
@@ -412,23 +423,18 @@ export class ParticipantDomainModule {
 
         if (keyProvider === KeyProvider.Pkcs11) {
 
-            const bootstrap = ParticipantDomainModule.createPkcs11Bootstrap(settings);
             const vaultSettings = settings.vaultSettings?.();
 
-            if (bootstrap == null || vaultSettings == null) {
+            if (vaultSettings == null || !vaultSettings.isConfigured()) {
                 throw new Error(
-                    `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but the device or Vault is not `
-                    + 'configured, so no key can be created.',
+                    `KEY_PROVIDER is '${KeyProvider.Pkcs11}' but Vault is not configured. The key `
+                    + 'reference and public key a custodian provisions are read from Vault.',
                 );
             }
 
             return new Pkcs11JwsKeyProvisioner(
-                new Pkcs11KeyGenerator(bootstrap.pool),
-                bootstrap,
                 new VaultClient(vaultSettings),
-                settings.hsmCredentialPathPrefix?.() ?? 'pivotal/hsmcred',
                 settings.keyRefPathPrefix?.() ?? 'pivotal/keyref',
-                settings.sharedSigningCryptoUser?.() ?? 'cu_web_outbound',
             );
         }
 
@@ -505,7 +511,7 @@ export namespace ParticipantDomainModule {
 
         centralLedgerAxiosParams(): CentralLedgerAxiosParams
 
-        /** Absent means {@link KeyProvider.Database} — legacy, for continuity only. */
+        /** Absent means {@link KeyProvider.None}: no Hub-facing signing keys are held or created. */
         keyProvider?(): KeyProvider;
 
         /** Required when {@link keyProvider} returns {@link KeyProvider.VaultKv} or
@@ -520,18 +526,6 @@ export namespace ParticipantDomainModule {
 
         /** Required when {@link keyProvider} returns {@link KeyProvider.Pkcs11}. */
         pkcs11Settings?(): Pkcs11Settings;
-
-        /**
-         * Path prefix for tenant crypto-user credentials, under {@link KeyProvider.Pkcs11}.
-         * Defaults to `pivotal/hsmcred` — where a custodian writes them at onboarding.
-         */
-        hsmCredentialPathPrefix?(): string;
-
-        /**
-         * Crypto user that signs on tenants' behalf. Named only in the reminder that a newly
-         * generated key still has to be shared with it.
-         */
-        sharedSigningCryptoUser?(): string;
 
         /** Absent where the deployment issues no DFSP certificates. */
         dfspCertIssuerSettings?(): DfspCertificateIssuer.Settings;

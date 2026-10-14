@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ReportDownloadSettings } from '@core/audit/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm';
 import { DfspCertificateIssuer } from '@core/participant/domain';
 import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
-import { Pkcs11Settings } from '@shared/pkcs11';
 import type { WebPivotalModule } from './web-pivotal.module';
 
 export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
@@ -262,61 +262,38 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     }
 
     /**
-     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
-     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
-     * a typo must not silently decide where private keys live.
+     * Which key profile onboarding creates keys under. Unset or `none` creates none: a deployment
+     * that has not turned on JWS onboards DFSPs without a Hub-facing signing key. An unrecognised
+     * value throws rather than defaulting — a typo must not decide where private keys live.
      */
     keyProvider(): KeyProvider {
-        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+        const keyProvider = KeyProvider.parse(
+            this.configService.get<string>('KEY_PROVIDER'), KeyProvider.None);
+
+        // Said once at startup, because this service cannot tell whether the deployment signs:
+        // FSPIOP_USE_JWS belongs to web-outbound. Where it does, onboarding without a key profile
+        // leaves each new DFSP unable to sign, and this line is the only trace of why.
+        if (keyProvider === KeyProvider.None && !WebPivotalSettings.unsetKeyProviderLogged) {
+            WebPivotalSettings.unsetKeyProviderLogged = true;
+            new Logger(WebPivotalSettings.name).warn(
+                'KEY_PROVIDER is not set: DFSPs are onboarded without a Hub-facing signing key. Set it '
+                + 'to vault-kv or pkcs11, matching web-outbound, if this deployment signs.');
+        }
+
+        return keyProvider;
     }
 
+    private static unsetKeyProviderLogged = false;
+
     /**
-     * Where key references are written, under `KEY_PROVIDER=pkcs11`.
+     * Where key records are read from, under `KEY_PROVIDER=pkcs11`.
      *
-     * This service *writes* them, unlike the signing services which only read: onboarding creates
-     * the key and records the reference that every reader then resolves.
+     * A custodian's provisioning script writes each tenant's key reference and public key here
+     * before onboarding. This service only reads them: it holds no HSM credential and never
+     * reaches the device.
      */
     keyRefPathPrefix(): string {
         return this.configService.get<string>('KEY_REF_PATH') ?? 'pivotal/keyref';
-    }
-
-    /**
-     * Where tenant crypto-user credentials are read from, under `KEY_PROVIDER=pkcs11`.
-     *
-     * A custodian writes each one before onboarding, because creating a crypto user needs a Crypto
-     * Officer and no service holds that. This service reads them to generate a tenant's key **as
-     * that tenant** — ownership is conferred at creation and cannot be transferred, so generating
-     * as a service identity would let that identity sign as every tenant it ever onboarded.
-     */
-    hsmCredentialPathPrefix(): string {
-        return this.configService.get<string>('HSM_CRED_PATH_PREFIX') ?? 'pivotal/hsmcred';
-    }
-
-    /**
-     * The crypto user that signs on tenants' behalf.
-     *
-     * Named only in the reminder logged after provisioning: a newly generated key is owned by its
-     * tenant and must still be shared with this user before anything can sign on that tenant's
-     * behalf. Sharing has no PKCS#11 equivalent, so it stays a manual step.
-     */
-    sharedSigningCryptoUser(): string {
-        return this.configService.get<string>('HSM_SHARED_SIGNING_USER') ?? 'cu_web_outbound';
-    }
-
-    /**
-     * How this workload reaches the device, under `KEY_PROVIDER=pkcs11`.
-     *
-     * No credential path: this service holds no standing identity on the device. It borrows each
-     * tenant's for the one operation that needs it and gives it back, so an empty path is what
-     * selects that mode rather than an oversight.
-     */
-    pkcs11Settings(): Pkcs11Settings {
-        return new Pkcs11Settings(
-            this.configService.get<string>('PKCS11_MODULE_PATH') ?? '',
-            this.configService.get<string>('PKCS11_TOKEN_LABEL') ?? '',
-            '',
-            this.keyRefPathPrefix(),
-        );
     }
 
     /**

@@ -1,7 +1,9 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
+import {generateKeyPairSync} from 'node:crypto';
 import {
     DatabaseJwsKeyProvisioner,
+    NoJwsKeyProvisioner,
     Pkcs11JwsKeyProvisioner,
     VaultJwsKeyProvisioner,
 } from '../../../../../../packages/core/participant/domain/component/store/jws-key-provisioner';
@@ -59,93 +61,79 @@ describe('VaultJwsKeyProvisioner', () => {
     });
 });
 
-class FakeGenerator {
+const PUBLIC_KEY = generateKeyPairSync('rsa', {modulusLength: 2048})
+    .publicKey.export({type: 'spki', format: 'pem'}).toString();
 
-    readonly calls: {username: string; label: string}[] = [];
-
-    generate(credential: {username: string; password: string}, label: string): Promise<string> {
-        this.calls.push({username: credential.username, label});
-        return Promise.resolve('-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----\n');
-    }
-}
-
-class FakeCredentials {
+/** What the custodian's provisioning script leaves in Vault, keyed by path. */
+class FakeKeyRecords {
 
     readonly reads: string[] = [];
 
-    credentialFor(vaultPath: string): Promise<{username: string; password: string}> {
-        this.reads.push(vaultPath);
-        const fspId = vaultPath.split('/').pop();
-        return Promise.resolve({username: `cu-${fspId}`, password: 'secret'});
+    constructor(private readonly records: Record<string, Record<string, string>>) {
+    }
+
+    readKvField(path: string, field: string): Promise<string | undefined> {
+        this.reads.push(path);
+        return Promise.resolve(this.records[path]?.[field]);
     }
 }
 
-function pkcs11Provisioner(generator = new FakeGenerator(), credentials = new FakeCredentials()) {
-    const vault = new FakeVault();
-    const provisioner = new Pkcs11JwsKeyProvisioner(
-        generator as any, credentials, vault as any,
-        'pivotal/hsmcred', 'pivotal/keyref', 'cu-web-outbound');
+function pkcs11Provisioner(records: Record<string, Record<string, string>>) {
+    const vault = new FakeKeyRecords(records);
 
-    return {provisioner, vault, generator, credentials};
+    return {provisioner: new Pkcs11JwsKeyProvisioner(vault, 'pivotal/keyref'), vault};
 }
 
 describe('Pkcs11JwsKeyProvisioner', () => {
 
-    it('should generate as the tenant, not as a service identity', async () => {
-        // The device confers ownership at creation and cannot transfer it, so whoever generates a
-        // key can always sign with it. Generating as anyone but the tenant hands that ability to
-        // whoever generated it, for every tenant it ever onboarded.
-        const {provisioner, credentials, generator} = pkcs11Provisioner();
-
-        await provisioner.provision('DemoDFSP1');
-
-        assert.deepEqual(credentials.reads, ['pivotal/hsmcred/DemoDFSP1']);
-        assert.equal(generator.calls[0].username, 'cu-DemoDFSP1');
-    });
-
-    it('should write a key reference the reader can resolve', async () => {
-        // The prefix and field have to agree with VaultJwsKeyRefSource, or provisioning succeeds
-        // and signing then reports a tenant with no key.
-        const {provisioner, vault} = pkcs11Provisioner();
-
-        await provisioner.provision('DemoDFSP1');
-
-        assert.equal(vault.writes[0].path, 'pivotal/keyref/DemoDFSP1');
-        assert.equal(vault.writes[0].field, 'keyRef');
-        assert.equal(vault.writes[0].value.startsWith('DemoDFSP1-jws-'), true);
-    });
-
-    it('should mint a new reference on every call, never reusing a label', async () => {
-        // Rotation calls this again. A reused label would leave two keys answering to one
-        // reference, and the device would sign with whichever it happened to find.
-        const {provisioner, vault} = pkcs11Provisioner();
-
-        await provisioner.provision('DemoDFSP1');
-        await new Promise(resolve => setTimeout(resolve, 1100));
-        await provisioner.provision('DemoDFSP1');
-
-        assert.notEqual(vault.writes[0].value, vault.writes[1].value);
-    });
-
-    it('should return no private key, because none exists outside the device', async () => {
-        const {provisioner} = pkcs11Provisioner();
+    it('should record the public key a custodian provisioned', async () => {
+        const {provisioner, vault} = pkcs11Provisioner({
+            'pivotal/keyref/DemoDFSP1': {keyRef: 'DemoDFSP1-jws-20261014T1200', publicKey: PUBLIC_KEY},
+        });
 
         const provisioned = await provisioner.provision('DemoDFSP1');
 
+        // The path has to agree with VaultJwsKeyRefSource and with what the script writes.
+        assert.ok(vault.reads.every(path => path === 'pivotal/keyref/DemoDFSP1'));
+        assert.equal(provisioned.publicKeyPem, PUBLIC_KEY);
         assert.equal(provisioned.legacyPrivateKeyPem, undefined);
-        assert.match(provisioned.publicKeyPem, /BEGIN PUBLIC KEY/);
     });
 
-    it('should fail rather than provision a tenant whose crypto user does not exist', async () => {
-        // The crypto user is created by a custodian, because creating one needs a Crypto Officer
-        // and no service holds that. This process can be given access to a tenant; it cannot
-        // invent one.
-        const credentials = {
-            credentialFor: () => Promise.reject(new Error('No crypto-user password at Vault path')),
-        };
-        const {provisioner} = pkcs11Provisioner(new FakeGenerator(), credentials as any);
+    it('should refuse a DFSP whose key has not been provisioned yet', async () => {
+        const {provisioner} = pkcs11Provisioner({});
 
-        await assert.rejects(provisioner.provision('DemoDFSP1'), /No crypto-user password/);
+        await assert.rejects(provisioner.assertReady('DemoDFSP1'), {code: 'PARTICIPANT_HSM_KEY_NOT_FOUND'});
+        await assert.rejects(provisioner.provision('DemoDFSP1'), {code: 'PARTICIPANT_HSM_KEY_NOT_FOUND'});
+    });
+
+    it('should refuse a record holding a key reference but no public key', async () => {
+        // Left by a provisioning run that stopped part-way. Recording nothing is better than
+        // recording a key MCM could never match.
+        const {provisioner} = pkcs11Provisioner({
+            'pivotal/keyref/DemoDFSP1': {keyRef: 'DemoDFSP1-jws-20261014T1200'},
+        });
+
+        await assert.rejects(provisioner.assertReady('DemoDFSP1'), {code: 'PARTICIPANT_HSM_KEY_NOT_FOUND'});
+    });
+
+    it('should refuse a public key that is not one', async () => {
+        const {provisioner} = pkcs11Provisioner({
+            'pivotal/keyref/DemoDFSP1': {keyRef: 'DemoDFSP1-jws-20261014T1200', publicKey: 'not a key'},
+        });
+
+        await assert.rejects(provisioner.assertReady('DemoDFSP1'), {code: 'PARTICIPANT_HSM_KEY_RECORD_INVALID'});
+    });
+});
+
+describe('NoJwsKeyProvisioner', () => {
+
+    it('should create no key and refuse nothing', async () => {
+        // What an unset KEY_PROVIDER selects: a deployment that has not turned on JWS onboards
+        // DFSPs without keeping keys it would never use.
+        const provisioner = new NoJwsKeyProvisioner();
+
+        await provisioner.assertReady('DemoDFSP1');
+        assert.equal(await provisioner.provision('DemoDFSP1'), null);
     });
 });
 
