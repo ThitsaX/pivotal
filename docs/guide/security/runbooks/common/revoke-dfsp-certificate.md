@@ -42,7 +42,7 @@ Make web-outbound refuse every request that presents the revoked certificate.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> get deploy web-outbound \
+  kubectl -n pivotal get deploy web-outbound \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="DFSP_FACING_MTLS_MANDATORY")].value}'
   ```
 
@@ -99,7 +99,7 @@ Revocation cannot be undone.
   `The client certificate presented has been revoked.` web-outbound logs:
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/web-outbound --since=15m | grep "is revoked"
+  kubectl -n pivotal logs deploy/web-outbound --since=15m | grep "is revoked"
   ```
 
   Expected: `Rejected '<FSP_ID>': certificate <FINGERPRINT> is revoked.`

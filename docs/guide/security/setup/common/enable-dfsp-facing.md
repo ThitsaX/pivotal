@@ -50,9 +50,8 @@ and `FSPIOP-Source` name different participants.
 - Your profile's Deploy Pivotal page verified: [vault-kv](../vault-kv/4-deploy-pivotal.md) or
   [pkcs11](../pkcs11/5-deploy-pivotal.md).
 - Two DFSPs onboarded, each with an access public key registered, called `<DFSP_A>` and `<DFSP_B>`
-  below. `vault-kv`: the "Onboard test DFSPs" step of [your setup sequence](../vault-kv/index.md).
-  `pkcs11`: onboarding is not available in this release, so Steps 5 to 7 cannot be completed; see
-  [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
+  below: the "Onboard test DFSPs" step of your setup sequence ([vault-kv](../vault-kv/index.md),
+  [pkcs11](../pkcs11/index.md)).
 - A server TLS certificate for the DFSP-facing host, as a Secret in the gateway's namespace, and a DNS
   record for the host. This page calls the Secret `<DFSP_GATEWAY_CREDENTIAL>` (see the
   [shared worksheet](hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet)). **It must be used

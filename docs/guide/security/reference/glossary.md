@@ -74,19 +74,21 @@ Full details are in [Certificates and keys](../concepts/certificates-and-keys.md
 
 | Term | Meaning |
 |---|---|
-| Key profile | Where Pivotal keeps its root CA keys and Hub JWS signing keys. Set with `KEY_PROVIDER`. |
+| Key profile | Where Pivotal keeps its root CA keys and Hub JWS signing keys. Set with `KEY_PROVIDER` (Hub JWS keys) and by the CA ceremony you run (root keys). |
 | `vault-kv` | The KMS-backed profile. Root keys in AWS KMS; Hub JWS signing keys in Vault KV. |
 | `pkcs11` | The HSM-backed profile. Root keys and Hub JWS signing keys in AWS CloudHSM. |
+| `none` | No Hub JWS signing keys are held or created. What an unset `KEY_PROVIDER` means: right only for a deployment that does not sign towards the Hub. |
 | `database` | A legacy setting that keeps Hub JWS private keys in Pivotal's database. Not recommended and not covered by this guide. |
-| `KEY_PROVIDER` | The setting that selects the key profile. Always set it explicitly. |
+| `KEY_PROVIDER` | The setting that selects the key profile. Set it explicitly whenever JWS is used: unset means `none`. |
 | KMS | AWS Key Management Service. Holds the root CA keys in the `vault-kv` profile. |
 | HSM | Hardware security module. In this guide, AWS CloudHSM. |
 | CloudHSM cluster | A group of HSMs that hold the same keys. |
 | Crypto Officer | The CloudHSM administrator role (`admin` in `cloudhsm-cli`). Creates and manages HSM users. Held only by custodians. |
-| Crypto user | A CloudHSM user that owns and uses keys (`crypto-user` in `cloudhsm-cli`). Each tenant has its own, named `cu_<FSP_ID>`; web-outbound signs as `cu_web_outbound`. |
+| Crypto user | A CloudHSM user that owns and uses keys (`crypto-user` in `cloudhsm-cli`). Each tenant has its own, named `cu_` plus the FSP ID with every character other than a letter or digit turned into `_`; the HSM shows names in lower case. web-outbound signs as `cu_web_outbound`. |
 | Key sharing | A CloudHSM feature that lets a key's owner allow another crypto user to use the key. Tenant keys are shared with `cu_web_outbound`. |
-| keyRef | The label that identifies a key inside the HSM. Stored in Vault, so services can find a tenant's key without holding it. |
+| keyRef | The label that identifies a key inside the HSM. Stored in Vault with the key's public key (the key record), so services can find a tenant's key without holding it. |
 | PKCS#11 | The standard interface Pivotal's Node services use to sign with the HSM. |
 | JCE | Java Cryptography Extension. The connector signs with the HSM through the CloudHSM JCE provider. |
-| HSM admin pod | The `hsm-tools` pod used for every CloudHSM administration task. |
+| HSM admin pod | The `hsm-tools` Deployment, from the `pivotal-hsm-tools` image, used for every CloudHSM administration task. Kept at zero replicas and scaled to one for a session. |
+| `provision-hsm-tenant.sh` | The custodian's script, run in the HSM admin pod, that creates a DFSP's crypto user and HSM key and records its key reference and public key in Vault, before the DFSP is onboarded. |
 | Custodian | A person who holds Crypto Officer or CA ceremony credentials. |

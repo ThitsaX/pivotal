@@ -69,6 +69,25 @@ wrong Secret.
 
 ---
 
+## HSM admin pod (`pkcs11` only)
+
+Source: `helm/values.yaml` (`hsmTools`), `helm/templates/hsm-tools.yaml`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `hsmTools.enabled` | `false` | Renders the `hsm-tools` Deployment and its ServiceAccount. |
+| `hsmTools.replicaCount` | `0` | Kept at zero; a custodian scales it to 1 for a session. Under ArgoCD self-heal, ignore differences on `/spec/replicas`. |
+| `hsmTools.image.repository`, `hsmTools.image.tag` | `ghcr.io/thitsax/pivotal-hsm-tools`, tag `""` (required when enabled: set it to your Pivotal release, or rendering fails with `hsmTools image.tag is required`) | The image with the pinned CloudHSM and Vault tools and both custodian scripts. |
+| `hsmTools.cloudhsmIp` | `""` | Required when enabled. IP address of one HSM; becomes `CLOUDHSM_IP`. |
+| `hsmTools.vaultAddress` | `""` | Required when enabled. Vault's in-cluster address; becomes `VAULT_ADDR`. |
+| `hsmTools.customerCaConfigMap` | `cloudhsm-customer-ca` | ConfigMap with the key `customerCA.crt`, mounted at `/opt/cloudhsm/etc/customerCA.crt`. |
+| `hsmTools.resources` | `global.defaultResources` | |
+
+Fixed in the template: no ServiceAccount token, Istio sidecar off, runs as user 10001, `/tmp` is an
+`emptyDir` that goes with the pod.
+
+---
+
 ## Istio
 
 Source: `helm/templates/istio-*.yaml`. Each list is off by default (`enabled: false`) and renders

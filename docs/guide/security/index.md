@@ -40,13 +40,14 @@ Both key profiles are covered: `vault-kv` (KMS-backed) and `pkcs11` (HSM-backed)
 |---|---|
 | [setup/index.md](setup/index.md) | Choose your profile's setup path |
 | [Hub operator items and setup worksheet](setup/common/hub-operator-and-worksheet.md) | Agree the Hub side and collect every shared value (both profiles) |
+| [Prepare the HSM admin pod](setup/pkcs11/hsm-admin-pod.md) | Deploy the `hsm-tools` pod, and start and end a custodian session (`pkcs11`) |
 
 ### Runbooks
 
 | Page | Profile | Use it to |
 |---|---|---|
 | [Onboard a DFSP](runbooks/vault-kv/onboard-dfsp.md) | `vault-kv` | Add a new DFSP |
-| [Onboard a DFSP](runbooks/pkcs11/onboard-dfsp.md) | `pkcs11` | Add a new DFSP |
+| [Onboard a DFSP](runbooks/pkcs11/onboard-dfsp.md) | `pkcs11` | Provision a new DFSP's key in the HSM, then add the DFSP |
 | [Revoke a DFSP certificate](runbooks/common/revoke-dfsp-certificate.md) | both | Stop a DFSP client certificate from being accepted |
 | [Check certificate renewals](runbooks/common/check-certificate-renewals.md) | both | Confirm automatic renewals are working |
 | [Re-key Pivotal's CAs](runbooks/common/pivotal-ca-rekey.md) | both | Replace a Pivotal CA |

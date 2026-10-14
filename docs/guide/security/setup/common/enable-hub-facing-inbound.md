@@ -72,10 +72,6 @@ signatures at the strictness chosen for each sender.
 - A portal account with `hub.signing-keys.update`, `participant.endpoint.register` and
   `participant.signing-keys.update`.
 
-> **`pkcs11` in this release:** Steps 1 to 5 (the callback certificate, gateway and server
-> certificate) can be completed, and Step 7 for peer senders. Step 6 needs onboarded DFSPs, which this
-> profile cannot create yet; see [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
-
 ### Optional
 
 - An Istio AuthorizationPolicy that allows the callback host only from the Hub egress gateway's

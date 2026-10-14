@@ -26,7 +26,7 @@ If you need signing keys held inside a hardware security module, use the
 | 2 | [CA ceremony](./2-ca-ceremony.md) | Create the two CA roots in AWS KMS and the intermediates in Vault | AWS administrator, custodian |
 | 3 | [Vault](./3-vault.md) | Create the KV mount, policies and Kubernetes auth roles | Vault administrator |
 | 4 | [Deploy Pivotal](./4-deploy-pivotal.md) | Install the Helm chart with the `vault-kv` settings and run the profile check | Platform engineer |
-| 5 | **Onboard test DFSPs**: [Onboard a DFSP (vault-kv)](../../runbooks/vault-kv/onboard-dfsp.md), once for each of two test DFSPs | Two DFSPs with keys, certificates and connectors, which pages 6 to 9 test with. Follow the runbook's *during setup* notes. | Platform engineer |
+| 5 | **Onboard test DFSPs**: [Onboard a DFSP (vault-kv)](../../runbooks/vault-kv/onboard-dfsp.md), once for each of two test DFSPs | Two DFSPs with keys and connectors, which pages 6 to 9 test with (their certificates come from page 6). Follow the runbook's *during setup* notes. | Platform engineer |
 | 6 | [Enable DFSP-facing mTLS and JWS](../common/enable-dfsp-facing.md) | Leg 1 | Platform engineer, Hub operator |
 | 7 | [Enable Hub-facing outbound mTLS and JWS](../common/enable-hub-facing-outbound.md) | Legs 2 and 3 | Platform engineer, Hub operator |
 | 8 | [Enable Hub-facing inbound mTLS and JWS](../common/enable-hub-facing-inbound.md) | Leg 4 | Platform engineer, Hub operator |

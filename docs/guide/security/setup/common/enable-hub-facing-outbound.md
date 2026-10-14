@@ -65,12 +65,8 @@ has a body.
 - The Hub operator has turned on JWS verification for Pivotal's DFSPs on the Hub side, or has agreed
   when to.
 - One connector per test DFSP is deployed, configured for your profile by its onboarding runbook
-  ([vault-kv](../../runbooks/vault-kv/onboard-dfsp.md)). A connector sends that DFSP's callbacks to
-  the Hub (leg 3).
-
-> **`pkcs11` in this release:** the mTLS steps (1 to 4) can be completed. The signing steps (5 and 6)
-> need onboarded DFSPs, which this profile cannot create yet; see
-> [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
+  ([vault-kv](../../runbooks/vault-kv/onboard-dfsp.md) or [pkcs11](../../runbooks/pkcs11/onboard-dfsp.md)).
+  A connector sends that DFSP's callbacks to the Hub (leg 3).
 
 ### Optional
 
@@ -259,6 +255,9 @@ has a body.
     (vault-kv): no key exists at that path. Check `VAULT_JWS_KEY_PATH_PREFIX` and `CONNECTOR_ID`,
     and that the DFSP has been onboarded. A Vault policy problem shows as a Vault error at startup
     instead.
+  - Connector log `No key reference at Vault path '...'. The crypto user exists but no key has been provisioned.`
+    (pkcs11): the DFSP's key was not provisioned, or `CONNECTOR_ID` does not match. See
+    [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md), Step 3.
 
 ### Step 6. Confirm each DFSP's signing flag
 

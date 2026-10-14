@@ -68,15 +68,15 @@ the variables in the last column.
 | Path | Fields | Written by | Read by | Profile | Prefix variable |
 |---|---|---|---|---|---|
 | `pivotal/jwskey/<FSP_ID>` | `privateKey` (PEM) | web-pivotal, at onboarding | web-outbound; that tenant's connector | `vault-kv` | `VAULT_JWS_KEY_PATH_PREFIX` |
-| `pivotal/keyref/<FSP_ID>` | `keyRef` (the key's label in the HSM) | provisioning, at onboarding | web-outbound; that tenant's connector | `pkcs11` | `KEY_REF_PATH` |
+| `pivotal/keyref/<FSP_ID>` | `keyRef` (the key's label in the HSM), `publicKey` (PEM) | the custodian, with `provision-hsm-tenant.sh`, before onboarding | web-outbound and that tenant's connector (`keyRef`); web-pivotal at onboarding (both) | `pkcs11` | `KEY_REF_PATH` |
 | `pivotal/hsmcred/<FSP_ID>` | `username`, `password` (the tenant's crypto user) | the custodian, with `provision-hsm-tenant.sh` | that tenant's connector | `pkcs11` | `HSM_CRED_PATH` (full path) |
 | `pivotal/hsmcred/web-outbound` | `username`, `password` (`cu_web_outbound`) | the custodian, once | web-outbound | `pkcs11` | `HSM_CRED_PATH` (full path) |
 
 A write keeps the other fields already at the path: the service reads the path first and writes
 the merged result. So a policy that allows a write must also allow `read` on that path.
 
-The `pkcs11` writers and web-pivotal's access to `pivotal/hsmcred/*` change in the next release,
-when the HSM onboarding flow changes.
+Under `pkcs11` no service writes to `hsmcred` or `keyref`: custodians do, with a token carrying the
+`pivotal-hsm-provisioning` policy below.
 
 ---
 
@@ -101,14 +101,19 @@ means that one compromised connector can read every tenant's key.
 | connector for `<FSP_ID>` | `sys/internal/ui/mounts/<KV_MOUNT>` | `read` | both (optional: the Java connector does not read it) |
 | web-pivotal | `pki_dfsp/sign/dfsp-client` | `create`, `update` | both |
 | web-pivotal | `<KV_MOUNT>/data/pivotal/jwskey/*` | `create`, `read`, `update` | `vault-kv` |
+| web-pivotal | `<KV_MOUNT>/data/pivotal/keyref/*` | `read` | `pkcs11` |
 | web-pivotal | `sys/internal/ui/mounts/<KV_MOUNT>` | `read` | both |
 | trust-manager | `pki_hub_client/sign/hub-callback-client` | `create`, `update` | both, when `HUB_CALLBACK_CERT_COMMON_NAME` is set |
 | cert-manager | `pki_hub_client/sign/web-inbound-server` | `create`, `update` | both |
 | cert-manager | `pki_hub_client/sign/pivotal-client` | `create`, `update` | only where workload client certificates come from Pivotal's CA |
 | web-inbound | none | — | both |
+| custodian token (`pivotal-hsm-provisioning`) | `<KV_MOUNT>/data/pivotal/hsmcred/*` and `<KV_MOUNT>/data/pivotal/keyref/*` | `create`, `read`, `update` | `pkcs11` |
+| custodian token (`pivotal-hsm-provisioning`) | `<KV_MOUNT>/data/pivotal/hsmcred/web-outbound` | `deny` | `pkcs11` |
 
-trust-manager also reads `pki_hub_client/ca_chain`, `pki_dfsp/ca_chain` and the DFSP root mount's
-`ca_chain`. Vault serves `ca_chain` without a token, so these reads need no policy.
+web-pivotal never reads `hsmcred`: under `pkcs11` it holds no crypto-user credential.
+
+trust-manager also reads `pki_hub_client/ca_chain`, `pki_dfsp/ca_chain`, and the DFSP root mount's
+`ca_chain` only when `DFSP_CA_ROOT_PKI_MOUNT` is set. Vault serves `ca_chain` without a token, so these reads need no policy.
 
 ---
 

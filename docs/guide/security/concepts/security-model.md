@@ -82,7 +82,7 @@ it and still be admitted on its access key alone.
 |---|---|---|
 | Root CA keys | In AWS KMS; cannot be exported | In AWS CloudHSM; cannot be exported |
 | Hub JWS private keys | Stored in Vault. Loaded into the memory of the services that sign. | Never leave the HSM. Services ask the HSM to sign. |
-| What keeps tenants apart | Vault policies: each connector can read only its own tenant's key; web-outbound and web-pivotal can reach every tenant's key path (web-outbound signs for all tenants; web-pivotal creates the keys) | HSM ownership: each tenant's key is owned by its own crypto user and shared only with web-outbound's crypto user |
+| What keeps tenants apart | Vault policies: each connector can read only its own tenant's key; web-outbound and web-pivotal can reach every tenant's key path (web-outbound signs for all tenants; web-pivotal creates the keys) | HSM ownership: each tenant's key is owned by its own crypto user and shared only with web-outbound's crypto user. web-pivotal reads only key references and public keys: it holds no crypto-user credential and cannot reach the HSM. |
 | What an attacker with full access to a running service gets | The keys that service can read | The crypto-user password the service holds, so they can sign from anywhere that reaches the HSM until that password is changed, but never copy the key |
 | Who must be trusted most | Anyone who can read the Vault KV paths | Custodians (the Crypto Officer can reset any crypto user's password, and so could sign as any tenant), and anyone who can read the HSM credential paths in Vault |
 

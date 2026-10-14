@@ -31,7 +31,7 @@ Run all Pivotal services with signing keys held in Vault KV, and prove the profi
 ### Mandatory
 
 - [3. Vault](./3-vault.md) completed and verified.
-- Secret `pivotal-hub-client-ca` exists in the Pivotal namespace ([CA ceremony, Step 7](./2-ca-ceremony.md#step-7-publish-the-root-as-pivotal-hub-client-ca)).
+- Secret `pivotal-hub-client-ca` exists in the Pivotal namespace ([CA ceremony, Step 7](./2-ca-ceremony.md#step-7-check-the-pivotal-hub-client-ca-secret)).
 - The Hub operator's items H1 to H4 are in place ([Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md#step-1-agree-the-hub-operators-items)).
 - The Pivotal Helm chart 0.2.0 and the image tags for your release.
 - The non-security settings for each service (database, Redis, NATS, ledger and oracle URLs).
@@ -71,7 +71,7 @@ Run all Pivotal services with signing keys held in Vault KV, and prove the profi
 
   webOutbound:
     env:
-      # Key profile. Always set it: when unset, Pivotal stores keys in the database in plaintext.
+      # Key profile. Unset means no keys; with FSPIOP_USE_JWS "true", web-outbound refuses to start.
       KEY_PROVIDER: vault-kv
       VAULT_ADDRESS: <VAULT_ADDRESS>
       VAULT_AUTH_METHOD: kubernetes

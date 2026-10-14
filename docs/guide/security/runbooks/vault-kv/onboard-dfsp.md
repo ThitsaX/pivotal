@@ -52,7 +52,6 @@ messages to the Hub.
 
 - `kubectl` access to the Pivotal namespace, to read logs.
 - Vault CLI access with read access to key metadata, to confirm the key exists.
-- None beyond the above.
 
 ## Steps
 
@@ -63,7 +62,7 @@ messages to the Hub.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> get deploy trust-manager \
+  kubectl -n pivotal get deploy trust-manager \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="MCM_AUTO_REGISTER_DFSPS")].value}'
   ```
 
@@ -127,7 +126,7 @@ openssl req -new -newkey rsa:2048 -nodes -keyout <DFSP_ID>-client.key \
 - **Expected Result:** The portal reports success. web-pivotal logs:
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/web-pivotal --since=10m | grep "<DFSP_ID>"
+  kubectl -n pivotal logs deploy/web-pivotal --since=10m | grep "<DFSP_ID>"
   ```
 
   ```text
@@ -151,7 +150,7 @@ openssl req -new -newkey rsa:2048 -nodes -keyout <DFSP_ID>-client.key \
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/trust-manager --since=10m | grep "<DFSP_ID>"
+  kubectl -n pivotal logs deploy/trust-manager --since=10m | grep "<DFSP_ID>"
   ```
 
 - **Expected Result:** Within seconds (or within an hour without NATS):
@@ -178,6 +177,10 @@ Expected: metadata with `current_version` 1 or higher. Do not run `vault kv get`
 prints the private key.
 
 ### Step 5. Issue the DFSP client certificate
+
+*During setup*: skip this step. [Enable the DFSP-facing side](../../setup/common/enable-dfsp-facing.md),
+Step 5, issues each test DFSP's certificate. Issuing one here as well would move this one to
+`retiring`.
 
 - **Purpose:** The DFSP needs a certificate from the DFSP CA to connect to the DFSP-facing gateway.
 - **Action:** In the portal, open **Participant → Certificates**. Enter the FSP ID, paste the CSR,
@@ -302,6 +305,9 @@ There is no offboarding command in this version. See
   **Participant → Add Currency**. Neither changes the signing key.
 
 ## References
+
+*During setup*, next: [Enable the DFSP-facing side](../../setup/common/enable-dfsp-facing.md), once both
+test DFSPs are onboarded.
 
 - [Certificates and keys](../../concepts/certificates-and-keys.md)
 - [Vault reference](../../reference/vault.md)

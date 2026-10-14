@@ -8,20 +8,6 @@ This page lists what Pivotal's mTLS and JWS support does **not** do in this vers
 instead. Read it before you plan a production rollout. Each entry states the effect and the
 workaround, if one exists.
 
-## pkcs11: DFSP onboarding is not available yet
-
-**Effect:** In the HSM-backed profile, this release cannot onboard a DFSP:
-
-- web-pivotal does not start with `KEY_PROVIDER=pkcs11`, so its `KEY_PROVIDER` is left unset.
-- Unset means `database`. Onboarding a DFSP through the portal would then generate the DFSP's Hub JWS
-  private key in software and store it **in plaintext in Pivotal's database**, not in the HSM.
-- Without onboarded DFSPs, the JWS part of [Enable the Hub-facing side: outbound](setup/common/enable-hub-facing-outbound.md)
-  and the [end-to-end check](setup/common/end-to-end-check.md) cannot be completed.
-
-**What to do:** Complete the `pkcs11` setup up to and including Deploy Pivotal, and the mTLS parts of
-the common pages. **Do not onboard DFSPs through the portal in this profile.** The next release adds
-pkcs11 onboarding; see [Onboard a DFSP (pkcs11)](runbooks/pkcs11/onboard-dfsp.md).
-
 ## No JWS signing key rotation
 
 **Effect:** There is no command, screen or API that replaces a tenant's Hub JWS signing key.

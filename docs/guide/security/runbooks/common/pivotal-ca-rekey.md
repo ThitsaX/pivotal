@@ -66,7 +66,7 @@ and the current expiry dates of both CAs.
   | DFSP-facing gateway trust anchor | Rewritten with the new DFSP CA within an hour, or at once after a trust-manager restart | trust-manager, automatically |
   | Every DFSP client certificate | No longer chains to the trusted CA. **Every DFSP must send a new CSR and receive a new certificate.** | Operator and every DFSP |
   | Pivotal CA registered in MCM (under each tenant and under Pivotal's own DFSP ID) | Re-registered with the new root and intermediate within an hour, once `pivotal-hub-client-ca` holds the new root | trust-manager, automatically |
-  | `pivotal-hub-client-ca` Secret (the root that trust-manager registers) | Must hold the new root | Operator, by hand, after the ceremony (as in your profile's CA ceremony page) |
+  | `pivotal-hub-client-ca` Secret (the root that trust-manager registers) | Must hold the new root | `vault-kv`: the ceremony script writes it. `pkcs11`: the operator, with the commands the ceremony prints (as in your profile's CA ceremony page) |
   | Hub egress trust of Pivotal's CA | Changes only when the Hub callback certificate is next published to the Hub | Manual. No supported trigger in this version. |
   | Hub callback certificate | Still signed by the old intermediate. Renewed under the new CA only when it has less than 30 days left. | Manual. No supported trigger in this version. |
   | Pivotal callback gateway trust anchor (`-cacert` Secret) | Holds the old CA. Must hold the CA that signs the Hub callback certificate. | Manual. It is created by hand. |

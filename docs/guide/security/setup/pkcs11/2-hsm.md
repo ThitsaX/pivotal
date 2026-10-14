@@ -9,7 +9,8 @@ every Pivotal environment needs before the CA ceremony: `cu_web_outbound`, the u
 signs as. Run it **once per environment**.
 
 The crypto users for the two root CAs are created in [Run the CA ceremony](3-ca-ceremony.md). The
-crypto user for each DFSP is created when that DFSP is onboarded.
+crypto user for each DFSP is created by a custodian with `provision-hsm-tenant.sh`, before that DFSP is
+onboarded ([Onboard a DFSP](../../runbooks/pkcs11/onboard-dfsp.md)).
 
 ## Objective
 
@@ -90,13 +91,14 @@ the `cu_web_outbound` crypto user with its credential stored in Vault.
 - **Expected Result:** both HSMs are `ACTIVE`. Record the private IP address of one of them as
   `<HSM_IP>`.
 
-### Step 5. Prepare the HSM admin pod
+### Step 5. Prepare the HSM admin pod and start a session
 
-- **Action:** follow [Prepare the HSM admin pod](hsm-admin-pod.md) from start to finish, then come
-  back here.
+- **Action:** follow [Prepare the HSM admin pod](hsm-admin-pod.md) Steps 1 to 5, then come back here
+  with the session still open.
 - **Expected Result:** `cloudhsm-cli cluster hsm-info` in the pod lists two HSMs.
 
-**Steps 6 to 9 run inside the HSM admin pod**, with `export PATH=$PATH:/opt/cloudhsm/bin` set.
+**Steps 6 to 9 run inside the HSM admin pod.** The CloudHSM tools are on the `PATH` and `VAULT_ADDR`
+is set there.
 
 ### Step 6. Activate the cluster
 
@@ -141,13 +143,12 @@ Keep `CLOUDHSM_ROLE` and `CLOUDHSM_PIN` set for Step 8.
 ### Step 8. Create the `cu_web_outbound` crypto user and store its credential in Vault
 
 - **Purpose:** web-outbound signs as any tenant by logging in as this one crypto user. Each tenant's
-  key is shared with it at onboarding. It owns no keys itself.
+  key is shared with it by `provision-hsm-tenant.sh`, before onboarding. It owns no keys itself.
 - **Action:** create the Vault KV mount (once), generate a random password, create the user, and
   write the credential straight to Vault. No person needs to know this password.
 - **Command or Configuration:**
 
   ```bash
-  export VAULT_ADDR=http://vault.vault.svc.cluster.local:8200
   read -r -s -p "Vault token: " VAULT_TOKEN; echo; export VAULT_TOKEN
 
   # Once per environment: the KV mount Pivotal reads. It must be version 2.
@@ -191,8 +192,8 @@ appears on Vault's command line.
   list. `cu_web_outbound` owns no keys.
 - **If It Fails:** the password in Vault does not match the HSM. Delete the user and repeat Step 8.
 
-Then delete the HSM admin pod if you are not going straight on to the
-[CA ceremony](3-ca-ceremony.md). See [Prepare the HSM admin pod: Rollback](hsm-admin-pod.md#rollback-or-recovery).
+Then end the session if you are not going straight on to the [CA ceremony](3-ca-ceremony.md). See
+[Prepare the HSM admin pod: End the session](hsm-admin-pod.md#step-6-end-the-session).
 
 ## Verification
 

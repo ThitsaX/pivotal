@@ -23,8 +23,6 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
 ### Mandatory
 
 - [Enable Hub-facing inbound mTLS and JWS](./enable-hub-facing-inbound.md) completed.
-- `pkcs11`: this check cannot be completed in this release, because it needs onboarded DFSPs; see
-  [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
 - Two onboarded DFSPs, `<DFSP_A>` (payer) and `<DFSP_B>` (payee), each with a client certificate, a
   connector, and a callback endpoint on the Pivotal callback host.
 - `<DFSP_A>` can send a correctly signed `POST /secured/sendmoney` with its client certificate. How
@@ -92,7 +90,8 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
 
 - **Purpose:** Confirm the signing keys are where your profile puts them.
 - **Action:** Run the profile check at the end of your profile's deploy page:
-  [vault-kv](../vault-kv/4-deploy-pivotal.md#verification) or [pkcs11](../pkcs11/5-deploy-pivotal.md#verification).
+  [vault-kv](../vault-kv/4-deploy-pivotal.md#verification), or for pkcs11 the per-DFSP check in
+  [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md#verification).
 - **Expected Result:** It passes for `<DFSP_A>` and `<DFSP_B>`.
 
 ## Verification
@@ -106,9 +105,8 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
       `dfsp-client` ignores names in requests.
 - [ ] Secret `pivotal-hub-client-ca` holds the Pivotal Hub-client CA root.
 - [ ] Each service has its own Vault role; no connector can read another DFSP's key.
-- [ ] `KEY_PROVIDER` is set explicitly on web-outbound, web-pivotal and every connector. (`pkcs11` in
-      this release: web-pivotal's is left unset on purpose; see
-      [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).)
+- [ ] `KEY_PROVIDER` is set explicitly, to the same profile, on web-outbound, web-pivotal and every
+      connector. Unset on web-outbound or web-pivotal means no signing keys.
 - [ ] trust-manager is running and its jobs are scheduled.
 
 **Leg 1**

@@ -13,12 +13,6 @@ The values shown here are only the ones this guide depends on. Every other setti
 [Environment variables](../../reference/environment-variables.md) and
 [Helm values](../../reference/helm-values.md).
 
-> **web-pivotal's `pkcs11` settings are completed with the next release.** This page configures
-> web-pivotal for DFSP certificate issuance only. **Do not onboard DFSPs through the portal in this
-> profile until then:** in this release, portal onboarding would create the DFSP's private key in
-> software and store it in plaintext in Pivotal's database, not in the HSM. See
-> [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
-
 ## Objective
 
 Run Pivotal with Hub JWS signing done inside CloudHSM, and prove the profile is in effect.
@@ -28,6 +22,8 @@ Run Pivotal with Hub JWS signing done inside CloudHSM, and prove the profile is 
 - All Pivotal pods are `Running`.
 - web-outbound runs with `KEY_PROVIDER=pkcs11`, has logged in to the HSM as `cu_web_outbound`, and
   holds no private key.
+- web-pivotal runs with `KEY_PROVIDER=pkcs11`, so portal onboarding records keys a custodian
+  provisioned in the HSM. It holds no HSM credential.
 - trust-manager has enrolled the Hub client certificate into Secret `pivotal-hub-client-cert`,
   written the Hub CA bundle into Secret `hub-ca-bundle`, and registered the Pivotal Hub-client CA
   with MCM.
@@ -40,7 +36,8 @@ Run Pivotal with Hub JWS signing done inside CloudHSM, and prove the profile is 
 |---|---|
 | [Configure Vault](4-vault.md) completed and verified | |
 | Secret `pivotal-hub-client-ca` in the Pivotal namespace | [Run the CA ceremony](3-ca-ceremony.md), Step 6 |
-| `customerCA.crt`, the CloudHSM cluster's CA certificate | [Prepare the CloudHSM cluster](2-hsm.md), Step 3 |
+| ConfigMap `cloudhsm-customer-ca`, holding the CloudHSM cluster's CA certificate | [Prepare the HSM admin pod](hsm-admin-pod.md), Step 1 |
+| Your values file, with the `hsmTools` block | [Prepare the HSM admin pod](hsm-admin-pod.md), Step 2. If you also turned the services off there, remove those lines now. |
 | `<HSM_IP>`, the private IP address of one HSM | [Prepare the CloudHSM cluster](2-hsm.md), Step 4 |
 | The Hub operator's items H1 to H4 in place: MCM URL, token URL and client, Hub CA in MCM | [Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md), with the shared values for this page |
 | The Pivotal Helm chart 0.2.0 and the image tags for your release | The published images already carry the CloudHSM library ([Prerequisites](1-prerequisites.md), Step 2) |
@@ -67,17 +64,18 @@ None.
 - **Expected Result:** `secret/trust-manager-mcm created`
 - **If It Fails:** `already exists`: replace it only if the value has changed.
 
-### Step 2. Publish the CloudHSM cluster certificate as a ConfigMap
+### Step 2. Check the CloudHSM cluster certificate ConfigMap
 
 - **Purpose:** the CloudHSM library reads `customerCA.crt` from a fixed path and refuses to connect
-  without it. It is public, so a ConfigMap is enough.
+  without it. web-outbound and the connectors mount the ConfigMap the HSM admin pod uses.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n pivotal create configmap cloudhsm-customer-ca --from-file=customerCA.crt=customerCA.crt
+  kubectl -n pivotal get configmap cloudhsm-customer-ca -o jsonpath='{.data.customerCA\.crt}' | openssl x509 -noout -subject
   ```
 
-- **Expected Result:** `configmap/cloudhsm-customer-ca created`
+- **Expected Result:** the subject of your cluster's CA certificate.
+- **If It Fails:** create it: [Prepare the HSM admin pod](hsm-admin-pod.md), Step 1.
 
 ### Step 3. Write the security settings into your values file
 
@@ -98,7 +96,7 @@ None.
     volumes:
       - {name: cloudhsm-customer-ca, configMap: {name: cloudhsm-customer-ca}}
     env:
-      # Key profile. Always set it: when unset, Pivotal stores keys in the database in plaintext.
+      # Key profile. Unset means no keys; with FSPIOP_USE_JWS "true", web-outbound refuses to start.
       KEY_PROVIDER: pkcs11
       VAULT_ADDRESS: <VAULT_ADDRESS>
       VAULT_AUTH_METHOD: kubernetes
@@ -130,8 +128,12 @@ None.
       VAULT_ROLE: pivotal-web-pivotal
       DFSP_CERT_PKI_MOUNT: pki_dfsp
       DFSP_CERT_PKI_ROLE: dfsp-client
-      # KEY_PROVIDER is deliberately left unset (database) in this release: web-pivotal does not
-      # start with pkcs11. Never onboard DFSPs through the portal until the next release.
+      # Onboarding records the key a custodian provisioned: it reads the key reference and public
+      # key from <VAULT_KV_MOUNT>/<KEY_REF_PATH>/<DFSP_ID>. No HSM settings: web-pivotal never
+      # reaches the device.
+      KEY_PROVIDER: pkcs11
+      VAULT_KV_MOUNT: pivotal-kv
+      KEY_REF_PATH: pivotal/keyref
 
   webInbound:
     env:
@@ -177,6 +179,8 @@ None.
     `true` or `false` are accepted; anything else stops trust-manager from starting.
   - trust-manager and web-inbound ignore `KEY_PROVIDER`. Do not add it to them. Neither talks to
     the HSM.
+  - web-pivotal needs no `CLOUDHSM_IP`, `PKCS11_*` or `HSM_CRED_PATH`, and no `cloudhsm-customer-ca`
+    mount.
 
 - **Expected Result:** a values file that renders. Check it with
   `helm template pivotal-stack <CHART> -n pivotal -f <VALUES_FILE> > /dev/null`.
@@ -187,8 +191,8 @@ None.
 - **Purpose:** each DFSP's Java connector signs its own callbacks inside the HSM, as that DFSP's own
   crypto user. It uses the CloudHSM JCE provider, not PKCS#11, so its settings differ from
   web-outbound's.
-- **Action:** nothing to deploy now. A connector is added when its DFSP is onboarded, because its
-  crypto user and key are created then. This is the `pkcs11` part of a connector entry:
+- **Action:** nothing to deploy now. A connector is added when its DFSP is onboarded, after a
+  custodian has created its crypto user and key. This is the `pkcs11` part of a connector entry:
 
   ```yaml
   connectors:
@@ -261,7 +265,9 @@ None.
   kubectl -n pivotal logs deploy/web-outbound | grep -E 'CloudHSM client configured|PKCS#11 ready|Signing through PKCS#11'
   ```
 
-- **Expected Result:** `pkcs11` and `pivotal/hsmcred/web-outbound`, then these three log lines:
+- **Expected Result:** `pkcs11` and `pivotal/hsmcred/web-outbound`, then these three log lines.
+  web-outbound logs in to the HSM at startup because `HSM_CRED_PATH` is set, even while
+  `FSPIOP_USE_JWS` is still off:
 
   ```text
   CloudHSM client configured for <HSM_IP>.
@@ -281,6 +287,7 @@ None.
 | 3 | Hub CA bundle present | `kubectl -n pivotal get secret hub-ca-bundle -o jsonpath='{.data.hub-ca\.pem}' \| base64 -d \| openssl x509 -noout -subject` | The Hub CA's subject |
 | 4 | Profile check | Step 7 | As described |
 | 5 | Vault logins (in a shell with `VAULT_ADDR` and an admin token) | `vault write -field=token_policies auth/kubernetes/login role=pivotal-web-outbound jwt="$(kubectl -n pivotal create token web-outbound)"` | `[default pivotal-web-outbound]` |
+| 6 | web-pivotal on the profile | `kubectl -n pivotal exec deploy/web-pivotal -- printenv KEY_PROVIDER` | `pkcs11` |
 
 **Negative test (roles are not interchangeable):**
 
@@ -291,8 +298,8 @@ vault write -field=token_policies auth/kubernetes/login role=pivotal-trust-manag
 
 Pass: Vault refuses with `service account name not authorized`.
 
-The profile check for a tenant's key (its keyRef in Vault, its private key in the HSM and not in the
-database) is part of [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md).
+The profile check for a tenant's key (its key record in Vault, its private key in the HSM and not in
+the database) is part of [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md).
 
 ## Troubleshooting
 
@@ -300,9 +307,10 @@ web-outbound startup errors under `pkcs11`, from its log:
 
 | Message | Cause | Fix |
 |---|---|---|
-| `KEY_PROVIDER is 'pkcs11' but the device is not configured. Set PKCS11_MODULE_PATH.` | `PKCS11_MODULE_PATH` missing | Step 3 |
+| `KEY_PROVIDER is 'pkcs11' and HSM_CRED_PATH is set, but the device is not configured. Set PKCS11_MODULE_PATH.` | `PKCS11_MODULE_PATH` missing | Step 3 |
 | `KEY_PROVIDER is 'pkcs11' but Vault is not configured.` | `VAULT_ADDRESS` or `VAULT_ROLE` missing | Step 3 |
-| `KEY_PROVIDER is 'pkcs11' and this workload signs, so it needs its own crypto user. Set HSM_CRED_PATH …` | `HSM_CRED_PATH` missing | Step 3 |
+| `KEY_PROVIDER is 'pkcs11' and FSPIOP_USE_JWS is true, so this service signs and needs its own crypto user. Set HSM_CRED_PATH …` | `HSM_CRED_PATH` missing on a signing web-outbound | Step 3 |
+| `FSPIOP_USE_JWS is true but KEY_PROVIDER is not set. …` | `KEY_PROVIDER` missing on web-outbound | Step 3 |
 | `No crypto-user password at Vault path 'pivotal/hsmcred/web-outbound' field 'password'.` | Credential not in Vault, wrong `VAULT_KV_MOUNT`, or policy does not allow the read | [Prepare the CloudHSM cluster](2-hsm.md), Step 8; [Configure Vault](4-vault.md) |
 | `CLOUDHSM_IP is set but /opt/cloudhsm/etc/customerCA.crt is missing.` | ConfigMap not mounted | Steps 2 and 3 |
 | `N PKCS#11 tokens are present … and no token label is configured.` | Not expected on CloudHSM | Check `PKCS11_MODULE_PATH` points at the CloudHSM library |
@@ -315,7 +323,8 @@ More: [Helm and deployment](../../troubleshooting.md#helm-and-deployment),
 
 - **Undo the release:** `helm rollback pivotal-stack <PREVIOUS_REVISION> -n pivotal`, or
   `helm uninstall pivotal-stack -n pivotal` for a first install. This leaves Vault, the HSM, the
-  ceremony output and the Secrets and ConfigMap from Steps 1 and 2 in place.
+  ceremony output, the Secret from Step 1 and the `cloudhsm-customer-ca` ConfigMap in place. A
+  rollback to before `hsmTools` was enabled also removes the HSM admin pod's Deployment.
 - **Do not switch an environment from `pkcs11` to another profile** after DFSPs are onboarded. Their
   keys exist only inside the HSM and cannot be exported.
 - **The Hub client certificate stays valid in MCM** after an uninstall. Pivotal cannot revoke it.
@@ -326,4 +335,4 @@ More: [Helm and deployment](../../troubleshooting.md#helm-and-deployment),
 - [Helm values](../../reference/helm-values.md)
 - [Scheduled jobs](../../reference/scheduled-jobs.md)
 - [Kubernetes resources](../../reference/kubernetes-resources.md)
-- Next: [Enable the DFSP-facing side](../common/enable-dfsp-facing.md)
+- Next: onboard two test DFSPs with [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md), then [Enable the DFSP-facing side](../common/enable-dfsp-facing.md)

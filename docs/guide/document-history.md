@@ -24,3 +24,8 @@ Document versions:
 - **Added:** Security section: mutual TLS and JWS on the DFSP-facing and Hub-facing sides, for the
   `vault-kv` and `pkcs11` key profiles. Concepts, setup, runbooks, reference, troubleshooting and
   known limitations.
+- **Changed:** `pkcs11` DFSP onboarding. A custodian provisions each DFSP's key with
+  `provision-hsm-tenant.sh` in the HSM admin pod, and portal onboarding records its public key,
+  refusing a DFSP that was not provisioned. The HSM admin pod is now the `hsm-tools` Deployment from
+  the `pivotal-hsm-tools` image. Unset `KEY_PROVIDER` now means no Hub JWS keys. The `vault-kv` CA
+  ceremony now writes `pivotal-hub-client-ca` itself.

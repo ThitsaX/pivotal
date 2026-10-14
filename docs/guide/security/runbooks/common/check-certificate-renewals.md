@@ -51,11 +51,11 @@ expire.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> get secret <HUB_CLIENT_CERT_SECRET> \
+  kubectl -n pivotal get secret <HUB_CLIENT_CERT_SECRET> \
     -o jsonpath='{.data.tls\.crt}' | base64 -d \
     | openssl x509 -noout -subject -issuer -enddate
 
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/trust-manager --since=48h \
+  kubectl -n pivotal logs deploy/trust-manager --since=48h \
     | grep -iE "hub server certificate|Hub-signed server certificate"
   ```
 
@@ -73,7 +73,7 @@ expire.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/trust-manager --since=48h \
+  kubectl -n pivotal logs deploy/trust-manager --since=48h \
     | grep -i "callback certificate"
   ```
 
@@ -84,7 +84,7 @@ expire.
 - **If It Fails:** The startup line appears only if trust-manager started within the time searched,
   and a running trust-manager with nothing to renew logs nothing. If there is no line, check whether
   `HUB_CALLBACK_CERT_COMMON_NAME` is set on the trust-manager Deployment
-  (`kubectl -n <PIVOTAL_NAMESPACE> get deploy trust-manager -o yaml | grep -A1 HUB_CALLBACK_CERT_COMMON_NAME`).
+  (`kubectl -n pivotal get deploy trust-manager -o yaml | grep -A1 HUB_CALLBACK_CERT_COMMON_NAME`).
   If it is not set, this certificate is not managed by Pivotal. Other failures: see
   [trust-manager and MCM](../../troubleshooting.md#trust-manager-and-mcm).
 

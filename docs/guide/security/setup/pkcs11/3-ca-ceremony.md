@@ -12,7 +12,7 @@ The CA ceremony creates Pivotal's two certificate authorities:
 | Signs | DFSP client certificates | The web-inbound server certificate and the Hub callback certificate |
 | Root key owned by | crypto user `cu_ca_dfsp_root` | crypto user `cu_ca_hub_root` |
 
-For each CA, the script [`ceremony-hsm.sh`](../../../../operations/hsm/setup/scripts/ceremony-hsm.sh):
+For each CA, the script `ceremony-hsm.sh`, which ships in the HSM admin pod's image:
 
 1. generates the root key pair **inside CloudHSM**, marked non-extractable;
 2. builds the self-signed root certificate with OpenSSL and has the HSM sign it;
@@ -50,13 +50,13 @@ the public certificates saved off the HSM admin pod.
 | Item | Notes |
 |---|---|
 | [Prepare the CloudHSM cluster](2-hsm.md) completed | Activated cluster, two HSMs |
-| [The HSM admin pod](hsm-admin-pod.md) running, with every step of that page done | The ceremony runs inside it. It needs the CloudHSM CLI, the PKCS#11 library, `libengine-pkcs11-openssl` and the Vault CLI |
+| An [HSM admin pod](hsm-admin-pod.md) session open (that page's Steps 4 and 5) | The ceremony runs inside it. The image carries the script, the CloudHSM CLI, the PKCS#11 library, `libengine-pkcs11-openssl` and the Vault CLI |
 | A Crypto Officer (custodian) for Step 1 | Creates the two ceremony crypto users |
 | **Two custodians**, one per root CA | Each sets and keeps one ceremony crypto-user password. Nobody holds both |
 | A witness | Records the ceremony |
 | A Vault token that can manage the two PKI mounts | See Step 2 |
 | `WEB_INBOUND_HOST`: web-inbound's public callback host name | `<PIVOTAL_CALLBACK_HOST>` from the [shared worksheet](../common/hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet). The script stops if it is not set |
-| The Pivotal source at the release you deploy | For the script file |
+| The Pivotal source at the release you deploy | Optional: to compare the script's checksum (Step 3) |
 
 ### Optional
 
@@ -66,8 +66,12 @@ the public certificates saved off the HSM admin pod.
 
 ## Steps
 
-Steps 1, 2 and 5 run **inside the HSM admin pod** with `export PATH=$PATH:/opt/cloudhsm/bin`.
-Steps 3, 6, 7 and 8 run on **your workstation**.
+Steps 1, 2, 3 and 5 run **inside the HSM admin pod**. Steps 6, 7 and 8 run on **your workstation**,
+with the pod's name in `POD`:
+
+```bash
+POD=$(kubectl -n pivotal get pod -l app.kubernetes.io/component=hsm-tools -o jsonpath='{.items[0].metadata.name}')
+```
 
 ### Step 1. Create the two ceremony crypto users
 
@@ -105,12 +109,13 @@ Steps 3, 6, 7 and 8 run on **your workstation**.
 
 - **Purpose:** the ceremony disables and re-enables both PKI mounts. A token that cannot do this
   fails partway through, after a root key already exists.
-- **Action:** in the pod, set the Vault address and token, then check the token's capabilities.
-  Use the `vault-active` service if your Vault runs in HA mode, so every write goes to the leader.
+- **Action:** in the pod, set the token, then check its capabilities. `VAULT_ADDR` is already set
+  from `hsmTools.vaultAddress`. If your Vault runs in HA mode, point it at the `vault-active`
+  service for this session, so every write goes to the leader.
 - **Command or Configuration:**
 
   ```bash
-  export VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200   # or http://vault.vault.svc.cluster.local:8200 without HA
+  export VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200   # HA only
   read -r -s -p "Vault token: " VAULT_TOKEN; echo; export VAULT_TOKEN
 
   vault token capabilities sys/mounts/pki_dfsp
@@ -139,21 +144,21 @@ Steps 3, 6, 7 and 8 run on **your workstation**.
 
 The script asks for the token itself, which is why it is unset again here.
 
-### Step 3. Copy the script into the pod
+### Step 3. Check the ceremony script
 
-- **Purpose:** the ceremony runs where the HSM is reachable.
-- **Action:** from the root of the Pivotal source, on your workstation.
-- **Command or Configuration:**
+- **Purpose:** the ceremony must run the script of the release you deploy. It ships in the image at
+  `/usr/local/bin/ceremony-hsm.sh`.
+- **Command or Configuration:** in the pod, and optionally on your workstation from the Pivotal
+  source at that release:
 
   ```bash
-  kubectl -n pivotal cp docs/operations/hsm/setup/scripts/ceremony-hsm.sh hsm-tools:/root/ceremony-hsm.sh
-  kubectl -n pivotal exec hsm-tools -- sha256sum /root/ceremony-hsm.sh
-  shasum -a 256 docs/operations/hsm/setup/scripts/ceremony-hsm.sh   # or sha256sum on Linux
+  sha256sum /usr/local/bin/ceremony-hsm.sh
+  shasum -a 256 docs/operations/hsm/setup/scripts/ceremony-hsm.sh   # workstation; sha256sum on Linux
   ```
 
 - **Expected Result:** the two hashes are identical.
-- **If It Fails:** copy it again. A truncated script runs up to the point where it was cut, which
-  can leave a root key generated and nothing done with it.
+- **If It Fails:** the image tag does not match the release. Fix `hsmTools.image.tag`, end the
+  session and start a new one.
 
 ### Step 4. Brief the participants
 
@@ -173,9 +178,7 @@ The script asks for the token itself, which is why it is unset again here.
 - **Command or Configuration:**
 
   ```bash
-  VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200 \
-  WEB_INBOUND_HOST=<PIVOTAL_CALLBACK_HOST> \
-    bash /root/ceremony-hsm.sh
+  WEB_INBOUND_HOST=<PIVOTAL_CALLBACK_HOST> ceremony-hsm.sh
   ```
 
 - **Expected Result:** for **each** CA, these lines appear:
@@ -198,14 +201,17 @@ The script asks for the token itself, which is why it is unset again here.
   role restored: pki_hub_client/roles/hub-callback-client
   ```
 
-  The script ends with `Done. Both roots are in CloudHSM and cannot be exported.`
+  The script ends with `Done. Both roots are in CloudHSM and cannot be exported.`, followed by the
+  commands to publish the Hub-facing root. Step 6 does the same, and also copies out the rest of the
+  output.
 - **If It Fails:**
   - `WEB_INBOUND_HOST is not set`: the script stopped before asking for anything. Set it and run
     again.
   - `REFUSING: both roots would be owned by the same crypto user`: enter a different user for each
     CA.
-  - The script exits with no message right after the Vault token prompt: a ceremony crypto-user
-    name or password is wrong (the script hides that error). Check the login with
+  - The script exits right after a `── <CA name> ──` header, with no further line: that CA's
+    ceremony crypto-user name or password is wrong (the script hides that error). For the DFSP CA
+    this happens after the whole Hub-client CA section. Check the login with
     `CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN=<USER>:<PASSWORD> /opt/cloudhsm/bin/cloudhsm-cli key list`.
   - The script stops partway: read the last line. Fix the cause and run the script again. A root
     key that already exists is reused (`root keypair already present — not regenerating`), and both
@@ -219,28 +225,30 @@ Judge the run by the script's own lines above.
 
 - **Purpose:** trust-manager registers this root certificate with MCM, so the Hub trusts the
   certificates Pivotal's Hub-client CA signs.
-- **Action:** from your workstation. Use the **root certificate only**, not the chain.
+- **Action:** from your workstation. The pod has no Kubernetes access, so the script prints commands
+  to publish the root instead of running them. The commands below do the same, and also copy out the
+  rest of the output for Step 7. `$POD` is the admin pod's name, as the script's first printed
+  command sets it. Use the **root certificate only**, not the chain.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n pivotal cp hsm-tools:/tmp/pivotal-ceremony-hsm/out ./ceremony-out
+  kubectl -n pivotal cp "$POD:/tmp/pivotal-ceremony-hsm/out" ./ceremony-out
   kubectl -n pivotal create secret generic pivotal-hub-client-ca \
-    --from-file=ca.pem=./ceremony-out/pki_hub_client/root.pem
+    --from-file=ca.pem=./ceremony-out/pki_hub_client/root.pem --dry-run=client -o yaml | kubectl apply -f -
   ```
 
-- **Expected Result:** `secret/pivotal-hub-client-ca created`.
-- **If It Fails:** if the Secret already exists from an earlier run, delete it and create it again.
+- **Expected Result:** `secret/pivotal-hub-client-ca created` (or `configured` on a re-run).
 
 ### Step 7. Save the ceremony output
 
-- **Purpose:** the working directory is on a pod that is about to be deleted. Its contents are
+- **Purpose:** the working directory is in the pod's `/tmp`, which goes when the session ends. Its contents are
   public certificates, but losing them means running the ceremony again.
 - **Action:** check the copy from Step 6 is complete, then store `./ceremony-out` with your change
   record.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n pivotal exec hsm-tools -- sh -c 'cd /tmp/pivotal-ceremony-hsm/out && sha256sum */root.pem */inter.pem */root.crl'
+  kubectl -n pivotal exec "$POD" -- sh -c 'cd /tmp/pivotal-ceremony-hsm/out && sha256sum */root.pem */inter.pem */root.crl'
   (cd ceremony-out && shasum -a 256 */root.pem */inter.pem */root.crl)
   ```
 
@@ -264,14 +272,8 @@ Judge the run by the script's own lines above.
      openssl x509 -in ceremony-out/pki_hub_client/root.pem -noout -fingerprint -sha256 -enddate
      ```
 
-  2. Remove the working directory from the pod. It holds the intermediate files of the ceremony:
-
-     ```bash
-     kubectl -n pivotal exec hsm-tools -- rm -rf /tmp/pivotal-ceremony-hsm /root/ceremony-hsm.sh
-     ```
-
-  3. Delete the HSM admin pod if you are not continuing straight away:
-     [Prepare the HSM admin pod: Rollback](hsm-admin-pod.md#rollback-or-recovery).
+  2. End the session: [Prepare the HSM admin pod: End the session](hsm-admin-pod.md#step-6-end-the-session).
+     Scaling to zero deletes the pod's `/tmp`, which holds the ceremony's working files.
 - **Expected Result:** the record is filed. Roots are valid for 10 years and intermediates for
   5 years; put both expiry dates where someone will be reminded.
 
@@ -304,7 +306,7 @@ and the label `pki_dfsp-root`.
 **3. The roles have the safe settings:**
 
 ```bash
-export VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200
+export VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200   # HA only; otherwise keep the pod's VAULT_ADDR
 read -r -s -p "Vault token: " VAULT_TOKEN; echo; export VAULT_TOKEN
 vault read pki_dfsp/roles/dfsp-client | grep use_csr
 vault read pki_hub_client/roles/web-inbound-server | grep -E 'allowed_domains|use_csr'
@@ -342,7 +344,7 @@ Expected: the subject's `CN` is `dfsp1`, not `someone-else`.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `-engine pkcs11` fails, naming the engine | `libengine-pkcs11-openssl` missing in the pod | [HSM admin pod](hsm-admin-pod.md), Step 4 |
+| `-engine pkcs11` fails, naming the engine | `libengine-pkcs11-openssl` missing: the pod was built by hand without it | [HSM admin pod: fallback](hsm-admin-pod.md#fallback-a-hand-built-pod) |
 | Vault step fails with `permission denied` | The token cannot manage the PKI mounts | Step 2 |
 | The script stops after `root keypair generated` | A Vault write failed, often a standby node | Use `vault-active` as `VAULT_ADDR` and run again |
 | `key list` shows no key for the root label | Logged in as the wrong ceremony user | Each root is visible only to its own user |

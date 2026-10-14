@@ -25,19 +25,14 @@ signing key.
 |---|---|---|
 | Root CA keys | AWS KMS | AWS CloudHSM |
 | When KMS or the HSM is used | KMS: only during the CA ceremony. No service calls KMS. | The HSM: during the ceremony, and for every signature at run time |
-| Hub JWS private keys | Vault KV, one path per tenant | CloudHSM; cannot be exported. Vault holds each tenant's keyRef and crypto-user login, and web-outbound's crypto-user login. |
-| Who creates a tenant's Hub JWS key | web-pivotal, when the DFSP is onboarded in the portal | A custodian, before the DFSP is onboarded (next release; see the note below) |
+| Hub JWS private keys | Vault KV, one path per tenant | CloudHSM; cannot be exported. Vault holds each tenant's keyRef, public key and crypto-user login, and web-outbound's crypto-user login. |
+| Who creates a tenant's Hub JWS key | web-pivotal, when the DFSP is onboarded in the portal | A custodian, with `provision-hsm-tenant.sh`, before the DFSP is onboarded. Onboarding then records the public key. |
 | How web-outbound signs | In memory, with the key read from Vault | Through PKCS#11, as its own crypto user, using keys shared with it |
 | How the connector signs | In memory, with the key read from Vault | Through the CloudHSM JCE provider, as the tenant's crypto user. The connector image must be built for CloudHSM. |
 | `KEY_PROVIDER` | `vault-kv` | `pkcs11` |
 | Extra people | Ceremony key holders | Custodians holding Crypto Officer credentials, for the ceremony and for every onboarding |
 | Extra infrastructure | An AWS account with KMS | An AWS CloudHSM cluster with at least two HSMs, reachable from the Kubernetes cluster |
 | Throughput | Signing is limited by CPU | Signing is limited by the HSM; measure it and size replicas to match |
-
-> **`pkcs11` in this release:** you can set up the HSM, the CA ceremony, Vault and the signing
-> services. Onboarding a DFSP is not yet available, and web-pivotal does not run with
-> `KEY_PROVIDER=pkcs11`. Both arrive in the next release. See
-> [Known limitations](../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
 
 ## Prerequisites by profile
 
@@ -71,9 +66,10 @@ deployments.
 
 ## What this means for you
 
-- Set `KEY_PROVIDER` explicitly on web-outbound, web-pivotal and every connector. If it is not set,
-  Pivotal's Node services fall back to `database`. (`pkcs11`: see your deploy page for web-pivotal
-  in this release.)
+- Set `KEY_PROVIDER` explicitly, to the same profile, on web-outbound, web-pivotal and every
+  connector. If it is not set on web-outbound or web-pivotal, they hold and create no Hub JWS keys,
+  and web-outbound refuses to start when `FSPIOP_USE_JWS` is `true`. That is the right setting only
+  for a deployment that does not use JWS towards the Hub.
 - Follow only your profile's setup path: [setup/index.md](../setup/index.md).
 
 ## References

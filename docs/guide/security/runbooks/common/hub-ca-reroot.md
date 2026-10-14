@@ -48,10 +48,10 @@ trusts the new CA.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> get secret <HUB_CLIENT_CERT_SECRET> \
+  kubectl -n pivotal get secret <HUB_CLIENT_CERT_SECRET> \
     -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -issuer -enddate
 
-  kubectl -n <PIVOTAL_NAMESPACE> get secret hub-ca-bundle \
+  kubectl -n pivotal get secret hub-ca-bundle \
     -o jsonpath='{.data.hub-ca\.pem}' | base64 -d | openssl x509 -noout -subject -fingerprint -sha256
   ```
 
@@ -66,7 +66,7 @@ trusts the new CA.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> delete secret <HUB_CLIENT_CERT_SECRET>
+  kubectl -n pivotal delete secret <HUB_CLIENT_CERT_SECRET>
   ```
 
 - **Expected Result:** `secret "<HUB_CLIENT_CERT_SECRET>" deleted`.
@@ -78,9 +78,9 @@ trusts the new CA.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> rollout restart deployment/trust-manager
-  kubectl -n <PIVOTAL_NAMESPACE> rollout status deployment/trust-manager
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/trust-manager --since=5m \
+  kubectl -n pivotal rollout restart deployment/trust-manager
+  kubectl -n pivotal rollout status deployment/trust-manager
+  kubectl -n pivotal logs deploy/trust-manager --since=5m \
     | grep -E "Hub CA changed|Enrolled a Hub-signed|Created Secret"
   ```
 
@@ -88,7 +88,7 @@ trusts the new CA.
 
   ```text
   Hub CA changed and Secret 'hub-ca-bundle' was rewritten. …   (only if not synced already)
-  Created Secret <PIVOTAL_NAMESPACE>/<HUB_CLIENT_CERT_SECRET>.
+  Created Secret pivotal/<HUB_CLIENT_CERT_SECRET>.
   Enrolled a Hub-signed server certificate for '<COMMON_NAME>' into Secret '<HUB_CLIENT_CERT_SECRET>'.
   ```
 
@@ -112,7 +112,7 @@ trusts the new CA.
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n <PIVOTAL_NAMESPACE> logs deploy/web-outbound --since=10m \
+  kubectl -n pivotal logs deploy/web-outbound --since=10m \
     | grep "Reloaded mutual TLS material"
   ```
 

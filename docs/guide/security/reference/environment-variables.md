@@ -24,7 +24,7 @@ Source: `packages/apps/web-outbound/required.settings.ts` (`keyProvider`, `vault
 
 | Variable | Default | Accepted values | Profile | Notes |
 |---|---|---|---|---|
-| `KEY_PROVIDER` | `database` | `vault-kv`, `pkcs11`, `database` | both | **Always set it.** Unset means `database`, which keeps private keys in plaintext in MySQL. An unknown value refuses startup. |
+| `KEY_PROVIDER` | `none` | `vault-kv`, `pkcs11`, `none`, `database` | both | Unset, empty or `none`: no Hub JWS signing keys. With `FSPIOP_USE_JWS=true` that refuses startup (`FSPIOP_USE_JWS is true but KEY_PROVIDER is not set. …`), so a signing web-outbound must set it. With `pkcs11` and `FSPIOP_USE_JWS=true`, `HSM_CRED_PATH` is also required. `database` is legacy (plaintext keys in MySQL). An unknown value refuses startup. |
 | `VAULT_ADDRESS` | empty | URL | both | For example `http://vault.vault.svc.cluster.local:8200`. |
 | `VAULT_AUTH_METHOD` | `kubernetes` | `kubernetes`, `token` | both | `token` is for local development only. Any other value refuses startup. |
 | `VAULT_ROLE` | empty | Vault Kubernetes auth role name | both | The role bound to the web-outbound ServiceAccount. See [vault.md](./vault.md#kubernetes-auth-roles). |
@@ -92,8 +92,8 @@ Source: `packages/apps/web-inbound/required.settings.ts`;
 `packages/shared/fspiop/component/security/mutual-tls-server.ts`;
 `packages/shared/fspiop/component/security/fspiop-mtls-server-cert-store.ts`.
 
-web-inbound verifies signatures and never signs. It ignores `KEY_PROVIDER` and needs no Vault role
-or HSM access in either profile.
+web-inbound verifies signatures and never signs. It ignores `KEY_PROVIDER`: it always runs as `none`,
+loads no private key, and needs no Vault role or HSM access in either profile.
 
 | Variable | Default | Accepted values | Required | Notes |
 |---|---|---|---|---|
@@ -113,19 +113,20 @@ When web-inbound serves TLS itself, its certificate files are re-read every 60 s
 Source: `packages/apps/web-pivotal/required.settings.ts` (`keyProvider`, `vaultSettings`,
 `dfspCertIssuerSettings`).
 
-web-pivotal issues DFSP client certificates and creates each tenant's Hub JWS signing key at
-onboarding.
+web-pivotal issues DFSP client certificates and gives each tenant its Hub JWS signing key at
+onboarding: it creates the key under `vault-kv`, and records the key a custodian provisioned under
+`pkcs11`. It never reaches the HSM.
 
 | Variable | Default | Accepted values | Profile | Notes |
 |---|---|---|---|---|
-| `KEY_PROVIDER` | `database` | `vault-kv`, `pkcs11`, `database` | both | Set it to match web-outbound. Unset means `database`, which stores new keys in plaintext. |
+| `KEY_PROVIDER` | `none` | `vault-kv`, `pkcs11`, `none`, `database` | both | Set it to match web-outbound. Unset, empty or `none`: DFSPs are onboarded without a Hub JWS key, and web-pivotal logs once at startup `KEY_PROVIDER is not set: DFSPs are onboarded without a Hub-facing signing key. Set it to vault-kv or pkcs11, matching web-outbound, if this deployment signs.` |
 | `VAULT_ADDRESS`, `VAULT_AUTH_METHOD`, `VAULT_ROLE`, `VAULT_KUBERNETES_AUTH_PATH`, `VAULT_KV_MOUNT`, `VAULT_JWS_KEY_PATH_PREFIX`, `VAULT_SERVICE_ACCOUNT_TOKEN_PATH`, `VAULT_TOKEN` | as for web-outbound | as for web-outbound | both | `VAULT_ROLE` is web-pivotal's own role. |
 | `DFSP_CERT_PKI_MOUNT` | empty | Vault PKI mount | both | `pki_dfsp`. Empty turns DFSP certificate issuance off. |
 | `DFSP_CERT_PKI_ROLE` | `dfsp-client` | Vault PKI role | both | |
 | `DFSP_CERT_TTL` | unset | Vault duration, for example `8760h` | both | Unset uses the role's own TTL. |
+| `KEY_REF_PATH` | `pivotal/keyref` | KV path prefix | `pkcs11` | Onboarding reads the tenant's `keyRef` and `publicKey` from `<prefix>/<fspId>` on `VAULT_KV_MOUNT`, and refuses the DFSP if either is missing. |
 
-**`pkcs11` settings for web-pivotal are not listed in this version.** The HSM onboarding flow
-changes in the next release; this table is completed then.
+Under `pkcs11`, web-pivotal needs no `PKCS11_*`, `HSM_CRED_PATH` or `CLOUDHSM_IP`.
 
 ---
 
@@ -134,7 +135,7 @@ changes in the next release; this table is completed then.
 Source: `packages/apps/trust-manager/required.settings.ts`;
 `packages/core/trust/domain/component/signing-tenant.consumer.ts`.
 
-trust-manager ignores `KEY_PROVIDER`. It never reads a private JWS key in either profile.
+trust-manager ignores `KEY_PROVIDER`: it always runs as `none` and never reads a private JWS key.
 
 ### MCM
 

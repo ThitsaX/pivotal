@@ -8,13 +8,15 @@ In the HSM-backed profile, Vault holds:
 
 - the two intermediate CAs (created by the [CA ceremony](3-ca-ceremony.md));
 - crypto-user credentials (`pivotal-kv/pivotal/hsmcred/<NAME>`, fields `username` and `password`);
-- key references (`pivotal-kv/pivotal/keyref/<DFSP_ID>`, field `keyRef`): the label of each
-  tenant's key inside the HSM.
+- key records (`pivotal-kv/pivotal/keyref/<DFSP_ID>`, fields `keyRef` and `publicKey`): the label
+  of each tenant's key inside the HSM, and its public key. A custodian's provisioning script writes
+  them before the DFSP is onboarded.
 
 Vault holds **no private key** in this profile. But a crypto-user credential lets its holder sign
 inside the HSM, so the Vault policies are still the boundary between tenants.
 
-This page writes one policy and one Kubernetes auth role per Pivotal service. Every service logs in
+This page writes one policy and one Kubernetes auth role per Pivotal service, and one policy for
+the custodians who provision DFSP keys. Every service logs in
 with its own Kubernetes ServiceAccount; nothing is distributed by hand.
 
 ## Objective
@@ -26,17 +28,13 @@ Create the policies and Kubernetes auth roles that let each service read only wh
 | Service | Vault role | Can do | Cannot do |
 |---|---|---|---|
 | web-outbound | `pivotal-web-outbound` | Read its own crypto-user credential (`hsmcred/web-outbound`) and every tenant's keyRef | Read any tenant's credential; sign certificates |
-| web-pivotal | `pivotal-web-pivotal` | Sign DFSP client certificates | See the note on web-pivotal below |
+| web-pivotal | `pivotal-web-pivotal` | Sign DFSP client certificates; read every tenant's key record (keyRef and public key), to record the public key at onboarding | Read any crypto-user credential; write anything in KV |
 | trust-manager | `pivotal-trust-manager` | Sign the Hub callback certificate; read the DFSP CA chain | Read any credential or keyRef |
 | cert-manager | `pivotal-cert-manager` | Sign the web-inbound server certificate | Anything else |
 | Each connector | `pivotal-<DFSP_ID>-connector` | Read **its own** credential and keyRef only | Read any other tenant's |
+| Custodians provisioning DFSP keys | policy `pivotal-hsm-provisioning`, on a token each custodian gets from the Vault administrator | Write each tenant's credential and key record, and read them back | Read or overwrite `cu_web_outbound`'s credential |
 
 web-inbound needs no Vault access.
-
-> **web-pivotal under `pkcs11` is completed with the next release.** Its key-reference access depends
-> on the DFSP onboarding procedure for this profile, which changes in that release. Until then this
-> page gives web-pivotal only certificate signing. See
-> [Known limitations](../../known-limitations.md#pkcs11-dfsp-onboarding-is-not-available-yet).
 
 ## Prerequisites
 
@@ -48,7 +46,7 @@ web-inbound needs no Vault access.
 | The KV v2 mount `pivotal-kv` | Created in [Prepare the CloudHSM cluster](2-hsm.md), Step 8 |
 | The credential `pivotal-kv/pivotal/hsmcred/web-outbound` | Same step |
 | A Vault token that can enable auth methods and write policies and auth roles | |
-| `VAULT_ADDR` and `VAULT_TOKEN` set in your shell | Any shell that reaches Vault; the HSM admin pod works |
+| `VAULT_ADDR` and `VAULT_TOKEN` set in your shell | Any shell that reaches Vault. The HSM admin pod works for the `vault` commands, but it has no `kubectl`: run Step 2's `kubectl exec` from your workstation ([reaching Vault from a workstation](1-prerequisites.md#step-3-check-your-workstation-tools)) |
 | `<CERT_MANAGER_NAMESPACE>` and `<CERT_MANAGER_VAULT_SA>` | The [shared worksheet](../common/hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet). The ServiceAccount is created later, on the inbound page. |
 
 ### Optional
@@ -59,7 +57,7 @@ None.
 
 ### Step 1. Check the KV mount
 
-- **Purpose:** the services read KV version 2 paths. A version 1 mount fails silently.
+- **Purpose:** the services read KV version 2 paths. Pivotal's services refuse to start on a version 1 mount.
 - **Command or Configuration:**
 
   ```bash
@@ -103,7 +101,9 @@ None.
   EOF
 
   vault policy write pivotal-web-pivotal - <<'EOF'
-  path "pki_dfsp/sign/dfsp-client" { capabilities = ["create", "update"] }
+  path "pki_dfsp/sign/dfsp-client"         { capabilities = ["create", "update"] }
+  path "pivotal-kv/data/pivotal/keyref/*"  { capabilities = ["read"] }
+  path "sys/internal/ui/mounts/pivotal-kv" { capabilities = ["read"] }
   EOF
 
   vault policy write pivotal-trust-manager - <<'EOF'
@@ -114,14 +114,27 @@ None.
   vault policy write pivotal-cert-manager - <<'EOF'
   path "pki_hub_client/sign/web-inbound-server" { capabilities = ["create", "update"] }
   EOF
+
+  vault policy write pivotal-hsm-provisioning - <<'EOF'
+  path "pivotal-kv/data/pivotal/hsmcred/*"           { capabilities = ["create", "read", "update"] }
+  path "pivotal-kv/data/pivotal/hsmcred/web-outbound" { capabilities = ["deny"] }
+  path "pivotal-kv/data/pivotal/keyref/*"            { capabilities = ["create", "read", "update"] }
+  EOF
   ```
 
   - web-outbound reads **one** credential (its own) and **every** keyRef: it logs in to the HSM as
     `cu_web_outbound`, and reaches each tenant's key because the key is shared with that user.
+  - web-pivotal reads key records only. It holds no crypto-user credential and cannot reach the HSM.
   - `sys/internal/ui/mounts/pivotal-kv` lets a service confirm the mount is version 2. Without it
     the service logs a warning and continues.
+  - `pivotal-hsm-provisioning` is for the custodians' tokens, used with
+    [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md). It can read the tenant
+    credentials it writes, which is no more than a custodian holding a Crypto Officer login can
+    already do. The `deny` line keeps `cu_web_outbound`'s credential out of reach. Issue each
+    custodian a short-lived token with it when they need one, for example
+    `vault token create -policy=pivotal-hsm-provisioning -ttl=1h`.
 
-- **Expected Result:** `Success! Uploaded policy: <name>` four times.
+- **Expected Result:** `Success! Uploaded policy: <name>` five times.
 - **If It Fails:** a syntax error names the line. Check the heredoc was pasted unchanged.
 
 ### Step 4. Create the Kubernetes auth roles
@@ -167,7 +180,7 @@ None.
   EOF
 
   vault write auth/kubernetes/role/pivotal-<DFSP_ID>-connector \
-    bound_service_account_names=<CONNECTOR_SERVICE_ACCOUNT> bound_service_account_namespaces=pivotal \
+    bound_service_account_names=<DFSP_ID>-connector bound_service_account_namespaces=pivotal \
     policies=pivotal-<DFSP_ID>-connector ttl=1h
   ```
 
@@ -179,7 +192,7 @@ None.
 | # | Check | Command | Pass |
 |---|---|---|---|
 | 1 | KV mount is version 2 | `vault secrets list -detailed \| grep '^pivotal-kv/'` | `version:2` |
-| 2 | Policies exist | `vault policy list` | All four `pivotal-*` names |
+| 2 | Policies exist | `vault policy list` | All five `pivotal-*` names |
 | 3 | Roles are bound correctly | `vault read auth/kubernetes/role/pivotal-web-outbound` (and the others) | `bound_service_account_names` and `bound_service_account_namespaces` as written |
 
 **Capability tests.** These use a short-lived token carrying one policy, so no pod is needed yet:
@@ -191,6 +204,16 @@ vault token capabilities "$T" pivotal-kv/data/pivotal/keyref/ANY             # e
 vault token capabilities "$T" pivotal-kv/data/pivotal/hsmcred/ANY_DFSP       # expect: deny
 vault token revoke "$T"
 
+T=$(vault token create -policy=pivotal-web-pivotal -ttl=5m -field=token)
+vault token capabilities "$T" pivotal-kv/data/pivotal/keyref/ANY             # expect: read
+vault token capabilities "$T" pivotal-kv/data/pivotal/hsmcred/ANY_DFSP       # expect: deny
+vault token revoke "$T"
+
+T=$(vault token create -policy=pivotal-hsm-provisioning -ttl=5m -field=token)
+vault token capabilities "$T" pivotal-kv/data/pivotal/keyref/ANY             # expect: create, read, update
+vault token capabilities "$T" pivotal-kv/data/pivotal/hsmcred/web-outbound   # expect: deny
+vault token revoke "$T"
+
 T=$(vault token create -policy=pivotal-trust-manager -ttl=5m -field=token)
 vault token capabilities "$T" pki_hub_client/sign/hub-callback-client        # expect: create, update
 vault token capabilities "$T" pivotal-kv/data/pivotal/hsmcred/web-outbound   # expect: deny
@@ -198,8 +221,9 @@ vault token revoke "$T"
 unset T
 ```
 
-The two `deny` lines are the negative tests: web-outbound cannot read a tenant's crypto-user
-credential, and trust-manager cannot read any.
+The `deny` lines are the negative tests: web-outbound and web-pivotal cannot read a tenant's
+crypto-user credential, custodians' provisioning tokens cannot touch `cu_web_outbound`'s, and
+trust-manager cannot read any.
 
 The login test for each service runs after deployment, in
 [Deploy Pivotal](5-deploy-pivotal.md#verification).

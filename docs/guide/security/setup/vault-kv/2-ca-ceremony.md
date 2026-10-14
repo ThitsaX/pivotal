@@ -226,7 +226,7 @@ Hub-client CA root certificate to the cluster.
     role restored: pki_hub_client/roles/web-inbound-server
     role restored: pki_hub_client/roles/hub-callback-client
     root CRL signed by KMS
-    root published to Secret pivotal/pivotal-ca-bundle
+    root published to Secret pivotal/pivotal-hub-client-ca
 
   -- Pivotal DFSP-Facing CA ------------------------------------
     root signed by KMS: alias/pivotal-dfsp-root-ca
@@ -254,23 +254,27 @@ Hub-client CA root certificate to the cluster.
   The script stops at the first error. Running it again from the start is safe **during the
   ceremony**, before any certificate has been issued: it disables and re-creates the mounts.
 
-### Step 7. Publish the root as `pivotal-hub-client-ca`
+### Step 7. Check the `pivotal-hub-client-ca` Secret
 
 - **Purpose:** trust-manager reads the Pivotal Hub-client CA root from the Secret
-  `pivotal-hub-client-ca` (key `ca.pem`) and registers it with MCM. The script writes the same file to
-  a Secret named `pivotal-ca-bundle`, which nothing reads.
-- **Action:** Create the Secret trust-manager expects from the same file, then remove the unused one.
+  `pivotal-hub-client-ca` (key `ca.pem`) and registers it with MCM. The script creates or updates it
+  (`root published to Secret pivotal/pivotal-hub-client-ca` in Step 6).
 - **Command or Configuration:**
 
   ```bash
-  kubectl -n pivotal create secret generic pivotal-hub-client-ca \
-    --from-file=ca.pem="$CEREMONY_OUT/pki_hub_client/root.pem"
-  kubectl -n pivotal delete secret pivotal-ca-bundle
+  kubectl -n pivotal get secret pivotal-hub-client-ca -o jsonpath='{.data.ca\.pem}' | base64 -d \
+    | openssl x509 -noout -fingerprint -sha256
+  openssl x509 -in "$CEREMONY_OUT/pki_hub_client/root.pem" -noout -fingerprint -sha256
   ```
 
-- **Expected Result:** `secret/pivotal-hub-client-ca created`, then `secret "pivotal-ca-bundle" deleted`.
-- **If It Fails:** `already exists` means a previous ceremony left one. Compare it with the new root
-  (see Verification) before you replace it.
+- **Expected Result:** the two fingerprints are identical.
+- **If It Fails:**
+  - **Step 6 stopped at publishing the Secret** (a `kubectl` error right after the Hub-client CA's
+    root CRL line): the script stops there, so the DFSP CA was not created either. Fix `kubectl`
+    access to the cluster and run Step 6 again.
+  - **The Secret is in another namespace:** the script used `PIVOTAL_NS`. Create it in `pivotal` from
+    the same file:
+    `kubectl -n pivotal create secret generic pivotal-hub-client-ca --from-file=ca.pem="$CEREMONY_OUT/pki_hub_client/root.pem" --dry-run=client -o yaml | kubectl apply -f -`.
 
 ### Step 8. Save the public outputs and clean up
 
