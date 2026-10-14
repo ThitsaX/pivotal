@@ -3,7 +3,10 @@
 //
 // The CA root ceremony against AWS KMS. Run once per deployment, per trust domain.
 //
-//   node scripts/ceremony-kms.js
+//   WEB_INBOUND_HOST=web-inbound.example.com node scripts/ceremony-kms.js
+//
+// WEB_INBOUND_HOST is web-inbound's public callback host. It is required: the ceremony re-creates
+// the Hub-facing mount, and the two roles that sign for that host are restored with it.
 //
 // Must run from the repository root so node-forge resolves.
 //
@@ -37,15 +40,42 @@ const VAULT_NS = process.env.VAULT_NS || 'vault';
 const VAULT_POD = process.env.VAULT_POD || 'vault-0';
 const VAULT_TOKEN = process.env.VAULT_DEV_ROOT_TOKEN || 'root-dev';
 const PIVOTAL_NS = process.env.PIVOTAL_NS || 'pivotal';
+const WEB_INBOUND_HOST = (process.env.WEB_INBOUND_HOST || '').trim();
+
+// Checked before any key is used: a ceremony that cannot restore every role it destroys must not
+// start, because the missing roles surface only at the next certificate renewal.
+if (WEB_INBOUND_HOST.length === 0) {
+    console.error('WEB_INBOUND_HOST is not set. Set it to web-inbound\'s public callback host, '
+        + 'for example web-inbound.example.com.');
+    process.exit(1);
+}
+
+// The name on both certificates comes from the request, never the CSR, and is held to the one
+// host. MCM's callback CSR has an empty subject, and cert-manager's request names the host itself.
+const WEB_INBOUND_NAME_ARGS = `allow_any_name=false allowed_domains=${WEB_INBOUND_HOST} `
+    + 'allow_bare_domains=true allow_subdomains=false enforce_hostnames=true allow_ip_sans=false '
+    + 'require_cn=true use_csr_common_name=false use_csr_sans=false key_bits=2048';
 
 const DOMAINS = [
     {mount: 'pki_hub_client', alias: process.env.HUB_CLIENT_KEY_ALIAS
         || 'alias/pivotal-hub-client-root-ca-rehearsal', cn: 'Pivotal Hub Client CA',
-     role: 'pivotal-client', publishAs: 'pivotal-ca-bundle',
-     roleArgs: 'client_flag=true server_flag=false max_ttl=2160h ttl=2160h ou=Pivotal require_cn=false'},
+     role: 'pivotal-client', publishAs: 'pivotal-hub-client-ca',
+     roleArgs: 'client_flag=true server_flag=false max_ttl=2160h ttl=2160h ou=Pivotal require_cn=false',
+     extraRoles: [
+         // The server certificate web-inbound presents to the Hub. Signed by cert-manager.
+         {name: 'web-inbound-server', args: `${WEB_INBOUND_NAME_ARGS} server_flag=true client_flag=false `
+             + 'max_ttl=2160h ttl=2160h ou=Pivotal organization=ThitsaWorks no_store=true'},
+         // The client certificate the Hub presents when it calls web-inbound. Signed by trust-manager
+         // from the CSR MCM generates.
+         {name: 'hub-callback-client', args: `${WEB_INBOUND_NAME_ARGS} server_flag=false client_flag=true `
+             + 'max_ttl=8760h ttl=8760h organization=Mojaloop key_type=rsa'},
+     ]},
     {mount: 'pki_dfsp', alias: process.env.DFSP_KEY_ALIAS
         || 'alias/pivotal-dfsp-root-ca-rehearsal', cn: 'Pivotal DFSP-Facing CA',
-     role: 'dfsp-client', roleArgs: 'client_flag=true server_flag=false max_ttl=8760h ttl=8760h ou=DFSP require_cn=true'},
+     // use_csr_common_name=false: the name comes from Pivotal's request (the DFSP id), never from the
+     // CSR, so a DFSP cannot ask for a certificate naming another participant.
+     role: 'dfsp-client', roleArgs: 'client_flag=true server_flag=false max_ttl=8760h ttl=8760h ou=DFSP '
+         + 'require_cn=true use_csr_common_name=false use_csr_sans=false'},
 ];
 
 const aws = (...args) => execFileSync('aws', args, {maxBuffer: 1 << 26}).toString();
@@ -207,6 +237,11 @@ function ceremony(domain) {
     vault(`vault write ${domain.mount}/roles/${domain.role} allow_any_name=true `
         + `enforce_hostnames=false key_bits=2048 organization=ThitsaWorks no_store=true ${domain.roleArgs}`);
     console.log(`  role restored: ${domain.mount}/roles/${domain.role}`);
+
+    for (const role of domain.extraRoles ?? []) {
+        vault(`vault write ${domain.mount}/roles/${role.name} ${role.args}`);
+        console.log(`  role restored: ${domain.mount}/roles/${role.name}`);
+    }
 
     fs.writeFileSync(path.join(out, 'root.crl'), buildRootCrl(domain.alias, rootPem));
     console.log('  root CRL signed by KMS');

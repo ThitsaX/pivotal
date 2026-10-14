@@ -15,9 +15,9 @@ import {KubernetesSecretWriter} from './kubernetes-secret-writer';
  * workload's. So this writes across a namespace boundary, which Istio scopes deliberately:
  * whoever can write that Secret decides which authority the gateway trusts.
  *
- * **The bundle is the intermediate followed by the root.** The issuing mount's own chain contains
- * only itself, the root living in a separate mount, so a bundle taken from one alone leaves the
- * gateway unable to build a path from a presented leaf to an anchor it trusts.
+ * **The bundle is the intermediate, followed by the root when a root mount is configured.** The
+ * issuing mount's own chain contains only itself. The CA ceremony keeps the root outside Vault, so
+ * by default the intermediate alone is the anchor.
  *
  * The CA rotates on the order of years, so this is a slow backstop rather than a hot path. It
  * exists so a rotation reaches the gateway without anyone remembering to copy a file — the same
@@ -98,9 +98,11 @@ export class DfspCaPublishScheduler implements OnModuleInit, OnModuleDestroy {
             return null;
         }
 
-        const root = this.settings.rootMount.length === 0
-            ? null
-            : await this.vault.readPkiCaChain(this.settings.rootMount);
+        if (this.settings.rootMount.length === 0) {
+            return `${intermediate}\n`;
+        }
+
+        const root = await this.vault.readPkiCaChain(this.settings.rootMount);
 
         if (root == null) {
             this.logger.warn(
@@ -115,9 +117,9 @@ export class DfspCaPublishScheduler implements OnModuleInit, OnModuleDestroy {
 
     private async tick(): Promise<void> {
 
-        const acquired = await this.lock.acquire(this.intervalMs + DfspCaPublishScheduler.LOCK_TTL_BUFFER_MS);
+        const token = await this.lock.acquire(this.intervalMs + DfspCaPublishScheduler.LOCK_TTL_BUFFER_MS);
 
-        if (!acquired) {
+        if (token == null) {
             return;
         }
 
@@ -134,6 +136,10 @@ export class DfspCaPublishScheduler implements OnModuleInit, OnModuleDestroy {
             const message = error instanceof Error ? error.message : String(error);
 
             this.logger.error(`DFSP CA publish failed: ${message}`);
+        } finally {
+            // Held only while this run works. Left to expire, it would make the next tick on
+            // this replica find it still held and skip, and a restart could not run the job.
+            await this.lock.release(token);
         }
     }
 }

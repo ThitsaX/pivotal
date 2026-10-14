@@ -8,6 +8,7 @@ describe('KeyProvider', () => {
         assert.equal(KeyProvider.parse('vault-kv', KeyProvider.Database), KeyProvider.VaultKv);
         assert.equal(KeyProvider.parse('pkcs11', KeyProvider.Database), KeyProvider.Pkcs11);
         assert.equal(KeyProvider.parse('database', KeyProvider.VaultKv), KeyProvider.Database);
+        assert.equal(KeyProvider.parse('none', KeyProvider.VaultKv), KeyProvider.None);
     });
 
     it('should tolerate whitespace and casing', () => {
@@ -17,12 +18,13 @@ describe('KeyProvider', () => {
     it('should use the fallback when unset', () => {
         assert.equal(KeyProvider.parse(undefined, KeyProvider.Database), KeyProvider.Database);
         assert.equal(KeyProvider.parse('', KeyProvider.VaultKv), KeyProvider.VaultKv);
+        assert.equal(KeyProvider.parse('   ', KeyProvider.None), KeyProvider.None);
     });
 
     it('should throw on an unrecognised value rather than defaulting', () => {
         // Silently defaulting would decide where private keys come from on the basis of a typo.
         assert.throws(() => KeyProvider.parse('vaultkv', KeyProvider.Database));
-        assert.throws(() => KeyProvider.parse('none', KeyProvider.Database));
+        assert.throws(() => KeyProvider.parse('off', KeyProvider.Database));
     });
 });
 

@@ -99,8 +99,29 @@ class FakeVault {
 
 const lock = {acquire: () => Promise.resolve('token'), release: () => Promise.resolve()} as any;
 
-function enroller(mcm: FakeMcm, vault: FakeVault): HubCallbackCertEnroller {
-    return new HubCallbackCertEnroller(mcm as any, vault, lock, SETTINGS, () => NOW, () => Promise.resolve());
+/** Stands in for Redis: one instance shared by two enrollers is one store outliving a restart. */
+class FakeFlag {
+
+    value = false;
+
+    isSet(): Promise<boolean> {
+        return Promise.resolve(this.value);
+    }
+
+    set(): Promise<void> {
+        this.value = true;
+        return Promise.resolve();
+    }
+
+    clear(): Promise<void> {
+        this.value = false;
+        return Promise.resolve();
+    }
+}
+
+function enroller(mcm: FakeMcm, vault: FakeVault, flag: FakeFlag = new FakeFlag()): HubCallbackCertEnroller {
+    return new HubCallbackCertEnroller(
+        mcm as any, vault, lock, flag, SETTINGS, () => NOW, () => Promise.resolve());
 }
 
 describe('HubCallbackCertEnroller', () => {
@@ -169,6 +190,22 @@ describe('HubCallbackCertEnroller', () => {
 
         mcm.calls.length = 0;
         assert.equal(await subject.renewIfNeeded(), 'current');
+    });
+
+    it('still publishes a pending certificate after a restart', async () => {
+        const mcm = new FakeMcm([]);
+        mcm.onboardFailures = 3;
+        const flag = new FakeFlag();
+
+        await assert.rejects(enroller(mcm, new FakeVault(), flag).renewIfNeeded(), /onboarding 'pivotal' failed/);
+        assert.equal(flag.value, true);
+
+        // A new process remembers nothing in memory; only the stored flag tells it the Hub is
+        // still presenting the old certificate.
+        mcm.calls.length = 0;
+        assert.equal(await enroller(mcm, new FakeVault(), flag).renewIfNeeded(), 'published');
+        assert.deepEqual(mcm.calls, ['list', 'ca', 'onboard']);
+        assert.equal(flag.value, false);
     });
 
     it('waits, signing nothing, until Pivotal\'s CA is registered under its DFSP', async () => {

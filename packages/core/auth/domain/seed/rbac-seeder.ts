@@ -66,12 +66,12 @@ const ROLE_SEEDS: RoleSeed[] = [
 
 const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.HUB_CURRENCY_ADD,                scope: 'HUB',  description: 'Provision hub settlement accounts for a new currency.'},
-    {keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE,         scope: 'HUB',  description: 'Update the hub-side JWS signing key pair.'},
+    {keyName: PermissionKey.HUB_SIGNING_KEYS_UPDATE,         scope: 'HUB',  description: 'Register the Hub\'s JWS public key, used to verify messages the Hub signs.'},
     {keyName: PermissionKey.PARTICIPANT_LIST,                scope: 'HUB',  description: 'View the list of registered participants.'},
     {keyName: PermissionKey.PARTICIPANT_ONBOARD,             scope: 'HUB',  description: 'Onboard a new FSP into the hub.'},
     {keyName: PermissionKey.PARTICIPANT_CURRENCY_ADD,        scope: 'HUB',  description: 'Enable an additional currency for an existing participant.'},
     {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   scope: 'HUB',  description: 'Register or replace a participant\'s callback endpoint.'},
-    {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'Update the JWS signing keys for a participant.'},
+    {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'View and change a participant\'s JWS policy: whether Pivotal signs as them, and how strictly their signatures are verified.'},
     {keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,   scope: 'HUB',  description: 'Update the access public key used to verify a participant\'s signed requests.'},
     {keyName: PermissionKey.PARTICIPANT_CERT_ENROLL,          scope: 'HUB',  description: 'Sign a participant\'s certificate request and issue a client certificate.'},
     {keyName: PermissionKey.PARTICIPANT_CERT_VIEW,            scope: 'HUB',  description: 'View and download participant client certificates and their status.'},
@@ -103,11 +103,11 @@ const ROLE_GRANTS: Record<string, string[]> = {
 const MENU_SEEDS: MenuSeed[] = [
     { menuKey: 'hub-add-currency', groupLabel: 'Hub', label: 'Add Currency', route: '/views/hub-add-currency', sortOrder: 10, permissionKey: PermissionKey.HUB_CURRENCY_ADD },
     { menuKey: 'hub-list-participants', groupLabel: 'Hub', label: 'List Participants', route: '/views/hub-list-participants', sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_LIST },
-    { menuKey: 'hub-add-signing-keys', groupLabel: 'Hub', label: 'Update Signing Keys', route: '/views/hub-add-signing-keys', sortOrder: 30, permissionKey: PermissionKey.HUB_SIGNING_KEYS_UPDATE },
+    { menuKey: 'hub-add-signing-keys', groupLabel: 'Hub', label: 'Hub JWS Public Key', route: '/views/hub-add-signing-keys', sortOrder: 30, permissionKey: PermissionKey.HUB_SIGNING_KEYS_UPDATE },
     { menuKey: 'participant-onboarding', groupLabel: 'Participant', label: 'Onboard FSP', route: '/views/participant-onboarding', sortOrder: 10, permissionKey: PermissionKey.PARTICIPANT_ONBOARD },
     { menuKey: 'participant-add-new-currency', groupLabel: 'Participant', label: 'Add Currency', route: '/views/participant-add-new-currency', sortOrder: 20, permissionKey: PermissionKey.PARTICIPANT_CURRENCY_ADD },
     { menuKey: 'participant-register-endpoint', groupLabel: 'Participant', label: 'Register Endpoint', route: '/views/participant-register-endpoint', sortOrder: 30, permissionKey: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER },
-    { menuKey: 'participant-add-signing-keys', groupLabel: 'Participant', label: 'Update Signing Keys', route: '/views/participant-add-signing-keys', sortOrder: 40, permissionKey: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE },
+    { menuKey: 'participant-add-signing-keys', groupLabel: 'Participant', label: 'JWS Policy', route: '/views/participant-add-signing-keys', sortOrder: 40, permissionKey: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE },
     { menuKey: 'participant-certificates', groupLabel: 'Participant', label: 'Certificates', route: '/views/participant-certificates', sortOrder: 50, permissionKey: PermissionKey.PARTICIPANT_CERT_VIEW },
     { menuKey: 'transactions', groupLabel: 'Audit', label: 'Find Transactions', route: '/views/transactions', sortOrder: 10, permissionKey: PermissionKey.AUDIT_TRANSACTIONS_LIST },
     { menuKey: 'admin-users', groupLabel: 'Admin', label: 'Users', route: '/views/admin-users', sortOrder: 10, permissionKey: PermissionKey.ADMIN_USERS_MANAGE },

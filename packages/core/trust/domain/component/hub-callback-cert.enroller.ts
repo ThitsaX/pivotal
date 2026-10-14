@@ -5,6 +5,7 @@ import * as forge from 'node-forge';
 import {RollupLock} from '@core/audit/domain/component';
 import {McmAxios, OutboundEnrollment, OutboundEnrollmentState} from '@shared/mcm-client';
 import {VaultClient} from '@shared/vault';
+import {RedisFlag} from './redis-flag';
 
 /**
  * Keeps the **Hub's** client certificate for calling Pivotal back from expiring.
@@ -37,6 +38,9 @@ export class HubCallbackCertEnroller implements OnModuleInit, OnModuleDestroy {
      * Set when a certificate was uploaded but publishing it failed. MCM reports no onboarding
      * state, and the uploaded certificate is valid, so without this the next tick would see
      * nothing to do and the Hub would keep presenting the old one until it expired.
+     *
+     * Kept in Redis as well as here: a restart would otherwise forget it, and the next renewal
+     * -- the only other thing that onboards -- is months away.
      */
     private onboardPending = false;
 
@@ -44,6 +48,7 @@ export class HubCallbackCertEnroller implements OnModuleInit, OnModuleDestroy {
         private readonly mcm: McmAxios,
         private readonly vault: Pick<VaultClient, 'signCertificate'>,
         private readonly lock: RollupLock,
+        private readonly pendingFlag: Pick<RedisFlag, 'isSet' | 'set' | 'clear'>,
         private readonly settings: HubCallbackCertEnroller.Settings,
         private readonly now: () => Date = () => new Date(),
         private readonly sleep: (ms: number) => Promise<void> =
@@ -77,6 +82,10 @@ export class HubCallbackCertEnroller implements OnModuleInit, OnModuleDestroy {
         const enrollments = await this.mcm.listOutboundEnrollments(this.settings.dfspId);
         const current = HubCallbackCertEnroller.newest(enrollments, OutboundEnrollmentState.CertSigned);
         const daysLeft = this.daysUntilExpiry(current?.certificate);
+
+        if (!this.onboardPending && await this.pendingFlag.isSet()) {
+            this.onboardPending = true;
+        }
 
         if (daysLeft != null && daysLeft > this.settings.renewBeforeDays && !this.onboardPending) {
             return 'current';
@@ -122,6 +131,7 @@ export class HubCallbackCertEnroller implements OnModuleInit, OnModuleDestroy {
         }
 
         this.onboardPending = true;
+        await this.pendingFlag.set();
         await this.onboard();
 
         this.logger.log(
@@ -167,13 +177,14 @@ export class HubCallbackCertEnroller implements OnModuleInit, OnModuleDestroy {
             try {
                 await this.mcm.onboard(this.settings.dfspId);
                 this.onboardPending = false;
+                await this.pendingFlag.clear();
                 return;
             } catch (error: unknown) {
                 if (attempt >= HubCallbackCertEnroller.ONBOARD_ATTEMPTS) {
                     const message = error instanceof Error ? error.message : String(error);
                     throw new Error(
                         `The certificate is uploaded but onboarding '${this.settings.dfspId}' failed, `
-                        + `so the Hub still presents the previous one. Retrying next tick; `
+                        + `so the Hub still presents the previous one. Retrying next tick, also after a restart; `
                         + `POST /dfsps/${this.settings.dfspId}/onboard publishes it by hand. ${message}`);
                 }
 

@@ -60,9 +60,8 @@ export class Pkcs11Settings {
     /**
      * Whether the device can be reached at all.
      *
-     * Only the module path is required. An empty {@link credentialPath} is not missing
-     * configuration — it selects the provisioning shape, where the workload holds no identity of
-     * its own and borrows each tenant's for the one operation that needs it.
+     * Only the module path is required here. An empty {@link credentialPath} means the workload
+     * does not sign, and is then given no device connection at all.
      */
     isConfigured(): boolean {
         return this.modulePath.trim().length > 0;

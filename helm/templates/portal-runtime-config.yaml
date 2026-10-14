@@ -1,0 +1,15 @@
+{{- if .Values.portal.runtimeConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ default "portal-runtime-config" .Values.portal.runtimeConfig.name }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+data:
+  config.js: |
+    window.__PIVOTAL_CONFIG__ = {
+    {{- range $key, $value := .Values.portal.runtimeConfig.values }}
+        {{ $key | quote }}: {{ $value | quote }},
+    {{- end }}
+    };
+{{- end }}

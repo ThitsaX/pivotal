@@ -273,12 +273,38 @@ export class WebOutboundSettings
     }
 
     /**
-     * Where private keys come from. Absent or `database` keeps the legacy plaintext-MySQL path;
-     * `vault-kv` is the KMS-backed profile. An unrecognised value throws rather than defaulting —
-     * a typo must not silently decide where private keys live.
+     * Where private keys come from. Unset or `none` holds no Hub-facing signing keys, which suits a
+     * deployment that does not sign; `vault-kv` is the KMS-backed profile and `pkcs11` the
+     * HSM-backed one. An unrecognised value throws rather than defaulting — a typo must not silently
+     * decide where private keys live.
+     *
+     * Signing without a key profile is refused here, at startup. Before `none` existed an unset value
+     * meant plaintext keys in MySQL, and a deployment that turned signing on without choosing would
+     * have kept them there unawares.
      */
     keyProvider(): KeyProvider {
-        return KeyProvider.parse(this.configService.get<string>('KEY_PROVIDER'), KeyProvider.Database);
+        const keyProvider = KeyProvider.parse(
+            this.configService.get<string>('KEY_PROVIDER'), KeyProvider.None);
+
+        if (!this.readRequiredBoolean('FSPIOP_USE_JWS')) {
+            return keyProvider;
+        }
+
+        if (keyProvider === KeyProvider.None) {
+            throw new Error(
+                'FSPIOP_USE_JWS is true but KEY_PROVIDER is not set. Set it to vault-kv or pkcs11, '
+                + 'the profile that holds the tenants\' signing keys.');
+        }
+
+        if (keyProvider === KeyProvider.Pkcs11
+            && (this.configService.get<string>('HSM_CRED_PATH') ?? '').trim().length === 0) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' and FSPIOP_USE_JWS is true, so this service `
+                + 'signs and needs its own crypto user. Set HSM_CRED_PATH to the Vault path holding '
+                + 'that credential.');
+        }
+
+        return keyProvider;
     }
 
     vaultSettings(): VaultSettings {

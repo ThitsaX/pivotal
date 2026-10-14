@@ -140,3 +140,32 @@ describe('WebOutboundSettings Hub access token', () => {
         assert.throws(() => settings(partial).outboundSettings(), /must be set together/);
     });
 });
+
+describe('WebOutboundSettings key provider', () => {
+
+    it('holds no keys when KEY_PROVIDER is unset or empty and signing is off', () => {
+        assert.equal(settings().keyProvider(), 'none');
+        assert.equal(settings({KEY_PROVIDER: ''}).keyProvider(), 'none');
+    });
+
+    it('refuses to sign without a key provider', () => {
+        // An unset value used to mean plaintext keys in MySQL; signing must not inherit that.
+        assert.throws(
+            () => settings({FSPIOP_USE_JWS: 'true'}).keyProvider(),
+            /FSPIOP_USE_JWS is true but KEY_PROVIDER is not set/);
+    });
+
+    it('refuses to sign through the HSM without its own crypto user', () => {
+        assert.throws(
+            () => settings({FSPIOP_USE_JWS: 'true', KEY_PROVIDER: 'pkcs11'}).keyProvider(),
+            /Set HSM_CRED_PATH/);
+    });
+
+    it('accepts a signing profile', () => {
+        assert.equal(settings({FSPIOP_USE_JWS: 'true', KEY_PROVIDER: 'vault-kv'}).keyProvider(), 'vault-kv');
+        assert.equal(
+            settings({FSPIOP_USE_JWS: 'true', KEY_PROVIDER: 'pkcs11', HSM_CRED_PATH: 'pivotal/hsmcred/web-outbound'})
+                .keyProvider(),
+            'pkcs11');
+    });
+});

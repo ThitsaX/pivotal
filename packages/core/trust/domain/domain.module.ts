@@ -10,6 +10,7 @@ import {VaultClient, VaultSettings} from '@shared/vault';
 import {
     DfspCaPublishScheduler,
     HubCallbackCertEnroller,
+    RedisFlag,
     HubCaSyncScheduler,
     HubServerCertEnroller,
     JwsKeyPublishScheduler,
@@ -27,6 +28,7 @@ const JWS_PUBLISH_LOCK = Symbol('TrustDomainJwsPublishLock');
 const SERVER_CERT_LOCK = Symbol('TrustDomainServerCertLock');
 const DFSP_CA_LOCK = Symbol('TrustDomainDfspCaLock');
 const CALLBACK_CERT_LOCK = Symbol('TrustDomainCallbackCertLock');
+const CALLBACK_CERT_ONBOARD_PENDING = Symbol('TrustDomainCallbackCertOnboardPending');
 
 const Components: Provider[] = [
     {
@@ -198,6 +200,12 @@ const Components: Provider[] = [
         inject: [McmAxios, KubernetesSecretWriter, SERVER_CERT_LOCK, REQUIRED_SETTINGS],
     },
     {
+        provide: CALLBACK_CERT_ONBOARD_PENDING,
+        useFactory: (settings: TrustDomainModule.RequiredSettings): RedisFlag =>
+            new RedisFlag(settings.redisUrl(), 'pivotal:trust:hub-callback-cert:onboard-pending'),
+        inject: [REQUIRED_SETTINGS],
+    },
+    {
         provide: CALLBACK_CERT_LOCK,
         useFactory: (settings: TrustDomainModule.RequiredSettings): RollupLock =>
             new RollupLock(settings.redisUrl(), 'pivotal:trust:hub-callback-cert'),
@@ -210,15 +218,17 @@ const Components: Provider[] = [
         useFactory: (
             mcm: McmAxios,
             lock: RollupLock,
+            pendingFlag: RedisFlag,
             settings: TrustDomainModule.RequiredSettings,
         ): HubCallbackCertEnroller | null => {
             const callback = settings.hubCallbackCertSettings();
 
             return callback == null
                 ? null
-                : new HubCallbackCertEnroller(mcm, new VaultClient(settings.vaultSettings()), lock, callback);
+                : new HubCallbackCertEnroller(
+                    mcm, new VaultClient(settings.vaultSettings()), lock, pendingFlag, callback);
         },
-        inject: [McmAxios, CALLBACK_CERT_LOCK, REQUIRED_SETTINGS],
+        inject: [McmAxios, CALLBACK_CERT_LOCK, CALLBACK_CERT_ONBOARD_PENDING, REQUIRED_SETTINGS],
     },
 ];
 

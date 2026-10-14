@@ -2,54 +2,207 @@ nameOverride: ""
 fullnameOverride: ""
 
 global:
+  imageRegistry: ""
   imagePullPolicy: IfNotPresent
+  # Names of existing pull Secrets, or set imageCredentials.createSecret to have the chart make one.
+  imagePullSecrets: []
+  imageCredentials:
+    createSecret: false
+    secretName: ghcr-pull-secret
+    registry: ghcr.io
+    username: ""
+    password: ""
+    email: ""
+  revisionHistoryLimit: 3
+  terminationGracePeriodSeconds: 30
 
-  # Hub CA trust bundle. Authoritative store, written by trust-manager after it
-  # pulls GET /hub/ca. Mounted optional so a cluster without it still starts;
-  # mTLS is what needs it, and mTLS is not on yet.
-  hubCaSecretName: hub-ca-bundle
+  podAnnotations: {}
+  commonLabels: {}
+  # Value of the `connector` label on every connector pod. Empty leaves the label off.
+  connectorLabel: dfsp
 
-  # The Hub-signed server certificate, obtained through MCM enrollment. Holds both
-  # tls.crt and tls.key, so it is the one Secret here that is genuinely secret.
-  hubServerCertSecretName: hub-server-cert
-  # Client leaf web-outbound presents to the Hub, issued from the Pivotal
-  # client trust domain -- never the same material as the server cert above.
-  hubClientCertSecretName: web-outbound-hub-client-tls
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
 
-  commonFspiopEnv:
-    FSPIOP_PARTIES_URL: http://web-inbound:3201
-    FSPIOP_QUOTES_URL: http://web-inbound:3201
-    FSPIOP_TRANSFERS_URL: http://web-inbound:3201
-    FSPIOP_SWITCH_ID: hub
-    FSPIOP_USE_JWS: "false"
-    FSPIOP_USE_MUTUAL_TLS: "false"
-    FSPIOP_SIGN_JWS: "false"
-    FSPIOP_VERIFY_JWS: "false"
-    FSPIOP_MUTUAL_TLS: "false"
-    FSPIOP_SOCKET_TIMEOUT_MS: "30000"
-    FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
-    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
-    FSPIOP_TLS_VERIFY_DOMAIN: "false"
-    FSPIOP_JWS_PRIVATE_KEY: ""
-    FSPIOP_JWS_PUBLIC_KEY: ""
-    FSPIOP_MTLS_CA: ""
-    FSPIOP_MTLS_CLIENT_CERT: ""
-    FSPIOP_MTLS_CLIENT_KEY: ""
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
 
-  commonDbEnv:
-    DB_WRITE_HOST: mysql
-    DB_WRITE_PORT: "3306"
-    DB_WRITE_USERNAME: root
-    DB_WRITE_PASSWORD: mysql
-    DB_WRITE_NAME: pivotal
-    DB_READ_HOST: mysql
-    DB_READ_PORT: "3306"
-    DB_READ_USERNAME: root
-    DB_READ_PASSWORD: mysql
-    DB_READ_NAME: pivotal
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
 
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  defaultResources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Database passwords. Set existingSecret to use a Secret you manage; otherwise the chart creates
+  # one from the passwords below.
+  secrets:
+    existingSecret: ""
+    mysqlRootPasswordKey: mysql-root-password
+    dbWritePasswordKey: db-write-password
+    dbReadPasswordKey: db-read-password
+    mysqlRootPassword: ""
+    dbWritePassword: ""
+    dbReadPassword: ""
+
+  # Every service with the database gets DB_WRITE_* and DB_READ_* from here. Set writeHost and
+  # readHost to send writes and reads to different hosts; both fall back to host.
+  database:
+    host: mysql
+    # writeHost: ""
+    # readHost: ""
+    port: "3306"
+    username: pivotal
+    name: pivotal
+
+  # Rendered into web-outbound, web-inbound and every connector. A service's own env wins over
+  # this block. Keep per-service settings (Hub URLs, FSPIOP_USE_JWS, FSPIOP_USE_MUTUAL_TLS, the TLS
+  # verify flags) on the service: FSPIOP_USE_MUTUAL_TLS, for one, means "present a certificate" on
+  # web-outbound and "serve TLS" on web-inbound.
+  commonFspiopEnv: {}
+    # FSPIOP_SWITCH_ID: hub
+    # FSPIOP_SOCKET_TIMEOUT_MS: "30000"
+    # FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
+
+# OpenTelemetry auto-instrumentation for the Java connectors. Needs the OpenTelemetry Operator and
+# a trace backend. A connector opts out with `tracing.enabled: false` on its own entry.
+tracing:
+  enabled: false
+  instrumentation:
+    name: default
+    spec:
+      exporter:
+        endpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
+      propagators: [tracecontext, baggage]
+      sampler:
+        type: parentbased_traceidratio
+        argument: "1.0"
+      java:
+        env:
+          - {name: OTEL_METRICS_EXPORTER, value: "none"}
+          - {name: OTEL_LOGS_EXPORTER, value: "none"}
+
+# ---------------------------------------------------------------------------------------------
+# Istio. Off by default; each list renders its items as written.
+# ---------------------------------------------------------------------------------------------
+istio:
+  gateways:
+    enabled: false
+    items: []
+    # - name: pivotal-dfsp-gateway                  # DFSP-facing: DFSPs call web-outbound
+    #   namespace: pivotal
+    #   selector:
+    #     app: istio-external-ingress-gw
+    #   servers:
+    #     - hosts: [pivotal.example.com]
+    #       port: {name: https-mtls, number: 443, protocol: HTTPS}
+    #       tls:
+    #         credentialName: pivotal-dfsp-tls      # anchor read from pivotal-dfsp-tls-cacert
+    #         mode: OPTIONAL_MUTUAL                 # MUTUAL once every DFSP presents a certificate
+    # - name: pivotal-hub-callback-gateway          # Hub-facing: the Hub calls web-inbound
+    #   namespace: pivotal
+    #   selector:
+    #     app: istio-external-ingress-gw
+    #   servers:
+    #     - hosts: [web-inbound.example.com]
+    #       port: {name: https-hub-callback, number: 443, protocol: HTTPS}
+    #       tls:
+    #         credentialName: pivotal-web-inbound-hub-tls
+    #         mode: MUTUAL
+  virtualServices:
+    enabled: false
+    items: []
+    # - name: pivotal-web-outbound-vs
+    #   namespace: pivotal
+    #   gateways: [pivotal-dfsp-gateway]
+    #   hosts: [pivotal.example.com]
+    #   http:
+    #     - route:
+    #         - destination: {host: web-outbound, port: {number: 3200}}
+    # - name: pivotal-web-inbound-hub-vs
+    #   namespace: pivotal
+    #   gateways: [pivotal-hub-callback-gateway]
+    #   hosts: [web-inbound.example.com]
+    #   http:
+    #     - route:
+    #         - destination: {host: web-inbound, port: {number: 3201}}
+  destinationRules:
+    enabled: false
+    items: []
+  authorizationPolicies:
+    enabled: false
+    items: []
+  # Hosts resolved inside the mesh rather than through public DNS.
+  serviceEntries:
+    enabled: false
+    items: []
+  # web-outbound reads the DFSP's verified certificate from the x-forwarded-client-cert header.
+  # Its sidecar must pass on what the gateway set, and not rewrite it.
+  envoyFilters:
+    enabled: false
+    items: []
+    # - name: web-outbound-xfcc-forward-only
+    #   namespace: pivotal
+    #   enabled: true
+    #   workloadLabels:
+    #     app.kubernetes.io/component: web-outbound
+    #   forwardClientCertDetails: FORWARD_ONLY
+
+# ---------------------------------------------------------------------------------------------
+# cert-manager. Off by default; each item's spec is rendered as written.
+# ---------------------------------------------------------------------------------------------
+certManager:
+  clusterIssuers:
+    enabled: false
+    items: []
+    # - name: pivotal-hub-server-issuer             # signs the web-inbound server certificate
+    #   spec:
+    #     vault:
+    #       server: http://vault.vault.svc.cluster.local:8200
+    #       path: pki_hub_client/sign/web-inbound-server
+    #       auth:
+    #         kubernetes:
+    #           role: <vault role for cert-manager>
+    #           mountPath: /v1/auth/kubernetes
+    #           serviceAccountRef:
+    #             name: <cert-manager service account>
+  certificates:
+    enabled: false
+    items: []
+    # - name: pivotal-web-inbound-hub-tls           # presented by the Hub callback gateway
+    #   namespace: <gateway namespace>
+    #   spec:
+    #     secretName: pivotal-web-inbound-hub-tls
+    #     commonName: web-inbound.example.com
+    #     dnsNames: [web-inbound.example.com]
+    #     usages: [digital signature, key encipherment, server auth]
+    #     duration: 2160h0m0s
+    #     renewBefore: 360h0m0s
+    #     privateKey: {algorithm: RSA, size: 2048, rotationPolicy: Always}
+    #     issuerRef: {name: pivotal-hub-server-issuer, kind: ClusterIssuer}
+
+# ---------------------------------------------------------------------------------------------
+# Bundled infrastructure. For evaluation only; a deployment normally uses its own MySQL,
+# NATS and Redis.
+# ---------------------------------------------------------------------------------------------
 mysql:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: mysql
@@ -65,10 +218,28 @@ mysql:
     storageClassName: ""
   env:
     MYSQL_DATABASE: pivotal
-    MYSQL_ROOT_PASSWORD: mysql
+  startupProbe:
+    exec:
+      command: [sh, -c, 'mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent']
+    failureThreshold: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+  readinessProbe:
+    exec:
+      command: [sh, -c, 'mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent']
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  livenessProbe:
+    exec:
+      command: [sh, -c, 'mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD" --silent']
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
 
 nats:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: nats
@@ -83,7 +254,7 @@ nats:
     - "8222"
 
 redis:
-  enabled: true
+  enabled: false
   replicaCount: 1
   image:
     repository: redis
@@ -98,251 +269,294 @@ redis:
       - ReadWriteOnce
     storageClassName: ""
 
+# ---------------------------------------------------------------------------------------------
+# Pivotal services.
+#
+# Each block takes: enabled, replicaCount, image, serviceAccount, service, env, volumes,
+# volumeMounts, resources, startupProbe, readinessProbe, livenessProbe, command, args,
+# podAnnotations, deploymentStrategy, securityContext.
+#
+# Defaults set only what does not depend on the environment. Everything else is shown as a
+# commented example: a default here would override the same name in global.commonFspiopEnv,
+# because a service's own env wins.
+#
+# Each service has its own ServiceAccount. Vault binds its auth roles to these names, so a shared
+# "default" account would let any service read any other's keys.
+# ---------------------------------------------------------------------------------------------
 webOutbound:
   enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
   serviceAccount:
     create: true
     name: web-outbound
   replicaCount: 1
   image:
-    repository: pivotal-web-outbound
-    tag: local
+    repository: ghcr.io/thitsax/pivotal-web-outbound
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3200
   env:
     WEB_OUTBOUND_PORT: "3200"
-    PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: "5"
-    NATS_URL: nats://nats:4222
-    REDIS_URL: redis://redis:6379
-    REDIS_CACHE_ITEM_TIMEOUT_MS: "900000"
-    CHECK_PAYER_FEE_AS_MANDATORY: "false"
-    POST_SENDMONEY_PAYEE_FSPID_REQUIRED: "true"
-    SUSPICIOUS_TRANSACTION_MONITORING_ENABLED: "true"
-    SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES: "3"
-    SUSPICIOUS_TRANSACTION_THRESHOLD: "10"
-    SUSPICIOUS_TRANSACTION_MATCHING_FIELDS: "payerFspId,payerIdValue,payeeFspId,payeeIdValue,amount"
-    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
-    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
-    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
-    # Whether a DFSP-facing caller may arrive with no client certificate. A presented
-    # certificate is verified and bound to fspiop-source either way, so this never turns
-    # mutual TLS on or off -- it decides only whether an absent one is fatal. Off by default
-    # so the mutual-TLS endpoint can run beside the plain one while DFSPs migrate; it needs a
-    # gateway setting the XFCC header before it can be turned on.
-    DFSP_FACING_MTLS_MANDATORY: "false"
-    # Private-key custody. `database` is the legacy plaintext-MySQL path; `vault-kv`
-    # is the KMS-backed profile. Use the in-cluster FQDN: a bare "vault" can resolve to
-    # a Docker-Compose Vault via CoreDNS host records in a local dev cluster.
-    KEY_PROVIDER: vault-kv
-    VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
-    VAULT_AUTH_METHOD: kubernetes
-    VAULT_KUBERNETES_AUTH_PATH: kubernetes
-    VAULT_KV_MOUNT: secret
-    VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
-    VAULT_ROLE: web-outbound
-
-    # Optional: blank disables POST /secured/registry/msisdn.
-    CENTRAL_REGISTRY_ORACLE_ENDPOINT: ""
-    CENTRAL_REGISTRY_ORACLE_SOCKET_TIMEOUT_MS: "10000"
-    CENTRAL_REGISTRY_ORACLE_CONNECTION_TIMEOUT_MS: "10000"
+    # SNOWFLAKE_NODE_ID: "1"                      # unique per service and replica
+    # NATS_URL: nats://nats:4222
+    # REDIS_URL: redis://redis:6379
+    # CENTRAL_LEDGER_URL: http://central-ledger:3001
+    #
+    # The Hub's FSPIOP endpoints:
+    # FSPIOP_PARTIES_URL: https://hub.example.com
+    # FSPIOP_QUOTES_URL: https://hub.example.com
+    # FSPIOP_TRANSFERS_URL: https://hub.example.com
+    #
+    # JWS signing towards the Hub. Each tenant is also switched on per participant:
+    # FSPIOP_USE_JWS: "true"
+    #
+    # mTLS towards the Hub, using the files trust-manager writes (mount them, see volumes below):
+    # FSPIOP_USE_MUTUAL_TLS: "true"
+    # FSPIOP_TLS_VERIFY_SERVER_CERT: "true"
+    # FSPIOP_TLS_VERIFY_DOMAIN: "true"
+    # FSPIOP_MTLS_CLIENT_CERT_PATH: /etc/pivotal/hub-client-tls/tls.crt
+    # FSPIOP_MTLS_CLIENT_KEY_PATH: /etc/pivotal/hub-client-tls/tls.key
+    # FSPIOP_MTLS_CA_PATH: /etc/pivotal/hub-ca/hub-ca.pem
+    #
+    # Whether a DFSP may call without a client certificate. A presented one is always checked:
+    # DFSP_FACING_MTLS_MANDATORY: "false"
+    #
+    # Where JWS signing keys are held: vault-kv (KMS-backed) or pkcs11 (HSM-backed).
+    # Unset means no keys; with FSPIOP_USE_JWS "true" it must be set, or web-outbound refuses to start:
+    # KEY_PROVIDER: vault-kv
+    # VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    # VAULT_AUTH_METHOD: kubernetes
+    # VAULT_ROLE: web-outbound
+    # VAULT_KV_MOUNT: secret
+    # VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
+  # volumeMounts:
+  #   - {name: hub-client-tls, mountPath: /etc/pivotal/hub-client-tls, readOnly: true}
+  #   - {name: hub-ca, mountPath: /etc/pivotal/hub-ca, readOnly: true}
+  # volumes:
+  #   - {name: hub-client-tls, secret: {secretName: pivotal-hub-client-cert}}
+  #   - {name: hub-ca, secret: {secretName: hub-ca-bundle}}
+  readinessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  livenessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
 
 webInbound:
   enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
   serviceAccount:
     create: true
     name: web-inbound
   replicaCount: 1
   image:
-    repository: pivotal-web-inbound
-    tag: local
+    repository: ghcr.io/thitsax/pivotal-web-inbound
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3201
   env:
     WEB_INBOUND_PORT: "3201"
-    NATS_URL: nats://nats:4222
-    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
-    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
-    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
+    # SNOWFLAKE_NODE_ID: "2"
+    # NATS_URL: nats://nats:4222
+    # CENTRAL_LEDGER_URL: http://central-ledger:3001
+    #
+    # Installs JWS verification. How strictly each sender is checked is set per participant;
+    # FSPIOP_JWS_VERIFY_MODE applies only to senders with no participant record:
+    # FSPIOP_USE_JWS: "true"
+    # FSPIOP_JWS_VERIFY_MODE: "off"
+    #
+    # Here this means "serve TLS". Leave it "false" when the Istio gateway terminates TLS:
+    # FSPIOP_USE_MUTUAL_TLS: "false"
+  readinessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  livenessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 15
 
 appAuditor:
   enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
   serviceAccount:
     create: true
     name: app-auditor
   replicaCount: 1
   image:
-    repository: pivotal-app-auditor
-    tag: local
-  env:
-    LOG_LEVEL: log
-    NATS_URL: nats://nats:4222
-    PIVOTAL_AUDIT_STREAM_NAME: PIVOTAL_AUDIT
+    repository: ghcr.io/thitsax/pivotal-app-auditor
+    tag: v1.4.0
+  env: {}
+    # SNOWFLAKE_NODE_ID: "3"
+    # NATS_URL: nats://nats:4222
 
 reportWorker:
-  enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
+  enabled: false
   serviceAccount:
     create: true
     name: report-worker
   replicaCount: 1
   image:
-    repository: pivotal-report-worker
-    tag: local
-  env:
-    REPORT_DOWNLOAD_WORKER_ENABLED: "true"
-    REPORT_DOWNLOAD_POLL_INTERVAL_MS: "5000"
-    REPORT_DOWNLOAD_PAGE_SIZE: "50000"
-    REPORT_DOWNLOAD_MAX_ROWS_PER_FILE: "50000"
-    REPORT_DOWNLOAD_MAX_ZIP_FILES: "1"
-    REPORT_DOWNLOAD_MAX_CONCURRENT: "3"
-    REPORT_DOWNLOAD_STALE_RUNNING_TTL_MS: "1200000"
-    REPORT_S3_ENABLED: "false"
-    REPORT_S3_BUCKET: your-aws-s3-bucket-name
-    REPORT_S3_REGION: us-east-1
-    REPORT_S3_ACCESS_KEY_ID: your-aws-access-key-id
-    REPORT_S3_SECRET_ACCESS_KEY: your-aws-secret-access-key
-    REPORT_S3_ENDPOINT: ""
-    REPORT_S3_FORCE_PATH_STYLE: "false"
-    REPORT_S3_PREFIX: reports/
-    REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
+    repository: ghcr.io/thitsax/pivotal-report-worker
+    tag: v1.4.0
+  env: {}
+    # SNOWFLAKE_NODE_ID: "4"
+    # REPORT_DOWNLOAD_WORKER_ENABLED: "true"
 
 webPivotal:
   enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
   serviceAccount:
     create: true
     name: web-pivotal
   replicaCount: 1
   image:
-    repository: pivotal-web-pivotal
-    tag: local
+    repository: ghcr.io/thitsax/pivotal-web-pivotal
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3202
   env:
     WEB_PIVOTAL_PORT: "3202"
-    PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES: "30"
-    PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS: "12"
-    CENTRAL_LEDGER_URL: http://host.docker.internal:3001
-    CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: ""
-    CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: ""
-    REPORT_DOWNLOAD_WORKER_ENABLED: "false"
-    REPORT_S3_ENABLED: "false"
-    REPORT_S3_BUCKET: your-aws-s3-bucket-name
-    REPORT_S3_REGION: us-east-1
-    REPORT_S3_ACCESS_KEY_ID: your-aws-access-key-id
-    REPORT_S3_SECRET_ACCESS_KEY: your-aws-secret-access-key
-    REPORT_S3_ENDPOINT: ""
-    REPORT_S3_FORCE_PATH_STYLE: "false"
-    REPORT_S3_PREFIX: reports/
-    REPORT_S3_PRESIGNED_URL_TTL_SECONDS: "900"
-
-trustManager:
-  # Publishing the DFSP-facing CA to the ingress gateway. Off by default: a deployment that
-  # fronts no DFSP-facing mutual TLS endpoint has no gateway to give a trust anchor to.
-  # `secretName` must match the Gateway's own `credentialName`.
-  dfspCaGateway:
-    enabled: false
-    namespace: ""
-    secretName: ""
-  enabled: false
-  replicaCount: 1
-  image:
-    repository: pivotal-trust-manager
-    tag: local
-  # Own identity: it writes the Hub CA Secret, so it needs a name RBAC can bind to.
-  serviceAccount:
-    create: true
-    name: trust-manager
-  env:
-    PEER_JWS_SYNC_INTERVAL_SECONDS: "300"
-    HUB_CA_SYNC_INTERVAL_SECONDS: "3600"
-    MCM_BASE_URL: ""
-    MCM_TOKEN_URL: ""
-    MCM_CLIENT_ID: ""
-    MCM_CLIENT_SECRET: ""
+    # SNOWFLAKE_NODE_ID: "5"
+    # REDIS_URL: redis://redis:6379
+    # CENTRAL_LEDGER_URL: http://central-ledger:3001
+    #
+    # DFSP client certificate issuance. Unset turns issuance off:
+    # DFSP_CERT_PKI_MOUNT: pki_dfsp
+    # DFSP_CERT_PKI_ROLE: dfsp-client
+    # VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    # VAULT_AUTH_METHOD: kubernetes
+    # VAULT_ROLE: web-pivotal
+    #
+    # Onboarding gives each tenant a JWS signing key in the custody KEY_PROVIDER names. Set it to
+    # match web-outbound. Unset means DFSPs are onboarded without one. Under pkcs11 a custodian
+    # creates the key first; onboarding reads its key reference and public key from KEY_REF_PATH:
+    # KEY_PROVIDER: vault-kv
+    # VAULT_KV_MOUNT: secret
+    # VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
 
 portal:
   enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
   serviceAccount:
     create: true
     name: portal
   replicaCount: 1
   image:
-    repository: pivotal-portal
-    tag: local
+    repository: ghcr.io/thitsax/pivotal-portal
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 4173
+  env: {}
+    # WEB_PIVOTAL_API_BASE_URL: https://pivotal-api.example.com
+  runtimeConfig:
+    enabled: false
+    name: portal-runtime-config
+    values: {}
 
-wallet1Connector:
-  enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
+# Registers Pivotal and its tenants with the Hub through MCM, keeps the Hub-facing certificates
+# renewed, and syncs JWS public keys. Off by default: it needs MCM credentials and the CA file
+# from the ceremony before it can start.
+trustManager:
+  enabled: false
   serviceAccount:
     create: true
-    name: wallet1-connector
+    name: trust-manager
   replicaCount: 1
   image:
-    repository: pivotal-wallet1-connector
-    tag: local
-  env:
-    NATS_URL: nats://nats:4222
-    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
-    CONNECTOR_ID: wallet1
-    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
-    CONNECTOR_ILP_SECRET: wallet1-ilp-secret
-    CATALYST_URL: http://host.docker.internal:4000
-    CATALYST_ENGINE_MODE: STRICT
+    repository: ghcr.io/thitsax/pivotal-trust-manager
+    tag: v1.4.0
+  env: {}
+    # SNOWFLAKE_NODE_ID: "6"
+    # REDIS_URL: redis://redis:6379
+    # NATS_URL: nats://nats:4222
+    # CENTRAL_LEDGER_URL: http://central-ledger:3001
+    #
+    # Pivotal's own participant ID in MCM:
+    # PIVOTAL_DFSP_ID: pivotal
+    # MCM_BASE_URL: http://mcm-connection-manager-api.mcm.svc.cluster.local:3001/api
+    # MCM_TOKEN_URL: https://keycloak.example.com/realms/dfsps/protocol/openid-connect/token
+    # MCM_CLIENT_ID: pivotal-trust-manager
+    # MCM_CLIENT_SECRET:                          # create the Secret first:
+    #   valueFrom:                                #   kubectl -n <namespace> create secret generic \
+    #     secretKeyRef:                           #     trust-manager-mcm --from-literal=MCM_CLIENT_SECRET=<secret>
+    #       name: trust-manager-mcm
+    #       key: MCM_CLIENT_SECRET
+    # MCM_AUTO_REGISTER_DFSPS: "true"
+    #
+    # Pivotal's Hub-facing root CA from the ceremony (mount it, see volumes below):
+    # PIVOTAL_CA_PATH: /etc/pivotal/hub-client-ca/ca.pem
+    #
+    # Pivotal's Hub client certificate, signed by the Hub CA through MCM:
+    # HUB_SERVER_CERT_COMMON_NAME: pivotal.example.com
+    # HUB_SERVER_CERT_SECRET_NAME: pivotal-hub-client-cert
+    #
+    # The Hub callback certificate. Set to web-inbound's public host; unset turns it off:
+    # HUB_CALLBACK_CERT_COMMON_NAME: web-inbound.example.com
+    #
+    # VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
+    # VAULT_AUTH_METHOD: kubernetes
+    # VAULT_ROLE: trust-manager
+    #
+    # Publishes the DFSP CA to the DFSP-facing gateway's trust anchor. The Secret must already
+    # exist in the gateway's namespace:
+    # DFSP_CA_PKI_MOUNT: pki_dfsp
+    # DFSP_CA_GATEWAY_NAMESPACE: istio-ingress-ext
+    # DFSP_CA_GATEWAY_SECRET_NAME: pivotal-dfsp-tls-cacert
+  # volumeMounts:
+  #   - {name: hub-client-ca, mountPath: /etc/pivotal/hub-client-ca, readOnly: true}
+  # volumes:
+  #   - {name: hub-client-ca, secret: {secretName: pivotal-hub-client-ca}}
 
-wallet2Connector:
-  enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
-  serviceAccount:
-    create: true
-    name: wallet2-connector
-  replicaCount: 1
-  image:
-    repository: pivotal-wallet2-connector
-    tag: local
-  env:
-    NATS_URL: nats://nats:4222
-    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
-    CONNECTOR_ID: wallet2
-    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
-    CONNECTOR_ILP_SECRET: wallet2-ilp-secret
-    CATALYST_URL: http://host.docker.internal:4000
-    CATALYST_ENGINE_MODE: STRICT
+# DFSP connectors, one entry each, with the same keys as a service. Each signs as its own
+# participant, so each gets its own ServiceAccount. `tracing.enabled: false` opts one out of
+# auto-instrumentation.
 
-wallet3Connector:
-  enabled: true
-  # Own Kubernetes identity. Vault binds its auth role to this name, so a shared
-  # "default" account would make per-tenant key scoping impossible.
-  serviceAccount:
-    create: true
-    name: wallet3-connector
-  replicaCount: 1
+# The HSM admin pod, for the HSM-backed (pkcs11) profile only. A custodian runs the CA ceremony and
+# provisions each DFSP's key from it. Zero replicas: scale to 1 for a session, back to 0 after.
+# Under ArgoCD with self-heal, ignore differences on /spec/replicas for the hsm-tools Deployment.
+hsmTools:
+  enabled: false
+  replicaCount: 0
   image:
-    repository: pivotal-wallet3-connector
-    tag: local
-  env:
-    NATS_URL: nats://nats:4222
-    PIVOTAL_FSPIOP_STREAM_NAME: PIVOTAL_FSPIOP
-    CONNECTOR_ID: wallet3
-    CONNECTOR_SUPPORTED_CURRENCIES: USD,LRD
-    CONNECTOR_ILP_SECRET: wallet3-ilp-secret
-    CATALYST_URL: http://host.docker.internal:4000
-    CATALYST_ENGINE_MODE: STRICT
+    repository: ghcr.io/thitsax/pivotal-hsm-tools
+    # First published with the release after v1.3.0. Set it to your Pivotal release.
+    tag: ""
+  # IP address of one HSM in the cluster.
+  cloudhsmIp: ""
+  # Vault's address from inside the cluster, for example http://vault.vault.svc.cluster.local:8200.
+  vaultAddress: ""
+  # ConfigMap holding the cluster's certificate under the key customerCA.crt.
+  customerCaConfigMap: cloudhsm-customer-ca
+  resources: {}
+
+connectors: []
+# - name: demodfsp1-connector
+#   enabled: true
+#   serviceAccount: {create: true, name: demodfsp1-connector}
+#   image: {repository: ghcr.io/thitsax/pivotal-thitsawallet-connector, tag: v0.0.17}
+#   volumeMounts:
+#     - {name: hub-client-tls, mountPath: /etc/pivotal/hub-client-tls, readOnly: true}
+#     - {name: hub-ca, mountPath: /etc/pivotal/hub-ca, readOnly: true}
+#   volumes:
+#     - {name: hub-client-tls, secret: {secretName: pivotal-hub-client-cert}}
+#     - {name: hub-ca, secret: {secretName: hub-ca-bundle}}
+#   env:
+#     CONNECTOR_ID: demodfsp1
+#     NATS_URL: nats://nats:4222
+#     FSPIOP_PARTIES_URL: https://hub.example.com
+#     FSPIOP_QUOTES_URL: https://hub.example.com
+#     FSPIOP_TRANSFERS_URL: https://hub.example.com
+#     FSPIOP_USE_JWS: "true"
+#     FSPIOP_USE_MUTUAL_TLS: "true"
+#     FSPIOP_MTLS_CLIENT_CERT_PATH: /etc/pivotal/hub-client-tls/tls.crt
+#     FSPIOP_MTLS_CLIENT_KEY_PATH: /etc/pivotal/hub-client-tls/tls.key
+#     FSPIOP_MTLS_CA_PATH: /etc/pivotal/hub-ca/hub-ca.pem
+#     KEY_PROVIDER: vault-kv
+#     VAULT_URL: http://vault.vault.svc.cluster.local:8200   # the Java connector reads VAULT_URL
+#     VAULT_ROLE: demodfsp1-connector
