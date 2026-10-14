@@ -285,3 +285,37 @@ describe('VaultClient KV engine version', () => {
         assert.equal(value, 'pem');
     });
 });
+
+describe('VaultClient CA chain', () => {
+
+    const CHAIN = '-----BEGIN CERTIFICATE-----\nintermediate\n-----END CERTIFICATE-----';
+
+    function answering(status: number, data: string): VaultClient {
+        const http = {get: () => Promise.resolve({status, data})};
+
+        return client(http as any);
+    }
+
+    it('should return the chain Vault serves', async () => {
+        assert.equal(await answering(200, `${CHAIN}\n`).readPkiCaChain('pki_dfsp'), CHAIN);
+    });
+
+    it('should answer null when the mount has no CA yet', async () => {
+        assert.equal(await answering(404, '').readPkiCaChain('pki_dfsp'), null);
+        assert.equal(await answering(200, '').readPkiCaChain('pki_dfsp'), null);
+    });
+
+    it('should refuse an error body rather than return it as a chain', async () => {
+        // What Vault answers an unauthenticated read of a mount that does not exist. Returned as
+        // a chain, it was published into a gateway's trust anchor.
+        await assert.rejects(
+            answering(403, '{"errors":["permission denied"]}').readPkiCaChain('pki_dfsp_root'),
+            /answered 403/);
+    });
+
+    it('should refuse a success that holds no certificate', async () => {
+        await assert.rejects(
+            answering(200, '{"errors":[]}').readPkiCaChain('pki_dfsp'),
+            /something other than a certificate chain/);
+    });
+});

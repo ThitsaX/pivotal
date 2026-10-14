@@ -71,7 +71,9 @@ export class TrustManagerSettings implements TrustDomainModule.RequiredSettings 
     dfspCaPublishSettings(): DfspCaPublishScheduler.Settings {
         return new DfspCaPublishScheduler.Settings(
             this.read('DFSP_CA_PKI_MOUNT') ?? 'pki_dfsp',
-            this.read('DFSP_CA_ROOT_PKI_MOUNT') ?? 'pki_dfsp_root',
+            // No ceremony puts the DFSP CA root in Vault -- it stays in KMS or the HSM -- so the
+            // default is none, and the intermediate alone is published as the anchor.
+            this.read('DFSP_CA_ROOT_PKI_MOUNT') ?? '',
             this.read('DFSP_CA_GATEWAY_NAMESPACE') ?? '',
             this.read('DFSP_CA_GATEWAY_SECRET_NAME') ?? '',
         );

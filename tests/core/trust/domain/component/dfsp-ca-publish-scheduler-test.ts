@@ -33,7 +33,21 @@ class FakeSecrets {
     }
 }
 
-const lock = {acquire: () => Promise.resolve(true)} as any;
+class FakeLock {
+
+    readonly released: string[] = [];
+
+    acquire(): Promise<string | null> {
+        return Promise.resolve('token');
+    }
+
+    release(token: string): Promise<void> {
+        this.released.push(token);
+        return Promise.resolve();
+    }
+}
+
+const lock = new FakeLock() as any;
 
 function scheduler(vault: FakeVault, secrets: FakeSecrets, settings = SETTINGS): DfspCaPublishScheduler {
     return new DfspCaPublishScheduler(vault as any, secrets as any, lock, settings);
@@ -86,6 +100,31 @@ describe('DfspCaPublishScheduler', () => {
         // writing nothing: the gateway would reject every DFSP rather than keep what it holds.
         assert.equal(await scheduler(vault, secrets).sync(), false);
         assert.equal(secrets.writes.length, 0);
+    });
+
+    it('should release its lock after each run, so the next run is not skipped', async () => {
+        const vault = new FakeVault({pki_dfsp: INTERMEDIATE});
+        const secrets = new FakeSecrets();
+        const ownLock = new FakeLock();
+        const job = new DfspCaPublishScheduler(vault as any, secrets as any, ownLock as any, SETTINGS);
+
+        job.onModuleInit();
+        job.onModuleDestroy();
+        await new Promise(resolve => setImmediate(resolve));
+
+        assert.deepEqual(ownLock.released, ['token']);
+    });
+
+    it('should release its lock even when the run fails', async () => {
+        const failing = {readPkiCaChain: () => Promise.reject(new Error('Vault answered 403'))};
+        const ownLock = new FakeLock();
+        const job = new DfspCaPublishScheduler(failing as any, new FakeSecrets() as any, ownLock as any, SETTINGS);
+
+        job.onModuleInit();
+        job.onModuleDestroy();
+        await new Promise(resolve => setImmediate(resolve));
+
+        assert.deepEqual(ownLock.released, ['token']);
     });
 
     it('should stay idle when no gateway is configured', () => {
