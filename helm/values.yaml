@@ -322,7 +322,7 @@ webOutbound:
     # DFSP_FACING_MTLS_MANDATORY: "false"
     #
     # Where JWS signing keys are held: vault-kv (KMS-backed) or pkcs11 (HSM-backed).
-    # Unset means `database`, which stores keys in plaintext:
+    # Unset means no keys; with FSPIOP_USE_JWS "true" it must be set, or web-outbound refuses to start:
     # KEY_PROVIDER: vault-kv
     # VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
     # VAULT_AUTH_METHOD: kubernetes
@@ -433,8 +433,9 @@ webPivotal:
     # VAULT_AUTH_METHOD: kubernetes
     # VAULT_ROLE: web-pivotal
     #
-    # Onboarding creates each tenant's JWS signing key in the custody KEY_PROVIDER names. Set it to
-    # match web-outbound. Unset means `database`, which stores the key in plaintext:
+    # Onboarding gives each tenant a JWS signing key in the custody KEY_PROVIDER names. Set it to
+    # match web-outbound. Unset means DFSPs are onboarded without one. Under pkcs11 a custodian
+    # creates the key first; onboarding reads its key reference and public key from KEY_REF_PATH:
     # KEY_PROVIDER: vault-kv
     # VAULT_KV_MOUNT: secret
     # VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
@@ -515,6 +516,25 @@ trustManager:
 # DFSP connectors, one entry each, with the same keys as a service. Each signs as its own
 # participant, so each gets its own ServiceAccount. `tracing.enabled: false` opts one out of
 # auto-instrumentation.
+
+# The HSM admin pod, for the HSM-backed (pkcs11) profile only. A custodian runs the CA ceremony and
+# provisions each DFSP's key from it. Zero replicas: scale to 1 for a session, back to 0 after.
+# Under ArgoCD with self-heal, ignore differences on /spec/replicas for the hsm-tools Deployment.
+hsmTools:
+  enabled: false
+  replicaCount: 0
+  image:
+    repository: ghcr.io/thitsax/pivotal-hsm-tools
+    # First published with the release after v1.3.0. Set it to your Pivotal release.
+    tag: ""
+  # IP address of one HSM in the cluster.
+  cloudhsmIp: ""
+  # Vault's address from inside the cluster, for example http://vault.vault.svc.cluster.local:8200.
+  vaultAddress: ""
+  # ConfigMap holding the cluster's certificate under the key customerCA.crt.
+  customerCaConfigMap: cloudhsm-customer-ca
+  resources: {}
+
 connectors: []
 # - name: demodfsp1-connector
 #   enabled: true

@@ -59,7 +59,7 @@ const WEB_INBOUND_NAME_ARGS = `allow_any_name=false allowed_domains=${WEB_INBOUN
 const DOMAINS = [
     {mount: 'pki_hub_client', alias: process.env.HUB_CLIENT_KEY_ALIAS
         || 'alias/pivotal-hub-client-root-ca-rehearsal', cn: 'Pivotal Hub Client CA',
-     role: 'pivotal-client', publishAs: 'pivotal-ca-bundle',
+     role: 'pivotal-client', publishAs: 'pivotal-hub-client-ca',
      roleArgs: 'client_flag=true server_flag=false max_ttl=2160h ttl=2160h ou=Pivotal require_cn=false',
      extraRoles: [
          // The server certificate web-inbound presents to the Hub. Signed by cert-manager.
