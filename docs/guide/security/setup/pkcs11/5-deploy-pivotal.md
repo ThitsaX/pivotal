@@ -1,6 +1,6 @@
 # Deploy Pivotal
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: pkcs11 · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: pkcs11 · Document version 1.0 (draft)
 
 ## Overview
 
@@ -40,7 +40,7 @@ Run Pivotal with Hub JWS signing done inside CloudHSM, and prove the profile is 
 | Your values file, with the `hsmTools` block | [Prepare the HSM admin pod](hsm-admin-pod.md), Step 2. If you also turned the services off there, remove those lines now. |
 | `<HSM_IP>`, the private IP address of one HSM | [Prepare the CloudHSM cluster](2-hsm.md), Step 4 |
 | The Hub operator's items H1 to H4 in place: MCM URL, token URL and client, Hub CA in MCM | [Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md), with the shared values for this page |
-| The Pivotal Helm chart 0.2.0 and the image tags for your release | The published images already carry the CloudHSM library ([Prerequisites](1-prerequisites.md), Step 2) |
+| The Pivotal Helm chart 0.3.0 and the image tags for your release | The published images already carry the CloudHSM library ([Prerequisites](1-prerequisites.md), Step 2) |
 | The non-security settings for each service | Database, Redis, NATS, ledger and oracle URLs |
 
 ### Optional

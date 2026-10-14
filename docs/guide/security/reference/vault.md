@@ -1,6 +1,6 @@
 # Vault
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 Everything Pivotal keeps in Vault: mounts, PKI roles, KV paths, the access each workload needs,
 and the Kubernetes auth roles. Placeholders: `<KV_MOUNT>` is your KV v2 mount (for example

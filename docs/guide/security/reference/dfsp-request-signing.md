@@ -1,6 +1,6 @@
 # DFSP Request Signing
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 How a DFSP signs its requests to Pivotal's DFSP-facing endpoints (leg 1) with its **DFSP access key**.
 Pivotal checks the signature against the access public key registered for the DFSP named in

@@ -1,6 +1,6 @@
 # Helm Values
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 Only the chart values that affect mutual TLS, JWS and key custody are listed. Every other value is
 documented in `helm/values.yaml`.

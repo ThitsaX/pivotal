@@ -31,6 +31,7 @@ image tags, Hub URLs, Vault, MCM, and the database.
 | `mysql`, `nats`, `redis` | Bundled infrastructure, off by default |
 | `webOutbound`, `webInbound`, `webPivotal`, `portal`, `appAuditor`, `reportWorker`, `trustManager` | One block per service: `enabled`, `image`, `replicaCount`, `serviceAccount`, `service`, `env`, `volumes`, `volumeMounts`, `resources`, probes, `podAnnotations`, `deploymentStrategy` |
 | `connectors` | One list entry per DFSP connector, with the same keys as a service, plus `tracing.enabled` |
+| `hsmTools` | The HSM admin pod for the HSM-backed profile: off and at 0 replicas by default. Set `cloudhsmIp`, `vaultAddress`, `customerCaConfigMap` and `image.tag`. |
 
 ### Environment variables
 

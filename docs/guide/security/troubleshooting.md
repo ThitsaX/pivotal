@@ -1,6 +1,6 @@
 # Troubleshooting
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 ## Summary
 
@@ -176,7 +176,7 @@ These apply to the `pkcs11` profile.
 | A value set in `global.commonFspiopEnv` has no effect on one service | A value set in the service's own `env` wins over the shared block. | Remove the value from the service's `env`, or set it there. |
 | trust-manager is not deployed | `trustManager.enabled` is `false` by default. | Set it to `true` after creating the Secrets it needs. See [Helm values](reference/helm-values.md). |
 | trust-manager log shows a Kubernetes `403` when writing a Secret | The chart grants trust-manager write access only to the Secrets named in its settings. A different name is not covered. | Use the Secret names from your values file, and deploy with the chart so the RBAC rules match them. |
-| Vault login fails after moving to chart 0.2.0 | Every service now runs as its own ServiceAccount. Vault roles bound to `default` no longer match. | Bind each Vault role to the service's own ServiceAccount. |
+| Vault login fails after moving from chart 0.1.x | Every service now runs as its own ServiceAccount. Vault roles bound to `default` no longer match. | Bind each Vault role to the service's own ServiceAccount. |
 | web-outbound does not start: `FSPIOP_USE_JWS is true but KEY_PROVIDER is not set. Set it to vault-kv or pkcs11, the profile that holds the tenants' signing keys.` | Unset `KEY_PROVIDER` means no signing keys, which cannot sign. | Set `KEY_PROVIDER` on web-outbound and web-pivotal to your profile. A deployment that does not sign towards the Hub sets `FSPIOP_USE_JWS: "false"` instead. |
 | Onboarding succeeds but the DFSP gets no Hub JWS key (`'<FSP_ID>' onboarded without a Hub-facing signing key: this deployment holds none.` in web-pivotal's log) | web-pivotal's `KEY_PROVIDER` is unset or `none`. | Set it to your profile. For a DFSP already onboarded this way, contact Pivotal support. |
 | The `hsm-tools` pod returns to zero replicas by itself | ArgoCD self-heal resets `/spec/replicas`. | Add `ignoreDifferences` for it: [Prepare the HSM admin pod](setup/pkcs11/hsm-admin-pod.md), Step 3. |

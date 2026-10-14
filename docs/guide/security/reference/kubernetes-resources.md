@@ -1,6 +1,6 @@
 # Kubernetes Resources
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 Every Kubernetes object that mutual TLS and JWS depend on: who creates it, who keeps it current,
 and who reads it. Names in `<ANGLE_CAPS>` are your choice; other names are the defaults or the

@@ -1,6 +1,6 @@
 # Pivotal CA Re-key
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
 
 > **Not a self-service procedure in this version.** A complete, tested cutover for a Pivotal CA
 > re-key is not provided. This page explains what a re-key changes, which parts Pivotal handles on its

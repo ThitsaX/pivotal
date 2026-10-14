@@ -291,7 +291,7 @@ webOutbound:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-web-outbound
-    tag: v1.3.0
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3200
@@ -354,7 +354,7 @@ webInbound:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-web-inbound
-    tag: v1.3.0
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3201
@@ -390,7 +390,7 @@ appAuditor:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-app-auditor
-    tag: v1.3.0
+    tag: v1.4.0
   env: {}
     # SNOWFLAKE_NODE_ID: "3"
     # NATS_URL: nats://nats:4222
@@ -403,7 +403,7 @@ reportWorker:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-report-worker
-    tag: v1.3.0
+    tag: v1.4.0
   env: {}
     # SNOWFLAKE_NODE_ID: "4"
     # REPORT_DOWNLOAD_WORKER_ENABLED: "true"
@@ -416,7 +416,7 @@ webPivotal:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-web-pivotal
-    tag: v1.3.0
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 3202
@@ -448,7 +448,7 @@ portal:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-portal
-    tag: v1.3.0
+    tag: v1.4.0
   service:
     type: ClusterIP
     port: 4173
@@ -470,7 +470,7 @@ trustManager:
   replicaCount: 1
   image:
     repository: ghcr.io/thitsax/pivotal-trust-manager
-    tag: v1.3.0
+    tag: v1.4.0
   env: {}
     # SNOWFLAKE_NODE_ID: "6"
     # REDIS_URL: redis://redis:6379

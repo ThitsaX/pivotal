@@ -1,6 +1,6 @@
 # 4. Deploy Pivotal (vault-kv)
 
-> Applies to: Pivotal v1.0.1 – v1.3.0, Helm chart 0.2.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
 
@@ -33,7 +33,7 @@ Run all Pivotal services with signing keys held in Vault KV, and prove the profi
 - [3. Vault](./3-vault.md) completed and verified.
 - Secret `pivotal-hub-client-ca` exists in the Pivotal namespace ([CA ceremony, Step 7](./2-ca-ceremony.md#step-7-check-the-pivotal-hub-client-ca-secret)).
 - The Hub operator's items H1 to H4 are in place ([Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md#step-1-agree-the-hub-operators-items)).
-- The Pivotal Helm chart 0.2.0 and the image tags for your release.
+- The Pivotal Helm chart 0.3.0 and the image tags for your release.
 - The non-security settings for each service (database, Redis, NATS, ledger and oracle URLs).
 
 ### Optional
