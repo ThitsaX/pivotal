@@ -44,15 +44,16 @@ describe('session token lifetimes', () => {
         assert.equal(jwt.decode(access).exp, (NOW + 5 * MINUTE) / 1000);
     });
 
-    it('uses configured idle and absolute limits', (t) => {
+    it('supports a 10-minute idle limit and a fractional-hour absolute limit', (t) => {
         t.mock.timers.enable({apis: ['Date'], now: NOW});
         const configured = new WebPivotalSettings(new ConfigService({
-            PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES: '45',
-            PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS: '8',
+            PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS: '300',
+            PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES: '10',
+            PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS: '0.5',
         }));
         const issued = new TokenService(jwt, configured).issueRefreshToken();
-        assert.equal(issued.expiresAt.getTime(), NOW + 45 * MINUTE);
-        assert.equal(issued.sessionExpiresAt.getTime(), NOW + 8 * 60 * MINUTE);
+        assert.equal(issued.expiresAt.getTime(), NOW + 10 * MINUTE);
+        assert.equal(issued.sessionExpiresAt.getTime(), NOW + 30 * MINUTE);
     });
 });
 
@@ -80,8 +81,10 @@ describe('web-pivotal startup session validation', () => {
     });
 
     for (const key of ['PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES', 'PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS', 'PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS']) {
-        it(`rejects invalid positive-integer values for ${key}`, () => {
-            for (const value of ['0', '-1', 'abc', '1.5', '', 'Infinity']) {
+        it(`rejects invalid duration values for ${key}`, () => {
+            const invalidValues = ['0', '-1', 'abc', '', 'Infinity'];
+            if (key !== 'PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS') invalidValues.push('1.5');
+            for (const value of invalidValues) {
                 assert.throws(
                     () => new WebPivotalSettings(new ConfigService({[key]: value})),
                     new RegExp(`Invalid environment variable ${key}:`),

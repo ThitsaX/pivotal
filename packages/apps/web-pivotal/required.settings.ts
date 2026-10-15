@@ -88,17 +88,17 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
     }
 
     accessTokenTtlSeconds(): number {
-        return this.readSessionPositiveInteger('PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS')
+        return this.readSessionPositiveDuration('PIVOTAL_IAM_ACCESS_TOKEN_TTL_SECONDS')
             ?? WebPivotalSettings.DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
     }
 
     sessionIdleTimeoutMinutes(): number {
-        return this.readSessionPositiveInteger('PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES')
+        return this.readSessionPositiveDuration('PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES')
             ?? WebPivotalSettings.DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES;
     }
 
     sessionAbsoluteTimeoutHours(): number {
-        return this.readSessionPositiveInteger('PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS')
+        return this.readSessionPositiveDuration('PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS', true)
             ?? WebPivotalSettings.DEFAULT_SESSION_ABSOLUTE_TIMEOUT_HOURS;
     }
 
@@ -112,14 +112,16 @@ export class WebPivotalSettings implements WebPivotalModule.RequiredSettings {
         }
     }
 
-    private readSessionPositiveInteger(name: string): number | undefined {
+    private readSessionPositiveDuration(name: string, allowFractional = false): number | undefined {
         const value = this.configService.get<string>(name);
         if (value == null) {
             return undefined;
         }
         const parsed = Number(value);
-        if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > Number.MAX_SAFE_INTEGER / 3_600_000) {
-            throw new Error(`Invalid environment variable ${name}: expected a positive integer within the supported duration range.`);
+        const validNumber = allowFractional ? Number.isFinite(parsed) : Number.isSafeInteger(parsed);
+        if (!validNumber || parsed <= 0 || parsed > Number.MAX_SAFE_INTEGER / 3_600_000) {
+            const type = allowFractional ? 'number' : 'integer';
+            throw new Error(`Invalid environment variable ${name}: expected a positive ${type} within the supported duration range.`);
         }
         return parsed;
     }

@@ -80,7 +80,7 @@ For AWS S3, leave `REPORT_S3_ENDPOINT` empty and set the real bucket, region, ac
 
 ## Portal session timeouts
 
-Set `PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES` (default `30`) and `PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS` (default `12`) on web-pivotal. Both require positive integers; startup rejects idle limits at or below the access-token TTL and absolute limits below the idle limit.
+Set `PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES` (default `30`) and `PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS` (default `12`) on web-pivotal. Idle minutes require a positive integer; absolute hours allow positive fractions such as `0.5` for 30 minutes. Startup rejects idle limits at or below the access-token TTL and absolute limits below the idle limit.
 
 ## Debug Checklist
 
