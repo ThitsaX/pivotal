@@ -268,6 +268,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/errorResponse'
+  /secured/rates:
+    get:
+      tags:
+      - rates
+      summary: Retrieves Catalyst's current effective FX rate for a currency pair
+      description: |
+        Authenticated, read-only pass-through to Catalyst. Pivotal sends the supplied
+        `baseCurrency` and `quoteCurrency` to Catalyst and returns Catalyst's successful
+        response without calculating, selecting, modifying, or storing a rate.
+
+        Sign the empty `{}` payload with RS256 using the same protected-header scheme as
+        transfer status. The signed `uri` must be byte-identical to the complete request
+        target, including the query string and its ordering. `date` must match the request
+        header and be within five minutes; `nonce` is single-use.
+      operationId: getCurrentFxRate
+      parameters:
+      - name: baseCurrency
+        in: query
+        required: true
+        description: ISO 4217 three-letter base currency code.
+        schema:
+          type: string
+          example: USD
+      - name: quoteCurrency
+        in: query
+        required: true
+        description: ISO 4217 three-letter quote currency code.
+        schema:
+          type: string
+          example: LRD
+      - name: authorization
+        in: header
+        description: Raw compact RS256 JWS with protected request metadata and `{}` payload. Do not use a Bearer prefix.
+        required: true
+        schema:
+          type: string
+      - name: date
+        in: header
+        description: RFC 7231 HTTP-date signed byte-for-byte into the protected header. Must be within five minutes of server time.
+        required: true
+        schema:
+          type: string
+          example: Mon, 12 Oct 2026 03:30:00 GMT
+      - name: fspiop-source
+        in: header
+        description: Calling DFSP with a registered access public key.
+        required: true
+        schema:
+          $ref: '#/components/schemas/fspId'
+      responses:
+        "200":
+          description: Current rate selected by Catalyst.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/currentFxRateResponse'
+        "401":
+          $ref: '#/components/responses/unauthorized'
+        "417":
+          description: A mandatory parameter/header is missing, malformed, or Catalyst has no rate for the pair.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
+        "502":
+          description: Catalyst could not be reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
+        "504":
+          description: Catalyst timed out.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
   /dfsp-list-with-prefixes:
     get:
       tags:
@@ -981,6 +1057,33 @@ Allowed values:
           allOf:
           - $ref: '#/components/schemas/errorResponse'
           nullable: true
+
+    currentFxRateResponse:
+      type: object
+      required:
+      - baseCurrency
+      - quoteCurrency
+      - rate
+      - effectiveFrom
+      - updatedAt
+      properties:
+        baseCurrency:
+          type: string
+          example: USD
+        quoteCurrency:
+          type: string
+          example: LRD
+        rate:
+          type: number
+          example: 184.00
+        effectiveFrom:
+          type: string
+          format: date-time
+          example: 2026-10-05T00:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2026-10-05T09:00:00Z
 
     acceptPartyResponse:
       type: object

@@ -65,7 +65,7 @@ docker compose up -d --build
 
 ## 4) External dependencies
 
-- Wallet connectors use `CATALYST_URL` (default: `http://host.docker.internal:4000`).
+- Wallet connectors and web-outbound's current FX rate API use `CATALYST_URL` (default: `http://host.docker.internal:4000`).
 - `web-inbound`, `web-outbound`, and `web-pivotal` use `CENTRAL_LEDGER_URL` (default: `http://host.docker.internal:3001`).
 - `web-inbound`, `web-outbound`, and `web-pivotal` can optionally use `CENTRAL_LEDGER_SOCKET_TIMEOUT_MS` and `CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS`.
 

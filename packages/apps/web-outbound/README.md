@@ -7,6 +7,7 @@
 - Exposes `POST /secured/sendmoney` to start party lookup.
 - Exposes `PUT /secured/sendmoney/{transferId}` for `acceptParty` and `acceptQuote`.
 - Exposes `GET /secured/transferStatus/{transferId}` to payer/payee DFSPs for audited transfer recovery.
+- Exposes `GET /secured/rates?baseCurrency=USD&quoteCurrency=LRD` as an authenticated pass-through to Catalyst's current-rate API.
 - Calls Hub `GET /parties`, `POST /quotes`, and `POST /transfers`.
 - Subscribes to the FSPIOP response stream published by `web-inbound`.
 - Uses Redis for in-flight transfer state and callback timeout tracking.
@@ -23,11 +24,12 @@ Default port: `3200`.
 
 Swagger docs: `http://localhost:3200/v1.0.0/api-docs`.
 
-For a transfer-status GET, sign an empty `{}` payload with RS256. The protected
+For a transfer-status or current-rate GET, sign an empty `{}` payload with RS256. The protected
 header must contain the exact request `uri`, `method: GET`, the byte-identical
 RFC 7231 `date` header, and a fresh unique `nonce`. Pivotal rejects dates outside
 the five-minute clock window and rejects nonce reuse through Redis. This stronger
-check is mandatory for this endpoint even when `ACCESS_JWT_ENABLED=false`.
+check is mandatory for these endpoints even when `ACCESS_JWT_ENABLED=false`. For
+the current-rate endpoint, `uri` includes the exact query string as sent.
 
 The `fspiop-source` must match the transfer's payer or payee FSP. Status is read
 from the MySQL `transactions` table, not the TTL-bound Redis transfer cache.
@@ -48,6 +50,7 @@ from the MySQL `transactions` table, not the TTL-bound Redis transfer cache.
 - `REDIS_URL`, `REDIS_CACHE_ITEM_TIMEOUT_MS`: temporary transfer state.
 - `FSPIOP_*_URL`: Hub parties, quotes, and transfers endpoints.
 - `FSPIOP_SWITCH_ID`: Hub FSP ID expected in FSPIOP headers.
+- `CATALYST_URL`, `CATALYST_SOCKET_TIMEOUT_MS`, `CATALYST_CONNECTION_TIMEOUT_MS`: Catalyst current-rate API connection.
 - `FSPIOP_USE_JWS`, `FSPIOP_USE_MUTUAL_TLS`: outbound Hub security switches.
 - `FSPIOP_OAUTH_TOKEN_URL`, `FSPIOP_OAUTH_CLIENT_ID`, `FSPIOP_OAUTH_CLIENT_SECRET`: optional, all three or none. When set, every Hub request carries a client-credentials bearer token, as the Hub's API gateway requires.
 - `PIVOTAL_FSPIOP_RESPONSE_STREAM_NAME`: must match `web-inbound`.

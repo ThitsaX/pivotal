@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import * as http from 'node:http';
 import * as https from 'node:https';
 import {describe, it} from 'node:test';
-import {AxiosError, AxiosInstance} from 'axios';
+import {AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig} from 'axios';
 import {CatalystAxios} from '../../../../packages/shared/catalyst/component/catalyst-axios';
 import {CatalystException} from '../../../../packages/shared/catalyst/exception/catalyst-exception';
 
@@ -54,6 +54,45 @@ describe('CatalystAxios', () => {
         assert.equal(exception.message.includes('ECONNREFUSED'), true);
     });
 
+    it('should distinguish timeout failures from other transport failures', () => {
+        const axiosError = new AxiosError('timeout of 10000ms exceeded', 'ECONNABORTED');
+        const exception = toCatalystException(axiosError);
+
+        assert.equal(exception.code, 'CATALYST_TIMEOUT');
+    });
+
+    it('should request the current rate with the exact currency parameters', async () => {
+        const responseBody = {
+            baseCurrency: 'USD',
+            quoteCurrency: 'LRD',
+            rate: 184,
+            effectiveFrom: '2026-10-05T00:00:00Z',
+            updatedAt: '2026-10-05T09:00:00Z',
+        };
+        let requestConfig: InternalAxiosRequestConfig | undefined;
+        const catalystAxios = new CatalystAxios('http://catalyst:8080');
+        const client = resolveClient(catalystAxios);
+        client.defaults.adapter = async (config): Promise<AxiosResponse> => {
+            requestConfig = config;
+            return {
+                data: responseBody,
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config,
+            };
+        };
+
+        const result = await catalystAxios.getCurrentFxRate('USD', 'LRD');
+
+        assert.equal(requestConfig?.url, 'http://catalyst:8080/rates');
+        assert.deepEqual(requestConfig?.params, {
+            baseCurrency: 'USD',
+            quoteCurrency: 'LRD',
+        });
+        assert.equal(result, responseBody);
+    });
+
     it('should fallback to Axios status message when error response body is not expected', () => {
         const axiosError = new AxiosError('Request failed with status code 500', 'ERR_BAD_RESPONSE');
         (axiosError as AxiosError & {response: unknown}).response = {
@@ -79,5 +118,20 @@ describe('CatalystAxios', () => {
         const exception = toCatalystException(axiosError);
         assert.equal(exception.code, 'FEE_POLICY_NOT_FOUND');
         assert.equal(exception.message.includes('Fee policy does not exist.'), true);
+    });
+
+    it('should use errorCode from the current FX rate error response body', () => {
+        const axiosError = new AxiosError('Request failed with status code 400', 'ERR_BAD_REQUEST');
+        (axiosError as AxiosError & {response: unknown}).response = {
+            status: 400,
+            data: {
+                errorCode: 'FX_RATE_NOT_FOUND',
+                message: 'FX rate is not available for LRD/VND.',
+            },
+        } as any;
+
+        const exception = toCatalystException(axiosError);
+        assert.equal(exception.code, 'FX_RATE_NOT_FOUND');
+        assert.equal(exception.message.includes('FX rate is not available for LRD/VND.'), true);
     });
 });

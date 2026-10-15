@@ -148,6 +148,10 @@ webOutbound:
     CENTRAL_REGISTRY_ORACLE_ENDPOINT: ""
     CENTRAL_REGISTRY_ORACLE_SOCKET_TIMEOUT_MS: "10000"
     CENTRAL_REGISTRY_ORACLE_CONNECTION_TIMEOUT_MS: "10000"
+    # Catalyst current FX rate API used by GET /secured/rates.
+    CATALYST_URL: http://host.docker.internal:4000
+    CATALYST_SOCKET_TIMEOUT_MS: "10000"
+    CATALYST_CONNECTION_TIMEOUT_MS: "10000"
 
 webInbound:
   enabled: true
