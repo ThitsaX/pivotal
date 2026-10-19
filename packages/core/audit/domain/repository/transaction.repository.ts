@@ -3,7 +3,6 @@
 import {BadRequestException, Injectable, Logger} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
 import {DbTarget} from '@shared/typeorm';
 import {Repository, SelectQueryBuilder} from 'typeorm';
 import {Transaction} from '../model';
@@ -16,7 +15,6 @@ export class TransactionRepository {
 
     private readonly logger = new Logger(TransactionRepository.name);
 
-    private static readonly SNOWFLAKE = Snowflake.get();
     private static readonly DEFAULT_SIZE = 20;
     private static readonly MAX_SIZE = 200;
     private static readonly JSON_REPLACER = (_key: string, value: unknown): unknown => {
@@ -97,13 +95,14 @@ export class TransactionRepository {
     }
 
     async save(entity: Transaction): Promise<Transaction> {
-        return this.writeRepository.save(entity);
+        // Use the correlation-keyed write path and read BIGINT IDs without JS number conversion.
+        entity.id = await this.upsert(entity);
+        return entity;
     }
 
     async upsert(input: TransactionRepository.UpsertInput): Promise<string> {
         const now = new Date();
         const values = [
-            TransactionRepository.SNOWFLAKE.nextId().toString(),
             input.correlationId,
             input.payerFsp,
             input.payeeFsp,
@@ -175,10 +174,10 @@ export class TransactionRepository {
         ];
         const placeholders = values.map(() => '?').join(', ');
 
-        // Use a single statement upsert so concurrent JetStream consumers do not race on read-before-write.
+        // Let the database allocate id: correlation_id must be the only supplied unique key.
+        // Keep the merge atomic for concurrent JetStream consumers.
         await this.writeRepository.query(
             `INSERT INTO transactions (
-                id,
                 correlation_id,
                 payer_fsp,
                 payee_fsp,
@@ -454,7 +453,11 @@ export class TransactionRepository {
             [input.correlationId],
         );
 
-        return rows[0]?.id ?? values[0];
+        if (rows[0]?.id == null) {
+            throw new Error(`Audit transaction missing after upsert: ${input.correlationId}`);
+        }
+
+        return String(rows[0].id);
     }
 
     private static toJsonValue(value: unknown | null | undefined): string | null {
@@ -514,7 +517,7 @@ export class TransactionRepository {
     /**
      * Keyset (cursor) pagination. Replaces offset + getManyAndCount + select-*.
      *
-     * - Sorts on `(sortColumn, id)`; the Snowflake `id` is the unique tiebreaker.
+     * - Sorts on `(sortColumn, id)`; the numeric `id` is the unique tiebreaker.
      * - Fetches `size + 1` rows to derive `hasNext`/`hasPrev` with no `COUNT(*)`.
      * - DFSP access scope `(payer OR payee = :fspId)` is run as two index-seekable legs
      *   and merged in memory (UNION semantics) instead of an OR that defeats the index.

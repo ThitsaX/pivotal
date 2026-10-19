@@ -7,8 +7,7 @@ import {
     TransactionScenario,
     TransferState,
 } from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
-import {BeforeInsert, Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {Column, Entity, Index, PrimaryGeneratedColumn} from 'typeorm';
 
 const DECIMAL_TRANSFORMER = {
     to(value: number | null): number | null {
@@ -45,9 +44,7 @@ const DECIMAL_TRANSFORMER = {
 @Index('transactions_23_idx', ['payeeHomeTransactionId'])
 export class Transaction {
 
-    private static readonly SNOWFLAKE = Snowflake.get();
-
-    @PrimaryColumn({type: 'bigint', name: 'id'})
+    @PrimaryGeneratedColumn({type: 'bigint', name: 'id'})
     public id!: string;
 
     @Column({type: 'varchar', length: 128, name: 'correlation_id'})
@@ -299,10 +296,4 @@ export class Transaction {
     @Column({type: 'datetime', name: 'updated_at'})
     public updatedAt!: Date;
 
-    @BeforeInsert()
-    private assignId(): void {
-        if (this.id == null) {
-            this.id = Transaction.SNOWFLAKE.nextId().toString();
-        }
-    }
 }
