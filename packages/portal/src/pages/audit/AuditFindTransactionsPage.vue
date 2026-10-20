@@ -1021,6 +1021,17 @@ const formatDateInTimeZone = (value: string): string => {
     return `${parts.date} ${parts.time} (${parts.zone})`;
 };
 
+const disputeResolutionTime = computed(() => {
+    const value = selectedTransaction.value?.record.disputeResolvedAt;
+
+    if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return null;
+
+    const utc = value.endsWith('Z') ? value : new Date(value).toISOString();
+    return utc.replace(/(?:\.(\d{1,9}))?Z$/, (_match, fraction: string = '') =>
+        `.${fraction.padEnd(9, '0')}Z`,
+    );
+});
+
 const formatOptionalValue = (value: unknown): string => {
     if (typeof value === 'string') {
         const trimmed = value.trim();
@@ -1380,19 +1391,22 @@ const getStatusDisplay = (record: Record<string, unknown>): {
     disputeClass: string;
     showDispute: boolean;
 } => {
-    const failed = isTrueValue(record.error);
     const dispute = isTrueValue(record.dispute) || isTrueValue(record.possibleDispute);
+    const resolved = record.disputeResolvedAt != null && record.disputeResolvedAt !== '';
+    const failed = isTrueValue(record.error) && !resolved;
 
     return {
         statusLabel: failed ? 'FAILED' : 'SUCCESS',
         statusClass: failed
             ? 'border-red-200 bg-red-50 text-red-700'
             : 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        disputeLabel: dispute ? 'DISPUTE' : 'NO DISPUTE',
-        disputeClass: dispute
+        disputeLabel: resolved ? 'RESOLVED' : dispute ? 'DISPUTE' : 'NO DISPUTE',
+        disputeClass: resolved
+            ? 'border-emerald-200 bg-emerald-50 text-center text-emerald-700'
+            : dispute
             ? 'border-red-200 bg-red-50 text-red-700'
             : 'border-slate-200 bg-slate-50 text-slate-500',
-        showDispute: dispute,
+        showDispute: dispute || resolved,
     };
 };
 
@@ -2646,6 +2660,7 @@ const goToLastPage = (): void => {
                                     {{ getStatusDisplay(selectedTransaction.record).statusLabel }}
                                 </span>
                                 <span
+                                    v-if="getStatusDisplay(selectedTransaction.record).showDispute"
                                     :class="[
                                         STATUS_BADGE_BASE_CLASS,
                                         getStatusDisplay(selectedTransaction.record).disputeClass,
@@ -2655,6 +2670,20 @@ const goToLastPage = (): void => {
                                 </span>
                             </div>
                         </div>
+
+                        <section
+                            v-if="disputeResolutionTime"
+                            aria-label="Dispute resolution log"
+                            class="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-3"
+                        >
+                            <p class="text-[10px] font-semibold uppercase text-emerald-700">
+                                Dispute resolved
+                            </p>
+                            <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
+                                <span class="text-slate-500">Resolved at</span>
+                                <time :datetime="disputeResolutionTime" class="min-w-0 break-all font-mono text-ink">{{ disputeResolutionTime }}</time>
+                            </p>
+                        </section>
 
                         <section
                             v-if="getPatchErrorDisplay(selectedTransaction.record).visible"
@@ -2681,7 +2710,7 @@ const goToLastPage = (): void => {
                                 </span>
                                 <div class="min-w-0">
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700">
-                                        Dispute Reason
+                                        {{ disputeResolutionTime ? 'Original Dispute Reason' : 'Dispute Reason' }}
                                     </p>
                                     <p class="mt-0.5 text-[13px] font-semibold text-ink">
                                         {{ getPatchErrorDisplay(selectedTransaction.record).headline }}
