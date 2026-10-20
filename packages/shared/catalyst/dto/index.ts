@@ -7,5 +7,6 @@ export * from './admin-scenario';
 export * from './fee-calculation-result';
 export * from './calculate-fee-input';
 export * from './calculate-fee-output';
+export * from './current-fx-rate';
 export * from './calculate-fee-by-fee-policy-id-input';
 export * from './calculate-fee-by-fee-policy-id-output';

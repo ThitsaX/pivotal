@@ -8,10 +8,11 @@ import { Transaction } from '@core/audit/domain/model';
 import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
 import { AmountTypeConstraint, FspiopAccessTokenProvider, FspiopAxios, FspiopBearerTokenInterceptor, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
-import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
+import { GetCurrentFxRateHandler, GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
 import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, SuspiciousTransactionMonitor, TransferStatusRepository } from './component';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
+import { CatalystAxios } from '@shared/catalyst';
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [
@@ -24,6 +25,7 @@ const QueryHandlers = [
     GetDfspListByUsecaseHandler,
     GetDfspListHandler,
     GetTransferStatusHandler,
+    GetCurrentFxRateHandler,
 ];
 
 @Module({})
@@ -144,6 +146,15 @@ export class OutboundDomainModule {
                         outboundSettings.centralRegistryOracleAxiosParams,
                     );
                 },
+                inject: [OutboundSettings],
+            },
+            {
+                provide: CatalystAxios,
+                useFactory: (outboundSettings: OutboundSettings): CatalystAxios =>
+                    new CatalystAxios(
+                        outboundSettings.catalystUrl,
+                        outboundSettings.catalystAxiosParams,
+                    ),
                 inject: [OutboundSettings],
             },
             ...(asyncOptions.providers ?? []),

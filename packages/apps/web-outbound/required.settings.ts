@@ -89,6 +89,11 @@ export class WebOutboundSettings
             this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_THRESHOLD', 10),
             this.readSuspiciousTransactionMatchingFields(),
             this.hubAccessToken(socketTimeoutMs),
+            this.readOptionalString('CATALYST_URL') ?? 'http://localhost:4000',
+            {
+                socketTimeoutMs: this.readPositiveInteger('CATALYST_SOCKET_TIMEOUT_MS'),
+                connectionTimeoutMs: this.readPositiveInteger('CATALYST_CONNECTION_TIMEOUT_MS'),
+            },
         );
     }
 

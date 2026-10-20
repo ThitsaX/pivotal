@@ -6,6 +6,36 @@ servers:
 - description: Generated server url
   url: http://localhost:8081
 paths:
+  /rates:
+    get:
+      operationId: GetCurrentFxRateController_execute
+      parameters:
+      - in: query
+        name: baseCurrency
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: quoteCurrency
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentFxRate"
+          description: Current effective FX rate
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalystError"
+          description: FX rate is unavailable
+      summary: Get the current effective FX rate
+      tags:
+      - current-fx-rate-controller
   /fee-policies/find:
     get:
       operationId: FindFeePolicyController_execute
@@ -254,6 +284,37 @@ paths:
       - calculate-fee-controller
 components:
   schemas:
+    CurrentFxRate:
+      type: object
+      required:
+      - baseCurrency
+      - quoteCurrency
+      - rate
+      - effectiveFrom
+      - updatedAt
+      properties:
+        baseCurrency:
+          type: string
+        quoteCurrency:
+          type: string
+        rate:
+          type: number
+        effectiveFrom:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CatalystError:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
     CalculateFee.Input:
       type: object
       properties:

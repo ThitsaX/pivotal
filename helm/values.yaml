@@ -335,6 +335,10 @@ webOutbound:
   # volumes:
   #   - {name: hub-client-tls, secret: {secretName: pivotal-hub-client-cert}}
   #   - {name: hub-ca, secret: {secretName: hub-ca-bundle}}
+  # Catalyst current FX rate API used by GET /secured/rates.
+  # CATALYST_URL: http://host.docker.internal:4000
+  # CATALYST_SOCKET_TIMEOUT_MS: "10000"
+  # CATALYST_CONNECTION_TIMEOUT_MS: "10000"
   readinessProbe:
     tcpSocket:
       port: http

@@ -10,7 +10,7 @@ import {
     ParticipantJwsPrivateKeyStore,
 } from '@core/participant/domain';
 import { AccessGuard, DfspCertificateGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
-import { CentralRegistryController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
+import { CentralRegistryController, CurrentFxRateController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
 import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
@@ -52,7 +52,13 @@ export class WebOutboundModule {
                 outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [SendMoneyController, DfspListController, CentralRegistryController, TransferStatusController],
+            controllers: [
+                SendMoneyController,
+                DfspListController,
+                CentralRegistryController,
+                TransferStatusController,
+                CurrentFxRateController,
+            ],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],

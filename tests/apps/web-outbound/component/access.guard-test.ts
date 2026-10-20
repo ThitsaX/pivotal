@@ -2,10 +2,10 @@ import * as assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {describe, it} from 'node:test';
 import {ExecutionContext} from '@nestjs/common';
+import {AccessGuard} from '../../../../packages/apps/web-outbound/component/access.guard';
 import {
-    AccessGuard,
     IS_SIGNED_TRANSFER_STATUS_KEY,
-} from '../../../../packages/apps/web-outbound/component';
+} from '../../../../packages/apps/web-outbound/component/signed-transfer-status.decorator';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
 import {Jwt} from '../../../../packages/shared/security/component/jwt';
 import {RsaKeyPair} from '../../../../packages/shared/security/component/key';
@@ -160,6 +160,24 @@ describe('AccessGuard signed transfer status lookup', () => {
                 assertCode(FspiopErrors.INVALID_SIGNATURE.errorType.code),
             );
         }
+    });
+
+    it('binds a current-rate signature to the exact query string on the wire', async () => {
+        const rateUri = '/secured/rates?baseCurrency=USD&quoteCurrency=LRD';
+        const {guard} = createGuard();
+
+        assert.equal(
+            await guard.canActivate(executionContext(signedRequest({requestUri: rateUri}))),
+            true,
+        );
+
+        await assert.rejects(
+            () => createGuard().guard.canActivate(executionContext(signedRequest({
+                requestUri: rateUri,
+                signedUri: '/secured/rates?quoteCurrency=LRD&baseCurrency=USD',
+            }))),
+            assertCode(FspiopErrors.INVALID_SIGNATURE.errorType.code),
+        );
     });
 
     it('requires an empty object payload', async () => {

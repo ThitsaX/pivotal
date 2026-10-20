@@ -110,6 +110,32 @@ describe('WebOutboundSettings payer fee validation', () => {
     });
 });
 
+describe('WebOutboundSettings Catalyst current FX rate client', () => {
+    it('uses the local Catalyst defaults when settings are omitted', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.equal(outboundSettings.catalystUrl, 'http://localhost:4000');
+        assert.deepEqual(outboundSettings.catalystAxiosParams, {
+            socketTimeoutMs: undefined,
+            connectionTimeoutMs: undefined,
+        });
+    });
+
+    it('reads the Catalyst URL and timeout settings', () => {
+        const outboundSettings = settings({
+            CATALYST_URL: 'http://catalyst:8080',
+            CATALYST_SOCKET_TIMEOUT_MS: '7000',
+            CATALYST_CONNECTION_TIMEOUT_MS: '3000',
+        }).outboundSettings();
+
+        assert.equal(outboundSettings.catalystUrl, 'http://catalyst:8080');
+        assert.deepEqual(outboundSettings.catalystAxiosParams, {
+            socketTimeoutMs: 7000,
+            connectionTimeoutMs: 3000,
+        });
+    });
+});
+
 
 
 describe('WebOutboundSettings Hub access token', () => {
