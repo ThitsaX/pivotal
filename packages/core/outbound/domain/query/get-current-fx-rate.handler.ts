@@ -44,7 +44,7 @@ export class GetCurrentFxRateHandler {
 
             throw new FspiopException(
                 GetCurrentFxRateHandler.toPivotalError(error.code),
-                error,
+                error.message,
             );
         }
     }

@@ -35,9 +35,10 @@ function handlerWith(result: CurrentFxRate | Error): {
     return {handler, calls};
 }
 
-function assertFspiopCode(code: string): (error: unknown) => boolean {
+function assertFspiopCode(code: string, message?: string): (error: unknown) => boolean {
     return (error: unknown): boolean => error instanceof FspiopException
-        && error.errorDefinition.errorType.code === code;
+        && error.errorDefinition.errorType.code === code
+        && (message == null || error.message === message);
 }
 
 describe('GetCurrentFxRateHandler', () => {
@@ -50,15 +51,19 @@ describe('GetCurrentFxRateHandler', () => {
         assert.deepEqual(calls, [{baseCurrency: 'USD', quoteCurrency: 'LRD'}]);
     });
 
-    it('maps FX_RATE_NOT_FOUND to Pivotal generic ID not found', async () => {
+    it('maps FX_RATE_NOT_FOUND to Pivotal generic validation error and preserves the Catalyst message', async () => {
+        const catalystMessage = 'Catalyst (FX_RATE_NOT_FOUND) FX rate is not available for USD/LRD.';
         const {handler} = handlerWith(new CatalystException(
             'FX_RATE_NOT_FOUND',
-            'FX rate is not available for USD/LRD.',
+            catalystMessage,
         ));
 
         await assert.rejects(
             () => handler.execute(new GetCurrentFxRateQuery('USD', 'LRD')),
-            assertFspiopCode(FspiopErrors.GENERIC_ID_NOT_FOUND.errorType.code),
+            assertFspiopCode(
+                FspiopErrors.GENERIC_VALIDATION_ERROR.errorType.code,
+                catalystMessage,
+            ),
         );
     });
 
