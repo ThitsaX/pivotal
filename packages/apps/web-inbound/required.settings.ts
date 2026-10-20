@@ -173,7 +173,9 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
      * outbound one.
      */
     keyProvider(): KeyProvider {
-        return KeyProvider.Database;
+        // `none`, not `database`: this service verifies and never signs, so it has no reason to
+        // load private keys a legacy deployment may still hold in MySQL.
+        return KeyProvider.None;
     }
 
     vaultSettings(): VaultSettings {

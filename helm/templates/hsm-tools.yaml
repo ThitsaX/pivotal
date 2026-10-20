@@ -1,0 +1,90 @@
+{{- /*
+  The HSM admin pod, for the HSM-backed profile only: where a custodian runs the CA ceremony and
+  provisions each DFSP's key.
+
+  Zero replicas by default. A custodian scales it to 1 for a session and back to 0 afterwards, so
+  no admin pod sits in the cluster between sessions. Under ArgoCD with self-heal, ignore
+  differences on /spec/replicas for this Deployment, or the scale-up is undone.
+
+  It holds nothing secret and has no Kubernetes API access: no ServiceAccount token is mounted.
+  The Crypto Officer login and the Vault token are typed in for each session.
+*/}}
+{{- if .Values.hsmTools.enabled }}
+{{- $hsm := .Values.hsmTools }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hsm-tools
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hsm-tools
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hsm-tools
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hsm-tools
+spec:
+  replicas: {{ $hsm.replicaCount | default 0 }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pivotal-stack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: hsm-tools
+  template:
+    metadata:
+      labels:
+        {{- include "pivotal-stack.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: hsm-tools
+      annotations:
+        # The HSMs are outside the mesh, on ports 2223-2225. A sidecar under a REGISTRY_ONLY
+        # outbound policy would block them.
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: hsm-tools
+      automountServiceAccountToken: false
+      {{- include "pivotal-stack.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hsm-tools
+          image: {{ include "pivotal-stack.image" (dict "global" .Values.global "image" $hsm.image "component" "hsmTools") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          stdin: true
+          tty: true
+          env:
+            - name: CLOUDHSM_IP
+              value: {{ required "hsmTools.cloudhsmIp is required" $hsm.cloudhsmIp | quote }}
+            - name: VAULT_ADDR
+              value: {{ required "hsmTools.vaultAddress is required" $hsm.vaultAddress | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: customer-ca
+              mountPath: /opt/cloudhsm/etc/customerCA.crt
+              subPath: customerCA.crt
+              readOnly: true
+            - name: scratch
+              mountPath: /tmp
+          resources:
+            {{- toYaml ($hsm.resources | default .Values.global.defaultResources) | nindent 12 }}
+      volumes:
+        - name: customer-ca
+          configMap:
+            name: {{ required "hsmTools.customerCaConfigMap is required" $hsm.customerCaConfigMap }}
+        # Ceremony output and the provisioning script's temporary files. Gone when the pod is.
+        - name: scratch
+          emptyDir: {}
+{{- end }}

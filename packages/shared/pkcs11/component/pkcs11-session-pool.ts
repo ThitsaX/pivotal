@@ -83,8 +83,7 @@ export class Pkcs11SessionPool {
         if (credential == null) {
             this.logger.log(
                 `PKCS#11 ready on token '${this.resolvedLabel}' via `
-                + `${this.settings.modulePath}. No standing identity: this process authenticates `
-                + 'as a tenant for each operation.',
+                + `${this.settings.modulePath}, with no crypto user logged in.`,
             );
             return;
         }

@@ -162,6 +162,26 @@ export class DeviceHeldJwsPrivateKeySource extends JwsPrivateKeySource {
     }
 }
 
+/**
+ * Yields nothing, because this deployment holds no Hub-facing signing keys.
+ *
+ * Selected when `KEY_PROVIDER` is unset or `none`. Private keys a legacy database profile left
+ * in `participant_key` are deliberately not read: nothing here signs with them.
+ */
+export class NoJwsPrivateKeySource extends JwsPrivateKeySource {
+
+    async resolve(
+        participantKeys: ParticipantKey[],
+        previous?: ReadonlyMap<string, string>,
+    ): Promise<Map<string, string>> {
+
+        void participantKeys;
+        void previous;
+
+        return new Map<string, string>();
+    }
+}
+
 export namespace JwsPrivateKeySource {
 
     /**

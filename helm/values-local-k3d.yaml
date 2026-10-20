@@ -1,4 +1,4 @@
-# Local k3d overlay for the Vault-Kubernetes-auth work (trust-manager step 4).
+# Local k3d overlay for the Vault-Kubernetes-auth work.
 #
 # The cluster runs ONLY the Pivotal services under test. Mojaloop, MySQL, NATS,
 # Redis and the DemoWallet backend stay in their Docker Compose stacks and are
@@ -7,20 +7,42 @@
 #
 # Re-run that script after any `docker compose up`: container IPs move.
 
-# Infrastructure comes from Compose, not from this chart.
-mysql:
-  enabled: false
-nats:
-  enabled: false
-redis:
-  enabled: false
+global:
+  imagePullPolicy: Never   # images are side-loaded with `k3d image import`
 
-# Only the two services being proven in this stage.
-appAuditor:      { enabled: false }
-reportWorker:    { enabled: false }
+  database:
+    host: mysql
+    port: "3306"
+    username: central_ledger
+    name: pivotal
+  secrets:
+    dbWritePassword: password
+    dbReadPassword: password
+
+  commonFspiopEnv:
+    # Connectors and web-outbound call Hub services directly, so these are the
+    # Hub's own endpoints -- not web-inbound.
+    FSPIOP_PARTIES_URL: http://account-lookup-service:4002
+    FSPIOP_QUOTES_URL: http://quoting-service:3002
+    FSPIOP_TRANSFERS_URL: http://ml-api-adapter:3000
+    FSPIOP_SWITCH_ID: hub
+    FSPIOP_USE_JWS: "true"
+    FSPIOP_SOCKET_TIMEOUT_MS: "30000"
+    FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
+    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
+    FSPIOP_TLS_VERIFY_DOMAIN: "false"
+    # Deployment default only. Per-participant rows in participant_key override
+    # it, which is what makes rollout per tenant rather than a flag day.
+    FSPIOP_JWS_VERIFY_MODE: "off"
+
+# Only the services being proven here.
+appAuditor:   { enabled: false }
+reportWorker: { enabled: false }
+
 # The portal and its API are enabled here so the certificate screens can be used against
 # the live CA. web-pivotal is the only service that talks to pki_dfsp for issuance.
 webPivotal:
+  image: { repository: pivotal-web-pivotal, tag: local }
   env:
     WEB_PIVOTAL_PORT: "3202"
     # Distinguishes this replica's generated ids. A single local replica, so a fixed value
@@ -52,53 +74,31 @@ webPivotal:
     DFSP_CERT_PKI_ROLE: dfsp-client
 
 portal:
+  image: { repository: pivotal-portal, tag: local }
   env:
     # The browser reaches the API directly, so this is a host-side address rather than
     # a cluster one.
     WEB_PIVOTAL_API_BASE_URL: http://127.0.0.1:3202
-wallet1Connector: { enabled: false }
-wallet2Connector: { enabled: false }
-wallet3Connector: { enabled: false }
-
-global:
-  imagePullPolicy: Never   # images are side-loaded with `k3d image import`
-
-  commonDbEnv:
-    DB_WRITE_HOST: mysql
-    DB_WRITE_PORT: "3306"
-    DB_WRITE_USERNAME: central_ledger
-    DB_WRITE_PASSWORD: password
-    DB_WRITE_NAME: pivotal
-    DB_READ_HOST: mysql
-    DB_READ_PORT: "3306"
-    DB_READ_USERNAME: central_ledger
-    DB_READ_PASSWORD: password
-    DB_READ_NAME: pivotal
-
-  commonFspiopEnv:
-    # Connectors and web-outbound call Hub services directly, so these are the
-    # Hub's own endpoints -- not web-inbound.
-    FSPIOP_PARTIES_URL: http://account-lookup-service:4002
-    FSPIOP_QUOTES_URL: http://quoting-service:3002
-    FSPIOP_TRANSFERS_URL: http://ml-api-adapter:3000
-    FSPIOP_SWITCH_ID: hub
-    FSPIOP_USE_JWS: "true"
-    FSPIOP_USE_MUTUAL_TLS: "false"
-    FSPIOP_SOCKET_TIMEOUT_MS: "30000"
-    FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
-    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
-    FSPIOP_TLS_VERIFY_DOMAIN: "false"
-    # Deployment default only. Per-participant rows in participant_key override
-    # it, which is what makes rollout per tenant rather than a flag day.
-    FSPIOP_JWS_VERIFY_MODE: "off"
-    # No key material in env: KEY_PROVIDER=vault-kv is the whole point here.
-    FSPIOP_JWS_PRIVATE_KEY: ""
-    FSPIOP_JWS_PUBLIC_KEY: ""
-    FSPIOP_MTLS_CA: ""
-    FSPIOP_MTLS_CLIENT_CERT: ""
-    FSPIOP_MTLS_CLIENT_KEY: ""
 
 webOutbound:
+  image: { repository: pivotal-web-outbound, tag: local }
+  # The Hub CA bundle from trust-manager, and the client leaf cert-manager issues locally.
+  volumeMounts:
+    - name: hub-ca
+      mountPath: /etc/pivotal/hub-ca
+      readOnly: true
+    - name: hub-client-tls
+      mountPath: /etc/pivotal/hub-client-tls
+      readOnly: true
+  volumes:
+    - name: hub-client-tls
+      secret:
+        secretName: web-outbound-hub-client-tls
+        optional: true
+    - name: hub-ca
+      secret:
+        secretName: hub-ca-bundle
+        optional: true
   env:
     WEB_OUTBOUND_PORT: "3200"
     PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS: "5"
@@ -116,6 +116,14 @@ webOutbound:
     PIVOTAL_FSPIOP_RESPONSE_MAX_AGE_MS: "60000"
     ACCESS_JWT_ENABLED: "false"
     ERROR_MESSAGE_LANGUAGE: en_US
+    # Repeated from the shared block: a service's own env wins, so the chart's placeholder
+    # Hub URLs would otherwise apply.
+    FSPIOP_PARTIES_URL: http://account-lookup-service:4002
+    FSPIOP_QUOTES_URL: http://quoting-service:3002
+    FSPIOP_TRANSFERS_URL: http://ml-api-adapter:3000
+    FSPIOP_USE_JWS: "true"
+    FSPIOP_TLS_VERIFY_SERVER_CERT: "false"
+    FSPIOP_TLS_VERIFY_DOMAIN: "false"
     KEY_PROVIDER: vault-kv
     VAULT_ADDRESS: http://vault.vault.svc.cluster.local:8200
     VAULT_AUTH_METHOD: kubernetes
@@ -133,6 +141,7 @@ webOutbound:
     FSPIOP_MTLS_CLIENT_KEY_PATH: /etc/pivotal/hub-client-tls/tls.key
 
 webInbound:
+  image: { repository: pivotal-web-inbound, tag: local }
   env:
     WEB_INBOUND_PORT: "3201"
     NATS_URL: nats://nats:4222
@@ -140,16 +149,8 @@ webInbound:
     CENTRAL_LEDGER_SOCKET_TIMEOUT_MS: "30000"
     CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS: "5000"
     ERROR_MESSAGE_LANGUAGE: en_US
-    # web-inbound only VERIFIES, so it needs public keys from MySQL and no Vault
-    # access at all -- no role, no crypto user.
-    KEY_PROVIDER: database
-    # The listener presents the certificate the Hub signed through enrollment, and
-    # verifies callers against the Hub's own CA. Deliberately NOT the client leaf,
-    # which no peer verifying against the Hub's chain would accept.
-    FSPIOP_MTLS_SERVER_CERT_PATH: /etc/pivotal/hub-server-cert/tls.crt
-    FSPIOP_MTLS_SERVER_KEY_PATH: /etc/pivotal/hub-server-cert/tls.key
-    FSPIOP_MTLS_CA_PATH: /etc/pivotal/hub-ca/hub-ca.pem
+    FSPIOP_USE_JWS: "true"
     # Left off here: the Hub services in the Compose stack call this listener over
     # plain HTTP and hold no client certificate, so enabling it locally would only
-    # break the loop. Turned on per environment once the caller can present one.
+    # break the loop.
     FSPIOP_USE_MUTUAL_TLS: "false"

@@ -359,7 +359,12 @@ export class VaultClient {
      * anything needing to verify the chain can fetch it without a credential. Read here through
      * the same client for one timeout and one base URL rather than a second HTTP path.
      *
+     * Only a body holding a certificate is a chain. Vault answers an unauthenticated read of a
+     * mount that does not exist with 403 and a JSON error, and that body must never reach a
+     * caller that publishes what it gets as a trust anchor.
+     *
      * @returns the chain as PEM, or null when the mount has no CA yet
+     * @throws when Vault answers with anything other than a chain or a 404
      */
     async readPkiCaChain(mount: string): Promise<string | null> {
 
@@ -373,9 +378,23 @@ export class VaultClient {
             return null;
         }
 
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(
+                `Vault answered ${response.status} reading the CA chain of mount '${mount}'. `
+                + 'Check the mount exists.');
+        }
+
         const chain = typeof response.data === 'string' ? response.data.trim() : '';
 
-        return chain.length === 0 ? null : chain;
+        if (chain.length === 0) {
+            return null;
+        }
+
+        if (!chain.includes('-----BEGIN CERTIFICATE-----')) {
+            throw new Error(`Vault returned something other than a certificate chain for mount '${mount}'.`);
+        }
+
+        return chain;
     }
 
     /**

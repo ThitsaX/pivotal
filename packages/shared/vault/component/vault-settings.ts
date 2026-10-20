@@ -34,11 +34,23 @@ export enum KeyProvider {
      * not be used where real value moves.
      */
     Database = 'database',
+
+    /**
+     * No Hub-facing signing key is held or created. Onboarding records a tenant without one, and
+     * nothing in this deployment signs FSPIOP messages towards the Hub.
+     *
+     * What an **unset** `KEY_PROVIDER` means, so a deployment that has not turned on JWS needs no
+     * key settings and keeps no keys it will never use. A service that is asked to sign refuses to
+     * start under it rather than signing nothing.
+     */
+    None = 'none',
 }
 
 export namespace KeyProvider {
 
-    const VALUES: readonly string[] = [KeyProvider.VaultKv, KeyProvider.Pkcs11, KeyProvider.Database];
+    const VALUES: readonly string[] = [
+        KeyProvider.VaultKv, KeyProvider.Pkcs11, KeyProvider.Database, KeyProvider.None,
+    ];
 
     /**
      * Parses `KEY_PROVIDER`. An unrecognised value **throws** rather than falling back: silently

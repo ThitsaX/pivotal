@@ -3,7 +3,7 @@
 import {Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
 import {FspiopVerifyMode} from '@shared/fspiop/component/fspiop-verify-mode';
 import {ParticipantKeyRepository, ParticipantRepository} from '../../repository';
-import {DatabaseJwsPrivateKeySource, JwsPrivateKeySource} from './jws-private-key-source';
+import {JwsPrivateKeySource, NoJwsPrivateKeySource} from './jws-private-key-source';
 import {JwsKeyRefSource} from './jws-key-ref-source';
 
 @Injectable()
@@ -44,11 +44,10 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
         @Inject(ParticipantKeyRepository)
         private readonly participantKeyRepository: ParticipantKeyRepository,
         /**
-         * Where private keys come from. Defaults to the database source so that a deployment which
-         * has not chosen a `KEY_PROVIDER` keeps working — but that source is legacy, and the
-         * default exists for continuity rather than as a recommendation.
+         * Where private keys come from. Defaults to none, matching an unset `KEY_PROVIDER`: a
+         * deployment that has not chosen a profile holds no signing keys.
          */
-        private readonly privateKeySource: JwsPrivateKeySource = new DatabaseJwsPrivateKeySource(),
+        private readonly privateKeySource: JwsPrivateKeySource = new NoJwsPrivateKeySource(),
         /**
          * Set only under a device-backed profile. Left undefined otherwise, so a deployment
          * that holds real keys does no Vault round trips looking for references that will

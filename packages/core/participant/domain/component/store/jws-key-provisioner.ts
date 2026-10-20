@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {Logger} from '@nestjs/common';
+import {createPublicKey} from 'node:crypto';
+import {PivotalException} from '@shared/foundation/exception/pivotal-exception';
 import {RsaKeyPair} from '@shared/security';
 import {VaultClient, VaultSettings} from '@shared/vault';
-import {Pkcs11KeyGenerator} from '@shared/pkcs11';
+import {ParticipantErrorCode, participantError} from '../../error/participant-errors';
 
 /**
  * Creates the signing key for a tenant Pivotal signs as, wherever that deployment keeps keys.
@@ -21,13 +23,24 @@ import {Pkcs11KeyGenerator} from '@shared/pkcs11';
 export abstract class JwsKeyProvisioner {
 
     /**
-     * Brings a signing key into existence for `fspId` and returns its public half.
+     * Refuses, before anything else is changed, when this tenant cannot be given a key.
+     *
+     * Onboarding calls this before it touches the ledger, so a tenant that will fail here is never
+     * half-created there. Most profiles create the key themselves and have nothing to check.
+     */
+    async assertReady(fspId: string): Promise<void> {
+        void fspId;
+    }
+
+    /**
+     * Brings a signing key into existence for `fspId` and returns its public half, or null when
+     * this deployment holds no Hub-facing signing keys at all.
      *
      * Implementations must be safe to call again for a tenant that already has one: provisioning is
      * reached from onboarding, and an onboarding that is retried after a partial failure must not
      * leave a tenant with a key nobody recorded.
      */
-    abstract provision(fspId: string): Promise<JwsKeyProvisioner.Provisioned>;
+    abstract provision(fspId: string): Promise<JwsKeyProvisioner.Provisioned | null>;
 }
 
 export namespace JwsKeyProvisioner {
@@ -95,92 +108,86 @@ export class VaultJwsKeyProvisioner extends JwsKeyProvisioner {
 }
 
 /**
- * Has the device generate the keypair, so the private half never exists outside it.
+ * Records the key a custodian created in the HSM. Creates nothing.
  *
- * The **HSM-backed** profile, and the reason this contract returns a public key alone.
+ * The **HSM-backed** profile. Creating the key needs the tenant's own crypto user, and sharing it
+ * with the user that signs on tenants' behalf can only be done from the device tooling, so both
+ * belong to the custodian's provisioning script. That script writes the key reference and the
+ * public key to Vault; this reads them back.
  *
- * **Generated as the tenant's own crypto user.** The device confers ownership at creation and has
- * no transfer operation, so whoever generates a key can always use it — generating as a service
- * identity would hand that service the ability to sign as every tenant it ever onboarded. This
- * process therefore borrows the tenant's credential for the operation and holds none of its own.
- *
- * **It cannot create that crypto user.** The credential must already be in Vault, put there by a
- * custodian, because creating users needs a Crypto Officer and no service holds one. That is the
- * separation this profile exists to keep: this process can ask the device to make a key for a
- * tenant it has been given access to, and cannot invent a tenant.
+ * Keeping this side to a read is what lets this process hold no HSM credential and load no device
+ * library: it cannot create, use or share any tenant's key, only learn the public half of one.
  */
 export class Pkcs11JwsKeyProvisioner extends JwsKeyProvisioner {
+
+    private static readonly KEY_REF_FIELD = 'keyRef';
+
+    private static readonly PUBLIC_KEY_FIELD = 'publicKey';
 
     private readonly logger = new Logger(Pkcs11JwsKeyProvisioner.name);
 
     constructor(
-        private readonly keyGenerator: Pkcs11KeyGenerator,
-        private readonly credentials: Pkcs11JwsKeyProvisioner.CredentialSource,
-        private readonly vaultClient: VaultClient,
-        /** Path prefix; the credential is read from `<prefix>/<fspId>`. */
-        private readonly credentialPathPrefix: string,
-        /** Path prefix; the reference is written to `<prefix>/<fspId>`. */
+        private readonly vaultClient: Pick<VaultClient, 'readKvField'>,
+        /** Path prefix; the record is read from `<prefix>/<fspId>`. */
         private readonly keyRefPathPrefix: string,
-        /** Crypto user that signs on tenants' behalf, named in the message about sharing. */
-        private readonly sharedSigningUser: string,
     ) {
         super();
     }
 
-    async provision(fspId: string): Promise<JwsKeyProvisioner.Provisioned> {
-
-        const tenant = fspId.trim();
-        const credential = await this.credentials.credentialFor(
-            `${this.credentialPathPrefix}/${tenant}`);
-
-        // The label is the keyRef, and it must name exactly one key for the life of that key.
-        // Minted fresh every time rather than derived from the tenant alone: rotation calls this
-        // again, and a reused label would leave two keys answering to one reference.
-        const label = Pkcs11JwsKeyProvisioner.mintLabel(tenant);
-
-        const publicKeyPem = await this.keyGenerator.generate(credential, label);
-
-        // Written before the caller records the public key, for the same reason the Vault
-        // provisioner writes first: the other order can leave a tenant marked as signing with a
-        // reference nothing can resolve. This order can at worst leave an unreferenced key in the
-        // device, which fails nothing.
-        await this.vaultClient.writeKvField(
-            `${this.keyRefPathPrefix}/${tenant}`,
-            Pkcs11JwsKeyProvisioner.KEY_REF_FIELD,
-            label,
-        );
-
-        // Said loudly because nothing else will say it, and the failure it prevents is silent:
-        // until the key is shared, the tenant's own connector signs fine while anything signing on
-        // its behalf cannot -- which reads as a bug in the signing path rather than a missing step.
-        this.logger.warn(
-            `Provisioned '${tenant}' with key reference '${label}'. It is owned by that tenant's `
-            + `crypto user and is NOT yet shared with '${this.sharedSigningUser}'. Sharing is a `
-            + 'device operation with no PKCS#11 equivalent: run it from the device tooling before '
-            + 'enabling signing, or anything signing on this tenant\'s behalf will fail.',
-        );
-
-        return new JwsKeyProvisioner.Provisioned(publicKeyPem);
+    async assertReady(fspId: string): Promise<void> {
+        await this.read(fspId);
     }
 
-    private static readonly KEY_REF_FIELD = 'keyRef';
+    async provision(fspId: string): Promise<JwsKeyProvisioner.Provisioned> {
 
-    /**
-     * A label carrying the tenant and the moment it was minted.
-     *
-     * The timestamp is what makes it version-inclusive — two keys for one tenant never collide,
-     * and the reference alone says which generation a signature came from.
-     */
-    private static mintLabel(fspId: string): string {
-        return `${fspId}-jws-${new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15)}`;
+        const record = await this.read(fspId);
+
+        this.logger.log(
+            `Recorded the HSM key '${record.keyRef}' that a custodian provisioned for '${fspId.trim()}'.`);
+
+        return new JwsKeyProvisioner.Provisioned(record.publicKeyPem);
+    }
+
+    private async read(fspId: string): Promise<{keyRef: string; publicKeyPem: string}> {
+
+        const path = `${this.keyRefPathPrefix}/${fspId.trim()}`;
+        const keyRef = await this.vaultClient.readKvField(path, Pkcs11JwsKeyProvisioner.KEY_REF_FIELD);
+        const publicKeyPem = await this.vaultClient.readKvField(
+            path, Pkcs11JwsKeyProvisioner.PUBLIC_KEY_FIELD);
+
+        if (keyRef == null || publicKeyPem == null) {
+            this.logger.warn(
+                `No key reference and public key at Vault path '${path}'. Provision '${fspId.trim()}' `
+                + 'with the custodian script before onboarding it.');
+            const error = participantError(ParticipantErrorCode.HSM_KEY_NOT_FOUND);
+            throw new PivotalException(error.code, error.message);
+        }
+
+        try {
+            createPublicKey(publicKeyPem);
+        } catch {
+            // A record the provisioning script did not write whole. Recording it would publish a key
+            // to the Hub that no signature made with the HSM key could ever match.
+            this.logger.warn(`The public key at Vault path '${path}' could not be read as a public key.`);
+            const error = participantError(ParticipantErrorCode.HSM_KEY_RECORD_INVALID);
+            throw new PivotalException(error.code, error.message);
+        }
+
+        return {keyRef, publicKeyPem};
     }
 }
 
-export namespace Pkcs11JwsKeyProvisioner {
+/**
+ * Creates nothing: this deployment holds no Hub-facing signing keys.
+ *
+ * Selected when `KEY_PROVIDER` is unset or `none`. A tenant is onboarded without a key, so a
+ * deployment that has not turned on JWS keeps no private keys it would never use.
+ */
+export class NoJwsKeyProvisioner extends JwsKeyProvisioner {
 
-    /** Reads a tenant's crypto-user credential. Implemented by the device bootstrap. */
-    export interface CredentialSource {
-        credentialFor(vaultPath: string): Promise<{username: string; password: string}>;
+    async provision(fspId: string): Promise<null> {
+        void fspId;
+        return null;
     }
 }
 

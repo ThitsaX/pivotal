@@ -61,7 +61,7 @@ const submit = async (): Promise<void> => {
         const result = await executeParticipantAction('POST', viewDefinition.endpoint, requestPreview.value);
 
         responsePayload.value = result.payload;
-        successMessage.value = 'Signing keys were saved for hub.';
+        successMessage.value = 'Hub JWS public key saved.';
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error);
         responsePayload.value = {
@@ -79,7 +79,7 @@ const submit = async (): Promise<void> => {
         eyebrow="Hub"
         :title="viewDefinition.title"
         :subtitle="viewDefinition.subtitle"
-        form-description="Paste the JWS public and private keys to create or replace the signing key pair for Hub."
+        form-description="Paste the Hub's JWS public key. Pivotal uses it to verify messages the Hub signs. A new key replaces the current one."
         :selected-time-zone="selectedTimeZone"
         :loading="loading"
         :error-message="errorMessage"
@@ -93,7 +93,7 @@ const submit = async (): Promise<void> => {
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
-                                Signing Keys
+                                Public Key
                             </h3>
                             <p class="mt-1 max-w-2xl text-sm text-slate-600">
                                 The Hub's public key, used to verify what it signs. Pivotal never signs as the Hub, so no private key is held.
@@ -126,7 +126,7 @@ const submit = async (): Promise<void> => {
                             class="inline-block h-2.5 w-2.5 rounded-full bg-accentWarm"
                             :class="loading ? 'animate-pulseGlow' : ''"
                         />
-                        {{ loading ? 'Submitting...' : 'Add Signing Keys' }}
+                        {{ loading ? 'Saving...' : 'Save Public Key' }}
                     </button>
 
                     <button

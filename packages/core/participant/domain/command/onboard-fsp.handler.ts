@@ -12,12 +12,14 @@ import {ParticipantKeyRepository, ParticipantRepository} from '../repository';
 import {OnboardFspCommand} from './onboard-fsp.command';
 
 /**
- * Onboards a participant and provisions the signing key it will use towards the Hub.
+ * Onboards a participant and provisions the signing key it will use towards the Hub, where this
+ * deployment holds one.
  *
- * The key is created here rather than supplied, and no private key crosses the API: under the Vault
- * profile it goes straight to Vault, under the HSM profile it never leaves the hardware, and only
- * the legacy database profile hands one back to be stored. That is why the request carries no key
- * fields at all — an operator has nothing to paste, and nothing to lose.
+ * No private key crosses the API. Under the Vault profile the key is created here and goes straight
+ * to Vault. Under the HSM profile a custodian has already created it inside the hardware, and this
+ * only records its public half. Only the legacy database profile hands a private key back to be
+ * stored. That is why the request carries no key fields at all — an operator has nothing to paste,
+ * and nothing to lose.
  *
  * Signing is left **off**. A tenant that signs before its public key has reached MCM produces
  * signatures no peer can verify, which surfaces as a Hub rejection rather than as a provisioning
@@ -48,6 +50,17 @@ export class OnboardFspHandler
 
     async execute(command: OnboardFspCommand): Promise<OnboardFspCommand.Output> {
         const {name, currencies, endpoint, accessPublicKey} = command.input;
+
+        const existingKey = await this.participantKeyRepository.findByFspId(name, DbTarget.Write);
+        const holdsKey = existingKey?.jwsPublicKey != null && existingKey.jwsPublicKey.trim().length > 0;
+
+        // Before the ledger, so a tenant that cannot be given a key is refused rather than left
+        // registered at the Hub with no key to sign with. Should the key step still fail after the
+        // ledger, onboarding again completes it: a tenant without a key is checked and provisioned
+        // afresh.
+        if (!holdsKey) {
+            await this.keyProvisioner.assertReady(name);
+        }
 
         await this.centralLedgerFacade.onboardFsp(name, currencies, endpoint);
 
@@ -80,6 +93,12 @@ export class OnboardFspHandler
         }
 
         const provisioned = await this.keyProvisioner.provision(fspId);
+
+        if (provisioned == null) {
+            this.logger.log(
+                `'${fspId}' onboarded without a Hub-facing signing key: this deployment holds none.`);
+            return;
+        }
 
         const participantKey = existing ?? new ParticipantKey();
 

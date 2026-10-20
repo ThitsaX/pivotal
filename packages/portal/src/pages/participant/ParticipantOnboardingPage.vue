@@ -129,7 +129,7 @@ const submit = async (): Promise<void> => {
         eyebrow="Participant"
         :title="viewDefinition.title"
         :subtitle="viewDefinition.subtitle"
-        form-description="Enter the participant name, base endpoint, supported currencies, and signing keys required to onboard a new FSP."
+        form-description="Enter the participant name, base endpoint, supported currencies, and access public key required to onboard a new FSP. A JWS signing key is created automatically."
         :selected-time-zone="selectedTimeZone"
         :loading="loading"
         :error-message="errorMessage"

@@ -68,3 +68,26 @@ export class PrivateKeyJwsSigner extends JwsSigner {
         return FspiopSignature.sign(privateKey, input, payload);
     }
 }
+
+/**
+ * Signs nothing, for a workload that holds no Hub-facing signing key.
+ *
+ * Every tenant is unkeyed here, so every request passes through unsigned, as an unkeyed tenant's
+ * does under any profile. A service that is configured to sign refuses to start without a key
+ * profile rather than reaching this.
+ */
+export class NoKeyJwsSigner extends JwsSigner {
+
+    async sign(
+        fspId: string,
+        input: FspiopProtectedHeader.Input,
+        payload: string,
+    ): Promise<FspiopSignature.Header | undefined> {
+
+        void fspId;
+        void input;
+        void payload;
+
+        return undefined;
+    }
+}

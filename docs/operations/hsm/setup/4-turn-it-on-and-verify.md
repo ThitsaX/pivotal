@@ -37,7 +37,6 @@ Same under both backends:
 | --- | --- | --- |
 | `KEY_PROVIDER` | `pkcs11` | every signing workload |
 | `HSM_CRED_PATH` | `pivotal/hsmcred/<fspId>`, or `pivotal/hsmcred/web-outbound` | a workload that **signs**: its own credential |
-| `HSM_CRED_PATH_PREFIX` | `pivotal/hsmcred` | the workload that **provisions**: it reads each tenant's in turn, so it takes a prefix rather than one path |
 | `KEY_REF_PATH` | `pivotal/keyref` | read by connectors and web-outbound, **written** by the workload that provisions |
 
 Backend-specific — set the column for the device you are running against:

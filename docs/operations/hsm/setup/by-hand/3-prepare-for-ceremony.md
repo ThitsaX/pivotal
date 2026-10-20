@@ -136,7 +136,8 @@ path "pki_hub_client/*"          { capabilities = ["create", "read", "update", "
 [`../2-ca-ceremony.md`](../2-ca-ceremony.md), with both custodians present:
 
 ```bash
-VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200 /root/ceremony-hsm.sh
+VAULT_ADDR=http://vault-active.vault.svc.cluster.local:8200 \
+  WEB_INBOUND_HOST=<web-inbound public host> /root/ceremony-hsm.sh
 ```
 
 It prompts for both crypto-user passwords and the Vault token — nothing is passed on the command
