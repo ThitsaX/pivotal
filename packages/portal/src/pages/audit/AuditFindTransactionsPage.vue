@@ -1023,13 +1023,7 @@ const formatDateInTimeZone = (value: string): string => {
 
 const disputeResolutionTime = computed(() => {
     const value = selectedTransaction.value?.record.disputeResolvedAt;
-
-    if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return null;
-
-    const utc = value.endsWith('Z') ? value : new Date(value).toISOString();
-    return utc.replace(/(?:\.(\d{1,9}))?Z$/, (_match, fraction: string = '') =>
-        `.${fraction.padEnd(9, '0')}Z`,
-    );
+    return typeof value === 'string' && toDateTimeParts(value) ? value : null;
 });
 
 const formatOptionalValue = (value: unknown): string => {
@@ -2660,7 +2654,6 @@ const goToLastPage = (): void => {
                                     {{ getStatusDisplay(selectedTransaction.record).statusLabel }}
                                 </span>
                                 <span
-                                    v-if="getStatusDisplay(selectedTransaction.record).showDispute"
                                     :class="[
                                         STATUS_BADGE_BASE_CLASS,
                                         getStatusDisplay(selectedTransaction.record).disputeClass,
@@ -2672,26 +2665,30 @@ const goToLastPage = (): void => {
                         </div>
 
                         <section
-                            v-if="disputeResolutionTime"
-                            aria-label="Dispute resolution log"
-                            class="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-3"
+                            v-if="disputeResolutionTime || getPatchErrorDisplay(selectedTransaction.record).visible"
+                            :aria-label="disputeResolutionTime ? 'Dispute Resolved' : 'Dispute Reason'"
+                            :class="['space-y-3 rounded-xl border px-3.5 py-3',
+                                disputeResolutionTime ? 'border-emerald-200 bg-emerald-50/60' : 'border-red-200 bg-red-50/60',
+                            ]"
                         >
-                            <p class="text-[10px] font-semibold uppercase text-emerald-700">
-                                Dispute resolved
-                            </p>
-                            <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
-                                <span class="text-slate-500">Resolved at</span>
-                                <time :datetime="disputeResolutionTime" class="min-w-0 break-all font-mono text-ink">{{ disputeResolutionTime }}</time>
-                            </p>
-                        </section>
+                            <header v-if="disputeResolutionTime" class="flex items-start gap-2.5">
+                                <span aria-hidden="true" class="inline-flex h-6 w-6 shrink-0 items-center justify-center text-lg leading-none text-emerald-700">&#10003;</span>
+                                <div class="min-w-0 space-y-1">
+                                    <p class="text-[10px] font-semibold uppercase text-emerald-700">Dispute Resolved</p>
+                                    <p class="text-[13px] font-semibold text-ink">
+                                        Resolved <time :datetime="disputeResolutionTime">{{ formatDateInTimeZone(disputeResolutionTime) }}</time>
+                                    </p>
+                                </div>
+                            </header>
 
-                        <section
-                            v-if="getPatchErrorDisplay(selectedTransaction.record).visible"
-                            class="space-y-3 rounded-xl border border-red-200 bg-red-50/60 px-3.5 py-3"
-                        >
-                            <header class="flex items-start gap-2.5">
+                            <template v-if="getPatchErrorDisplay(selectedTransaction.record).visible">
+                            <header :class="['flex items-start gap-2.5',
+                                disputeResolutionTime ? 'border-t border-dashed border-emerald-200 pt-3' : '',
+                            ]">
                                 <span
-                                    class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700"
+                                    :class="['mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                                        disputeResolutionTime ? 'bg-slate-100 text-slate-600' : 'bg-red-100 text-red-700',
+                                    ]"
                                     aria-hidden="true"
                                 >
                                     <svg
@@ -2709,8 +2706,10 @@ const goToLastPage = (): void => {
                                     </svg>
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700">
-                                        {{ disputeResolutionTime ? 'Original Dispute Reason' : 'Dispute Reason' }}
+                                    <p :class="['text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                        disputeResolutionTime ? 'text-slate-600' : 'text-red-700',
+                                    ]">
+                                        {{ disputeResolutionTime ? 'Original error' : 'Dispute Reason' }}
                                     </p>
                                     <p class="mt-0.5 text-[13px] font-semibold text-ink">
                                         {{ getPatchErrorDisplay(selectedTransaction.record).headline }}
@@ -2800,6 +2799,7 @@ const goToLastPage = (): void => {
                                     && !getPatchErrorDisplay(selectedTransaction.record).responseBody"
                                 class="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-white/70 px-2.5 py-2 text-[12px] font-mono leading-5 text-ink"
                             >{{ getPatchErrorDisplay(selectedTransaction.record).raw }}</pre>
+                            </template>
                         </section>
 
                         <div class="grid gap-2.5 xl:grid-cols-4">
