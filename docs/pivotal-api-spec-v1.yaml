@@ -274,29 +274,89 @@ paths:
       - rates
       summary: Retrieves Catalyst's current effective FX rate for a currency pair
       description: |
-        Authenticated, read-only pass-through to Catalyst. Pivotal sends the supplied
+        Returns Catalyst's current effective FX rate for the requested currency pair.
+        This endpoint is an authenticated, read-only integration layer: Pivotal forwards
         `baseCurrency` and `quoteCurrency` to Catalyst and returns Catalyst's successful
-        response without calculating, selecting, modifying, or storing a rate.
+        response without calculating, selecting, modifying, or storing an FX rate.
 
-        Sign the empty `{}` payload with RS256 using the same protected-header scheme as
-        transfer status. The signed `uri` must be byte-identical to the complete request
-        target, including the query string and its ordering. `date` must match the request
-        header and be within five minutes; `nonce` is single-use.
+        ### Who may call it
+
+        `fspiop-source` must identify a DFSP with an access public key registered in
+        Pivotal. The request signature is verified against that registered key.
+
+        ### Signing a request
+
+        Every request carries a compact RS256 JWS in the `authorization` header,
+        signed with the DFSP's access private key. Send the raw token — no `Bearer`
+        prefix.
+
+        The JWS payload must be the empty JSON object `{}`, whose unpadded Base64URL
+        value is `e30`. All request binding lives in the protected header:
+
+        | Field    | Required value                                                        |
+        | -------- | --------------------------------------------------------------------- |
+        | `alg`    | `RS256`                                                                 |
+        | `typ`    | `JWT`                                                                   |
+        | `uri`    | Complete request target exactly as sent, including the ordered query string |
+        | `method` | `GET`                                                                   |
+        | `date`   | Byte-for-byte identical to the `date` request header                   |
+        | `nonce`  | Unique per call, 1 to 128 characters                                   |
+
+        Example protected header:
+
+        ```json
+        {
+          "alg": "RS256",
+          "typ": "JWT",
+          "uri": "/secured/rates?baseCurrency=USD&quoteCurrency=LRD",
+          "method": "GET",
+          "date": "Tue, 20 Oct 2026 04:00:00 GMT",
+          "nonce": "9f2b7c14-3d5e-4a81-9f60-2c8d1b4e7a03"
+        }
+        ```
+
+        ### Rules each field must satisfy
+
+        - **`date` format.** Use an RFC 7231 HTTP-date in GMT. Generate it when sending
+          the request; do not reuse the example value.
+        - **`date` freshness.** The value must be within five minutes of Pivotal's server
+          time in either direction and must exactly match the signed `date` value.
+        - **`nonce` reuse.** The nonce is remembered for ten minutes per
+          `fspiop-source`. Generate a fresh value for every call, including retries.
+        - **`uri` match.** The signed value must exactly match the request target received
+          by Pivotal. It includes the query-string order, names, values, encoding, and
+          separators. For example, signing `baseCurrency` before `quoteCurrency` while
+          sending them in the reverse order is rejected.
+
+        Authentication failures return `3105 Invalid signature` (HTTP 401). Missing
+        required headers or query parameters return `3102 Missing mandatory element`,
+        and malformed values return `3101 Malformed syntax` (both HTTP 417).
+
+        When Catalyst reports `FX_RATE_NOT_FOUND`, Pivotal returns `3100 Generic
+        validation error` (HTTP 417) and preserves Catalyst's message in
+        `detailedDescription`. Catalyst communication failures, service unavailability,
+        and timeouts are mapped to the existing Pivotal error standard.
       operationId: getCurrentFxRate
       parameters:
       - name: baseCurrency
         in: query
         required: true
-        description: ISO 4217 three-letter base currency code.
+        description: ISO 4217 three-letter uppercase base currency code forwarded unchanged to Catalyst.
         schema:
           type: string
+          minLength: 3
+          maxLength: 3
+          pattern: "^[A-Z]{3}$"
           example: USD
       - name: quoteCurrency
         in: query
         required: true
-        description: ISO 4217 three-letter quote currency code.
+        description: ISO 4217 three-letter uppercase quote currency code forwarded unchanged to Catalyst.
         schema:
           type: string
+          minLength: 3
+          maxLength: 3
+          pattern: "^[A-Z]{3}$"
           example: LRD
       - name: authorization
         in: header
@@ -306,11 +366,11 @@ paths:
           type: string
       - name: date
         in: header
-        description: RFC 7231 HTTP-date signed byte-for-byte into the protected header. Must be within five minutes of server time.
+        description: Current RFC 7231 HTTP-date signed byte-for-byte into the protected header. Must be within five minutes of server time; do not reuse the example value.
         required: true
         schema:
           type: string
-          example: Mon, 12 Oct 2026 03:30:00 GMT
+          example: Tue, 20 Oct 2026 04:00:00 GMT
       - name: fspiop-source
         in: header
         description: Calling DFSP with a registered access public key.
@@ -319,27 +379,51 @@ paths:
           $ref: '#/components/schemas/fspId'
       responses:
         "200":
-          description: Current rate selected by Catalyst.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/currentFxRateResponse'
+          $ref: '#/components/responses/getCurrentFxRateSuccess'
         "401":
           $ref: '#/components/responses/unauthorized'
         "417":
-          description: A mandatory parameter/header is missing, malformed, or Catalyst has no rate for the pair.
+          description: Missing parameter/header (3102), malformed value (3101), or FX rate unavailable from Catalyst (3100).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/errorResponse'
+              examples:
+                fxRateNotFound:
+                  summary: Catalyst has no current rate for the requested pair
+                  value:
+                    statusCode: "3100"
+                    message: Please try again later. If you still cannot do the payment, please contact your service provider.
+                    localeMessage: Please try again later. If you still cannot do the payment, please contact your service provider.
+                    detailedDescription: Catalyst (FX_RATE_NOT_FOUND) FX rate is not available for USD/LRD.
+                malformedParameter:
+                  summary: A query parameter is malformed
+                  value:
+                    statusCode: "3101"
+                    message: Please fill out the complete and correct information
+                    localeMessage: Please fill out the complete and correct information
+                    detailedDescription: baseCurrency query parameter must contain exactly one non-blank string value.
+                missingParameter:
+                  summary: A required query parameter is missing
+                  value:
+                    statusCode: "3102"
+                    message: Please fill out the complete and correct information.
+                    localeMessage: Please fill out the complete and correct information.
+                    detailedDescription: baseCurrency query parameter is required.
         "502":
-          description: Catalyst could not be reached.
+          description: Catalyst could not be reached (1000 Communication error).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorResponse'
+        "503":
+          description: Catalyst is temporarily unavailable (2003 Service currently unavailable).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/errorResponse'
         "504":
-          description: Catalyst timed out.
+          description: Catalyst timed out (2004 Server timed out).
           content:
             application/json:
               schema:
@@ -1298,6 +1382,19 @@ Allowed values:
             currency: LRD
             initiatedTimestamp: "2026-08-25T09:12:31.204Z"
             errorInformation: null
+
+    getCurrentFxRateSuccess:
+      description: Current effective FX rate selected and returned by Catalyst.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/currentFxRateResponse'
+          example:
+            baseCurrency: USD
+            quoteCurrency: LRD
+            rate: 184.00
+            effectiveFrom: "2026-10-05T00:00:00Z"
+            updatedAt: "2026-10-05T09:00:00Z"
 
     postTransferServerError:
       description: An error occurred processing the transfer
