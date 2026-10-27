@@ -87,11 +87,13 @@
     "generate:fspiop-dto": "openapi-generator-cli generate --generator-key fspiop-dto && npm run fix:fspiop-dto && npm run generate:fspiop-dto:index",
     "generate:catalyst-dto": "npm run prepare:catalyst-dto-spec && openapi-generator-cli generate --generator-key catalyst-dto && npm run fix:catalyst-dto && npm run generate:catalyst-dto:index",
     "regenerate:fspiop-dto": "npm run clean:fspiop-dto && npm run generate:fspiop-dto",
-    "regenerate:catalyst-dto": "npm run clean:catalyst-dto && npm run generate:catalyst-dto"
+    "regenerate:catalyst-dto": "npm run clean:catalyst-dto && npm run generate:catalyst-dto",
+    "build:shared-iso20022": "nest build shared-iso20022"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
     "@aws-sdk/s3-request-presigner": "^3.1056.0",
+    "@mojaloop/ml-schema-transformer-lib": "npm:thitsa-schema-transformer-lib@0.1.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.0",

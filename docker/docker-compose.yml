@@ -5,6 +5,7 @@ x-common-fspiop-env: &common_fspiop_env
   FSPIOP_QUOTES_URL: ${FSPIOP_QUOTES_URL:-http://web-inbound:3201}
   FSPIOP_TRANSFERS_URL: ${FSPIOP_TRANSFERS_URL:-http://web-inbound:3201}
   FSPIOP_SWITCH_ID: ${FSPIOP_SWITCH_ID:-hub}
+  API_TYPE: ${API_TYPE:-iso20022}
   FSPIOP_USE_JWS: ${FSPIOP_USE_JWS:-false}
   FSPIOP_USE_MUTUAL_TLS: ${FSPIOP_USE_MUTUAL_TLS:-false}
   FSPIOP_SIGN_JWS: ${FSPIOP_SIGN_JWS:-false}

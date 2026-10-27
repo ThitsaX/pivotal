@@ -10,6 +10,7 @@ import {
     FspiopException,
     FspiopHeaders,
 } from '@shared/fspiop';
+import type {Iso20022PutQuotesContext, OriginalIso20022PostQuotePayload} from '@shared/iso20022';
 import {PerformPostQuotesCommand} from './perform-post-quotes.command';
 import {AuditErrorConverter, ConnectorSettings, FspConnector} from '../component';
 
@@ -31,7 +32,7 @@ export class PerformPostQuotesHandler
     }
 
     async execute(command: PerformPostQuotesCommand): Promise<PerformPostQuotesCommand.Output> {
-        const {correlationId, payerFsp, payeeFsp, request} = command.input;
+        const {correlationId, payerFsp, payeeFsp, request, iso20022PostQuoteRequest} = command.input;
         const {quotesUrl} = this.fspiopAxios.settings;
         const connectorId = this.connectorSettings.connectorId;
         const createdAt = new Date();
@@ -69,6 +70,7 @@ export class PerformPostQuotesHandler
                 headers,
                 request.quoteId,
                 response,
+                PerformPostQuotesHandler.toIso20022PutQuotesContext(iso20022PostQuoteRequest),
             );
 
             await this.auditPublisher.publish(
@@ -176,5 +178,13 @@ export class PerformPostQuotesHandler
         }
 
         return null;
+    }
+
+    private static toIso20022PutQuotesContext(
+        iso20022PostQuoteRequest: OriginalIso20022PostQuotePayload | undefined,
+    ): Iso20022PutQuotesContext | undefined {
+        return iso20022PostQuoteRequest != null
+            ? {isoPostQuote: iso20022PostQuoteRequest}
+            : undefined;
     }
 }

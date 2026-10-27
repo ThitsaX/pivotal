@@ -154,6 +154,27 @@ function createHandler(cachedRequest: TransferRequest) {
 
 describe('PutAcceptQuoteHandler', () => {
 
+    it('forwards confirmation extensions while keeping the authoritative home transaction ID', async () => {
+        const cachedRequest = transferRequest();
+        const fixture = createHandler(cachedRequest);
+        const extensionList = {extension: [
+            {key: 'audit', value: 'one'},
+            {key: 'audit', value: 'two'},
+            {key: 'homeTransactionId', value: 'untrusted-extension-value'},
+        ]};
+        const before = structuredClone(extensionList);
+        await fixture.handler.execute(new PutAcceptQuoteCommand(
+            new PutAcceptQuoteCommand.Input('transfer-1', true, 'wallet1', 'payer-home-final', extensionList),
+        ));
+        assert.deepEqual(fixture.postedTransfer?.extensionList, {extension: [
+            {key: 'payerFee', value: '1'},
+            {key: 'audit', value: 'one'},
+            {key: 'audit', value: 'two'},
+            {key: 'homeTransactionId', value: 'payer-home-final'},
+        ]});
+        assert.deepEqual(extensionList, before);
+    });
+
     it('overwrites the payer home transaction ID when the third call supplies one', async () => {
         const cachedRequest = transferRequest();
         const fixture = createHandler(cachedRequest);

@@ -6,6 +6,7 @@ import {PutAcceptPartyCommand} from '../../../../../packages/core/outbound/domai
 import {PutAcceptPartyHandler} from '../../../../../packages/core/outbound/domain/command/put-accept-party.handler';
 import {AmountDecimalValidator, PayerProvidedFeesValidator} from '../../../../../packages/core/outbound/domain/component';
 import {FspParty} from '../../../../../packages/core/outbound/domain/dto';
+import type {QuoteSuccessPayload} from '../../../../../packages/shared/fspiop';
 import {
     AmountType,
     Currency,
@@ -71,78 +72,83 @@ function transferRequest(): TransferRequest {
 
 describe('PutAcceptPartyHandler', () => {
 
-    it('uses the confirmed acceptParty amount when posting the quote request', async () => {
-        const cachedRequest = transferRequest();
-        let postedQuoteAmount: string | undefined;
-        let postedQuoteExtensionList: ExtensionList | undefined;
-        let savedRequest: TransferRequest | undefined;
-        const extensionList: ExtensionList = {
-            extension: [
-                {key: 'payerProvidedSchemeFee', value: '1.23'},
-                {key: 'payerProvidedPayerFee', value: '2.34'},
-            ],
-        };
+    for (const iso20022QuoteResponse of [undefined, {Document: {quoteResponse: 'original'}}]) {
+        it(`uses the confirmed amount and caches the quote callback ${iso20022QuoteResponse == null ? 'without' : 'with'} original ISO 20022 data`, async () => {
+            const cachedRequest = transferRequest();
+            let postedQuoteAmount: string | undefined;
+            let postedQuoteExtensionList: ExtensionList | undefined;
+            let savedRequest: TransferRequest | undefined;
+            const extensionList: ExtensionList = {
+                extension: [
+                    {key: 'payerProvidedSchemeFee', value: '1.23'},
+                    {key: 'payerProvidedPayerFee', value: '2.34'},
+                ],
+            };
 
-        const callback = new QuotesIDPutResponse();
-        callback.transferAmount = money('44.44');
-        callback.payeeReceiveAmount = money('44.44');
-        callback.payeeFspFee = money('0');
+            const callback = new QuotesIDPutResponse();
+            callback.transferAmount = money('44.44');
+            callback.payeeReceiveAmount = money('44.44');
+            callback.payeeFspFee = money('0');
 
-        const handler = new PutAcceptPartyHandler(
-            {
-                settings: {quotesUrl: 'http://quotes'},
-                async postQuotes(
-                    _url: string,
-                    _headers: unknown,
-                    body: {amount?: Money; extensionList?: ExtensionList},
-                ): Promise<void> {
-                    postedQuoteAmount = body.amount?.amount;
-                    postedQuoteExtensionList = body.extensionList;
-                },
-            } as never,
-            {
-                async waitFor(): Promise<QuotesIDPutResponse> {
-                    return callback;
-                },
-                cancel(): void {
-                },
-            } as never,
-            {
-                async acquireLock(): Promise<string> {
-                    return 'lock-token';
-                },
-                async releaseLock(): Promise<void> {
-                },
-                async get(): Promise<TransferRequest> {
-                    return cachedRequest;
-                },
-                async set(_key: string, value: TransferRequest): Promise<void> {
-                    savedRequest = value;
-                },
-                async delete(): Promise<void> {
-                },
-            } as never,
-            {
-                async publish(message: TransactionMessage): Promise<void> {
-                    assert.ok(message);
-                },
-            } as never,
-            {
-                validate(): void {
-                },
-            } as never,
-            new PayerProvidedFeesValidator(true, new AmountDecimalValidator(2)),
-        );
+            const handler = new PutAcceptPartyHandler(
+                {
+                    settings: {quotesUrl: 'http://quotes'},
+                    async postQuotes(
+                        _url: string,
+                        _headers: unknown,
+                        body: {amount?: Money; extensionList?: ExtensionList; transactionRequestId?: string},
+                    ): Promise<void> {
+                        postedQuoteAmount = body.amount?.amount;
+                        postedQuoteExtensionList = body.extensionList;
+                        assert.equal(body.transactionRequestId, undefined);
+                    },
+                } as never,
+                {
+                    async waitFor(): Promise<QuoteSuccessPayload> {
+                        return {response: callback, iso20022QuoteResponse};
+                    },
+                    cancel(): void {
+                    },
+                } as never,
+                {
+                    async acquireLock(): Promise<string> {
+                        return 'lock-token';
+                    },
+                    async releaseLock(): Promise<void> {
+                    },
+                    async get(): Promise<TransferRequest> {
+                        return cachedRequest;
+                    },
+                    async set(_key: string, value: TransferRequest): Promise<void> {
+                        savedRequest = value;
+                    },
+                    async delete(): Promise<void> {
+                    },
+                } as never,
+                {
+                    async publish(message: TransactionMessage): Promise<void> {
+                        assert.ok(message);
+                    },
+                } as never,
+                {
+                    validate(): void {
+                    },
+                } as never,
+                new PayerProvidedFeesValidator(true, new AmountDecimalValidator(2)),
+            );
 
-        const output = await handler.execute(
-            new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, ' 44.44 ', extensionList, 'wallet1')),
-        );
+            const output = await handler.execute(
+                new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, ' 44.44 ', extensionList, 'wallet1')),
+            );
 
-        assert.equal(postedQuoteAmount, '44.44');
-        assert.deepEqual(postedQuoteExtensionList, extensionList);
-        assert.equal(savedRequest?.amount, '44.44');
-        assert.equal(output.response.amount, '44.44');
-    });
+            assert.equal(postedQuoteAmount, '44.44');
+            assert.deepEqual(postedQuoteExtensionList, extensionList);
+            assert.equal(savedRequest?.amount, '44.44');
+            assert.deepEqual(savedRequest?.quotes, callback);
+            assert.deepEqual(savedRequest?.iso20022QuoteResponse, iso20022QuoteResponse);
+            assert.equal(output.response.amount, '44.44');
+        });
+    }
 
     it('rejects acceptParty when fspiop-source differs from the cached payer FSP', async () => {
         const cachedRequest = transferRequest();
@@ -156,8 +162,8 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
-                async waitFor(): Promise<QuotesIDPutResponse> {
-                    return new QuotesIDPutResponse();
+                async waitFor(): Promise<QuoteSuccessPayload> {
+                    return {response: new QuotesIDPutResponse()};
                 },
                 cancel(): void {
                 },

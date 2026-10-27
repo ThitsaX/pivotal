@@ -93,6 +93,7 @@ export class ConnectorPostQuotesListener implements OnModuleInit {
                                 message.payerFsp,
                                 message.payeeFsp,
                                 message.request,
+                                message.iso20022PostQuoteRequest,
                             ),
                         ),
                     );

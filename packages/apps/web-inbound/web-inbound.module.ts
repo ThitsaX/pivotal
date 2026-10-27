@@ -54,14 +54,19 @@ export class WebInboundModule {
                 inject: asyncOptions.inject ?? [],
             },
             {
+                provide: FspiopSettings,
+                useFactory: (settings: WebInboundModule.RequiredSettings): FspiopSettings => settings.fspiopSettings(),
+                inject: [REQUIRED_SETTINGS],
+            },
+            {
                 provide: FspInboundGuard,
-                useFactory: (settings: WebInboundModule.RequiredSettings, participantSigningKeysCache: ParticipantSigningKeysCache): FspInboundGuard => {
+                useFactory: (settings: FspiopSettings, participantSigningKeysCache: ParticipantSigningKeysCache): FspInboundGuard => {
                     return new FspInboundGuard(
                         new ParticipantJwsPublicKeyStore(participantSigningKeysCache),
-                        settings.fspiopSettings(),
+                        settings,
                     );
                 },
-                inject: [REQUIRED_SETTINGS, ParticipantSigningKeysCache],
+                inject: [FspiopSettings, ParticipantSigningKeysCache],
             }
         ];
     }

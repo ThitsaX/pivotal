@@ -21,7 +21,7 @@ export class HandlePostQuotesHandler
     }
 
     async execute(command: HandlePostQuotesCommand): Promise<HandlePostQuotesCommand.Output> {
-        const {correlationId, payerFsp, payeeFsp, request} = command.input;
+        const {correlationId, payerFsp, payeeFsp, request, iso20022PostQuoteRequest} = command.input;
         const auditCorrelationId = resolveGatewayCorrelationId(
             correlationId,
             request.transactionId,
@@ -45,7 +45,15 @@ export class HandlePostQuotesHandler
             ),
         );
 
-        await this.publisher.publish(new ConnectorPostQuotesPublisher.Message(connectorCorrelationId, payerFsp, payeeFsp, request));
+        await this.publisher.publish(
+            new ConnectorPostQuotesPublisher.Message(
+                connectorCorrelationId,
+                payerFsp,
+                payeeFsp,
+                request,
+                iso20022PostQuoteRequest,
+            ),
+        );
         return new HandlePostQuotesCommand.Output();
     }
 }

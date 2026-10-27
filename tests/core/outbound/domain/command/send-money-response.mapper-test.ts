@@ -81,7 +81,6 @@ describe('SendMoneyResponseMapper', () => {
             );
 
             assert.equal(response.currentState, StateEnum.WaitingForQuoteAcceptance);
-            assert.equal(response.payeeFspFeeAmount, '1.99');
             assert.equal(response.payeeFee, '1.99');
             assert.equal(response.payerFee, '2.99');
             assert.equal(response.schemeFee, '1.34');
@@ -169,15 +168,25 @@ describe('SendMoneyResponseMapper', () => {
             assert.equal(response.schemeFee, '0');
         });
 
-        it('passes the raw extension array through on the response', () => {
-            const extensions = [makeExtension('payeeFee', '1.99')];
+        it('removes fee extensions while preserving other extensions on the response', () => {
+            const otherExtension = makeExtension('homeTransactionId', 'home-txn-001');
+            const extensions = [
+                makeExtension(' PayeeFee ', '1.99'),
+                makeExtension('PAYERFEE', '2.99'),
+                makeExtension('schemeFee', '1.34'),
+                otherExtension,
+            ];
             const response = SendMoneyResponseMapper.toWaitingForQuoteAcceptance(
                 makeTransferRequest(),
                 undefined,
                 makeExtensionList(extensions),
             );
 
-            assert.deepEqual(response.extensionList, extensions);
+            assert.deepEqual(response.extensionList, [otherExtension]);
+            assert.equal(response.payeeFee, '1.99');
+            assert.equal(response.payerFee, '2.99');
+            assert.equal(response.schemeFee, '1.34');
+            assert.equal(extensions.length, 4);
         });
     });
 

@@ -4,6 +4,7 @@ import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import {ConfigService} from '@nestjs/config';
 import {WebOutboundSettings} from '../../../packages/apps/web-outbound/required.settings';
+import {ApiType} from '../../../packages/shared/iso20022/api-type';
 
 const BASE_ENV: Record<string, string> = {
     REDIS_URL: 'redis://localhost:6379',
@@ -64,6 +65,22 @@ describe('WebOutboundSettings payer fee validation', () => {
             /Invalid environment variable POST_SENDMONEY_PAYEE_FSPID_REQUIRED/,
         );
     });
+    it('defaults the Hub API type to FSPIOP', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.equal(outboundSettings.fspiopSettings.apiType, ApiType.FSPIOP);
+    });
+
+    it('reads ISO 20022 Hub API type from env', () => {
+        const outboundSettings = settings({API_TYPE: 'iso20022'}).outboundSettings();
+
+        assert.equal(outboundSettings.fspiopSettings.apiType, ApiType.ISO20022);
+    });
+
+    it('rejects an unsupported Hub API type', () => {
+        assert.throws(
+            () => settings({API_TYPE: 'xml'}).outboundSettings(),
+            /Invalid API_TYPE/,
+        );
+    });
 });
-
-

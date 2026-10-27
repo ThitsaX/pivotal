@@ -16,6 +16,7 @@ import {
     PublicKeyStore,
 } from '@shared/security';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {ApiType} from '@shared/iso20022/api-type';
 import type {WebInboundModule} from './web-inbound.module';
 
 export class WebInboundSettings implements WebInboundModule.RequiredSettings {
@@ -71,6 +72,7 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
     }
 
     fspiopSettings(): FspiopSettings {
+        const apiType = ApiType.parse(this.readOptionalApiType());
         return new FspiopSettings(
             this.readRequiredString('FSPIOP_SWITCH_ID'),
             this.readRequiredString('FSPIOP_PARTIES_URL'),
@@ -78,6 +80,7 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
             this.readRequiredString('FSPIOP_TRANSFERS_URL'),
             this.readRequiredBoolean('FSPIOP_USE_JWS'),
             this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS'),
+            apiType,
         );
     }
 
@@ -146,5 +149,13 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
         }
 
         return parsed;
+    }
+    private readOptionalString(name: string): string | undefined {
+        const value = this.configService.get<string>(name);
+        return value == null || value.trim().length === 0 ? undefined : value;
+    }
+
+    private readOptionalApiType(): string | undefined {
+        return this.readOptionalString('API_TYPE');
     }
 }

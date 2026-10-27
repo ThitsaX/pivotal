@@ -5,6 +5,7 @@ import { OutboundSettings } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
 import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
+import {ApiType} from '@shared/iso20022/api-type';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
 
@@ -54,6 +55,8 @@ export class WebOutboundSettings
             connectionTimeoutMs: this.readPositiveInteger('CENTRAL_REGISTRY_ORACLE_CONNECTION_TIMEOUT_MS'),
         };
 
+        const apiType = ApiType.parse(this.readOptionalApiType());
+
         const fspiopAxiosParams: FspiopAxiosParams = {
             socketTimeoutMs,
             connectionTimeoutMs,
@@ -70,7 +73,8 @@ export class WebOutboundSettings
                 this.readRequiredString('FSPIOP_QUOTES_URL'),
                 this.readRequiredString('FSPIOP_TRANSFERS_URL'),
                 this.readRequiredBoolean('FSPIOP_USE_JWS'),
-                this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS')
+                this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS'),
+                apiType,
             ),
             fspiopAxiosParams,
             this.readRequiredString('PREFIX_ORACLE_ENDPOINT'),
@@ -174,6 +178,10 @@ export class WebOutboundSettings
         }
 
         return value;
+    }
+
+    private readOptionalApiType(): string | undefined {
+        return this.readOptionalString('API_TYPE');
     }
 
     private readOptionalBoolean(name: string): boolean | undefined {

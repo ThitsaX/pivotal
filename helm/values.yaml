@@ -9,6 +9,7 @@ global:
     FSPIOP_QUOTES_URL: http://web-inbound:3201
     FSPIOP_TRANSFERS_URL: http://web-inbound:3201
     FSPIOP_SWITCH_ID: hub
+    API_TYPE: iso20022
     FSPIOP_USE_JWS: "false"
     FSPIOP_USE_MUTUAL_TLS: "false"
     FSPIOP_SIGN_JWS: "false"

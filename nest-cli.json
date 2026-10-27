@@ -283,6 +283,15 @@
       "compilerOptions": {
         "tsConfigPath": "packages/samples/wallet3-connector/tsconfig.app.json"
       }
+    },
+    "shared-iso20022": {
+      "type": "library",
+      "root": "packages/shared/iso20022",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/iso20022",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/iso20022/tsconfig.app.json"
+      }
     }
   }
 }

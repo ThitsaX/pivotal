@@ -11,6 +11,7 @@ import {
     FspiopMtlsClientCertStore,
     FspiopSettings,
 } from '@shared/fspiop';
+import {ApiType} from '@shared/iso20022/api-type';
 import {
     CaStore,
     ClientCertStore,
@@ -54,6 +55,8 @@ export class Wallet1ConnectorSettings implements ConnectorConsumerModule.Require
     }
 
     fspiopSettings(): FspiopSettings {
+        const apiType = ApiType.parse(this.readOptionalApiType());
+
         return new FspiopSettings(
             this.readString('FSPIOP_SWITCH_ID', Wallet1ConnectorSettings.DEFAULT_SWITCH_ID),
             this.readString('FSPIOP_PARTIES_URL', Wallet1ConnectorSettings.DEFAULT_PARTIES_URL),
@@ -61,6 +64,7 @@ export class Wallet1ConnectorSettings implements ConnectorConsumerModule.Require
             this.readString('FSPIOP_TRANSFERS_URL', Wallet1ConnectorSettings.DEFAULT_TRANSFERS_URL),
             this.readBoolean('FSPIOP_USE_JWS', Wallet1ConnectorSettings.DEFAULT_USE_JWS),
             this.readBoolean('FSPIOP_USE_MUTUAL_TLS', Wallet1ConnectorSettings.DEFAULT_USE_MUTUAL_TLS),
+            apiType,
         );
     }
 
@@ -114,6 +118,15 @@ export class Wallet1ConnectorSettings implements ConnectorConsumerModule.Require
 
     private readString(name: string, fallback: string): string {
         return this.configService.get<string>(name) ?? fallback;
+    }
+
+    private readOptionalApiType(): string | undefined {
+        return this.readOptionalString('API_TYPE');
+    }
+
+    private readOptionalString(name: string): string | undefined {
+        const value = this.configService.get<string>(name);
+        return value == null || value.trim().length === 0 ? undefined : value;
     }
 
     private readBoolean(name: string, fallback: boolean): boolean {
