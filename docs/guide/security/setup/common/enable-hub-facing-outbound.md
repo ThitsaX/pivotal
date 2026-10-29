@@ -257,7 +257,7 @@ has a body.
     instead.
   - Connector log `No key reference at Vault path '...'. The crypto user exists but no key has been provisioned.`
     (pkcs11): the DFSP's key was not provisioned, or `CONNECTOR_ID` does not match. See
-    [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md), Step 3.
+    [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md#step-1-create-the-dfsps-signing-key).
 
 ### Step 6. Confirm each DFSP's signing flag
 

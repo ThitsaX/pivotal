@@ -106,17 +106,18 @@ openssl req -new -newkey rsa:2048 -nodes -keyout <DFSP_ID>-client.key \
   The **endpoint** is where the Hub sends this DFSP's callbacks, and it must reach web-inbound, never
   the DFSP's own system:
 
-  - after setup: `https://<PIVOTAL_CALLBACK_HOST>`;
+  - after setup: `http://<PIVOTAL_CALLBACK_HOST>` (`http`, not `https`: the Hub's egress gateway
+    upgrades it to mTLS);
   - *during setup*, before [Enable the Hub-facing side: inbound](../../setup/common/enable-hub-facing-inbound.md):
     the address the Hub uses today to reach web-inbound. That page moves it to
-    `https://<PIVOTAL_CALLBACK_HOST>`.
+    `http://<PIVOTAL_CALLBACK_HOST>`.
 - **Command or Configuration (API alternative):** `POST /participant/onboard` on web-pivotal:
 
   ```json
   {
     "name": "<DFSP_ID>",
     "currencies": ["<CURRENCY>"],
-    "endpoint": "https://<PIVOTAL_CALLBACK_HOST>",
+    "endpoint": "http://<PIVOTAL_CALLBACK_HOST>",
     "accessPublicKey": "<ACCESS_PUBLIC_KEY_PEM>"
   }
   ```

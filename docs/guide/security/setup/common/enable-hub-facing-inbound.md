@@ -282,9 +282,14 @@ signatures at the strictness chosen for each sender.
 
 - **Purpose:** The Hub sends a DFSP's callbacks to the endpoint registered for it in the ledger.
 - **Action:** For **one** test DFSP first, open **Participant → Register Endpoint**, and set the
-  endpoint to `https://<PIVOTAL_CALLBACK_HOST>`. Or call `PUT /participant/endpoint` with
-  `{"name": "<DFSP_ID>", "endpoint": "https://<PIVOTAL_CALLBACK_HOST>"}`. Run a transfer to that DFSP,
+  endpoint to `http://<PIVOTAL_CALLBACK_HOST>`. Or call `PUT /participant/endpoint` with
+  `{"name": "<DFSP_ID>", "endpoint": "http://<PIVOTAL_CALLBACK_HOST>"}`. Run a transfer to that DFSP,
   then repeat for the others.
+
+  Use `http://`, not `https://`. The Hub's egress gateway turns a callback addressed to this host
+  over `http` into an mTLS connection on port 443, presenting the Hub's client certificate. An
+  `https://` endpoint bypasses the egress gateway, so no client certificate is presented and the
+  callback gateway refuses the connection.
 - **Expected Result:** The transfer completes, and the callback gateway's access log shows the Hub's
   requests on `<PIVOTAL_CALLBACK_HOST>`.
 - **If It Fails:** Set the endpoint back to its previous value at once (see Rollback), then check

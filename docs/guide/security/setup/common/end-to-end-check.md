@@ -91,7 +91,7 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
 - **Purpose:** Confirm the signing keys are where your profile puts them.
 - **Action:** Run the profile check at the end of your profile's deploy page:
   [vault-kv](../vault-kv/4-deploy-pivotal.md#verification), or for pkcs11 the per-DFSP check in
-  [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md#verification).
+  [Onboard a DFSP (pkcs11)](../../runbooks/pkcs11/onboard-dfsp.md#step-5-check-that-payments-work).
 - **Expected Result:** It passes for `<DFSP_A>` and `<DFSP_B>`.
 
 ## Verification

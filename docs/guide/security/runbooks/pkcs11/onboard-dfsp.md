@@ -1,393 +1,556 @@
 # Onboard a DFSP (pkcs11)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: pkcs11 · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: pkcs11 · Document version 1.1 (draft)
 
-## Overview
+Use this guide to add a new DFSP to Pivotal, or to upgrade a DFSP that was onboarded on an earlier
+Pivotal version.
 
-This procedure adds one DFSP to a Pivotal deployment that uses the `pkcs11` profile. It has two
-parts, done by different people:
+| Your situation | Follow |
+|---|---|
+| The DFSP is new to Pivotal | [Onboarding a new DFSP](#onboarding-a-new-dfsp) |
+| The DFSP already sends payments through Pivotal | [Upgrading an existing DFSP](#upgrading-an-existing-dfsp) |
 
-1. **A custodian provisions the DFSP's key in the HSM.** In the
-   [HSM admin pod](../../setup/pkcs11/hsm-admin-pod.md), the script `provision-hsm-tenant.sh`
-   creates the DFSP's crypto user, generates its Hub JWS signing key inside the HSM as that user,
-   shares the key with `cu_web_outbound`, and writes the key reference and the public key to Vault.
-2. **An operator onboards the DFSP in the portal.** web-pivotal reads the key reference and public
-   key from Vault and records the public key. It creates nothing in the HSM. trust-manager then
-   publishes the public key to MCM and turns signing on. Finally you issue the DFSP's client
-   certificate and add its connector.
+> **Doing the initial setup?** Use [Onboarding a new DFSP](#onboarding-a-new-dfsp) for each test
+> DFSP, and follow the notes marked **During setup**.
 
-Portal onboarding refuses a DFSP whose key has not been provisioned, **before** it creates anything
-at the Hub.
+## The example on this page
 
-**The crypto user's name** is `cu_` followed by the FSP ID, with every character other than a letter
-or a digit turned into `_`. For example, `dfsp-a` gets `cu_dfsp_a`. The HSM shows names in lower
-case, so FSP IDs that differ only in case, or only in `-` versus `_`, would share one crypto user:
-avoid them. The script prints the name it uses (`Provisioning '<DFSP_ID>' (crypto user '…')`); this
-page calls it `<CRYPTO_USER>`.
+Every command on this page uses one example: we are onboarding a new DFSP called **MyGreenBank**.
+Replace each example value with your own.
 
-Use it in two situations:
+| What | Example value | Where it comes from |
+|---|---|---|
+| FSP ID | `MyGreenBank` | Agreed with the DFSP. Case-sensitive. |
+| Currency | `USD` | Agreed with the DFSP. |
+| Access public key file | `./mygreenbank-access.pub` | Sent by the DFSP. A path on your computer. |
+| CSR file | `./mygreenbank-client.csr` | Sent by the DFSP. A path on your computer. |
+| Kubeconfig file | `~/.kube/pivotal.yaml` | Your cluster access file. |
+| Pivotal repository | `~/projects/pivotal` | Your clone of the Pivotal repository. |
+| Vault address (inside the cluster) | `http://vault.vault.svc.cluster.local:8200` | The [shared worksheet](../../setup/common/hub-operator-and-worksheet.md). |
+| Pivotal callback host | `web-inbound.example.com` | The [shared worksheet](../../setup/common/hub-operator-and-worksheet.md). |
+| Crypto user | `cu_MyGreenBank` | Created by the script from the FSP ID. The HSM shows it as `cu_mygreenbank`. |
+| Key reference | `MyGreenBank-jws-20261029093000` | Created by the script. The ending is the date and time it ran. |
+| Connector name | `mygreenbank-java-connector` | Your choice. Kubernetes names must be lower case. |
 
-- **During setup**, right after [Deploy Pivotal](../../setup/pkcs11/5-deploy-pivotal.md), to onboard
-  the test DFSPs the shared setup pages need. The steps marked *during setup* below tell you which
-  settings to leave off until the later setup pages turn them on.
-- **After setup**, to add each new DFSP.
+## Onboarding a new DFSP
 
-## Objective
+**What you'll do**
 
-Make a new DFSP able to call Pivotal over mTLS with signed requests, and have Pivotal sign the DFSP's
-messages to the Hub with a key that exists only inside the HSM.
+1. Create the DFSP's signing key in the HSM.
+2. Onboard the DFSP in the portal.
+3. Issue the DFSP's client certificate.
+4. Add the DFSP's connector.
+5. Check that payments work.
 
-## Expected Outcome
+**Before you begin**
 
-- The DFSP's crypto user `<CRYPTO_USER>` owns a non-extractable signing key in the HSM, shared with
-  `cu_web_outbound`.
-- Vault holds the DFSP's crypto-user credential, key reference and public key.
-- The DFSP is in the Hub and in MCM, and MCM holds its public key.
-- Signing is enabled for the DFSP, and Pivotal's database holds no private key for it.
-- The DFSP has a client certificate whose subject is `CN=<DFSP_ID>`.
-- A first request from the DFSP is accepted.
+You need:
 
-## Prerequisites
-
-### Mandatory
-
-- [Deploy Pivotal (pkcs11)](../../setup/pkcs11/5-deploy-pivotal.md) completed and verified, with
-  web-pivotal on `KEY_PROVIDER=pkcs11`.
-- A custodian with a Crypto Officer login, and a Vault token carrying the `pivotal-hsm-provisioning`
-  policy ([Configure Vault](../../setup/pkcs11/4-vault.md), Step 3).
-- `kubectl` access to start an [HSM admin pod](../../setup/pkcs11/hsm-admin-pod.md) session.
-- A Vault administrator, for the connector's policy and role in Step 7. The custodian's
-  `pivotal-hsm-provisioning` token cannot write policies or roles. The `vault` CLI must reach Vault;
-  see [Prerequisites](../../setup/pkcs11/1-prerequisites.md#step-3-check-your-workstation-tools).
-- trust-manager is running.
-- The DFSP exists in MCM, **or** trust-manager runs with `MCM_AUTO_REGISTER_DFSPS=true`.
+- A Crypto Officer account on the HSM.
+- A Vault token with the `pivotal-hsm-provisioning` policy. See [Configure Vault](../../setup/pkcs11/4-vault.md).
+- The HSM admin pod, deployed. See [Prepare the HSM admin pod](../../setup/pkcs11/hsm-admin-pod.md).
+- `kubectl` access to the cluster.
 - A portal account with the permissions **participant.onboard**, **participant.certificate.enroll**
   and **participant.certificate.view**.
-- From the DFSP:
-  - its FSP ID (case-sensitive; letters, digits, `-` and `_`, starting with a letter or digit, 2 to
-    31 characters);
-  - its currencies;
-  - its **access public key** (PEM). The DFSP keeps the private key;
-  - a **certificate signing request** (CSR, PEM, RSA key of at least 2048 bits). The DFSP keeps the
-    private key.
+- A Vault administrator, for the connector's Vault policy in Step 4.
+- trust-manager running with `MCM_AUTO_REGISTER_DFSPS=true`. If it is off, ask the Hub operator to
+  create the DFSP in MCM first.
 
-### Optional
+From the DFSP:
 
-None. Step 3 checks the key's owner and sharing itself.
+- its FSP ID (letters, digits, `-` and `_`; 2 to 31 characters);
+- its currencies;
+- its access public key file;
+- its certificate signing request (CSR) file.
 
-## Steps
+**What the DFSP's two files must be**
 
-### Step 1. Check that the DFSP can be registered in MCM
+The DFSP creates two separate key pairs, keeps both private keys, and sends you only the public
+parts:
 
-- **Purpose:** trust-manager cannot publish the DFSP's public key to MCM until the DFSP exists there.
-- **Command or Configuration:**
+| File | Purpose | Key type and size | Format | Checked by Pivotal |
+|---|---|---|---|---|
+| Access public key (`mygreenbank-access.pub`) | Verifies the DFSP's signed requests to Pivotal (RS256) | RSA, 2048 bits or more | PEM, `-----BEGIN PUBLIC KEY-----` | Only when the DFSP's first request arrives. A wrong key is accepted at onboarding and then every request fails. |
+| Certificate signing request (`mygreenbank-client.csr`) | Becomes the DFSP's client certificate for mTLS | RSA, 2048 bits or more | PEM, `-----BEGIN CERTIFICATE REQUEST-----` | At Step 3. Anything else is refused. |
 
-  ```bash
-  kubectl -n pivotal get deploy trust-manager \
-    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="MCM_AUTO_REGISTER_DFSPS")].value}'
-  ```
+Other key types, such as EC, don't work: a CSR with one is refused at Step 3, and requests signed
+with one are refused. The CSR's subject and alternative names are ignored: Pivotal always issues the
+certificate with `CN = <FSP ID>`.
 
-- **Expected Result:** `true`. Otherwise, the Hub operator must create the DFSP in MCM before you
-  continue.
-- **If It Fails:** If MCM creates a Keycloak account for each DFSP, trust-manager also needs
-  `MCM_DFSP_CONTACT_EMAIL`. See [Environment variables](../../reference/environment-variables.md).
-
-### Step 2. Check the DFSP's access key and CSR
-
-- **Purpose:** catch a wrong file before it reaches the portal.
-- **Command or Configuration:**
-
-  ```bash
-  openssl pkey -pubin -in <ACCESS_PUBLIC_KEY_FILE> -noout -text | head -1
-  openssl req -in <CSR_FILE> -noout -verify -text | grep "Public-Key"
-  ```
-
-- **Expected Result:** the key is an RSA public key. The CSR verifies and shows
-  `Public-Key: (2048 bit)` or more.
-- **If It Fails:** ask the DFSP for new files. The subject of the CSR does not matter: Pivotal sets the
-  certificate's subject to the FSP ID.
-
-For a test DFSP only, you can create both yourself:
+Send these commands to the DFSP if it needs them. They create both files, using MyGreenBank as the
+example:
 
 ```bash
-openssl genrsa -out <DFSP_ID>-access.key 2048
-openssl rsa -in <DFSP_ID>-access.key -pubout -out <DFSP_ID>-access.pub
-openssl req -new -newkey rsa:2048 -nodes -keyout <DFSP_ID>-client.key \
-  -out <DFSP_ID>-client.csr -subj "/CN=<DFSP_ID>"
+# Access key pair: the DFSP keeps mygreenbank-access.key and sends mygreenbank-access.pub
+openssl genrsa -out mygreenbank-access.key 2048
+openssl rsa -in mygreenbank-access.key -pubout -out mygreenbank-access.pub
+
+# Client certificate key and CSR: the DFSP keeps mygreenbank-client.key and sends mygreenbank-client.csr
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout mygreenbank-client.key -out mygreenbank-client.csr \
+  -subj "/CN=MyGreenBank"
 ```
 
-### Step 3. Provision the DFSP's key in the HSM (custodian)
+> **Tip:** Check the DFSP's two files before you start. MyGreenBank sent `mygreenbank-access.pub` and
+> `mygreenbank-client.csr`, saved in the current folder:
+>
+> ```bash
+> openssl pkey -pubin -in ./mygreenbank-access.pub -noout -text | head -1
+> openssl req -in ./mygreenbank-client.csr -noout -verify -text | grep "Public-Key"
+> ```
+>
+> You should see:
+>
+> ```text
+> Public-Key: (2048 bit)
+> Certificate request self-signature verify OK
+>                 Public-Key: (2048 bit)
+> ```
+>
+> If either command fails, ask the DFSP for new files.
 
-- **Purpose:** create the key where only the DFSP's own crypto user owns it, and record what
-  onboarding needs.
-- **Action:** start an [HSM admin pod session](../../setup/pkcs11/hsm-admin-pod.md#step-4-start-a-session),
-  then run the script. It prompts for the Vault token (unless `VAULT_TOKEN` is already set) and for
-  the Crypto Officer login.
-- **Command or Configuration (in the pod):**
+### Step 1: Create the DFSP's signing key
 
-  ```bash
-  provision-hsm-tenant.sh <DFSP_ID>
+A custodian does this step in the HSM admin pod. The script creates the DFSP's own crypto user,
+generates its signing key inside the HSM, shares the key with web-outbound, and records the key
+reference and public key in Vault.
+
+Connect to the cluster:
+
+```bash
+export KUBECONFIG=~/.kube/pivotal.yaml
+```
+
+Open a shell in the HSM admin pod. How you do it depends on how the pod was deployed:
+
+**If the pod was deployed with Helm** (`deploy/hsm-tools`), start a session as described in
+[Start a session](../../setup/pkcs11/hsm-admin-pod.md#step-4-start-a-session). The script is already
+in the pod, and `PATH` and `VAULT_ADDR` are already set:
+
+```bash
+kubectl -n pivotal scale deploy/hsm-tools --replicas=1
+kubectl -n pivotal rollout status deploy/hsm-tools --timeout=180s
+kubectl -n pivotal exec -it deploy/hsm-tools -- bash
+```
+
+**If the pod was built by hand** (a pod named `hsm-tools`), copy the script in from the Pivotal
+repository, then open a shell and set up `PATH` and `VAULT_ADDR`:
+
+```bash
+cd ~/projects/pivotal
+kubectl -n pivotal cp docs/operations/hsm/runbooks/scripts/provision-hsm-tenant.sh \
+  hsm-tools:/usr/local/bin/provision-hsm-tenant.sh
+kubectl -n pivotal exec hsm-tools -- chmod +x /usr/local/bin/provision-hsm-tenant.sh
+kubectl -n pivotal exec -it hsm-tools -- bash
+```
+
+Then, in the pod:
+
+```bash
+export PATH=$PATH:/opt/cloudhsm/bin VAULT_ADDR=http://vault.vault.svc.cluster.local:8200
+```
+
+In the pod, check that the tools work:
+
+```bash
+cloudhsm-cli --version; vault version; which provision-hsm-tenant.sh openssl
+cloudhsm-cli cluster hsm-info | grep -c '"serial-number"'
+```
+
+You should see the tool versions, the paths of the script and `openssl`, and the number of HSMs
+(1 or more; 2 or more in a multi-device cluster).
+
+Run the script with the FSP ID:
+
+```bash
+provision-hsm-tenant.sh MyGreenBank
+```
+
+When prompted, enter the Vault token, then the Crypto Officer username (press Enter for `admin`)
+and password.
+
+**Result:** the output looks like this:
+
+```text
+Provisioning 'MyGreenBank' (crypto user 'cu_MyGreenBank')
+  credential written: pivotal-kv/pivotal/hsmcred/MyGreenBank
+  crypto user created: cu_MyGreenBank
+  key generated in the HSM: MyGreenBank-jws-20261029093000
+  shared with cu_web_outbound
+  key reference and public key recorded: pivotal-kv/pivotal/keyref/MyGreenBank
+── verification ─────────────────────────────────
+…
+keyRef in Vault:     MyGreenBank-jws-20261029093000
+publicKey in Vault:  matches the HSM
+```
+
+In the key details printed under `verification`, check that:
+
+- the owner is `cu_mygreenbank` (the HSM shows names in lower case);
+- the key is shared with `cu_web_outbound`;
+- `extractable` is `false`.
+
+Type `exit` to leave the pod, then
+[end the session](../../setup/pkcs11/hsm-admin-pod.md#step-6-end-the-session).
+
+The script is safe to run again. A DFSP that is already provisioned is reported and left alone.
+
+> **Note:** The crypto user's name is `cu_` plus the FSP ID, with any character other than a letter
+> or digit turned into `_`. For example, `My-GreenBank` would become `cu_My_GreenBank`. Avoid FSP
+> IDs that differ only in case, or only in `-` versus `_`: they would share one crypto user.
+
+**If something goes wrong**
+
+| Message | What to do |
+|---|---|
+| `REFUSING: VAULT_ADDR is not set.` | Export `VAULT_ADDR` in the pod, as shown above. |
+| `REFUSING: 'MyGreenBank' is not a safe fspId …` | Use only letters, digits, `-` and `_`, starting with a letter or digit. |
+| `REFUSING: this Vault token is not valid, or Vault is not reachable …` | Get a new custodian token and run again. Nothing was changed. |
+| `REFUSING: 'MyGreenBank' already has key '…' but no public key …` | The DFSP was keyed before this script recorded public keys. Do not provision it again. Nothing was changed. |
+| `REFUSING: … already holds a credential, but no crypto user 'cu_MyGreenBank' exists.` | The DFSP's crypto user has another name, for example `cu_mygreenbank_old`. Run again with `CRYPTO_USER=cu_mygreenbank_old provision-hsm-tenant.sh MyGreenBank`. |
+| `'MyGreenBank' is already provisioned with key '…'. Nothing to do.` | Not an error. Go to Step 2. |
+| `crypto user 'cu_MyGreenBank' already exists; using its credential from Vault` | Not an error. An earlier run stopped part-way, and the script carries on. |
+| `FAILED: no password readable at …` | The token cannot read the credential path. Check it has `pivotal-hsm-provisioning`. |
+| A JSON error from `cloudhsm-cli` | Wrong Crypto Officer login, or an HSM problem. See [HSM troubleshooting](../../troubleshooting.md#hsm). |
+
+### Step 2: Onboard the DFSP in the portal
+
+1. Go to **Participant → Onboard FSP**.
+2. Fill in the form:
+
+   | Field | Example |
+   |---|---|
+   | FSP ID | `MyGreenBank` |
+   | Currencies | `USD` |
+   | Endpoint | `http://web-inbound.example.com` |
+   | Access public key | The contents of `mygreenbank-access.pub`, from `-----BEGIN PUBLIC KEY-----` to `-----END PUBLIC KEY-----` |
+
+   > **Important:** The endpoint is where the Hub sends this DFSP's callbacks. It must be Pivotal's
+   > callback host, never the DFSP's own system.
+   >
+   > **Where to find it:** the callback host is web-inbound's public address on the Hub-facing
+   > gateway. It is the same for every DFSP. It was chosen during setup
+   > ([Enable the Hub-facing side: inbound](../../setup/common/enable-hub-facing-inbound.md)) and
+   > recorded in the [shared worksheet](../../setup/common/hub-operator-and-worksheet.md). To read
+   > it from the cluster:
+   >
+   > ```bash
+   > kubectl -n pivotal get gateway pivotal-hub-callback-gateway \
+   >   -o jsonpath='{.spec.servers[0].hosts[0]}{"\n"}'
+   > ```
+   >
+   > It prints the host, for example `web-inbound.example.com`. Put `http://` in front of it.
+   >
+   > **Use `http://`, not `https://`.** The connection is still encrypted and uses mTLS. The Hub's
+   > egress gateway turns a callback addressed to this host over `http` into an mTLS connection on
+   > port 443, presenting the Hub's client certificate. With `https://`, the callback skips the
+   > egress gateway, presents no certificate, and Pivotal's gateway refuses it.
+   >
+   > If it prints `NotFound`, the Hub-facing inbound side isn't set up yet. Use the address in the
+   > **During setup** note below.
+   >
+   > **During setup:** before [Enable the Hub-facing side: inbound](../../setup/common/enable-hub-facing-inbound.md),
+   > use the address the Hub uses today to reach web-inbound. That page moves it later.
+3. Select **Submit**.
+
+You don't enter a signing key. Pivotal reads the public key that Step 1 recorded in Vault.
+
+**Result:** within a few seconds, **Participant → JWS Policy** shows signing as enabled for
+MyGreenBank. Without NATS this can take up to an hour.
+
+To see it in the logs:
+
+```bash
+kubectl -n pivotal logs deploy/trust-manager --since=10m | grep "MyGreenBank"
+```
+
+Look for:
+
+```text
+'MyGreenBank' is published to MCM and signing is now enabled.
+```
+
+> **Important:** Don't turn signing on by hand before this message appears. The Hub would reject
+> every signed message.
+
+**If something goes wrong**
+
+| Message | What to do |
+|---|---|
+| `This DFSP has no signing key in the HSM yet …` | Step 1 was not done for this FSP ID. Nothing was created at the Hub. Do Step 1, then submit again. |
+| `This DFSP's signing key record in Vault does not hold a valid public key …` | The Vault record was changed by hand. Contact Pivotal support. Do not overwrite it. |
+| `… was refused by Vault …` | web-pivotal's Vault policy can't read `pivotal-kv/data/pivotal/keyref/*`. See [Configure Vault](../../setup/pkcs11/4-vault.md). |
+| Signing is not enabled after an hour | See [trust-manager and MCM](../../troubleshooting.md#trust-manager-and-mcm). |
+
+### Step 3: Issue the client certificate
+
+> **During setup:** skip this step. [Enable the DFSP-facing side](../../setup/common/enable-dfsp-facing.md)
+> issues the test DFSPs' certificates. Issuing one here too would move this one to `retiring`.
+
+1. Go to **Participant → Certificates** and select **MyGreenBank**.
+2. Paste the contents of `mygreenbank-client.csr`, from `-----BEGIN CERTIFICATE REQUEST-----` to
+   `-----END CERTIFICATE REQUEST-----`, and select **Sign request**.
+3. Select **Download** and send the file to MyGreenBank.
+
+**Result:** the certificate shows as `active`. To check the downloaded file, for example
+`MyGreenBank.pem` in your Downloads folder:
+
+```bash
+openssl x509 -in ~/Downloads/MyGreenBank.pem -noout -subject -issuer
+```
+
+The subject is `CN = MyGreenBank`. Pivotal sets the subject itself, whatever the CSR says.
+
+### Step 4: Add the DFSP's connector
+
+Each DFSP has one connector. It sends the DFSP's callbacks to the Hub and signs them in the HSM.
+
+1. Give the connector access to MyGreenBank's records in Vault, and nothing else. You add two
+   things: a **policy** (what it may read) and a **role** (who may log in with that policy).
+
+   The connector can read only MyGreenBank's own records:
+
+   | Vault path | Why the connector needs it |
+   |---|---|
+   | `pivotal-kv/data/pivotal/hsmcred/MyGreenBank` | The password it uses to log in to the HSM as `cu_MyGreenBank` |
+   | `pivotal-kv/data/pivotal/keyref/MyGreenBank` | The label of the signing key it uses |
+   | `sys/internal/ui/mounts/pivotal-kv` | Lets the Vault client confirm the store is KV v2 before reading |
+
+   Read-only and exact paths, with no wildcard: if one connector is compromised, no other DFSP's
+   key is exposed.
+
+   **With GitOps (recommended).** In your gitops repository, open
+   `apps/vault-pki-setup/pivotal-trust-pki.yaml`. Copy an existing connector's `Policy` and
+   `KubernetesAuthEngineRole` (for example DemoDFSP1's), and rename them for MyGreenBank:
+
+   ```yaml
+   apiVersion: redhatcop.redhat.io/v1alpha1
+   kind: Policy
+   metadata:
+     name: pivotal-hsm-mygreenbank
+   spec:
+     authentication:
+       path: kubernetes
+       role: policy-admin
+       serviceAccount:
+         name: default
+     policy: |
+       path "pivotal-kv/data/pivotal/hsmcred/MyGreenBank" {
+         capabilities = ["read"]
+       }
+       path "pivotal-kv/data/pivotal/keyref/MyGreenBank" {
+         capabilities = ["read"]
+       }
+       path "sys/internal/ui/mounts/pivotal-kv" {
+         capabilities = ["read"]
+       }
+     type: acl
+   ---
+   apiVersion: redhatcop.redhat.io/v1alpha1
+   kind: KubernetesAuthEngineRole
+   metadata:
+     name: pivotal-mygreenbank-connector-role
+   spec:
+     authentication:
+       path: kubernetes
+       role: policy-admin
+       serviceAccount:
+         name: default
+     path: kubernetes
+     tokenTTL: 3600
+     policies:
+       - pivotal-hsm-mygreenbank
+     targetServiceAccounts:
+       - mygreenbank-java-connector
+     targetNamespaces:
+       targetNamespaces:
+         - pivotal
+   ```
+
+   Commit, and let ArgoCD sync `vault-pki-setup` **before** `pivotal`.
+
+   **Without GitOps.** A Vault administrator runs the same thing with the `vault` CLI:
+
+   ```bash
+   vault policy write pivotal-hsm-mygreenbank - <<'EOF'
+   path "pivotal-kv/data/pivotal/hsmcred/MyGreenBank" { capabilities = ["read"] }
+   path "pivotal-kv/data/pivotal/keyref/MyGreenBank"  { capabilities = ["read"] }
+   path "sys/internal/ui/mounts/pivotal-kv"           { capabilities = ["read"] }
+   EOF
+
+   vault write auth/kubernetes/role/pivotal-mygreenbank-connector-role \
+     bound_service_account_names=mygreenbank-java-connector \
+     bound_service_account_namespaces=pivotal \
+     policies=pivotal-hsm-mygreenbank ttl=1h
+   ```
+
+   > **Note:** The Vault paths use the FSP ID exactly (`MyGreenBank`). Kubernetes and Vault names
+   > are lower case. The service account must be the connector's own name,
+   > `mygreenbank-java-connector`, or the connector can't log in to Vault.
+
+2. Add the connector to the `connectors` list in your values file. Use the settings in
+   [Deploy Pivotal](../../setup/pkcs11/5-deploy-pivotal.md#step-4-know-the-connector-settings),
+   with:
+
+   | Setting | Example value |
+   |---|---|
+   | `name` | `mygreenbank-java-connector` |
+   | `serviceAccount.name` | `mygreenbank-java-connector` |
+   | `CONNECTOR_ID` | `MyGreenBank` |
+   | `VAULT_ROLE` | `pivotal-mygreenbank-connector-role` |
+   | `FSPIOP_USE_JWS` | `"true"` |
+
+   Add the Hub mTLS mounts and settings in
+   [Enable the Hub-facing side: outbound](../../setup/common/enable-hub-facing-outbound.md#step-3-configure-each-connector-for-mtls).
+
+   > **During setup:** set `FSPIOP_USE_JWS: "false"`, and leave out the Hub mTLS settings, until
+   > [Enable the Hub-facing side: outbound](../../setup/common/enable-hub-facing-outbound.md) turns them on.
+
+3. Deploy. Create the Vault role before the connector starts, or it fails to log in to Vault.
+
+**Result:** the connector pod is running, and its log shows:
+
+```text
+Signing for 'MyGreenBank' through CloudHSM, key reference 'MyGreenBank-jws-20261029093000'
+```
+
+**If something goes wrong**
+
+| Message | What to do |
+|---|---|
+| `No key reference at Vault path '…' …` | Step 1 didn't finish, or `CONNECTOR_ID` isn't exactly `MyGreenBank`. Fix it, then restart the connector: it reads its key only at startup. |
+| `Failed to open the CloudHSM key for 'MyGreenBank'.` | See [HSM troubleshooting](../../troubleshooting.md#hsm). |
+
+### Step 5: Check that payments work
+
+> **During setup:** the setup pages and the [end-to-end check](../../setup/common/end-to-end-check.md)
+> cover this.
+
+Check that:
+
+- **A request from MyGreenBank is accepted.** Send it with the new certificate and a signed
+  `authorization` header.
+- **A transfer from MyGreenBank completes.** The Hub accepts Pivotal's signed requests for it.
+- **No private key is stored in the database.** In the Pivotal database:
+
+  ```sql
+  SELECT fsp_id, role, jws_private_key IS NULL AS no_private_key_in_db
+  FROM participant_key WHERE fsp_id = 'MyGreenBank';
   ```
 
-  Use `CRYPTO_USER=<NAME> provision-hsm-tenant.sh <DFSP_ID>` only for a DFSP whose crypto user was
-  created before this script existed under a different name.
-- **Expected Result:**
+  `role` is `self`, and `no_private_key_in_db` is `1`.
+- **A mismatched request is refused.** A request with MyGreenBank's certificate but another DFSP's
+  `FSPIOP-Source` is refused with `3105`.
 
-  ```text
-  Provisioning '<DFSP_ID>' (crypto user '<CRYPTO_USER>')
-    credential written: pivotal-kv/pivotal/hsmcred/<DFSP_ID>
-    crypto user created: <CRYPTO_USER>
-    key generated in the HSM: <DFSP_ID>-jws-<TIMESTAMP>
-    shared with cu_web_outbound
-    key reference and public key recorded: pivotal-kv/pivotal/keyref/<DFSP_ID>
-  ── verification ─────────────────────────────────
-  …
-  keyRef in Vault:     <DFSP_ID>-jws-<TIMESTAMP>
-  publicKey in Vault:  matches the HSM
+If web-outbound's requests for MyGreenBank fail with `No private key labelled '…' on this token`
+while its connector signs correctly, the key isn't shared with `cu_web_outbound`. Contact Pivotal
+support.
+
+## Upgrading an existing DFSP
+
+Use this section for a DFSP that already sends payments through Pivotal, onboarded on an earlier
+Pivotal version. The example here is an existing DFSP called **MyBlueBank**.
+
+> **Important:** Don't use **Onboard FSP** for an existing DFSP. It asks the Hub to create the
+> DFSP, its currency accounts and its limits again, and the DFSP already has them.
+
+**Before you begin**
+
+- You need the same access and tools as for a new DFSP.
+- Agree a cutover window with the DFSP.
+- Check whether the DFSP already has a Hub-facing signing key. In the Pivotal database:
+
+  ```sql
+  SELECT fsp_id, role, jws_public_key IS NOT NULL AS has_key
+  FROM participant_key WHERE fsp_id = 'MyBlueBank';
   ```
 
-  In the `key list` output above the last lines, confirm the key's owner is `<CRYPTO_USER>` (the HSM shows it in lower case), it is
-  shared with `cu_web_outbound`, and `extractable` is `false`. Then end the session
-  ([Step 6 of the HSM admin pod page](../../setup/pkcs11/hsm-admin-pod.md#step-6-end-the-session)).
-- **If It Fails:**
-  - `REFUSING: VAULT_ADDR is not set.`: the script was run outside the admin pod, or the pod has no
-    `hsmTools.vaultAddress`.
-  - `REFUSING: '<DFSP_ID>' is not a safe fspId …`: the FSP ID has a character other than letters,
-    digits, `-` and `_`, or does not start with a letter or digit.
-  - `REFUSING: this Vault token is not valid, or Vault is not reachable at <VAULT_ADDRESS>.`: the token
-    has expired or was mistyped, or the pod cannot reach Vault. Get a new custodian token and run
-    again. Nothing was changed.
-  - `REFUSING: '<DFSP_ID>' already has key '<KEY_REF>' but no public key in pivotal-kv/pivotal/keyref/<DFSP_ID>.`:
-    the DFSP was provisioned before the script recorded public keys. It already has a key, which its
-    connector and web-outbound sign with. Nothing was changed; do not provision it again.
-  - `REFUSING: pivotal-kv/pivotal/hsmcred/<DFSP_ID> already holds a credential, but no crypto user '<CRYPTO_USER>' exists.`:
-    the DFSP's crypto user has another name, for example one created before this script. Run again
-    with `CRYPTO_USER=<EXISTING_NAME>`. Nothing was changed.
-  - `'<DFSP_ID>' is already provisioned with key '<KEY_REF>'. Nothing to do.`: not an error. Go on to
-    Step 4.
-  - `crypto user '<CRYPTO_USER>' already exists; using its credential from Vault`: an earlier run
-    stopped part-way. The script carries on with the existing user.
-  - `FAILED: no password readable at …`: the Vault token cannot read the credential path (check it
-    carries `pivotal-hsm-provisioning`), or the crypto user was created by hand with no credential in
-    Vault. In the second case, use `CRYPTO_USER=` for the right user, or have a Crypto Officer reset its
-    password and write it to that path.
-  - A JSON error from `cloudhsm-cli`: a wrong Crypto Officer login, or an HSM problem. The script
-    prints the device's own message. See [HSM](../../troubleshooting.md#hsm).
+  | Result | What it means |
+  |---|---|
+  | `has_key` is `1` | Moving the DFSP to the HSM is a key rotation. Follow [Rotate a tenant's signing key](../../../../operations/hsm/runbooks/rotate-signing-key.md) instead of Step 1. |
+  | No row, or `has_key` is `0` | Follow Step 1. Then see the note under Step 1 below. |
 
-The script is safe to re-run. It never creates a second crypto user for a DFSP, and a DFSP that is
-already provisioned is left alone.
+### Step 1: Create the DFSP's signing key
 
-### Step 4. Onboard the DFSP
+Follow [Step 1 for a new DFSP](#step-1-create-the-dfsps-signing-key), with
+`provision-hsm-tenant.sh MyBlueBank`.
 
-- **Purpose:** create the DFSP in the Hub, record its access public key, and record the public half of
-  the key the custodian provisioned.
-- **Action:** in the portal, open **Participant → Onboard FSP**. Enter the FSP ID, currencies,
-  endpoint and access public key. Submit.
+> **Note:** This version has no supported way to record the new public key for an existing DFSP
+> without **Onboard FSP**. Contact Pivotal support before you continue.
 
-  The **endpoint** is where the Hub sends this DFSP's callbacks, and it must reach web-inbound, never
-  the DFSP's own system:
+### Step 2: Point the Hub's callbacks to Pivotal
 
-  - after setup: `https://<PIVOTAL_CALLBACK_HOST>`;
-  - *during setup*, before [Enable the Hub-facing side: inbound](../../setup/common/enable-hub-facing-inbound.md):
-    the address the Hub uses today to reach web-inbound. That page moves it to
-    `https://<PIVOTAL_CALLBACK_HOST>`.
-- **Command or Configuration (API alternative):** `POST /participant/onboard` on web-pivotal:
+Change MyBlueBank's callback endpoint to Pivotal's callback host. Call `PUT /participant/endpoint`
+on web-pivotal:
 
-  ```json
-  {
-    "name": "<DFSP_ID>",
-    "currencies": ["<CURRENCY>"],
-    "endpoint": "https://<PIVOTAL_CALLBACK_HOST>",
-    "accessPublicKey": "<ACCESS_PUBLIC_KEY_PEM>"
-  }
-  ```
+```json
+{"name": "MyBlueBank", "endpoint": "http://web-inbound.example.com"}
+```
 
-  You do not supply a signing key. web-pivotal reads the public key from
-  `pivotal-kv/pivotal/keyref/<DFSP_ID>`.
-- **Expected Result:** the portal reports success. web-pivotal logs:
+The Hub caches endpoints, so the change can take a few minutes to be used.
 
-  ```bash
-  kubectl -n pivotal logs deploy/web-pivotal --since=10m | grep "<DFSP_ID>"
-  ```
+### Step 3: Issue the client certificate
 
-  ```text
-  Recorded the HSM key '<DFSP_ID>-jws-<TIMESTAMP>' that a custodian provisioned for '<DFSP_ID>'.
-  Provisioned '<DFSP_ID>' as a signing tenant. Signing stays off until its public key is published to MCM.
-  Announced '<DFSP_ID>' as a signing tenant awaiting publication.
-  ```
+Follow [Step 3 for a new DFSP](#step-3-issue-the-client-certificate), with MyBlueBank's CSR. The DFSP
+keeps working without the certificate until mTLS becomes mandatory.
 
-  Without NATS on web-pivotal, the last line reads instead:
-  `No NATS connection; '<DFSP_ID>' will be published by the periodic reconcile.`
+### Step 4: Upgrade the DFSP's connector
 
-- **If It Fails:**
-  - `This DFSP has no signing key in the HSM yet. A custodian must provision it before the DFSP can be onboarded.`
-    (code `PARTICIPANT_HSM_KEY_NOT_FOUND`, HTTP 404). web-pivotal logs
-    `No key reference and public key at Vault path '<PATH>'. Provision '<DFSP_ID>' with the custodian script before onboarding it.`
-    Step 3 has not been done for this FSP ID, or it stopped before writing the key record. Nothing was
-    created at the Hub. Do Step 3, then submit again.
-  - `This DFSP's signing key record in Vault does not hold a valid public key. A custodian must check the provisioning run.`
-    (code `PARTICIPANT_HSM_KEY_RECORD_INVALID`, HTTP 400). web-pivotal logs
-    `The public key at Vault path '<PATH>' could not be read as a public key.` The record was not
-    written by the script, or was changed by hand. Nothing was created at the Hub. Contact Pivotal
-    support; do not overwrite the record.
-  - `… was refused by Vault …`: web-pivotal's Vault policy does not allow reading
-    `pivotal-kv/data/pivotal/keyref/*`. See [Configure Vault](../../setup/pkcs11/4-vault.md).
-  - `Could not announce signing tenant '<DFSP_ID>' …`: not an error. trust-manager publishes the key on
-    its next hourly run instead.
-  - If the DFSP already has a public key on record, onboarding keeps it and logs
-    `'<DFSP_ID>' already holds a signing key; leaving it in place. Rotate deliberately rather than by re-onboarding.`
+Follow [Step 4 for a new DFSP](#step-4-add-the-dfsps-connector), but update MyBlueBank's existing
+connector entry instead of adding a new one: the new image, the Vault policy and role, the Hub mTLS
+settings and `FSPIOP_USE_JWS: "true"`.
 
-### Step 5. Confirm that the key is published and signing is on
+### Step 5: Check that payments work
 
-- **Purpose:** signing starts only after MCM confirms it holds the DFSP's public key.
-- **Command or Configuration:**
+Run the [same checks as for a new DFSP](#step-5-check-that-payments-work), during the cutover window.
 
-  ```bash
-  kubectl -n pivotal logs deploy/trust-manager --since=10m | grep "<DFSP_ID>"
-  ```
-
-- **Expected Result:** within seconds (or within an hour without NATS):
-
-  ```text
-  Registered '<DFSP_ID>' as a DFSP in MCM.            (only when MCM_AUTO_REGISTER_DFSPS=true)
-  '<DFSP_ID>' is published to MCM and signing is now enabled.
-  ```
-
-  On the hourly run, the second line reads instead:
-  `'<DFSP_ID>' was published to MCM but never switched on; signing is now enabled. Its provisioning announcement was missed.`
-
-  In the portal, **Participant → JWS Policy** for the DFSP shows signing enabled.
-- **If It Fails:** see [trust-manager and MCM](../../troubleshooting.md#trust-manager-and-mcm). Do not
-  turn signing on by hand before the key is in MCM: the Hub would reject every signed message.
-
-### Step 6. Issue the DFSP client certificate
-
-*During setup*: skip this step. [Enable the DFSP-facing side](../../setup/common/enable-dfsp-facing.md),
-Step 5, issues each test DFSP's certificate. Issuing one here as well would move this one to
-`retiring`.
-
-- **Purpose:** the DFSP needs a certificate from the DFSP CA to connect to the DFSP-facing gateway.
-- **Action:** follow
-  [Enable the DFSP-facing side, Step 5](../../setup/common/enable-dfsp-facing.md#step-5-issue-a-client-certificate-to-each-test-dfsp)
-  for this one DFSP: **Participant → Certificates**, paste the CSR, **Sign request**, then
-  **Download**.
-- **Expected Result:** the new certificate is `active` and its subject contains `CN = <DFSP_ID>`.
-- **If It Fails:** see that page's If It Fails.
-
-Send the downloaded file to the DFSP.
-
-### Step 7. Add the DFSP's connector
-
-- **Purpose:** each DFSP has one connector. It sends the DFSP's callbacks to the Hub (leg 3) and signs
-  them inside the HSM, as the DFSP's own crypto user.
-- **Action:**
-  1. **Vault administrator:** create the connector's Vault policy and role. They read **only its
-     own** credential and key reference ([Configure Vault](../../setup/pkcs11/4-vault.md#step-5-know-the-per-dfsp-connector-policy)):
-
-     ```bash
-     vault policy write pivotal-<DFSP_ID>-connector - <<'EOF'
-     path "pivotal-kv/data/pivotal/hsmcred/<DFSP_ID>" { capabilities = ["read"] }
-     path "pivotal-kv/data/pivotal/keyref/<DFSP_ID>"  { capabilities = ["read"] }
-     path "sys/internal/ui/mounts/pivotal-kv"         { capabilities = ["read"] }
-     EOF
-
-     vault write auth/kubernetes/role/pivotal-<DFSP_ID>-connector \
-       bound_service_account_names=<DFSP_ID>-connector bound_service_account_namespaces=pivotal \
-       policies=pivotal-<DFSP_ID>-connector ttl=1h
-     ```
-
-  2. Add the connector entry from
-     [Deploy Pivotal, Step 4](../../setup/pkcs11/5-deploy-pivotal.md#step-4-know-the-connector-settings)
-     to the `connectors` list, with `FSPIOP_USE_JWS: "true"` (*during setup*: `"false"` until
-     [Enable the Hub-facing side: outbound](../../setup/common/enable-hub-facing-outbound.md) turns
-     it on). Add the Hub mTLS mounts and settings from that page once it has been completed.
-  3. Deploy with Helm. Create the Vault role **before** the connector starts.
-- **Expected Result:** the connector pod is `Running`. With `FSPIOP_USE_JWS: "true"`, it logs
-  `Signing for '<DFSP_ID>' through CloudHSM, key reference '<DFSP_ID>-jws-<TIMESTAMP>'`.
-- **If It Fails:**
-  - `No key reference at Vault path '<PATH>'. The crypto user exists but no key has been provisioned. Outbound FSPIOP callbacks will be sent unsigned.`:
-    Step 3 did not finish, or `CONNECTOR_ID` does not match the FSP ID. Fix, then restart the
-    connector: it reads its key only at startup.
-  - `Failed to open the CloudHSM key for '<DFSP_ID>'.`: see [HSM](../../troubleshooting.md#hsm).
-
-## Verification
-
-*During setup*, Steps 3 to 7 are the checks; the shared setup pages and the
-[end-to-end check](../../setup/common/end-to-end-check.md) then prove the rest. After setup:
-
-- **Positive:**
-  - The DFSP sends a request to the DFSP-facing gateway with its new certificate and a signed
-    `authorization` header. It is accepted.
-  - A transfer from the DFSP completes. The Hub accepts Pivotal's signed requests for it.
-  - The database holds no private key for the DFSP. In the Pivotal database:
-
-    ```sql
-    SELECT fsp_id, role, jws_private_key IS NULL AS no_private_key_in_db
-    FROM participant_key WHERE fsp_id = '<DFSP_ID>';
-    ```
-
-    Pass: `role` is `self` and `no_private_key_in_db` is `1`.
-- **Negative:**
-  - **An unprovisioned DFSP is refused, and nothing is created at the Hub.** Submit
-    **Participant → Onboard FSP** with an FSP ID that has not been through Step 3. The portal shows
-    `This DFSP has no signing key in the HSM yet. …`. Ask the Hub operator to confirm the ID does not
-    exist in the Hub's ledger.
-  - A request with this DFSP's certificate but another DFSP's `FSPIOP-Source` is refused with `3105`
-    `The client certificate does not belong to the participant named in fspiop-source.`
-
-## Troubleshooting
-
-- [HSM](../../troubleshooting.md#hsm)
-- [Vault](../../troubleshooting.md#vault)
-- [Leg 1: DFSP-facing](../../troubleshooting.md#leg-1-dfsp-facing)
-- [Legs 2 and 3: Hub-facing outbound](../../troubleshooting.md#legs-2-and-3-hub-facing-outbound)
-- [trust-manager and MCM](../../troubleshooting.md#trust-manager-and-mcm)
-- **web-outbound's requests for this DFSP fail with `No private key labelled '<KEY_REF>' on this token. …`,
-  while its connector signs correctly:** the key is not shared with `cu_web_outbound`. Step 3 shares it
-  and shows the sharing; if Step 3 reported success, contact Pivotal support.
-
-## Rollback or Recovery
+## Undo an onboarding
 
 There is no offboarding command in this version. See
 [Known limitations](../../known-limitations.md#no-dfsp-offboarding).
 
-- **Step 3 done, Step 4 not yet:** nothing exists outside the HSM and Vault. To discard it, in an
-  [HSM admin pod session](../../setup/pkcs11/hsm-admin-pod.md):
-  1. The custodian deletes the key pair **as its owner**. The owner's password is at
-     `pivotal-kv/pivotal/hsmcred/<DFSP_ID>`:
+**After Step 1, before Step 2.** Nothing exists outside the HSM and Vault yet. To remove it, in an
+[HSM admin pod session](../../setup/pkcs11/hsm-admin-pod.md):
 
-     ```bash
-     CU_PASS=$(vault kv get -field=password pivotal-kv/pivotal/hsmcred/<DFSP_ID>)
-     export CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN="<CRYPTO_USER>:$CU_PASS"; unset CU_PASS
-     cloudhsm-cli key delete --filter attr.label=<KEY_REF>
-     cloudhsm-cli key delete --filter attr.label=<KEY_REF>-pub
-     unset CLOUDHSM_ROLE CLOUDHSM_PIN
-     ```
+1. Delete the key pair as its owner. The owner's password is in Vault:
 
-  2. A Crypto Officer deletes the crypto user:
-     `cloudhsm-cli user delete --username <CRYPTO_USER> --role crypto-user` (with `CLOUDHSM_ROLE=admin`).
-  3. A **Vault administrator** removes the two records. The custodian's policy cannot delete:
+   ```bash
+   CU_PASS=$(vault kv get -field=password pivotal-kv/pivotal/hsmcred/MyGreenBank)
+   export CLOUDHSM_ROLE=crypto-user CLOUDHSM_PIN="cu_MyGreenBank:$CU_PASS"; unset CU_PASS
+   cloudhsm-cli key delete --filter attr.label=MyGreenBank-jws-20261029093000
+   cloudhsm-cli key delete --filter attr.label=MyGreenBank-jws-20261029093000-pub
+   unset CLOUDHSM_ROLE CLOUDHSM_PIN
+   ```
 
-     ```bash
-     vault kv metadata delete pivotal-kv/pivotal/hsmcred/<DFSP_ID>
-     vault kv metadata delete pivotal-kv/pivotal/keyref/<DFSP_ID>
-     ```
+2. A Crypto Officer deletes the crypto user, with `CLOUDHSM_ROLE=admin`:
 
-- **After Step 4, do not delete the key or its Vault records.** MCM holds its public key, and the HSM
-  key cannot be recreated: a new key needs a rotation, which this version does not support.
-- **Certificate issued to the wrong DFSP or from the wrong CSR:** revoke it. See
+   ```bash
+   cloudhsm-cli user delete --username cu_MyGreenBank --role crypto-user
+   ```
+
+3. A Vault administrator removes the two records:
+
+   ```bash
+   vault kv metadata delete pivotal-kv/pivotal/hsmcred/MyGreenBank
+   vault kv metadata delete pivotal-kv/pivotal/keyref/MyGreenBank
+   ```
+
+**After Step 2.** Don't delete the key or its Vault records. MCM holds the public key, and a new key
+needs a rotation.
+
+**Other fixes**
+
+- **Certificate issued to the wrong DFSP, or from the wrong CSR:** revoke it. See
   [Revoke a DFSP certificate](../common/revoke-dfsp-certificate.md).
 - **Wrong access public key:** replace it with `PUT /participant/access-key`.
-- **Signing must stop for this DFSP:** turn signing off in **Participant → JWS Policy**. trust-manager
-  does not turn it back on.
+- **Signing must stop for this DFSP:** turn it off in **Participant → JWS Policy**. trust-manager
+  doesn't turn it back on.
 
-## References
-
-*During setup*, next: [Enable the DFSP-facing side](../../setup/common/enable-dfsp-facing.md), once both
-test DFSPs are onboarded.
+## Related pages
 
 - [Prepare the HSM admin pod](../../setup/pkcs11/hsm-admin-pod.md)
 - [Configure Vault (pkcs11)](../../setup/pkcs11/4-vault.md)
 - [Certificates and keys](../../concepts/certificates-and-keys.md)
 - [Vault reference](../../reference/vault.md)
 - [Scheduled jobs](../../reference/scheduled-jobs.md)
+- [Troubleshooting](../../troubleshooting.md)
