@@ -29,3 +29,14 @@ regexTarget = "secret"
 regexes = [
     '''^Pkcs11KeySigner$''',
 ]
+
+[[allowlists]]
+description = """
+An HSM key label of the form <DFSP_ID>-jws-<timestamp>, shown in runbook sample output. A label \
+only names a key that never leaves the HSM, so it is not a secret. Allowlisted by value rather \
+than by path, so a real secret in the same file is still reported."""
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+    '''^[A-Za-z0-9]+-jws-\d{14}$''',
+]
