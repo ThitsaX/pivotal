@@ -6,24 +6,21 @@ import {
     GetCurrentFxRateHandler,
     GetCurrentFxRateQuery,
 } from '../../../../../packages/core/outbound/domain';
-import {CatalystException, CurrentFxRate} from '../../../../../packages/shared/catalyst';
+import {CatalystException, RawCurrentFxRate} from '../../../../../packages/shared/catalyst';
 import {FspiopErrors, FspiopException} from '../../../../../packages/shared/fspiop';
 
-const RESPONSE: CurrentFxRate = {
-    baseCurrency: 'USD',
-    quoteCurrency: 'LRD',
-    rate: 184,
-    effectiveFrom: '2026-10-05T00:00:00Z',
-    updatedAt: '2026-10-05T09:00:00Z',
-};
+const RESPONSE = new RawCurrentFxRate(
+    '{"baseCurrency":"USD","quoteCurrency":"LRD","rate":184,'
+    + '"effectiveFrom":"2026-10-05T00:00:00Z","updatedAt":"2026-10-05T09:00:00Z"}',
+);
 
-function handlerWith(result: CurrentFxRate | Error): {
+function handlerWith(result: RawCurrentFxRate | Error): {
     handler: GetCurrentFxRateHandler;
     calls: Array<{baseCurrency: string; quoteCurrency: string}>;
 } {
     const calls: Array<{baseCurrency: string; quoteCurrency: string}> = [];
     const handler = new GetCurrentFxRateHandler({
-        async getCurrentFxRate(baseCurrency: string, quoteCurrency: string): Promise<CurrentFxRate> {
+        async getCurrentFxRate(baseCurrency: string, quoteCurrency: string): Promise<RawCurrentFxRate> {
             calls.push({baseCurrency, quoteCurrency});
             if (result instanceof Error) {
                 throw result;
@@ -42,7 +39,7 @@ function assertFspiopCode(code: string, message?: string): (error: unknown) => b
 }
 
 describe('GetCurrentFxRateHandler', () => {
-    it('passes the requested pair to Catalyst and returns its object unchanged', async () => {
+    it('passes the requested pair to Catalyst and returns its raw response unchanged', async () => {
         const {handler, calls} = handlerWith(RESPONSE);
 
         const result = await handler.execute(new GetCurrentFxRateQuery('USD', 'LRD'));

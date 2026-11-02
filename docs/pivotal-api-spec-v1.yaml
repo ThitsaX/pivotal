@@ -277,7 +277,9 @@ paths:
         Returns Catalyst's current effective FX rate for the requested currency pair.
         This endpoint is an authenticated, read-only integration layer: Pivotal forwards
         `baseCurrency` and `quoteCurrency` to Catalyst and returns Catalyst's successful
-        response without calculating, selecting, modifying, or storing an FX rate.
+        response without calculating, selecting, modifying, or storing an FX rate. The
+        `rate` remains a JSON number and is returned in Catalyst's plain decimal notation,
+        without conversion to scientific notation.
 
         ### Who may call it
 
@@ -1159,7 +1161,8 @@ Allowed values:
           example: LRD
         rate:
           type: number
-          example: 184.00
+          description: Current FX rate represented as a JSON number in plain decimal notation.
+          example: 190
         effectiveFrom:
           type: string
           format: date-time
@@ -1392,7 +1395,7 @@ Allowed values:
           example:
             baseCurrency: USD
             quoteCurrency: LRD
-            rate: 184.00
+            rate: 190
             effectiveFrom: "2026-10-05T00:00:00Z"
             updatedAt: "2026-10-05T09:00:00Z"
 

@@ -62,13 +62,8 @@ describe('CatalystAxios', () => {
     });
 
     it('should request the current rate with the exact currency parameters', async () => {
-        const responseBody = {
-            baseCurrency: 'USD',
-            quoteCurrency: 'LRD',
-            rate: 184,
-            effectiveFrom: '2026-10-05T00:00:00Z',
-            updatedAt: '2026-10-05T09:00:00Z',
-        };
+        const responseBody = '{"baseCurrency":"USD","quoteCurrency":"LRD","rate":184,'
+            + '"effectiveFrom":"2026-10-05T00:00:00Z","updatedAt":"2026-10-05T09:00:00Z"}';
         let requestConfig: InternalAxiosRequestConfig | undefined;
         const catalystAxios = new CatalystAxios('http://catalyst:8080');
         const client = resolveClient(catalystAxios);
@@ -90,7 +85,31 @@ describe('CatalystAxios', () => {
             baseCurrency: 'USD',
             quoteCurrency: 'LRD',
         });
-        assert.equal(result, responseBody);
+        assert.equal(requestConfig?.responseType, 'text');
+        assert.equal(result.body, responseBody);
+    });
+
+    it('should preserve Catalyst decimal numbers in plain notation', async () => {
+        const rates = ['190', '1200', '0.0054', '0.0000000001'];
+
+        for (const rate of rates) {
+            const responseBody = `{"baseCurrency":"LRD","quoteCurrency":"USD","rate":${rate},`
+                + '"effectiveFrom":"2026-10-05T00:00:00Z","updatedAt":"2026-10-05T09:00:00Z"}';
+            const catalystAxios = new CatalystAxios('http://catalyst:8080');
+            const client = resolveClient(catalystAxios);
+            client.defaults.adapter = async (config): Promise<AxiosResponse> => ({
+                data: responseBody,
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config,
+            });
+
+            const result = await catalystAxios.getCurrentFxRate('LRD', 'USD');
+
+            assert.equal(result.body, responseBody);
+            assert.equal(result.body.includes(`"rate":${rate}`), true);
+        }
     });
 
     it('should fallback to Axios status message when error response body is not expected', () => {
@@ -120,14 +139,11 @@ describe('CatalystAxios', () => {
         assert.equal(exception.message.includes('Fee policy does not exist.'), true);
     });
 
-    it('should use errorCode from the current FX rate error response body', () => {
+    it('should use errorCode from a raw current FX rate error response body', () => {
         const axiosError = new AxiosError('Request failed with status code 400', 'ERR_BAD_REQUEST');
         (axiosError as AxiosError & {response: unknown}).response = {
             status: 400,
-            data: {
-                errorCode: 'FX_RATE_NOT_FOUND',
-                message: 'FX rate is not available for LRD/VND.',
-            },
+            data: '{"errorCode":"FX_RATE_NOT_FOUND","message":"FX rate is not available for LRD/VND."}',
         } as any;
 
         const exception = toCatalystException(axiosError);
