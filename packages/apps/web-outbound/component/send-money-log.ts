@@ -6,15 +6,17 @@
  *
  * The request line (SendMoneyLogInterceptor) and the error-response line
  * (OutboundExceptionFilter) are built here so the pair always correlates on the same
- * identifiers, always renders as a single line, and always applies the same redaction.
+ * identifiers and always renders as a single line. Authorization is intentionally
+ * included only in the request-header line; credentials in bodies and error responses
+ * remain redacted.
  */
 
 const UNKNOWN = 'unknown';
 
 /**
- * Replaced outright. Credentials and secrets have no forensic value and must never
- * reach the log, whether or not the DTO declares them - the raw request body is logged
- * before the ValidationPipe has stripped anything.
+ * Replaced outright except for the Authorization request header, which the header audit
+ * line intentionally includes. This also protects undeclared fields in the raw request
+ * body, which is logged before the ValidationPipe has stripped anything.
  */
 const REDACTED_FIELDS: ReadonlySet<string> = new Set([
     'accesskey',
@@ -64,10 +66,11 @@ export interface LoggableErrorResponse {
     statusCode?: string;
 }
 
-const redactLogValue = (key: string, value: unknown): unknown => {
+const redactLogValue = (key: string, value: unknown, includeAuthorization: boolean): unknown => {
     const normalizedKey = key.toLowerCase();
 
-    if (REDACTED_FIELDS.has(normalizedKey)) {
+    if (REDACTED_FIELDS.has(normalizedKey)
+        && !(includeAuthorization && normalizedKey === 'authorization')) {
         return '[redacted]';
     }
 
@@ -84,13 +87,13 @@ const redactLogValue = (key: string, value: unknown): unknown => {
  * JSON.stringify without an indent argument emits no raw newlines - any newline inside a
  * string value is escaped to \n - so the result never splits a log entry in an aggregator.
  */
-export const stringifyForLog = (value: unknown): string => {
+export const stringifyForLog = (value: unknown, includeAuthorization: boolean = false): string => {
     if (value == null) {
         return '{}';
     }
 
     try {
-        return JSON.stringify(value, redactLogValue) ?? '{}';
+        return JSON.stringify(value, (key, nestedValue) => redactLogValue(key, nestedValue, includeAuthorization)) ?? '{}';
     } catch {
         return '[unserializable payload]';
     }
@@ -107,7 +110,7 @@ export const formatSendMoneyRequestLog = (body: unknown): string => {
 };
 
 export const formatSendMoneyRequestHeadersLog = (body: unknown, headers: unknown): string => {
-    return `Post Send Money request headers for ${toSendMoneyIdentifiers(body)}: ${stringifyForLog(headers)}`;
+    return `Post Send Money request headers for ${toSendMoneyIdentifiers(body)}: ${stringifyForLog(headers, true)}`;
 };
 
 export const formatSendMoneyErrorResponseLog = (
