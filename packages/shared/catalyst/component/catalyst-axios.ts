@@ -8,9 +8,9 @@ import {
     CalculateFeeByFeePolicyIdOutput,
     CalculateFeeInput,
     CalculateFeeOutput,
-    CurrentFxRate,
     FeePolicy,
 } from '../dto';
+import { RawCurrentFxRate } from './raw-current-fx-rate';
 
 export type CatalystHeadersMap = Record<string, string>;
 
@@ -100,12 +100,24 @@ export class CatalystAxios {
 
     private static toCatalystException(error: AxiosError): CatalystException {
         const status = error.response?.status ?? 503;
-        const data = error.response?.data;
+        const data = CatalystAxios.parseJsonIfPossible(error.response?.data);
 
         const code = CatalystAxios.resolveErrorCode(error, status, data);
         const message = CatalystAxios.resolveErrorMessage(status, data, error);
 
         return new CatalystException(code, `Catalyst (${code}) ${message}`);
+    }
+
+    private static parseJsonIfPossible(data: unknown): unknown {
+        if (typeof data !== 'string') {
+            return data;
+        }
+
+        try {
+            return JSON.parse(data) as unknown;
+        } catch {
+            return data;
+        }
     }
 
     private static resolveErrorCode(error: AxiosError, status: number, data: unknown): string {
@@ -250,14 +262,21 @@ export class CatalystAxios {
     async getCurrentFxRate(
         baseCurrency: string,
         quoteCurrency: string,
-    ): Promise<CurrentFxRate> {
-        return this.get(
-            '/rates',
+    ): Promise<RawCurrentFxRate> {
+        const response = await this.client.get<string>(
+            this.resolveUrl('/rates'),
             {
-                baseCurrency,
-                quoteCurrency,
+                headers: this.defaultHeaders,
+                params: {
+                    baseCurrency,
+                    quoteCurrency,
+                },
+                responseType: 'text',
+                transformResponse: [(data: string): string => data],
             },
         );
+
+        return new RawCurrentFxRate(response.data);
     }
 
     async calculateFee(
