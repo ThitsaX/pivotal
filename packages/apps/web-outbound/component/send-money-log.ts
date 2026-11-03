@@ -23,14 +23,17 @@ const REDACTED_FIELDS: ReadonlySet<string> = new Set([
     'authorization',
     'credential',
     'cvv',
+    'cookie',
     'logobase64',
     'otp',
     'passcode',
     'password',
     'pin',
     'privatekey',
+    'proxy-authorization',
     'refreshtoken',
     'secret',
+    'set-cookie',
     'signature',
     'token',
 ]);
@@ -101,6 +104,10 @@ export const toSendMoneyIdentifiers = (body: unknown): string => {
 
 export const formatSendMoneyRequestLog = (body: unknown): string => {
     return `Post Send Money request for ${toSendMoneyIdentifiers(body)}: ${stringifyForLog(body)}`;
+};
+
+export const formatSendMoneyRequestHeadersLog = (body: unknown, headers: unknown): string => {
+    return `Post Send Money request headers for ${toSendMoneyIdentifiers(body)}: ${stringifyForLog(headers)}`;
 };
 
 export const formatSendMoneyErrorResponseLog = (

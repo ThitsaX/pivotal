@@ -3,7 +3,7 @@
 import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
-import { formatSendMoneyRequestLog } from './send-money-log';
+import { formatSendMoneyRequestHeadersLog, formatSendMoneyRequestLog } from './send-money-log';
 
 /**
  * Logs the outbound Post Send Money payload exactly once per call.
@@ -26,6 +26,7 @@ export class SendMoneyLogInterceptor implements NestInterceptor {
         const request = context.switchToHttp().getRequest<Request>();
 
         this.logger.log(formatSendMoneyRequestLog(request?.body));
+        this.logger.log(formatSendMoneyRequestHeadersLog(request?.body, request?.headers));
 
         return next.handle();
     }
