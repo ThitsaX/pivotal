@@ -4,7 +4,7 @@
 /**
  * Shared formatting for the Post Send Money outbound audit log.
  *
- * The request line (SendMoneyLogInterceptor) and the error-response line
+ * The request lines (SendMoneyLogMiddleware) and the error-response line
  * (OutboundExceptionFilter) are built here so the pair always correlates on the same
  * identifiers and always renders as a single line. Authorization is intentionally
  * included only in the request-header line; credentials in bodies and error responses

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { DynamicModule, MiddlewareConsumer, Module, NestModule, Provider, RequestMethod } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OutboundDomainModule, RedisClient } from '@core/outbound/domain';
 import {
@@ -9,7 +9,7 @@ import {
     ParticipantDomainModule,
     ParticipantJwsPrivateKeyStore,
 } from '@core/participant/domain';
-import { AccessGuard, DfspCertificateGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
+import { AccessGuard, DfspCertificateGuard, JwtPolicy, SendMoneyLogMiddleware } from './component';
 import { CentralRegistryController, CurrentFxRateController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
@@ -18,7 +18,14 @@ import { ParticipantSigningKeysCache } from "@core/participant/domain/component/
 const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 
 @Module({})
-export class WebOutboundModule {
+export class WebOutboundModule implements NestModule {
+
+    configure(consumer: MiddlewareConsumer): void {
+        consumer.apply(SendMoneyLogMiddleware).forRoutes({
+            path: 'secured/sendmoney',
+            method: RequestMethod.POST,
+        });
+    }
 
     static forRoot(): DynamicModule {
         return WebOutboundModule.forRootAsync({
@@ -103,7 +110,7 @@ export class WebOutboundModule {
                 },
                 inject: [ParticipantCertRepository, REQUIRED_SETTINGS, Reflector],
             },
-            SendMoneyLogInterceptor,
+            SendMoneyLogMiddleware,
         ];
     }
 
