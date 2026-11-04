@@ -6,5 +6,5 @@ export * from './outbound-exception.filter';
 export * from './public.decorator';
 export * from './dfsp-certificate.guard';
 export * from './send-money-log';
-export * from './send-money-log.interceptor';
+export * from './send-money-log.middleware';
 export * from './signed-transfer-status.decorator';

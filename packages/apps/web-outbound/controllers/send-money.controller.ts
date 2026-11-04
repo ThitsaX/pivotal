@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
@@ -8,7 +8,6 @@ import { MdcContext } from '@shared/foundation';
 import { Extension, ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
 
 export class PutSendMoneyRequest {
     @IsOptional()
@@ -103,11 +102,8 @@ export class SendMoneyController {
         return {extension};
     }
 
-    // The request line is emitted by SendMoneyLogInterceptor, which runs before the
-    // ValidationPipe and therefore also covers payloads rejected during validation.
     @Post()
     @HttpCode(HttpStatus.OK)
-    @UseInterceptors(SendMoneyLogInterceptor)
     async post(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: SendMoneyRequest,
