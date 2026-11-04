@@ -123,6 +123,16 @@ describe('AccessGuard signed transfer status lookup', () => {
         assert.equal(reservationCalls[0].ttlMs, 10 * 60 * 1000);
     });
 
+    it('accepts the authorization token with or without a Bearer prefix', async () => {
+        for (const prefix of ['', 'Bearer ', 'bearer   ']) {
+            const {guard} = createGuard();
+            const request = signedRequest();
+            request.headers.authorization = `${prefix}${request.headers.authorization}`;
+
+            assert.equal(await guard.canActivate(executionContext(request)), true);
+        }
+    });
+
     it('rejects a verbatim replay of an otherwise valid request', async () => {
         const {guard} = createGuard();
         const request = signedRequest({nonce: 'replay-once'});

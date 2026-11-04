@@ -94,7 +94,7 @@ const bootstrap = async (): Promise<void> => {
             'Outbound API for initiating FSPIOP lookup, quoting, and transfer flows.',
         )
         .setVersion('1.0.0')
-        .addApiKey({ type: 'apiKey', name: 'authorization', in: 'header', description: 'Authorization header with raw RS256-signed JWT' }, 'authorization')
+        .addApiKey({ type: 'apiKey', name: 'authorization', in: 'header', description: 'RS256-signed JWT, optionally prefixed with Bearer' }, 'authorization')
         .addApiKey({ type: 'apiKey', name: FspiopHeaders.Names.FSPIOP_SOURCE, in: 'header' }, FspiopHeaders.Names.FSPIOP_SOURCE)
         .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
