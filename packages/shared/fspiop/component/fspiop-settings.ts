@@ -24,6 +24,8 @@ import { FspiopVerifyMode } from './fspiop-verify-mode';
  * }
  */
 
+import {ApiType} from '@shared/iso20022/api-type';
+
 export class FspiopSettings {
     constructor(
         public readonly switchId: string,
@@ -32,6 +34,7 @@ export class FspiopSettings {
         public readonly transfersUrl: string,
         public readonly useJws: boolean,
         public readonly useMutualTls: boolean,
+        public readonly apiType: ApiType = ApiType.FSPIOP,
 
         /**
          * Verification mode for sources with no `participant_key` row of their own.

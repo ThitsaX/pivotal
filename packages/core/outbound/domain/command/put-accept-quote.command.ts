@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {TransfersIDPutResponse} from '@shared/fspiop';
+import {ExtensionList, TransfersIDPutResponse} from '@shared/fspiop';
 import {SendMoneyResponse} from '../dto';
 
 export class PutAcceptQuoteCommand {
@@ -16,6 +16,7 @@ export namespace PutAcceptQuoteCommand {
             public readonly acceptQuote: boolean,
             public readonly requestSource?: string,
             public readonly homeTransactionId?: string,
+            public readonly extensionList?: ExtensionList,
         ) {
         }
     }

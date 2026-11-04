@@ -22,6 +22,16 @@ export class PutSendMoneyRequest {
     amount?: string;
 
     @IsOptional()
+    @Transform(({value}) => {
+        const extension = Array.isArray(value) ? value : value?.extension;
+        if (!Array.isArray(extension)) return value;
+        return extension.length === 0 ? undefined : {
+            extension: extension.map((item) => ({
+                ...item,
+                value: typeof item.value === 'number' ? String(item.value) : item.value,
+            })),
+        };
+    })
     extensionList?: Array<Extension> | ExtensionList;
 
     @IsOptional()
@@ -166,6 +176,7 @@ export class SendMoneyController {
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
                             request.homeTransactionId,
+                            SendMoneyController.toExtensionList(request.extensionList),
                         ),
                     ),
                 );

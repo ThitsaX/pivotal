@@ -23,10 +23,13 @@ import {
     ErrorInformationResponse,
     FspiopErrors,
     FspiopHeaders,
+    FspiopSettings,
     PartiesTypeIDPutResponse,
     PartyIdType,
 } from '@shared/fspiop';
 import { MdcContext } from '@shared/foundation';
+import {InboundRepresentation} from './representation';
+import {InboundRequestLogger} from './inbound-request-logger';
 
 @Controller('parties')
 export class PartiesController {
@@ -34,9 +37,15 @@ export class PartiesController {
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
     private readonly logger = new Logger(PartiesController.name);
 
+    private static async iso20022Transformer(): Promise<typeof import('../../../shared/iso20022/iso20022-transformer').Iso20022Transformer> {
+        return (await import('../../../shared/iso20022/iso20022-transformer')).Iso20022Transformer;
+    }
+
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
+        @Inject(FspiopSettings)
+        private readonly settings: FspiopSettings,
     ) {
     }
 
@@ -52,94 +61,121 @@ export class PartiesController {
     ): void {
         const idValue = subId ? `${id} ${subId}` : id;
         MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
-        this.dispatch(() => {
-            this.logger.log(
+            this.dispatch(() => {
+                this.logger.log(
                     `Get Party Request for idValue ${idValue}`,
-            );
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = PartiesController.headerValue(sourceHeader);
-            const payeeFsp = PartiesController.headerValue(destinationHeader);
+                );
+                const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+                const payerFsp = PartiesController.headerValue(sourceHeader);
+                const payeeFsp = PartiesController.headerValue(destinationHeader);
 
-            return new HandleGetPartiesCommand(
-                new HandleGetPartiesCommand.Input(correlationId, payerFsp, payeeFsp, type, id, subId ?? null),
-            );
+                return new HandleGetPartiesCommand(
+                    new HandleGetPartiesCommand.Input(correlationId, payerFsp, payeeFsp, type, id, subId ?? null),
+                );
             });
         });
     }
 
     @Put(':type/:id{/:subId}/error')
     @HttpCode(HttpStatus.OK)
-    putPartiesError(
+    async putPartiesError(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.CONTENT_TYPE) contentTypeHeader: string | string[] | undefined,
         @Body() request: ErrorInformationResponse | undefined,
-    ): void {
+    ): Promise<void> {
         const idValue = subId ? `${id} ${subId}` : id;
-        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
-        this.dispatch(() => {
-            this.logger.log(
-                    `Put Party Error Request for idValue ${idValue} : ${JSON.stringify(request)}`,
-            );
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = PartiesController.headerValue(destinationHeader);
-            const payeeFsp = PartiesController.headerValue(sourceHeader);
-            const error = PartiesController.toErrorInformationObject(request);
 
-            return new HandlePutPartiesErrorCommand(
-                new HandlePutPartiesErrorCommand.Input(
-                    correlationId,
-                    payerFsp,
-                    payeeFsp,
-                    type,
-                    id,
-                    subId ?? null,
-                    error,
-                ),
-            );
+        InboundRequestLogger.logBodyBeforeRepresentationConversion(this.logger, 'PUT /parties/error', request);
+        const mappedRequest = await this.mapPutPartiesError(contentTypeHeader, request);
+
+        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
+            this.dispatch(() => {
+                this.logger.log(
+                    `Put Party Error Request for idValue ${idValue} : ${JSON.stringify(mappedRequest)}`,
+                );
+                const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+                const payerFsp = PartiesController.headerValue(destinationHeader);
+                const payeeFsp = PartiesController.headerValue(sourceHeader);
+                const error = PartiesController.toErrorInformationObject(mappedRequest);
+
+                return new HandlePutPartiesErrorCommand(
+                    new HandlePutPartiesErrorCommand.Input(
+                        correlationId,
+                        payerFsp,
+                        payeeFsp,
+                        type,
+                        id,
+                        subId ?? null,
+                        error,
+                    ),
+                );
             });
         });
     }
 
     @Put(':type/:id{/:subId}')
     @HttpCode(HttpStatus.OK)
-    putParties(
+    async putParties(
         @Param('type') type: PartyIdType,
         @Param('id') id: string,
         @Param('subId') subId: string | undefined,
         @Headers(FspiopHeaders.Names.TRACE_PARENT) traceparentHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) sourceHeader: string | string[] | undefined,
         @Headers(FspiopHeaders.Names.FSPIOP_DESTINATION) destinationHeader: string | string[] | undefined,
+        @Headers(FspiopHeaders.Names.CONTENT_TYPE) contentTypeHeader: string | string[] | undefined,
         @Body() request: PartiesTypeIDPutResponse,
-    ): void {
+    ): Promise<void> {
         const idValue = subId ? `${id} ${subId}` : id;
-        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
-        this.dispatch(() => {
-            this.logger.log(
-                    `Put Party Request for idValue ${idValue} : ${JSON.stringify(request)}`,
-            );
-            const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
-            const payerFsp = PartiesController.headerValue(destinationHeader);
-            const payeeFsp = PartiesController.headerValue(sourceHeader);
 
-            return new HandlePutPartiesCommand(
-                new HandlePutPartiesCommand.Input(
-                    correlationId,
-                    payerFsp,
-                    payeeFsp,
-                    type,
-                    id,
-                    subId ?? null,
-                    request,
-                ),
-            );
+        InboundRequestLogger.logBodyBeforeRepresentationConversion(this.logger, 'PUT /parties', request);
+        const mappedRequest = await this.mapPutParties(contentTypeHeader, request);
+
+        MdcContext.run({[MdcContext.ID_VALUE]: idValue}, () => {
+            this.dispatch(() => {
+                this.logger.log(
+                    `Put Party Request for idValue ${idValue} : ${JSON.stringify(mappedRequest)}`,
+                );
+                const correlationId = PartiesController.optionalHeaderValue(traceparentHeader);
+                const payerFsp = PartiesController.headerValue(destinationHeader);
+                const payeeFsp = PartiesController.headerValue(sourceHeader);
+
+                return new HandlePutPartiesCommand(
+                    new HandlePutPartiesCommand.Input(
+                        correlationId,
+                        payerFsp,
+                        payeeFsp,
+                        type,
+                        id,
+                        subId ?? null,
+                        mappedRequest,
+                    ),
+                );
             });
         });
     }
 
+    private async mapPutParties(
+        contentType: string | string[] | undefined,
+        request: PartiesTypeIDPutResponse,
+    ): Promise<PartiesTypeIDPutResponse> {
+        return InboundRepresentation.isIso20022(this.settings, contentType)
+            ? await (await PartiesController.iso20022Transformer()).isoPutPartiesToFspiop(request) as PartiesTypeIDPutResponse
+            : request;
+    }
+
+    private async mapPutPartiesError(
+        contentType: string | string[] | undefined,
+        request: ErrorInformationResponse | undefined,
+    ): Promise<ErrorInformationResponse | undefined> {
+        return request != null && InboundRepresentation.isIso20022(this.settings, contentType)
+            ? await (await PartiesController.iso20022Transformer()).isoPutPartiesErrorToFspiop(request) as ErrorInformationResponse
+            : request;
+    }
 
     private static headerValue(value: string | string[] | undefined, fallback = ''): string {
         if (value == null) {

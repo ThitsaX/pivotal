@@ -25,6 +25,7 @@ import {
     TransactionInitiatorType,
     TransactionType,
 } from '@shared/fspiop';
+import type {QuoteSuccessPayload} from '@shared/fspiop';
 import { TransferRequest } from '../cache';
 import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient, SuspiciousTransactionMonitor } from '../component';
 import { SendMoneyResponse } from '../dto';
@@ -161,7 +162,7 @@ export class PutAcceptPartyHandler
             const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
             const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 
-            const waitPromise = this.subscriber.waitFor<QuotesIDPutResponse>(
+            const waitPromise = this.subscriber.waitFor<QuoteSuccessPayload>(
                 successSubject,
                 errorSubject,
             );
@@ -177,8 +178,10 @@ export class PutAcceptPartyHandler
                 throw PutAcceptPartyHandler.toFspiopException(error, transferId);
             }
 
-            const callback = await waitPromise;
+            const callbackPayload = await waitPromise;
+            const callback = callbackPayload.response;
             transferRequest.quotes = callback;
+            transferRequest.iso20022QuoteResponse = callbackPayload.iso20022QuoteResponse;
             transferRequest.transfer = undefined;
 
             const response = PutAcceptPartyHandler.toResponse(transferRequest, callback);
@@ -276,7 +279,8 @@ export class PutAcceptPartyHandler
         const quoteRequest = new QuotesPostRequest();
         quoteRequest.quoteId = transferId;
         quoteRequest.transactionId = transferId;
-        quoteRequest.transactionRequestId = transferId;
+        // This flow is payer-initiated and has no originating payee transaction request.
+        // Reusing transferId here makes the ISO mapper infer a PAYEE-initiated flow.
         quoteRequest.payee = transferRequest.payee;
         quoteRequest.payer = transferRequest.payer;
         quoteRequest.amountType = transferRequest.amountType;

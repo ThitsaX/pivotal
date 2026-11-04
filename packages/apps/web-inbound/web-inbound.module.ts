@@ -59,7 +59,13 @@ export class WebInboundModule {
                 inject: asyncOptions.inject ?? [],
             },
             {
+                provide: FspiopSettings,
+                useFactory: (settings: WebInboundModule.RequiredSettings): FspiopSettings => settings.fspiopSettings(),
+                inject: [REQUIRED_SETTINGS],
+            },
+            {
                 provide: FspInboundGuard,
+
                 useFactory: (settings: WebInboundModule.RequiredSettings, participantSigningKeysCache: ParticipantSigningKeysCache): FspInboundGuard => {
                     const fspiopSettings = settings.fspiopSettings();
 

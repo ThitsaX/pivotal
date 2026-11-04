@@ -18,6 +18,7 @@ import {
     TransfersIDPutResponse,
     TransfersPostRequest,
 } from '@shared/fspiop';
+import type {Iso20022PostTransfersContext, OriginalIso20022QuoteResponsePayload} from '@shared/iso20022';
 import { TransferRequest } from '../cache';
 import { AmountDecimalValidator, RedisClient } from '../component';
 import { SendMoneyResponse } from '../dto';
@@ -67,6 +68,7 @@ export class PutAcceptQuoteHandler
     private static toTransfersPostRequest(
         transferId: string,
         transferRequest: TransferRequest,
+        extensionList?: QuotesIDPutResponse['extensionList'],
     ): TransfersPostRequest {
         const quotes = transferRequest.quotes;
 
@@ -90,6 +92,7 @@ export class PutAcceptQuoteHandler
         transfersPostRequest.extensionList = PutAcceptQuoteHandler.toExtensionList(
             quotes,
             transferRequest.homeTransactionId,
+            extensionList,
         );
 
         return transfersPostRequest;
@@ -98,8 +101,9 @@ export class PutAcceptQuoteHandler
     private static toExtensionList(
         quotes: QuotesIDPutResponse,
         homeTransactionId: string | undefined,
+        additional?: QuotesIDPutResponse['extensionList'],
     ): QuotesIDPutResponse['extensionList'] {
-        const extension = (quotes.extensionList?.extension ?? [])
+        const extension = [...(quotes.extensionList?.extension ?? []), ...(additional?.extension ?? [])]
             .filter((item) => item.key?.trim().toLowerCase()
                 !== PutAcceptQuoteHandler.HOME_TRANSACTION_ID_EXTENSION_KEY.toLowerCase())
             .map((item) => ({...item}));
@@ -141,6 +145,14 @@ export class PutAcceptQuoteHandler
         return FspiopErrorTranslator.toFspiopException(error);
     }
 
+    private static toIso20022PostTransfersContext(
+        iso20022QuoteResponse: OriginalIso20022QuoteResponsePayload | undefined,
+    ): Iso20022PostTransfersContext | undefined {
+        return iso20022QuoteResponse != null
+            ? {isoPostQuoteResponse: iso20022QuoteResponse}
+            : undefined;
+    }
+
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const { transferId } = command.input;
         const lockToken = await this.redisClient.acquireLock(
@@ -168,7 +180,7 @@ export class PutAcceptQuoteHandler
     }
 
     private async executeLocked(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
-        const { transferId, acceptQuote, requestSource, homeTransactionId } = command.input;
+        const { transferId, acceptQuote, requestSource, homeTransactionId, extensionList } = command.input;
         const transferRequest = await this.getTransferRequest(transferId);
 
         // Idempotency guard (sequential duplicates): a successful acceptQuote deletes the
@@ -193,7 +205,7 @@ export class PutAcceptQuoteHandler
         }
 
         const destination = PutAcceptQuoteHandler.getFspId(transferRequest.payee, 'payee');
-        const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest);
+        const transfersPostRequest = PutAcceptQuoteHandler.toTransfersPostRequest(transferId, transferRequest, extensionList);
         const { transfersUrl } = this.fspiopAxios.settings;
         const createdAt = new Date();
         this.amountDecimalValidator.validate(transfersPostRequest.amount);
@@ -230,7 +242,12 @@ export class PutAcceptQuoteHandler
             );
 
             try {
-                await this.fspiopAxios.postTransfers(transfersUrl, headers, transfersPostRequest);
+                await this.fspiopAxios.postTransfers(
+                    transfersUrl,
+                    headers,
+                    transfersPostRequest,
+                    PutAcceptQuoteHandler.toIso20022PostTransfersContext(transferRequest.iso20022QuoteResponse),
+                );
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 const stack = error instanceof Error ? error.stack : undefined;
