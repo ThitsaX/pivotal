@@ -264,7 +264,7 @@ function stateColor(state: string): string {
 }
 
 function stateLabel(state: string): string {
-    return state === 'COMMITTED' ? 'Success Trx' : state;
+    return state === 'COMMITTED' ? 'Success Txn' : state;
 }
 
 /** Gradient fill for bar/column series — light, modern, slightly translucent. */
@@ -378,6 +378,7 @@ const hasTrend = computed((): boolean => (data.value?.dailyTrend.length ?? 0) > 
 
 const trendSeries = computed(() => {
     const days = data.value?.dailyTrend ?? [];
+    
     return [
         {name: 'Successful', data: days.map((d) => Math.max(d.count - d.errorCount, 0))},
         {name: 'Failed',     data: days.map((d) => d.errorCount)},
@@ -518,6 +519,15 @@ const latencySeries = computed(() => [
     // axis/tooltip; the formatter then renders clean seconds.
     {name: 'Avg latency', data: (data.value?.latencyTrend ?? []).map((p) => (p.avgLatencyMs == null ? null : Math.round(p.avgLatencyMs)))},
 ]);
+
+const latencyChartKey = computed((): string => {
+    const snapshot = data.value;
+    if (snapshot == null) {
+        return 'latency-empty';
+    }
+
+    return `${snapshot.generatedAt}|${snapshot.range.from}|${snapshot.range.to}`;
+});
 
 const latencyOptions = computed<ApexOptions>(() => ({
     chart: baseChart('area', {dropShadow: {enabled: true, top: 4, blur: 6, opacity: 0.12, color: COLOR.violet}}),
@@ -922,7 +932,7 @@ watch(
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Success Rate</p>
                         <p class="font-display text-xl leading-tight text-emerald-600">{{ formatPercent(live ? live.successRateToday : data.successRate) }}</p>
-                        <p class="text-[11px] text-slate-400">committed ÷ selected total</p>
+                        <p class="text-[11px] text-slate-400">success txn ÷ selected total</p>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Errors / Disputes</p>
@@ -933,8 +943,8 @@ watch(
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency</p>
-                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(live ? live.avgLatencyMsToday : data.avgLatencyMs) }}</p>
-                        <p class="text-[11px] text-slate-400">as of {{ formatTimestamp(live ? live.asOf : data.asOf) }}</p>
+                        <p class="font-display text-xl leading-tight text-ink">{{ formatLatency(data.avgLatencyMs) }}</p>
+                        <p class="text-[11px] text-slate-400">as of {{ formatTimestamp(data.generatedAt) }}</p>
                     </article>
                 </div>
 
@@ -967,7 +977,7 @@ watch(
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft xl:col-span-4">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Avg Latency — Selected Range</p>
                         <div v-if="!hasLatency" class="mt-2 text-sm text-slate-500">No completed transfers.</div>
-                        <VueApexCharts v-else type="area" height="195" :options="latencyOptions" :series="latencySeries" />
+                        <VueApexCharts v-else :key="latencyChartKey" type="area" height="195" :options="latencyOptions" :series="latencySeries" />
                     </article>
                 </div>
 
@@ -999,12 +1009,12 @@ watch(
                         </div>
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payer FSPs (Completed)</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top 5 Payer FSPs (Completed & Dispute)</p>
                         <div v-if="!hasPayer" class="mt-2 text-sm text-slate-500">No data.</div>
                         <VueApexCharts v-else type="bar" height="160" :options="payerOptions" :series="payerSeries" />
                     </article>
                     <article class="border border-accent/20 bg-white px-3 py-2 shadow-soft">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top Payee FSPs (Completed)</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Top 5 Payee FSPs (Completed & Dispute)</p>
                         <div v-if="!hasPayee" class="mt-2 text-sm text-slate-500">No data.</div>
                         <VueApexCharts v-else type="bar" height="160" :options="payeeOptions" :series="payeeSeries" />
                     </article>

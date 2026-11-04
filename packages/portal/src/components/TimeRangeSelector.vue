@@ -157,6 +157,11 @@ const formatPartsInZone = (date: Date, timeZone: string): {year: number; month: 
     return {year, month, day};
 };
 
+const todayDateValue = computed((): string => {
+    const today = formatPartsInZone(new Date(), props.selectedTimeZone);
+    return `${today.year}-${padTwo(today.month)}-${padTwo(today.day)}`;
+});
+
 const shiftDateByDays = (year: number, month: number, day: number, days: number): {year: number; month: number; day: number} => {
     const shifted = new Date(Date.UTC(year, month - 1, day + days));
 
@@ -393,7 +398,8 @@ const updateDatePart = (target: 'start' | 'end', value: string): void => {
 };
 
 // Validation: a custom range is invalid when the resolved start is not strictly
-// before the end. Presets always produce a valid range, so they never error.
+// before the end, or when the From date is after today in the selected timezone.
+// Presets always produce a valid range, so they never error.
 const rangeError = computed((): string => {
     if (selectedMode.value !== 'custom' || !props.startValue || !props.endValue) {
         return '';
@@ -406,7 +412,22 @@ const rangeError = computed((): string => {
         return '';
     }
 
-    return start >= end ? 'Start date & time must be before the end date & time.' : '';
+    if (start >= end) {
+        return 'Start date & time must be before the end date & time.';
+    }
+
+    const today = formatPartsInZone(new Date(), props.selectedTimeZone);
+    const tomorrow = shiftDateByDays(today.year, today.month, today.day, 1);
+    const tomorrowIso = zonedLocalToUtcIso(
+        localMidnight(tomorrow.year, tomorrow.month, tomorrow.day),
+        props.selectedTimeZone,
+    );
+
+    if (start >= new Date(tomorrowIso).getTime()) {
+        return 'From date must not be later than today.';
+    }
+
+    return '';
 });
 
 watch(
@@ -540,6 +561,7 @@ watch(
                                         ref="startDateInputRef"
                                         :value="customStartDate"
                                         type="date"
+                                        :max="todayDateValue"
                                         :disabled="props.disabled === true"
                                         class="date-hidden-input"
                                         @input="updateDatePart('start', ($event.target as HTMLInputElement).value)"
