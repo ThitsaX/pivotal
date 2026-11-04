@@ -1,6 +1,6 @@
 # Enable DFSP-Facing mTLS and JWS (Leg 1)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Overview
 
@@ -65,9 +65,55 @@ and `FSPIOP-Source` name different participants.
 
 - An Istio AuthorizationPolicy that limits which source addresses may reach the DFSP-facing host.
   Recommended while certificates are optional (Steps 2 to 7): until then, a DFSP that presents no
-  certificate is still admitted, so the host must not be reachable more widely than intended.
+  certificate is still admitted, so the host must not be reachable more widely than intended. For
+  example, in your Helm values:
+
+  ```yaml
+  istio:
+    authorizationPolicies:
+      enabled: true
+      items:
+        - name: pivotal-dfsp-host-allowed-sources
+          namespace: <GATEWAY_NAMESPACE>
+          selector:
+            matchLabels:
+              <GATEWAY_SELECTOR_KEY>: <GATEWAY_SELECTOR_VALUE>
+          action: DENY
+          rules:
+            - to:
+                - operation:
+                    hosts: ["<DFSP_FACING_HOST>", "<DFSP_FACING_HOST>:*"]
+              from:
+                - source:
+                    notIpBlocks: ["<DFSP_SOURCE_CIDR>"]   # for example 203.0.113.0/24
+  ```
+
+  It refuses requests to the DFSP-facing host from any other address, and leaves the gateway's other
+  hosts alone. List every DFSP's address range. Which field to use depends on how the gateway learns
+  the DFSP's address:
+
+  | How the DFSP's address reaches the gateway | Field |
+  |---|---|
+  | As the connection's source address, for example with `externalTrafficPolicy: Local` on the gateway Service and no proxy in front | `notIpBlocks` (as above) |
+  | In `X-Forwarded-For` or the PROXY protocol, from a load balancer or proxy in front of the gateway | `notRemoteIpBlocks`, with the gateway configured to trust that proxy (Istio's `numTrustedProxies`, or the PROXY protocol listener setting) |
+
+  Then check it from both sides:
+
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST "https://<DFSP_FACING_HOST>/secured/sendmoney" -d '{}'
+  ```
+
+  Run it while certificates are still optional (before Step 8). From an address in the list, the
+  answer is not `403`: web-outbound answers, for example with `417`. From any other address it is
+  `403`, and the body reads `RBAC: access denied`.
 
 ## Steps
+
+The placeholders come from the
+[shared worksheet](hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet), for example
+`<GATEWAY_NAMESPACE>` = `istio-ingress-ext`, `<GATEWAY_SELECTOR_KEY>: <GATEWAY_SELECTOR_VALUE>` =
+`app: istio-external-ingress-gw`, `<DFSP_FACING_HOST>` = `pivotal.example.com`,
+`<DFSP_GATEWAY_CREDENTIAL>` = `pivotal-dfsp-tls`, and `<DFSP_A>`, `<DFSP_B>` = `dfsp1`, `dfsp2`.
 
 ### Step 1. Create the gateway's trust anchor
 
@@ -88,7 +134,8 @@ and `FSPIOP-Source` name different participants.
 
 - **Expected Result:** The subject contains `Pivotal DFSP-Facing CA Intermediate`, then
   `secret/<DFSP_GATEWAY_CREDENTIAL>-cacert created`.
-- **If It Fails:** An empty file means the ceremony did not install the intermediate in `pki_dfsp`.
+- **If It Fails:** An empty file means no intermediate is installed in `pki_dfsp`: check your CA
+  ceremony page.
 
 > **Give this host its own credential.** The anchor follows the credential name. If another host
 > (the portal, or the Pivotal callback gateway) uses the same credential, it gets the same anchor,
@@ -199,8 +246,8 @@ and `FSPIOP-Source` name different participants.
   Write the gateway values as plain strings. The chart creates the permission only when both are
   set directly.
 
-  > **Leave `DFSP_CA_ROOT_PKI_MOUNT` unset.** The ceremony keeps the DFSP CA root outside Vault, so
-  > trust-manager publishes the intermediate as the anchor.
+  > **Leave `DFSP_CA_ROOT_PKI_MOUNT` unset**, wherever the DFSP CA root is kept (KMS, the HSM, Vault
+  > or offline). trust-manager then publishes the intermediate alone as the anchor.
 
 - **Expected Result:**
 
@@ -340,7 +387,8 @@ Run these after Step 8. Tests 1 and 2 from Step 7 must still pass.
 | 3 | Revoked certificate | Revoke a test certificate (see [Revoke a DFSP certificate](../../runbooks/common/revoke-dfsp-certificate.md)), then repeat Step 7 test 1 with it | `The client certificate presented has been revoked.` on the next request |
 | 4 | Signature check | Have a DFSP send a correctly signed request | The request is processed |
 
-Test 3 takes effect immediately: web-outbound checks the database on every request.
+Test 3 takes effect on the next request once Pivotal's read replica has the change: web-outbound
+looks the certificate up on every request, without a cache.
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 # Onboard a DFSP (vault-kv)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
 
@@ -223,7 +223,7 @@ Send the downloaded file to the DFSP. If the DFSP already had a certificate, the
 - **Action:**
   1. Create a Vault policy that lets the connector read **only its own** key, and a Kubernetes auth
      role bound to the connector's ServiceAccount. The names match
-     [Configure Vault](../../setup/vault-kv/3-vault.md):
+     [3. Vault](../../setup/vault-kv/3-vault.md):
 
      ```bash
      vault policy write pivotal-<DFSP_ID>-connector - <<'EOF'
@@ -233,7 +233,7 @@ Send the downloaded file to the DFSP. If the DFSP already had a certificate, the
      vault write auth/kubernetes/role/pivotal-<DFSP_ID>-connector \
        bound_service_account_names=<DFSP_ID>-connector \
        bound_service_account_namespaces=pivotal \
-       policies=pivotal-<DFSP_ID>-connector
+       policies=pivotal-<DFSP_ID>-connector ttl=1h
      ```
 
   2. Add an entry to the `connectors` list in your Helm values:

@@ -1,6 +1,6 @@
 # Setup
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Choose your profile
 
@@ -12,7 +12,7 @@ If you have not decided, read [Choosing a profile](../concepts/choosing-a-profil
 
 | Profile | Keys kept in | Follow |
 |---|---|---|
-| `vault-kv` (KMS-backed) | CA roots in AWS KMS; Hub JWS signing keys in Vault | [vault-kv/index.md](vault-kv/index.md) |
+| `vault-kv` (KMS-backed) | CA roots in AWS KMS, or without KMS in Vault or offline; Hub JWS signing keys in Vault | [vault-kv/index.md](vault-kv/index.md) |
 | `pkcs11` (HSM-backed) | CA roots and Hub JWS signing keys in AWS CloudHSM | [pkcs11/index.md](pkcs11/index.md) |
 
 Follow **one** path from start to finish. Each path lists every page in order, including the shared

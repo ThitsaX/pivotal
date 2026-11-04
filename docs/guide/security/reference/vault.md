@@ -1,6 +1,6 @@
 # Vault
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 Everything Pivotal keeps in Vault: mounts, PKI roles, KV paths, the access each workload needs,
 and the Kubernetes auth roles. Placeholders: `<KV_MOUNT>` is your KV v2 mount (for example
@@ -16,12 +16,14 @@ Sources: `docs/operations/kms/setup/scripts/ceremony-kms.js`;
 
 | Mount | Type | Created by | Holds | Profile |
 |---|---|---|---|---|
-| `pki_hub_client` | PKI | CA ceremony | Pivotal Hub-client CA intermediate. Its key is generated inside Vault; the root that signed it stays in KMS or the HSM. | both |
+| `pki_hub_client` | PKI | CA ceremony | Pivotal Hub-client CA intermediate. Its key is generated inside Vault; the root that signed it stays in KMS, the HSM, a `_root` mount or offline storage. | both |
 | `pki_dfsp` | PKI | CA ceremony | DFSP CA intermediate. Same arrangement. | both |
+| `pki_hub_client_root`, `pki_dfsp_root` | PKI | CA ceremony without AWS KMS, roots in Vault | The two roots, with keys generated inside Vault. Not created by any other ceremony. Leave `DFSP_CA_ROOT_PKI_MOUNT` unset even when these exist. | `vault-kv` |
 | `<KV_MOUNT>` | KV **version 2** | You, once | Hub JWS signing keys (`vault-kv`); key references and crypto-user credentials (`pkcs11`) | both |
 
 The ceremony disables and re-creates both PKI mounts, with a maximum lease TTL of `43800h`. Every
-role on them is re-created by the ceremony script.
+role on them is re-created by the ceremony script. The [ceremony without AWS KMS](../setup/vault-kv/2-ca-ceremony-without-kms.md)
+creates the mounts once, with the same TTL, and creates the roles by hand, without `pivotal-client`.
 
 Pivotal's Node services check that `<KV_MOUNT>` is version 2 before reading or writing. A version 1
 mount makes them refuse to start. Without read access to `sys/internal/ui/mounts/<KV_MOUNT>`, the

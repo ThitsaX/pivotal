@@ -1,6 +1,6 @@
 # End-to-End Check
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Overview
 
@@ -100,7 +100,7 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
 
 **Environment**
 
-- [ ] The two CA roots are different keys, held in KMS (`vault-kv`) or the HSM (`pkcs11`).
+- [ ] The two CA roots are different keys, held in KMS, Vault or offline (`vault-kv`), or the HSM (`pkcs11`).
 - [ ] Vault roles `dfsp-client`, `web-inbound-server` and `hub-callback-client` exist, and
       `dfsp-client` ignores names in requests.
 - [ ] Secret `pivotal-hub-client-ca` holds the Pivotal Hub-client CA root.

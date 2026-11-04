@@ -1,6 +1,6 @@
 # Security: mTLS and JWS
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## What this section covers
 
@@ -17,7 +17,8 @@ Both are covered on both sides of Pivotal:
 | DFSP-facing | A DFSP's system calling Pivotal |
 | Hub-facing | Pivotal calling the Mojaloop Hub, and the Hub calling Pivotal back |
 
-Both key profiles are covered: `vault-kv` (KMS-backed) and `pkcs11` (HSM-backed).
+Both key profiles are covered: `vault-kv` (KMS-backed) and `pkcs11` (HSM-backed). The `vault-kv`
+profile can also run without AWS KMS, with the CA roots in Vault or offline.
 
 ## Which path to follow
 
@@ -52,6 +53,8 @@ Both key profiles are covered: `vault-kv` (KMS-backed) and `pkcs11` (HSM-backed)
 | [Check certificate renewals](runbooks/common/check-certificate-renewals.md) | both | Confirm automatic renewals are working |
 | [Re-key Pivotal's CAs](runbooks/common/pivotal-ca-rekey.md) | both | Replace a Pivotal CA |
 | [Hub CA re-root](runbooks/common/hub-ca-reroot.md) | both | Follow the Hub operator replacing the Hub CA |
+| [Use the offline CA roots](runbooks/vault-kv/offline-ca-root.md) | `vault-kv`, offline roots | Re-sign a root CRL, revoke an intermediate, or sign a new one |
+| [Vault unseal](runbooks/common/vault-unseal.md) | both | Choose a seal, set up Transit auto-unseal, migrate from Shamir, recover |
 | [Backup and recovery](runbooks/common/backup-and-recovery.md) | both | Know what to back up and how to recover |
 
 ### Reference

@@ -1,6 +1,6 @@
 # Choosing a Profile
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Summary
 
@@ -23,15 +23,15 @@ signing key.
 
 | | `vault-kv` (KMS-backed) | `pkcs11` (HSM-backed) |
 |---|---|---|
-| Root CA keys | AWS KMS | AWS CloudHSM |
-| When KMS or the HSM is used | KMS: only during the CA ceremony. No service calls KMS. | The HSM: during the ceremony, and for every signature at run time |
+| Root CA keys | AWS KMS. Without KMS: in Vault (non-production) or offline (production) | AWS CloudHSM |
+| When KMS or the HSM is used | KMS: only during the CA ceremony. No service calls KMS, so the profile also runs without it. | The HSM: during the ceremony, and for every signature at run time |
 | Hub JWS private keys | Vault KV, one path per tenant | CloudHSM; cannot be exported. Vault holds each tenant's keyRef, public key and crypto-user login, and web-outbound's crypto-user login. |
 | Who creates a tenant's Hub JWS key | web-pivotal, when the DFSP is onboarded in the portal | A custodian, with `provision-hsm-tenant.sh`, before the DFSP is onboarded. Onboarding then records the public key. |
 | How web-outbound signs | In memory, with the key read from Vault | Through PKCS#11, as its own crypto user, using keys shared with it |
 | How the connector signs | In memory, with the key read from Vault | Through the CloudHSM JCE provider, as the tenant's crypto user. The connector image must be built for CloudHSM. |
 | `KEY_PROVIDER` | `vault-kv` | `pkcs11` |
 | Extra people | Ceremony key holders | Custodians holding Crypto Officer credentials, for the ceremony and for every onboarding |
-| Extra infrastructure | An AWS account with KMS | An AWS CloudHSM cluster with at least two HSMs, reachable from the Kubernetes cluster |
+| Extra infrastructure | An AWS account with KMS. Without KMS: none, or an air-gapped machine for offline roots | An AWS CloudHSM cluster with at least two HSMs, reachable from the Kubernetes cluster |
 | Throughput | Signing is limited by CPU | Signing is limited by the HSM; measure it and size replicas to match |
 
 ## Prerequisites by profile
@@ -41,7 +41,7 @@ signing key.
 | Kubernetes, Helm, Istio, cert-manager | Yes | Yes |
 | HashiCorp Vault with Kubernetes auth | Yes | Yes |
 | Access to the Hub's MCM | Yes | Yes |
-| AWS KMS (asymmetric signing keys) | Yes | No |
+| AWS KMS (asymmetric signing keys) | Only for the KMS ceremony; see [CA ceremony without AWS KMS](../setup/vault-kv/2-ca-ceremony-without-kms.md) | No |
 | AWS CloudHSM cluster, at least two HSMs | No | Yes |
 | CloudHSM client software and the cluster's CA certificate | No | Yes |
 | Connector image built for CloudHSM | No | Yes |

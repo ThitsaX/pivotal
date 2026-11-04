@@ -1,8 +1,11 @@
 # 2. CA Ceremony (vault-kv)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
+
+> **No AWS KMS?** Use [2. CA ceremony without AWS KMS](./2-ca-ceremony-without-kms.md) instead of this
+> page. It keeps the roots in Vault or offline, and ends in the same Vault state.
 
 Pivotal runs two certificate authorities. Each has a root key in AWS KMS and an intermediate CA in
 Vault PKI:

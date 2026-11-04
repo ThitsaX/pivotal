@@ -1,6 +1,6 @@
 # Glossary
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 Every page in this section uses these names, and only these names.
 
@@ -45,11 +45,12 @@ Every page in this section uses these names, and only these names.
 | Term | Meaning |
 |---|---|
 | CA | Certificate authority. Signs certificates; anyone who trusts the CA trusts what it signs. |
-| Root CA | The top CA of a chain. Its private key is kept in AWS KMS (`vault-kv`) or AWS CloudHSM (`pkcs11`) and used only during a CA ceremony. |
+| Root CA | The top CA of a chain. Its private key is kept in AWS KMS (`vault-kv`) or AWS CloudHSM (`pkcs11`) and used only during a CA ceremony. A `vault-kv` deployment without KMS keeps it in Vault or offline; an offline root is also used once a year to re-sign its CRL. |
+| Offline root | A root CA key created and used only on an air-gapped machine, and stored encrypted in safes. One of the root locations of a `vault-kv` deployment without KMS. |
 | Intermediate CA | A CA signed by a root, which signs everyday certificates. Pivotal's intermediates live in Vault. |
 | CA ceremony | The one-time procedure that creates Pivotal's two root CAs and their intermediates. |
-| DFSP CA | Pivotal's CA for the DFSP-facing side: a **root** and an **intermediate**, both made in the CA ceremony. The root's key stays in KMS (`vault-kv`) or the HSM (`pkcs11`) and is used only to sign the intermediate. The intermediate lives in Vault mount `pki_dfsp` (role `dfsp-client`) and issues DFSP client certificates. trust-manager publishes the intermediate as the DFSP-facing gateway's trust anchor. |
-| Pivotal Hub-client CA | Pivotal's CA for the Hub-facing side: a root (key in KMS or the HSM; certificate in Secret `pivotal-hub-client-ca`) and an intermediate in Vault mount `pki_hub_client`. Signs the web-inbound server certificate (role `web-inbound-server`) and the Hub callback certificate (role `hub-callback-client`). The ceremony also creates a role `pivotal-client`, which the setup in this guide does not use. Its root certificate is stored in the Secret `pivotal-hub-client-ca`, key `ca.pem`. |
+| DFSP CA | Pivotal's CA for the DFSP-facing side: a **root** and an **intermediate**, both made in the CA ceremony. The root's key stays in KMS (`vault-kv`), the HSM (`pkcs11`), or, without KMS, Vault or offline storage, and is used only to sign the intermediate. The intermediate lives in Vault mount `pki_dfsp` (role `dfsp-client`) and issues DFSP client certificates. trust-manager publishes the intermediate as the DFSP-facing gateway's trust anchor. |
+| Pivotal Hub-client CA | Pivotal's CA for the Hub-facing side: a root (key in KMS, the HSM, Vault or offline storage; certificate in Secret `pivotal-hub-client-ca`) and an intermediate in Vault mount `pki_hub_client`. Signs the web-inbound server certificate (role `web-inbound-server`) and the Hub callback certificate (role `hub-callback-client`). The ceremony also creates a role `pivotal-client`, which the setup in this guide does not use. Its root certificate is stored in the Secret `pivotal-hub-client-ca`, key `ca.pem`. |
 | Hub CA | The Hub operator's CA. Signs the Hub's own server certificates and Pivotal's Hub client certificate. |
 | CA bundle | A file of CA certificates used to check certificates presented by the other side. |
 | CSR | Certificate signing request. Created by whoever holds a private key, so the key itself never has to be sent anywhere. |
@@ -75,12 +76,14 @@ Full details are in [Certificates and keys](../concepts/certificates-and-keys.md
 | Term | Meaning |
 |---|---|
 | Key profile | Where Pivotal keeps its root CA keys and Hub JWS signing keys. Set with `KEY_PROVIDER` (Hub JWS keys) and by the CA ceremony you run (root keys). |
-| `vault-kv` | The KMS-backed profile. Root keys in AWS KMS; Hub JWS signing keys in Vault KV. |
+| `vault-kv` | The KMS-backed profile. Root keys in AWS KMS, or without KMS in Vault or offline; Hub JWS signing keys in Vault KV. |
 | `pkcs11` | The HSM-backed profile. Root keys and Hub JWS signing keys in AWS CloudHSM. |
 | `none` | No Hub JWS signing keys are held or created. What an unset `KEY_PROVIDER` means: right only for a deployment that does not sign towards the Hub. |
 | `database` | A legacy setting that keeps Hub JWS private keys in Pivotal's database. Not recommended and not covered by this guide. |
 | `KEY_PROVIDER` | The setting that selects the key profile. Set it explicitly whenever JWS is used: unset means `none`. |
-| KMS | AWS Key Management Service. Holds the root CA keys in the `vault-kv` profile. |
+| KMS | AWS Key Management Service. Holds the root CA keys in the `vault-kv` profile, unless the deployment runs without it. |
+| Transit auto-unseal | A Vault seal where the main Vault asks a second Vault (the unseal Vault) to decrypt Vault's internal root key at startup. Unrelated to the CA root keys. See [Vault unseal](../runbooks/common/vault-unseal.md). |
+| Recovery keys | The key shares a Vault with auto-unseal returns instead of unseal keys. They do not unseal Vault; they authorize operations such as generating a root token. |
 | HSM | Hardware security module. In this guide, AWS CloudHSM. |
 | CloudHSM cluster | A group of HSMs that hold the same keys. |
 | Crypto Officer | The CloudHSM administrator role (`admin` in `cloudhsm-cli`). Creates and manages HSM users. Held only by custodians. |

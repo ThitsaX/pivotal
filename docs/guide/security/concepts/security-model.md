@@ -1,6 +1,6 @@
 # Security Model
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Summary
 
@@ -80,7 +80,7 @@ it and still be admitted on its access key alone.
 
 | | `vault-kv` (KMS-backed) | `pkcs11` (HSM-backed) |
 |---|---|---|
-| Root CA keys | In AWS KMS; cannot be exported | In AWS CloudHSM; cannot be exported |
+| Root CA keys | In AWS KMS; cannot be exported. Without KMS: in Vault, usable by Vault administrators (non-production), or offline, encrypted, used only on an air-gapped machine | In AWS CloudHSM; cannot be exported |
 | Hub JWS private keys | Stored in Vault. Loaded into the memory of the services that sign. | Never leave the HSM. Services ask the HSM to sign. |
 | What keeps tenants apart | Vault policies: each connector can read only its own tenant's key; web-outbound and web-pivotal can reach every tenant's key path (web-outbound signs for all tenants; web-pivotal creates the keys) | HSM ownership: each tenant's key is owned by its own crypto user and shared only with web-outbound's crypto user. web-pivotal reads only key references and public keys: it holds no crypto-user credential and cannot reach the HSM. |
 | What an attacker with full access to a running service gets | The keys that service can read | The crypto-user password the service holds, so they can sign from anywhere that reaches the HSM until that password is changed, but never copy the key |

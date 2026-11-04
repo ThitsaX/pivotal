@@ -1,6 +1,6 @@
 # Overview
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Summary
 
@@ -76,7 +76,7 @@ also be trusted on the Hub-facing side.
 | Vault | Holds Pivotal's intermediate CAs and signs certificates with them. Holds the Hub JWS signing keys (`vault-kv`) or references to them and HSM credentials (`pkcs11`). |
 | cert-manager | Issues and renews the web-inbound server certificate through Vault. |
 | MCM | The Hub's registry. Pivotal enrolls its Hub client certificate there, registers its CA and public keys, and reads the Hub CA and peers' public keys from it. |
-| AWS KMS or AWS CloudHSM | Holds the root CA keys. With `pkcs11`, CloudHSM also holds every Hub JWS signing key and performs the signing. |
+| AWS KMS or AWS CloudHSM | Holds the root CA keys. With `pkcs11`, CloudHSM also holds every Hub JWS signing key and performs the signing. A `vault-kv` deployment without KMS keeps the root keys in Vault or offline instead. |
 
 ## What this means for you
 

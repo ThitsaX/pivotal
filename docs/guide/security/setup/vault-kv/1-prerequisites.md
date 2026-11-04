@@ -1,6 +1,6 @@
 # 1. Prerequisites (vault-kv)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
 
@@ -37,8 +37,9 @@ Confirm that every dependency of the `vault-kv` setup is available and reachable
 | Redis | Reachable from the cluster | web-outbound, web-pivotal, trust-manager |
 | NATS | Reachable from the cluster | web-outbound, web-inbound, connectors, trust-manager |
 | Mojaloop Hub with MCM | MCM (Mojaloop Connection Manager) v3.7.4, and its Keycloak | Hub-facing legs 2–4 |
-| AWS account | AWS KMS available in the chosen region | The two CA root keys |
-| Ceremony host | A short-lived machine (for example an EC2 instance) that can reach AWS KMS and the cluster | The CA ceremony |
+| AWS account (KMS ceremony only) | AWS KMS available in the chosen region | The two CA root keys |
+| Ceremony host (KMS ceremony only) | A short-lived machine (for example an EC2 instance) that can reach AWS KMS and the cluster | The CA ceremony |
+| Air-gapped machine (ceremony without AWS KMS, offline roots only) | OpenSSL 3; never connected to a network; two encrypted removable media and a transfer medium | The offline root keys |
 
 #### Tools
 
@@ -48,10 +49,10 @@ On the platform engineer's workstation and on the ceremony host:
 |---|---|---|
 | `kubectl` | Matching the cluster | Workstation, ceremony host |
 | `helm` | 3.x | Workstation |
-| `aws` CLI | 2.x | Ceremony host, and the AWS administrator's workstation |
+| `aws` CLI (KMS ceremony only) | 2.x | Ceremony host, and the AWS administrator's workstation |
 | `vault` CLI | Matching the Vault server | Workstation |
-| Node.js and npm | Node 22 (`>=22 <23`) | Ceremony host |
-| A checkout of the `pivotal` repository at the release tag | — | Ceremony host |
+| Node.js and npm (KMS ceremony only) | Node 22 (`>=22 <23`) | Ceremony host |
+| A checkout of the `pivotal` repository at the release tag (KMS ceremony only) | — | Ceremony host |
 | `openssl`, `curl`, `jq` | Any recent version | Workstation, ceremony host |
 
 #### Access
@@ -60,8 +61,9 @@ On the platform engineer's workstation and on the ceremony host:
 |---|---|
 | Platform engineer | Create Secrets in the Pivotal namespace and in the ingress gateway's namespace; install Helm releases; `kubectl exec` into Pivotal pods; `create` on `serviceaccounts/token` in the Pivotal namespace (for `kubectl create token`) |
 | Vault administrator | A Vault token that can enable secrets engines, write policies and write Kubernetes auth roles |
-| AWS administrator | `kms:CreateKey`, `kms:CreateAlias`, `kms:GetKeyPolicy`, `kms:PutKeyPolicy` in the chosen region |
-| Custodian (runs the ceremony) | On the ceremony host: an AWS identity allowed only `kms:Sign`, `kms:GetPublicKey` and `kms:DescribeKey` on the root keys; `kubectl exec` into the Vault pod; a Vault token that can disable and enable the PKI mounts and write roles; permission to create a Secret in the Pivotal namespace |
+| AWS administrator (KMS ceremony only) | `kms:CreateKey`, `kms:CreateAlias`, `kms:GetKeyPolicy`, `kms:PutKeyPolicy` in the chosen region |
+| Key holders (ceremony without AWS KMS, offline roots only) | At least two named people who keep the root key passphrases and are present at every use of the roots |
+| Custodian (runs the ceremony) | Without AWS KMS: the Vault token described in [the ceremony's Step 2](./2-ca-ceremony-without-kms.md#step-2-get-a-vault-token-for-the-ceremony) and permission to create a Secret in the Pivotal namespace. With AWS KMS, on the ceremony host: an AWS identity allowed only `kms:Sign`, `kms:GetPublicKey` and `kms:DescribeKey` on the root keys; `kubectl exec` into the Vault pod; a Vault token that can disable and enable the PKI mounts and write roles; permission to create a Secret in the Pivotal namespace |
 
 #### What the Hub operator must provide
 
@@ -73,7 +75,7 @@ items before page 4.
 | Item | Why you might want it |
 |---|---|
 | external-dns | Creates DNS records for the gateway hosts |
-| A CloudTrail trail with a metric filter and alarm on `kms:Sign` | Alerts on any use of a root key. Legitimate use is only during a ceremony. Strongly recommended for production. |
+| A CloudTrail trail with a metric filter and alarm on `kms:Sign` (KMS ceremony only) | Alerts on any use of a root key. Legitimate use is only during a ceremony. Strongly recommended for production. |
 | OpenTelemetry Operator | Tracing for the Java connectors |
 
 ## Steps
@@ -129,14 +131,16 @@ items before page 4.
 
 | Value | Example | Your value |
 |---|---|---|
-| AWS region | — | |
-| KMS alias, DFSP CA root | `alias/pivotal-dfsp-root-ca` | |
-| KMS alias, Pivotal Hub-client CA root | `alias/pivotal-hub-client-root-ca` | |
+| Where the CA roots are kept | AWS KMS, in Vault, or offline | |
+| AWS region (KMS ceremony only) | — | |
+| KMS alias, DFSP CA root (KMS ceremony only) | `alias/pivotal-dfsp-root-ca` | |
+| KMS alias, Pivotal Hub-client CA root (KMS ceremony only) | `alias/pivotal-hub-client-root-ca` | |
+| Root key holders (offline roots only) | Names | |
 
 The shared values (namespaces, hosts, MCM, Vault, IDs) are in the
 [shared worksheet](../common/hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet).
 
-- **Expected Result:** No empty cells.
+- **Expected Result:** No empty cells, apart from rows that do not apply to your choice of root location.
 
 ## Verification
 
@@ -144,7 +148,7 @@ The shared values (namespaces, hosts, MCM, Vault, IDs) are in the
 |---|---|---|
 | Vault is unsealed | `vault status` | `Sealed false` |
 | Kubernetes auth exists, or can be enabled | `vault auth list` | `kubernetes/` listed, or you hold rights to enable it |
-| AWS identity and region are right (AWS administrator) | `aws sts get-caller-identity` and `aws configure get region` | Expected account and region |
+| AWS identity and region are right (AWS administrator; KMS ceremony only) | `aws sts get-caller-identity` and `aws configure get region` | Expected account and region |
 | Shared items | Step 3 | The shared page's verification passed |
 | Gateway exists | Step 2 | Gateway pod running |
 
@@ -163,4 +167,4 @@ Not applicable. This page changes nothing.
 - [Choosing a profile](../../concepts/choosing-a-profile.md)
 - [Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md)
 - [Glossary](../../reference/glossary.md)
-- Next: [2. CA ceremony](./2-ca-ceremony.md)
+- Next: [2. CA ceremony](./2-ca-ceremony.md), or [2. CA ceremony without AWS KMS](./2-ca-ceremony-without-kms.md)

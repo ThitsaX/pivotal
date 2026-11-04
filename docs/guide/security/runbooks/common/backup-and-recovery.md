@@ -1,6 +1,6 @@
 # Backup and Recovery
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: both · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: both · Document version 1.0 (draft)
 
 ## Overview
 
@@ -47,6 +47,9 @@ Make sure that every item that cannot be re-created is backed up, and know the r
   | Vault storage | Vault | Both intermediate CA keys; Vault policies and roles. `vault-kv`: every tenant's Hub JWS signing private key. `pkcs11`: each tenant's key reference and crypto-user credential. | Intermediates: a full re-key ([Pivotal CA re-key](pivotal-ca-rekey.md)). JWS keys or key references: tenants cannot sign, and no supported command replaces a key ([Known limitations](../../known-limitations.md#no-jws-signing-key-rotation)). |
   | Pivotal database | MySQL | DFSP access public keys; tenant and peer JWS public keys and signing/verify settings; the records of every issued DFSP client certificate | Lost certificate records: every DFSP certificate is refused as `not recognised`, and every DFSP needs a new one. Lost JWS public keys: tenants stop signing and senders cannot be verified. **Do not onboard the DFSP again:** under `vault-kv` that also overwrites the tenant's private key in Vault with a new one that MCM does not hold. Restoring the database is the only supported recovery. |
   | CA root keys, `vault-kv` | AWS KMS | The private keys of both roots | Cannot be exported or backed up. Protect the KMS keys against deletion. Lost: a full re-key with new roots. |
+  | CA root keys, `vault-kv` without KMS, roots in Vault | Vault (`pki_dfsp_root`, `pki_hub_client_root`) | The private keys of both roots | Covered by the Vault storage backup. Lost with Vault: a full re-key with new roots. |
+  | CA root keys, `vault-kv` without KMS, offline roots | Two encrypted media in separate safes | Each CA folder: encrypted root key, `index.txt`, `crlnumber`, certificates | Keep both copies identical after every use ([Use the offline CA roots](../vault-kv/offline-ca-root.md)). Both lost: a full re-key with new roots once an intermediate needs replacing. |
+  | Transit key (Transit auto-unseal only) | The unseal Vault | The key that unseals the main Vault | Back up the unseal Vault. Lost: the main Vault cannot be unsealed ([Vault unseal](vault-unseal.md)). |
   | CA root keys and tenant JWS keys, `pkcs11` | AWS CloudHSM | The private keys of both roots and every tenant's Hub JWS signing key | Keys cannot be exported, but they are included in CloudHSM cluster backups. Keep those backups. Lost without a backup: a full re-key, and tenants cannot sign. |
 
 - **Expected Result:** Each item has a backup schedule and a tested restore.

@@ -1,12 +1,12 @@
 # 3. Vault (vault-kv)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
 
 In the `vault-kv` profile, Vault holds three things for Pivotal:
 
-- the two intermediate CAs (created by the ceremony on the previous page);
+- the two intermediate CAs (created by the CA ceremony on the previous page, with or without AWS KMS);
 - each DFSP's Hub JWS signing key, in a KV version 2 mount;
 - the access rules that decide which Pivotal service may read or write each of them.
 
@@ -35,12 +35,15 @@ The connector roles are created per DFSP during onboarding, not on this page.
 
 ### Mandatory
 
-- [2. CA ceremony](./2-ca-ceremony.md) completed and verified.
+- Page 2 completed and verified: [2. CA ceremony](./2-ca-ceremony.md) or
+  [2. CA ceremony without AWS KMS](./2-ca-ceremony-without-kms.md).
 - A Vault token that can enable secrets engines and auth methods, write policies and write auth roles.
 - `VAULT_ADDR` set in your shell to a reachable Vault address.
 - From the [shared worksheet](../common/hub-operator-and-worksheet.md#step-3-fill-in-the-worksheet):
-  the Pivotal namespace, `<CERT_MANAGER_NAMESPACE>` and `<CERT_MANAGER_VAULT_SA>`. The ServiceAccount
-  does not need to exist yet; it is created on the inbound page.
+  the Pivotal namespace, `<VAULT_NAMESPACE>` and `<VAULT_POD>` (for example `vault` and `vault-0`),
+  `<CERT_MANAGER_NAMESPACE>` (for example `cert-manager`) and `<CERT_MANAGER_VAULT_SA>` (for example
+  `pivotal-vault-issuer`). The ServiceAccount does not need to exist yet; it is created on the
+  inbound page.
 
 ### Optional
 
@@ -77,9 +80,12 @@ The connector roles are created per DFSP during onboarding, not on this page.
   vault auth enable kubernetes
 
   kubectl -n <VAULT_NAMESPACE> exec -it <VAULT_POD> -- sh -c \
-    'VAULT_TOKEN=<ADMIN_TOKEN> vault write auth/kubernetes/config \
+    'read -r -s VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config \
        kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"'
   ```
+
+  The second command waits for input: type your administrator token and press Enter. Nothing is
+  shown, and the token does not reach your shell history.
 
 - **Expected Result:** `Success! Enabled kubernetes auth method at: kubernetes/` and
   `Success! Data written to: auth/kubernetes/config`.

@@ -1,6 +1,6 @@
 # 4. Deploy Pivotal (vault-kv)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: vault-kv · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: vault-kv · Document version 1.0 (draft)
 
 ## Overview
 
@@ -31,9 +31,11 @@ Run all Pivotal services with signing keys held in Vault KV, and prove the profi
 ### Mandatory
 
 - [3. Vault](./3-vault.md) completed and verified.
-- Secret `pivotal-hub-client-ca` exists in the Pivotal namespace ([CA ceremony, Step 7](./2-ca-ceremony.md#step-7-check-the-pivotal-hub-client-ca-secret)).
+- Secret `pivotal-hub-client-ca` exists in the Pivotal namespace ([CA ceremony, Step 7](./2-ca-ceremony.md#step-7-check-the-pivotal-hub-client-ca-secret),
+  or [CA ceremony without AWS KMS, Step 8](./2-ca-ceremony-without-kms.md#step-8-publish-the-pivotal-hub-client-ca-root)).
 - The Hub operator's items H1 to H4 are in place ([Hub operator items and setup worksheet](../common/hub-operator-and-worksheet.md#step-1-agree-the-hub-operators-items)).
-- The Pivotal Helm chart 0.3.0 and the image tags for your release.
+- The Pivotal Helm chart for your release (0.3.0 or later; release v1.4.5 ships 0.3.1), and its
+  image tags.
 - The non-security settings for each service (database, Redis, NATS, ledger and oracle URLs).
 
 ### Optional
@@ -78,7 +80,7 @@ Run all Pivotal services with signing keys held in Vault KV, and prove the profi
       VAULT_ROLE: pivotal-web-outbound
       VAULT_KV_MOUNT: pivotal-kv               # the default, "secret", is not Pivotal's mount
       VAULT_JWS_KEY_PATH_PREFIX: pivotal/jwskey
-      # Off for now. Pages 5 and 6 turn these on.
+      # Off for now. Page 6 (DFSP-facing) and page 7 (outbound) turn these on.
       FSPIOP_USE_JWS: "false"
       FSPIOP_USE_MUTUAL_TLS: "false"
       FSPIOP_TLS_VERIFY_SERVER_CERT: "true"

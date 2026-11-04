@@ -1,6 +1,6 @@
 # Onboard a DFSP (pkcs11)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: pkcs11 · Document version 1.1 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: pkcs11 · Document version 1.1 (draft)
 
 Use this guide to add a new DFSP to Pivotal, or to upgrade a DFSP that was onboarded on an earlier
 Pivotal version.

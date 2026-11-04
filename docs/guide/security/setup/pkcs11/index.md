@@ -1,6 +1,6 @@
 # Setup: HSM-Backed Profile (`pkcs11`)
 
-> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 · Profile: pkcs11 · Document version 1.0 (draft)
+> Applies to: Pivotal v1.4.0 and later, Helm chart 0.3.0 and later · Profile: pkcs11 · Document version 1.0 (draft)
 
 ## Overview
 
@@ -35,12 +35,12 @@ After setup, onboard every further DFSP with the same runbook.
 
 | | `pkcs11` (this path) | `vault-kv` |
 |---|---|---|
-| Root CA keys | Generated in CloudHSM, non-extractable | AWS KMS |
+| Root CA keys | Generated in CloudHSM, non-extractable | AWS KMS, or without KMS in Vault or offline |
 | Hub JWS private keys | Generated in CloudHSM, owned by the tenant's crypto user | Vault KV |
 | What Vault holds for signing | A crypto-user credential, a keyRef and the public key | The private key |
 | Who creates a DFSP's key | A custodian, with `provision-hsm-tenant.sh`, before onboarding | web-pivotal, at onboarding |
 | Extra infrastructure | CloudHSM cluster, HSM admin pod, CloudHSM client in the images | None |
-| People | Custodians who hold Crypto Officer credentials | KMS key administrators |
+| People | Custodians who hold Crypto Officer credentials | KMS key administrators, or root key holders for offline roots |
 
 Everything on the four `common/` pages is the same in both profiles. See
 [Choosing a profile](../../concepts/choosing-a-profile.md).
