@@ -14,8 +14,10 @@ export namespace OnboardFspCommand {
             public readonly name: string,
             public readonly currencies: FspiopCurrency[],
             public readonly endpoint: string,
-            public readonly jwsPublicKey: string | undefined,
-            public readonly jwsPrivateKey: string | undefined,
+            // No JWS key fields. The signing key is provisioned by the handler into whatever
+            // custody the deployment uses, so there is nothing for a caller to supply and no
+            // private key on this path -- which is also the only shape that holds under the HSM
+            // profile, where a key cannot be handed in at all.
             public readonly accessPublicKey: string,
         ) {
         }

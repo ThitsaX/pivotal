@@ -6,3 +6,5 @@ export * from './audit-patch-response.command';
 export * from './audit-patch-response.handler';
 export * from './audit-patch-error.command';
 export * from './audit-patch-error.handler';
+export * from './audit-patch-resolved.command';
+export * from './audit-patch-resolved.handler';

@@ -61,7 +61,7 @@ const resolvedFormDescription = computed((): string => {
     }
 
     if (props.title === 'Onboard FSP') {
-        return 'Enter the participant name, base endpoint, supported currencies, and signing keys required to onboard a new FSP.';
+        return 'Enter the participant name, base endpoint, supported currencies, and access public key required to onboard a new FSP. A JWS signing key is created automatically.';
     }
 
     return 'Complete the required fields for this action and submit the request.';

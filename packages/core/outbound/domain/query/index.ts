@@ -6,3 +6,5 @@ export * from './get-dfsp-list.query';
 export * from './get-dfsp-list.handler';
 export * from './get-transfer-status.query';
 export * from './get-transfer-status.handler';
+export * from './get-current-fx-rate.query';
+export * from './get-current-fx-rate.handler';

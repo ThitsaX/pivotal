@@ -5,7 +5,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
 import { MdcContext } from '@shared/foundation';
-import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
+import { Extension, ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
@@ -32,7 +32,7 @@ export class PutSendMoneyRequest {
             })),
         };
     })
-    extensionList?: ExtensionList;
+    extensionList?: Array<Extension> | ExtensionList;
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
@@ -93,6 +93,26 @@ export class SendMoneyController {
         return payerFsp;
     }
 
+    // Accepts the bare array clients send on POST and the wrapped object this leg has always
+    // taken, so one payload shape works across both. An empty list is dropped rather than
+    // forwarded: FSPIOP requires at least one extension, so an empty one would be rejected by
+    // the peer as a malformed quote instead of being ignored as the caller intended.
+    private static toExtensionList(
+        extensionList: Array<Extension> | ExtensionList | undefined,
+    ): ExtensionList | undefined {
+        if (extensionList == null) {
+            return undefined;
+        }
+
+        const extension = Array.isArray(extensionList) ? extensionList : extensionList.extension;
+
+        if (!Array.isArray(extension) || extension.length === 0) {
+            return undefined;
+        }
+
+        return {extension};
+    }
+
     // The request line is emitted by SendMoneyLogInterceptor, which runs before the
     // ValidationPipe and therefore also covers payloads rejected during validation.
     @Post()
@@ -134,7 +154,7 @@ export class SendMoneyController {
                             transferId,
                             request.acceptParty,
                             request.amount ?? '',
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                             SendMoneyController.toOptionalSource(source),
                         ),
                     ),
@@ -156,7 +176,7 @@ export class SendMoneyController {
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
                             request.homeTransactionId,
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                         ),
                     ),
                 );

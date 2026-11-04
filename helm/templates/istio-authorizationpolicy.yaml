@@ -1,0 +1,20 @@
+{{- if .Values.istio.authorizationPolicies.enabled }}
+{{- range $policy := .Values.istio.authorizationPolicies.items }}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ required "istio.authorizationPolicies.items[].name is required" $policy.name }}
+  {{- with $policy.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  selector:
+    {{- toYaml (required (printf "istio.authorizationPolicies.items[%s].selector is required" $policy.name) $policy.selector) | nindent 4 }}
+  action: {{ default "ALLOW" $policy.action }}
+  rules:
+    {{- toYaml (required (printf "istio.authorizationPolicies.items[%s].rules is required" $policy.name) $policy.rules) | nindent 4 }}
+{{- end }}
+{{- end }}

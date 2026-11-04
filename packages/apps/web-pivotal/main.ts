@@ -12,6 +12,7 @@ import {AdminUserSeeder, RbacSeeder} from '@core/auth/domain';
 import {DbMigration, DbMigrationSettings} from '@shared/dbmigration';
 import {PivotalExceptionFilter} from '@shared/foundation';
 import {WebPivotalAppModule} from './app.module';
+import {WebPivotalSettings} from './required.settings';
 
 const AUDIT_SQL_LOCATION = 'packages/core/audit/domain/sql';
 const AUTH_SQL_LOCATION = 'packages/core/auth/domain/sql';
@@ -114,6 +115,9 @@ const bootstrap = async (): Promise<void> => {
         loadDotEnv({path: moduleEnvPath, override: true});
         Logger.log(`Loaded env from ${moduleEnvPath}.`, 'Bootstrap');
     }
+
+    // Fail before migrations or opening listeners if the session configuration is invalid.
+    new WebPivotalSettings();
 
     const auditLocation = resolve(repoRoot, AUDIT_SQL_LOCATION);
     const authLocation = resolve(repoRoot, AUTH_SQL_LOCATION);

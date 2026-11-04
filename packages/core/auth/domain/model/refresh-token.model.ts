@@ -26,6 +26,9 @@ export class RefreshToken {
     @Column({type: 'datetime', name: 'expires_at'})
     public expiresAt: Date;
 
+    @Column({type: 'datetime', precision: 3, name: 'session_expires_at', nullable: true})
+    public sessionExpiresAt: Date | null;
+
     @Column({type: 'datetime', name: 'revoked_at', nullable: true})
     public revokedAt: Date | null;
 
@@ -40,6 +43,7 @@ export class RefreshToken {
         familyId: string,
         tokenHash: string,
         expiresAt: Date,
+        sessionExpiresAt: Date | null,
         id?: string,
     ) {
         if (id !== undefined) {
@@ -49,6 +53,7 @@ export class RefreshToken {
         this.familyId = familyId;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
+        this.sessionExpiresAt = sessionExpiresAt;
         this.revokedAt = null;
         this.replacedBy = null;
     }

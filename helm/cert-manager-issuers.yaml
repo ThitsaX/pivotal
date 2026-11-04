@@ -1,0 +1,74 @@
+# cert-manager -> Vault PKI, one ClusterIssuer per trust domain.
+#
+# Mirrors prod-hub-guinea-gitops/apps/vault-pki-setup/certman-rbac.yaml: a
+# ServiceAccount cert-manager can mint tokens for, the RBAC that lets it, and an
+# issuer that authenticates to Vault with that token.
+#
+# Both issuers use `sign`, never `issue`: issue makes Vault generate the keypair.
+# cert-manager creates the private key in-cluster and sends only a CSR, which is
+# what keeps "the private key never leaves the requester" true.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-issuer
+  namespace: certmanager
+---
+# cert-manager mints a short-lived token for vault-issuer via the TokenRequest
+# API. Without this it cannot authenticate and every request fails 403.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-issuer-token
+  namespace: certmanager
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["vault-issuer"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-issuer-token
+  namespace: certmanager
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: certmanager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-issuer-token
+---
+# Hub-facing client leaves: web-outbound and each connector get their own.
+# The CA is registered with MCM, not the leaf, so these rotate with no MCM call.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: pki-hub-client
+spec:
+  vault:
+    path: pki_hub_client/sign/pivotal-client
+    server: http://vault.vault.svc.cluster.local:8200
+    auth:
+      kubernetes:
+        role: cert-manager
+        mountPath: /v1/auth/kubernetes
+        serviceAccountRef:
+          name: vault-issuer
+---
+# DFSP-facing client certs. Pivotal is the CA on this leg.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: pki-dfsp
+spec:
+  vault:
+    path: pki_dfsp/sign/dfsp-client
+    server: http://vault.vault.svc.cluster.local:8200
+    auth:
+      kubernetes:
+        role: cert-manager
+        mountPath: /v1/auth/kubernetes
+        serviceAccountRef:
+          name: vault-issuer

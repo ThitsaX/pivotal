@@ -4,6 +4,7 @@ import {describe, it} from 'node:test';
 import {JsMsg} from 'nats';
 import {AuditTransactionConsumer} from '../../../../packages/core/audit/consumer/listener/audit-transaction.consumer';
 import {TransactionMessage} from '../../../../packages/core/audit/common';
+import {AuditPatchResolvedCommand} from '../../../../packages/core/audit/domain';
 
 type FailureApi = {
     handleProcessingFailure(msg: JsMsg, message: TransactionMessage, error: unknown): void;
@@ -12,12 +13,19 @@ type StaticApi = {
     isPermanentDbError(error: unknown): boolean;
     MAX_DELIVERY_ATTEMPTS: number;
 };
+type DispatchApi = {
+    dispatch(message: TransactionMessage): Promise<void>;
+};
 
 const staticApi = AuditTransactionConsumer as unknown as StaticApi;
 
 function newConsumer(): FailureApi {
     // Constructor only stores its collaborators; the failure path uses none of them.
     return new AuditTransactionConsumer({} as never, {} as never) as unknown as FailureApi;
+}
+
+function newDispatchConsumer(commandBus: {execute(command: unknown): Promise<unknown>}): DispatchApi {
+    return new AuditTransactionConsumer({} as never, commandBus as never) as unknown as DispatchApi;
 }
 
 function fakeMsg(redeliveryCount: number): {msg: JsMsg; calls: {term: number; nak: number}} {
@@ -91,5 +99,78 @@ describe('AuditTransactionConsumer.handleProcessingFailure', () => {
 
         assert.equal(calls.term, 1);
         assert.equal(calls.nak, 0);
+    });
+});
+
+describe('AuditTransactionConsumer resolved patch dispatch', () => {
+
+    it('dispatches connector PATCH RESOLVED messages using correlationId and occurredAt', async () => {
+        const executed: unknown[] = [];
+        const consumer = newDispatchConsumer({
+            async execute(command: unknown): Promise<void> {
+                executed.push(command);
+            },
+        });
+
+        await consumer.dispatch(
+            TransactionMessage.resolved(
+                TransactionMessage.InvocationPhase.Patch,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: 'transfer-1',
+                    occurredAt: '2026-10-07T10:15:30.123Z',
+                },
+            ),
+        );
+
+        assert.equal(executed.length, 1);
+        assert.equal(executed[0] instanceof AuditPatchResolvedCommand, true);
+        const command = executed[0] as AuditPatchResolvedCommand;
+        assert.equal(command.input.correlationId, 'transfer-1');
+        assert.equal(command.input.occurredAt.toISOString(), '2026-10-07T10:15:30.123Z');
+    });
+
+    it('ignores PATCH RESOLVED messages from non-connector gateways', async () => {
+        const executed: unknown[] = [];
+        const consumer = newDispatchConsumer({
+            async execute(command: unknown): Promise<void> {
+                executed.push(command);
+            },
+        });
+
+        await consumer.dispatch(
+            TransactionMessage.resolved(
+                TransactionMessage.InvocationPhase.Patch,
+                TransactionMessage.InvocationGateway.Outbound,
+                {
+                    correlationId: 'transfer-1',
+                    occurredAt: '2026-10-07T10:15:30.123Z',
+                },
+            ),
+        );
+
+        assert.equal(executed.length, 0);
+    });
+
+    it('ignores PATCH RESOLVED messages with invalid payloads', async () => {
+        const executed: unknown[] = [];
+        const consumer = newDispatchConsumer({
+            async execute(command: unknown): Promise<void> {
+                executed.push(command);
+            },
+        });
+
+        await consumer.dispatch(
+            TransactionMessage.resolved(
+                TransactionMessage.InvocationPhase.Patch,
+                TransactionMessage.InvocationGateway.Connector,
+                {
+                    correlationId: '',
+                    occurredAt: 'not-a-date',
+                },
+            ),
+        );
+
+        assert.equal(executed.length, 0);
     });
 });

@@ -26,11 +26,13 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
             PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
+            PermissionKey.PARTICIPANT_CERT_ENROLL,
+            PermissionKey.PARTICIPANT_CERT_VIEW,
+            PermissionKey.PARTICIPANT_CERT_REVOKE,
             PermissionKey.AUDIT_TRANSACTIONS_LIST,
             PermissionKey.AUDIT_TRANSACTIONS_VIEW,
             PermissionKey.AUDIT_DASHBOARD_VIEW,
             PermissionKey.ADMIN_USERS_MANAGE,
-            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
         ],
@@ -47,6 +49,10 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
             PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
+            // Enrolls and inspects, but cannot revoke. Withdrawing a certificate cuts a DFSP off
+            // mid-operation, which is a different decision from onboarding one.
+            PermissionKey.PARTICIPANT_CERT_ENROLL,
+            PermissionKey.PARTICIPANT_CERT_VIEW,
         ],
     },
     {
@@ -102,7 +108,6 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
         scope:       'HUB',
         permissionKeys: [
             PermissionKey.ADMIN_USERS_MANAGE,
-            PermissionKey.ADMIN_DFSP_USERS_MANAGE,
             PermissionKey.ADMIN_ROLES_MANAGE,
             PermissionKey.ADMIN_PERMISSIONS_LIST,
         ],

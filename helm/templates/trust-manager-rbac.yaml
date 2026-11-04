@@ -1,0 +1,93 @@
+{{/*
+trust-manager writes certificate and key material into Secrets, so it needs permission
+to do exactly that and nothing more.
+
+Deliberately narrow. Whoever can write these Secrets decides which authority is trusted
+and which certificate is presented, so each grant names the individual object rather
+than Secrets in general.
+*/}}
+{{- if .Values.trustManager.enabled }}
+{{- $serviceAccount := .Values.trustManager.serviceAccount | default dict }}
+{{- $name := $serviceAccount.name | default "trust-manager" }}
+{{- $env := .Values.trustManager.env | default dict }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-certs
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ $env.HUB_CA_SECRET_NAME | default "hub-ca-bundle" | quote }}
+      - {{ $env.HUB_SERVER_CERT_SECRET_NAME | default "hub-server-cert" | quote }}
+    verbs: ["get", "patch"]
+  # `create` cannot be restricted by resourceName -- the authorizer does not know the
+  # name until the object exists. Scoped to this namespace, where both Secrets live.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-certs
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-certs
+{{- if and $env.DFSP_CA_GATEWAY_NAMESPACE $env.DFSP_CA_GATEWAY_SECRET_NAME }}
+---
+{{/*
+Publishing the DFSP-facing anchor means writing into the gateway's namespace, because
+Istio reads a gateway's credentials only from the namespace that gateway runs in.
+
+That boundary is the point rather than an inconvenience, so the grant is a separate Role
+over there, named to the single Secret, instead of anything inherited from this namespace.
+
+`create` is not granted. The Secret is expected to exist already, placed alongside the
+gateway, so a missing one surfaces as a failed sync rather than as this job quietly
+minting a trust anchor of its own.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ $env.DFSP_CA_GATEWAY_NAMESPACE }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ $env.DFSP_CA_GATEWAY_SECRET_NAME | quote }}
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-dfsp-ca
+  namespace: {{ $env.DFSP_CA_GATEWAY_NAMESPACE }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trust-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-dfsp-ca
+{{- end }}
+{{- end }}

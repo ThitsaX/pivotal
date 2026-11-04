@@ -1,0 +1,14 @@
+{{- /*
+  OpenTelemetry auto-instrumentation for the Java connectors. Needs the OpenTelemetry Operator and a
+  trace backend in the cluster. The connectors carry the matching annotation while this is on.
+*/}}
+{{- if .Values.tracing.enabled }}
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: {{ .Values.tracing.instrumentation.name }}
+  labels:
+    {{- include "pivotal-stack.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.tracing.instrumentation.spec | nindent 2 }}
+{{- end }}

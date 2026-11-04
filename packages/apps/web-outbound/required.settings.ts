@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { ConfigService } from '@nestjs/config';
-import { OutboundSettings } from '@core/outbound/domain';
+import { OutboundSettings, SuspiciousTransactionMonitor } from '@core/outbound/domain';
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
-import { FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import {ApiType} from '@shared/iso20022/api-type';
+import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
+import { Pkcs11Settings } from '@shared/pkcs11';
+import { FspiopAccessTokenProvider, FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';
 import type { WebOutboundModule } from './web-outbound.module';
 import { JwtPolicy } from './component';
 
@@ -86,13 +88,61 @@ export class WebOutboundSettings
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
             this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
             this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
+            this.readBoolean('SUSPICIOUS_TRANSACTION_MONITORING_ENABLED', true),
+            this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES', 3),
+            this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_THRESHOLD', 10),
+            this.readSuspiciousTransactionMatchingFields(),
+            this.hubAccessToken(socketTimeoutMs),
+            this.readOptionalString('CATALYST_URL') ?? 'http://localhost:4000',
+            {
+                socketTimeoutMs: this.readPositiveInteger('CATALYST_SOCKET_TIMEOUT_MS'),
+                connectionTimeoutMs: this.readPositiveInteger('CATALYST_CONNECTION_TIMEOUT_MS'),
+            },
         );
+    }
+
+    /**
+     * The Hub's token credentials: all three settings, or none.
+     *
+     * None means the Hub is reached where no token is checked. A partial set is refused at startup
+     * rather than read as none, because that is a typo, and taken as "off" it would surface only as
+     * every transfer being rejected by the Hub's gateway.
+     */
+    private hubAccessToken(timeoutMs: number | undefined): FspiopAccessTokenProvider.Settings | undefined {
+        const tokenUrl = this.readOptionalString('FSPIOP_OAUTH_TOKEN_URL');
+        const clientId = this.readOptionalString('FSPIOP_OAUTH_CLIENT_ID');
+        const clientSecret = this.readOptionalString('FSPIOP_OAUTH_CLIENT_SECRET');
+
+        if (tokenUrl == null && clientId == null && clientSecret == null) {
+            return undefined;
+        }
+
+        if (tokenUrl == null || clientId == null || clientSecret == null) {
+            throw new Error(
+                'FSPIOP_OAUTH_TOKEN_URL, FSPIOP_OAUTH_CLIENT_ID and FSPIOP_OAUTH_CLIENT_SECRET '
+                + 'must be set together, or not at all.');
+        }
+
+        return {tokenUrl, clientId, clientSecret, timeoutMs};
     }
 
     jwtPolicy(): JwtPolicy {
         return {
             enabled: this.readOptionalBoolean('ACCESS_JWT_ENABLED') ?? true,
         };
+    }
+
+    /**
+     * Whether a caller may reach the DFSP-facing leg without a client certificate.
+     *
+     * Named for what it decides. A presented certificate is verified in full either way, so this
+     * never turns mutual TLS on or off — it only says whether arriving without one is fatal.
+     *
+     * Off by default so the mutual-TLS endpoint can run beside the existing one and DFSPs migrate
+     * at their own pace, rather than every caller breaking on the day it is switched on.
+     */
+    dfspFacingMutualTlsMandatory(): boolean {
+        return this.readOptionalBoolean('DFSP_FACING_MTLS_MANDATORY') ?? false;
     }
 
     centralLedgerUrl(): string {
@@ -171,6 +221,18 @@ export class WebOutboundSettings
         return parsed;
     }
 
+    private readNonNegativeIntegerOrDefault(name: string, defaultValue: number): number {
+        return this.readNonNegativeInteger(name) ?? defaultValue;
+    }
+
+    private readSuspiciousTransactionMatchingFields(): ReturnType<typeof SuspiciousTransactionMonitor.parseMatchingFields> {
+        const raw = this.configService.get<string>('SUSPICIOUS_TRANSACTION_MATCHING_FIELDS');
+        if (raw == null || raw.trim().length === 0) {
+            return [...SuspiciousTransactionMonitor.DEFAULT_MATCHING_FIELDS];
+        }
+        return SuspiciousTransactionMonitor.parseMatchingFields(raw);
+    }
+
     private readOptionalString(name: string): string | undefined {
         const value = this.configService.get<string>(name);
         if (value == null || value.trim().length === 0) {
@@ -222,4 +284,106 @@ export class WebOutboundSettings
 
         return parsed;
     }
+
+    /**
+     * Where private keys come from. Unset or `none` holds no Hub-facing signing keys, which suits a
+     * deployment that does not sign; `vault-kv` is the KMS-backed profile and `pkcs11` the
+     * HSM-backed one. An unrecognised value throws rather than defaulting — a typo must not silently
+     * decide where private keys live.
+     *
+     * Signing without a key profile is refused here, at startup. Before `none` existed an unset value
+     * meant plaintext keys in MySQL, and a deployment that turned signing on without choosing would
+     * have kept them there unawares.
+     */
+    keyProvider(): KeyProvider {
+        const keyProvider = KeyProvider.parse(
+            this.configService.get<string>('KEY_PROVIDER'), KeyProvider.None);
+
+        if (!this.readRequiredBoolean('FSPIOP_USE_JWS')) {
+            return keyProvider;
+        }
+
+        if (keyProvider === KeyProvider.None) {
+            throw new Error(
+                'FSPIOP_USE_JWS is true but KEY_PROVIDER is not set. Set it to vault-kv or pkcs11, '
+                + 'the profile that holds the tenants\' signing keys.');
+        }
+
+        if (keyProvider === KeyProvider.Pkcs11
+            && (this.configService.get<string>('HSM_CRED_PATH') ?? '').trim().length === 0) {
+            throw new Error(
+                `KEY_PROVIDER is '${KeyProvider.Pkcs11}' and FSPIOP_USE_JWS is true, so this service `
+                + 'signs and needs its own crypto user. Set HSM_CRED_PATH to the Vault path holding '
+                + 'that credential.');
+        }
+
+        return keyProvider;
+    }
+
+    vaultSettings(): VaultSettings {
+        return new VaultSettings(
+            this.configService.get<string>('VAULT_ADDRESS') ?? '',
+            this.configService.get<string>('VAULT_ROLE') ?? '',
+            this.configService.get<string>('VAULT_KUBERNETES_AUTH_PATH') ?? 'kubernetes',
+            this.configService.get<string>('VAULT_KV_MOUNT') ?? 'secret',
+            this.configService.get<string>('VAULT_JWS_KEY_PATH_PREFIX') ?? 'pivotal/jwskey',
+            this.configService.get<string>('VAULT_SERVICE_ACCOUNT_TOKEN_PATH')
+                ?? VaultSettings.DEFAULT_SERVICE_ACCOUNT_TOKEN_PATH,
+            10_000,
+            this.readVaultAuthMethod(),
+            this.configService.get<string>('VAULT_TOKEN') ?? '',
+        );
+    }
+
+    /**
+     * Where key references live, under `KEY_PROVIDER=pkcs11`.
+     */
+    keyRefPathPrefix(): string {
+        return this.configService.get<string>('KEY_REF_PATH') ?? 'pivotal/keyref';
+    }
+
+    /**
+     * How this workload reaches its PKCS#11 device, under `KEY_PROVIDER=pkcs11`.
+     *
+     * No credential here, deliberately: it is read from Vault at the path named by
+     * `HSM_CRED_PATH`. An env-supplied one sits in the Deployment manifest, shows up in
+     * `kubectl describe`, needs a redeploy to rotate, and leaves no record of who read it.
+     *
+     * web-outbound signs as whichever tenant is the payer, so its credential is the shared
+     * `web-outbound` crypto user that every tenant's key is shared to — not a per-tenant one.
+     */
+    pkcs11Settings(): Pkcs11Settings {
+        return new Pkcs11Settings(
+            this.configService.get<string>('PKCS11_MODULE_PATH') ?? '',
+            this.configService.get<string>('PKCS11_TOKEN_LABEL') ?? '',
+            this.configService.get<string>('HSM_CRED_PATH') ?? '',
+            this.keyRefPathPrefix(),
+            this.readPositiveInteger('PKCS11_SESSION_POOL_SIZE') ?? Pkcs11Settings.DEFAULT_POOL_SIZE,
+        );
+    }
+
+    /**
+     * How this workload authenticates to Vault. Defaults to Kubernetes ServiceAccount auth; the
+     * token method exists only so a Vault running outside Kubernetes can be reached during local
+     * development, where there is no kubelet to project a ServiceAccount token.
+     */
+    private readVaultAuthMethod(): VaultAuthMethod {
+        const value = this.configService.get<string>('VAULT_AUTH_METHOD');
+
+        if (value == null || value.trim().length === 0) {
+            return VaultAuthMethod.Kubernetes;
+        }
+
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized !== VaultAuthMethod.Kubernetes && normalized !== VaultAuthMethod.Token) {
+            throw new Error(
+                `Invalid VAULT_AUTH_METHOD: '${value}'. Expected `
+                + `${VaultAuthMethod.Kubernetes} or ${VaultAuthMethod.Token}.`,
+            );
+        }
+
+        return normalized as VaultAuthMethod;
+    }
+
 }

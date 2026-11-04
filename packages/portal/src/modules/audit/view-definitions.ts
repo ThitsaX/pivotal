@@ -63,8 +63,8 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'hub-add-signing-keys',
-        title: 'Add Signing Keys',
-        subtitle: 'Create or update the JWS signing key pair for Hub.',
+        title: 'Hub JWS Public Key',
+        subtitle: 'Register the Hub\'s JWS public key. Pivotal uses it to verify messages the Hub signs.',
         endpoint: '/hub/signing-keys',
         criteriaFields: [],
         orderColumns: [],
@@ -74,7 +74,7 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     {
         key: 'participant-onboarding',
         title: 'Onboard FSP',
-        subtitle: 'Provision a new FSP with its endpoint, signing keys, and supported currencies.',
+        subtitle: 'Provision a new FSP with its endpoint, access public key, and supported currencies.',
         endpoint: '/participant/onboard',
         criteriaFields: [],
         orderColumns: [],
@@ -103,9 +103,20 @@ export const VIEW_DEFINITIONS: ViewDefinition[] = [
     },
     {
         key: 'participant-add-signing-keys',
-        title: 'Add Signing Keys',
-        subtitle: 'Create or update the JWS signing key pair for a participant by name.',
-        endpoint: '/participant/signing-keys',
+        title: 'JWS Policy',
+        subtitle: 'Turn FSPIOP signing on or off for a participant, and set how strictly their '
+            + 'inbound signatures are checked.',
+        endpoint: '/participant/jws-policy',
+        criteriaFields: [],
+        orderColumns: [],
+        columns: [],
+        primaryKey: 'id',
+    },
+    {
+        key: 'participant-certificates',
+        title: 'Certificates',
+        subtitle: 'Sign a DFSP certificate request and manage the certificates it holds.',
+        endpoint: '/participant/certificates',
         criteriaFields: [],
         orderColumns: [],
         columns: [],
