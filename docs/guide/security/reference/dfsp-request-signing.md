@@ -24,7 +24,7 @@ Source: `apps/web-outbound/component/access.guard.ts`.
 | Header | Value |
 |---|---|
 | `fspiop-source` | The DFSP's own FSP ID. It selects the public key Pivotal checks against. |
-| `authorization` | A compact JWS: `<header>.<payload>.<signature>`, each part base64url. **No `Bearer` prefix.** Exactly one value. |
+| `authorization` | A compact JWS: `<header>.<payload>.<signature>`, each part base64url. An optional, case-insensitive `Bearer` prefix is accepted. Exactly one value. |
 | `date` | Required for transfer status requests. Optional otherwise (see [body-less requests](#body-requests)). |
 
 The signature algorithm is **RS256** (RSA with SHA-256), using the DFSP's access private key. Pivotal
@@ -97,7 +97,7 @@ const uri = `/secured/transferStatus/${transferId}`;
 const statusAuth = sign(KEY,
   { alg: 'RS256', typ: 'JWT', uri, method: 'GET', date, nonce: crypto.randomUUID() },
   {});   // encodes to e30
-// send headers: fspiop-source, date, authorization (no "Bearer")
+// send headers: fspiop-source, date, authorization ("Bearer" is optional)
 ```
 
 ## References

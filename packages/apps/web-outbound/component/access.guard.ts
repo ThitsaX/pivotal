@@ -15,6 +15,8 @@ export class AccessGuard implements CanActivate {
 
     private static readonly AUTHORIZATION_HEADER_NAME = 'authorization';
 
+    private static readonly BEARER_PREFIX = /^Bearer[ \t]+/i;
+
     private static readonly SIGNED_LOOKUP_FRESHNESS_MS = 5 * 60 * 1000;
 
     private static readonly NONCE_KEY_PREFIX = 'nonce:';
@@ -153,7 +155,9 @@ export class AccessGuard implements CanActivate {
     }
 
     private static requireAuthorization(request: Request): string {
-        return AccessGuard.requireHeader(request, AccessGuard.AUTHORIZATION_HEADER_NAME);
+        const authorization = AccessGuard.requireHeader(request, AccessGuard.AUTHORIZATION_HEADER_NAME);
+
+        return authorization.replace(AccessGuard.BEARER_PREFIX, '').trim();
     }
 
     private static requireHeader(request: Request, name: string): string {

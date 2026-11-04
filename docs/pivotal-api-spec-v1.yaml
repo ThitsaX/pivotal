@@ -234,7 +234,7 @@ paths:
           pattern: "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
       - name: authorization
         in: header
-        description: Raw compact RS256 JWS with protected request metadata and `{}` payload. Do not use a Bearer prefix.
+        description: Compact RS256 JWS with protected request metadata and `{}` payload. An optional Bearer prefix is accepted.
         required: true
         schema:
           type: string
@@ -362,7 +362,7 @@ paths:
           example: LRD
       - name: authorization
         in: header
-        description: Raw compact RS256 JWS with protected request metadata and `{}` payload. Do not use a Bearer prefix.
+        description: Compact RS256 JWS with protected request metadata and `{}` payload. An optional Bearer prefix is accepted.
         required: true
         schema:
           type: string
