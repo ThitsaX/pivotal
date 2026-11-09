@@ -34,4 +34,16 @@ export class MdcContext {
 
         return this.storage.run(next, fn);
     }
+
+    public static runIsolated<T>(values: Record<string, string | undefined>, fn: () => T): T {
+        const next = new Map<string, string>();
+
+        for (const [key, value] of Object.entries(values)) {
+            if (key && value && value.trim().length > 0) {
+                next.set(key, value);
+            }
+        }
+
+        return this.storage.run(next, fn);
+    }
 }

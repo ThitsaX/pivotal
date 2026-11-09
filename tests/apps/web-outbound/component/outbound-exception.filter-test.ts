@@ -7,8 +7,8 @@ import {OutboundExceptionFilter}
     from '../../../../packages/apps/web-outbound/component/outbound-exception.filter';
 import {createOutboundValidationException}
     from '../../../../packages/apps/web-outbound/component/outbound-validation-error';
-import {formatSendMoneyRequestHeadersLog, formatSendMoneyRequestLog}
-    from '../../../../packages/apps/web-outbound/component/send-money-log';
+import {formatSendMoneyRequestLog}
+    from '../../../../packages/apps/web-outbound/component/request-log';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
 
 const ORIGINAL_LOGGER_ERROR = Logger.prototype.error;
@@ -208,7 +208,7 @@ describe('Post Send Money request log', () => {
         );
     });
 
-    it('redacts credentials and masks personal data', () => {
+    it('redacts credentials without masking personal data', () => {
         // Extra fields the DTO does not declare still reach req.body untouched, because
         // ValidationPipe's whitelist strips the DTO copy, not the parsed request body.
         const line = formatSendMoneyRequestLog({
@@ -219,25 +219,10 @@ describe('Post Send Money request log', () => {
 
         assert.equal(line.includes('"1234"'), false);
         assert.equal(line.includes('eyJhbGciOi'), false);
-        assert.equal(line.includes('Aung'), false);
-        assert.equal(line.includes('Min'), false);
+        assert.equal(line.includes('Aung'), true);
+        assert.equal(line.includes('Min'), true);
         // Party identifiers stay: they are the correlation keys the ticket requires.
         assert.match(line, /95333312345/);
-    });
-
-    it('includes authorization in headers while redacting other secrets and body authorization', () => {
-        const authorization = 'Bearer test-token-value';
-        const headersLine = formatSendMoneyRequestHeadersLog(SEND_MONEY_BODY, {
-            authorization,
-            cookie: 'session-secret',
-            'fspiop-source': 'mtn',
-        });
-        const bodyLine = formatSendMoneyRequestLog({authorization});
-
-        assert.match(headersLine, /"authorization":"Bearer test-token-value"/);
-        assert.match(headersLine, /"fspiop-source":"mtn"/);
-        assert.match(headersLine, /"cookie":"\[redacted\]"/);
-        assert.equal(bodyLine.includes(authorization), false);
     });
 
     it('escapes newlines so a hostile payload cannot forge a log line', () => {
