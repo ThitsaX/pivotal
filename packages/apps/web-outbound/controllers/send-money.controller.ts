@@ -117,9 +117,14 @@ export class SendMoneyController {
                 new PostSendMoneyCommand(input),
             );
 
-            this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
+            return MdcContext.runIsolated(
+                {[MdcContext.TRANSFER_ID]: output.response.transferId},
+                () => {
+                    this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
 
-            return output.response;
+                    return output.response;
+                },
+            );
         });
     }
 
@@ -131,9 +136,6 @@ export class SendMoneyController {
     ): Promise<SendMoneyResponse> {
         return MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, async () => {
             if (request.acceptParty != null) {
-                this.logger.log(
-                    `Put SendMoney Accept Party Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
-                );
                 const output: PutAcceptPartyCommand.Output = await this.commandBus.execute(
                     new PutAcceptPartyCommand(
                         new PutAcceptPartyCommand.Input(
@@ -152,9 +154,6 @@ export class SendMoneyController {
             }
 
             if (request.acceptQuote != null) {
-                this.logger.log(
-                    `Put SendMoney Accept Quote Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
-                );
                 const output: PutAcceptQuoteCommand.Output = await this.commandBus.execute(
                     new PutAcceptQuoteCommand(
                         new PutAcceptQuoteCommand.Input(

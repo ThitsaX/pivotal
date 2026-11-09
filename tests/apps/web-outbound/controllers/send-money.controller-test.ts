@@ -7,8 +7,9 @@ import {
     PutSendMoneyRequest,
     SendMoneyController,
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
-import {PutAcceptPartyCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {PostSendMoneyCommand, PutAcceptPartyCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
+import {MdcContext} from '../../../../packages/shared/foundation';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
 import { useContainer } from 'class-validator';
@@ -603,5 +604,34 @@ describe('SendMoneyController', () => {
             (error: unknown) => error instanceof FspiopException
                 && error.errorDefinition.errorType.code === FspiopErrors.PAYER_PERMISSION_ERROR.errorType.code,
         );
+    });
+
+    it('uses idValue during POST processing and only transferId for the response log', async () => {
+        const observed: Array<{idValue?: string; transferId?: string}> = [];
+        const controller = new SendMoneyController({
+            async execute(command: PostSendMoneyCommand): Promise<unknown> {
+                observed.push({
+                    idValue: MdcContext.get(MdcContext.ID_VALUE),
+                    transferId: MdcContext.get(MdcContext.TRANSFER_ID),
+                });
+
+                return {response: {transferId: command.input.correlationId}};
+            },
+        } as never);
+        const logger = (controller as unknown as {logger: {log: () => void}}).logger;
+
+        logger.log = (): void => {
+            observed.push({
+                idValue: MdcContext.get(MdcContext.ID_VALUE),
+                transferId: MdcContext.get(MdcContext.TRANSFER_ID),
+            });
+        };
+
+        await controller.post('wallet1', sendMoneyBody('wallet1', 'wallet2') as never);
+
+        assert.equal(observed.length, 2);
+        assert.deepEqual(observed[0], {idValue: '2769100001', transferId: undefined});
+        assert.equal(observed[1]?.idValue, undefined);
+        assert.match(observed[1]?.transferId ?? '', /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
     });
 });

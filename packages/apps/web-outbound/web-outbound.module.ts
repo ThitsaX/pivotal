@@ -9,7 +9,7 @@ import {
     ParticipantDomainModule,
     ParticipantJwsPrivateKeyStore,
 } from '@core/participant/domain';
-import { AccessGuard, DfspCertificateGuard, JwtPolicy, SendMoneyLogMiddleware } from './component';
+import { AccessGuard, DfspCertificateGuard, JwtPolicy, RequestLogMiddleware } from './component';
 import { CentralRegistryController, CurrentFxRateController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
@@ -21,9 +21,9 @@ const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 export class WebOutboundModule implements NestModule {
 
     configure(consumer: MiddlewareConsumer): void {
-        consumer.apply(SendMoneyLogMiddleware).forRoutes({
-            path: 'secured/sendmoney',
-            method: RequestMethod.POST,
+        consumer.apply(RequestLogMiddleware).forRoutes({
+            path: '*',
+            method: RequestMethod.ALL,
         });
     }
 
@@ -110,7 +110,7 @@ export class WebOutboundModule implements NestModule {
                 },
                 inject: [ParticipantCertRepository, REQUIRED_SETTINGS, Reflector],
             },
-            SendMoneyLogMiddleware,
+            RequestLogMiddleware,
         ];
     }
 

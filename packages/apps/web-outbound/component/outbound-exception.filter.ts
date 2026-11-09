@@ -4,7 +4,19 @@ import { ArgumentsHost, BadRequestException, Catch, ExceptionFilter, Logger } fr
 import { Request, Response } from 'express';
 import { ExtensionList, FspiopException, FspiopStatusTranslator, FspiopUserMessages, ErrorMessageLanguage } from '@shared/fspiop';
 import { OutboundValidationErrorResponse, isOutboundValidationErrorResponse } from './outbound-validation-error';
-import { LoggableErrorResponse, formatSendMoneyErrorResponseLog } from './send-money-log';
+import { stringifyForLog, toSendMoneyIdentifiers } from './request-log';
+
+interface LoggableErrorResponse {
+    statusCode?: string;
+}
+
+const formatSendMoneyErrorResponseLog = (
+    body: unknown,
+    errorResponse: LoggableErrorResponse,
+): string => {
+    return `Post Send Money error response for ${toSendMoneyIdentifiers(body)}`
+        + `: errorCode=${errorResponse?.statusCode ?? 'unknown'} ${stringifyForLog(errorResponse)}`;
+};
 
 export class OutboundErrorInformation {
     statusCode!: string;
