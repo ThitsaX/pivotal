@@ -20,7 +20,7 @@ import {
     PartyIdInfo,
     PartyPersonalInfo,
 } from '@shared/fspiop';
-import { AmountDecimalValidator, RedisClient } from '../component';
+import { AmountDecimalValidator, OutboundSettings, RedisClient } from '../component';
 import { TransferRequest } from '../cache';
 import { FspParty, SendMoneyRequest } from '../dto';
 import { PostSendMoneyCommand } from './post-send-money.command';
@@ -43,6 +43,8 @@ export class PostSendMoneyHandler
         private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(AmountDecimalValidator)
         private readonly amountDecimalValidator: AmountDecimalValidator,
+        @Inject(OutboundSettings)
+        private readonly outboundSettings: OutboundSettings,
     ) {
     }
 
@@ -72,12 +74,58 @@ export class PostSendMoneyHandler
         return fspParty;
     }
 
-    private static toTransferRequest(
+    private static readonly GOVERNMENT_TO_PERSON = 'GOVERNMENT_TO_PERSON';
+    private static readonly GOVERNMENT_TO_PERSON_REFUND = 'GOVERNMENT_TO_PERSON_REFUND';
+
+    private isGolNationalPaymentSwitchParty(party: FspParty): boolean {
+        const configuredFspIds = this.outboundSettings.golNationalPaymentSwitchFspIds;
+        if (configuredFspIds.size === 0) {
+            return false;
+        }
+
+        const fspId = PostSendMoneyHandler.toOptionalValue(party.fspId)?.toLowerCase();
+        const idValue = PostSendMoneyHandler.toOptionalValue(party.idValue)?.toLowerCase();
+
+        return (fspId != null && configuredFspIds.has(fspId))
+            || (idValue != null && configuredFspIds.has(idValue));
+    }
+
+    private static isGovernmentToPersonSubScenario(subScenario: string | undefined): boolean {
+        const normalized = PostSendMoneyHandler.toOptionalValue(subScenario);
+
+        return normalized === PostSendMoneyHandler.GOVERNMENT_TO_PERSON
+            || normalized === PostSendMoneyHandler.GOVERNMENT_TO_PERSON_REFUND;
+    }
+
+    private applyGolNationalPaymentSwitchPayerName(request: SendMoneyRequest): void {
+        if (!this.isGolNationalPaymentSwitchParty(request.from)) {
+            return;
+        }
+        if (!PostSendMoneyHandler.isGovernmentToPersonSubScenario(request.subScenario)) {
+            return;
+        }
+        if (PostSendMoneyHandler.toOptionalValue(request.from.displayName) != null) {
+            return;
+        }
+
+        const configuredName = PostSendMoneyHandler.toOptionalValue(
+            this.outboundSettings.golNationalPaymentSwitchName,
+        );
+        if (configuredName == null) {
+            return;
+        }
+
+        request.from.displayName = configuredName;
+    }
+
+    private toTransferRequest(
         request: SendMoneyRequest,
         callback: PartiesTypeIDPutResponse,
         transferId: string,
         initiatedTimestamp: string,
     ): TransferRequest {
+        this.applyGolNationalPaymentSwitchPayerName(request);
+
         const transferRequest = new TransferRequest();
         transferRequest.payer = PostSendMoneyHandler.toParty(request.from);
         transferRequest.payee = callback.party;
@@ -256,7 +304,7 @@ export class PostSendMoneyHandler
 
             const callback = await waitPromise;
             const resolvedDestination = PostSendMoneyHandler.resolveDestination(callback, destination);
-            const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
+            const cachedTransaction = this.toTransferRequest(
                 request,
                 callback,
                 transferId,

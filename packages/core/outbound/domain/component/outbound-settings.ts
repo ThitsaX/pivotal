@@ -36,6 +36,13 @@ export class OutboundSettings {
         /** Catalyst base URL used by the current FX rate pass-through. */
         public readonly catalystUrl: string = 'http://localhost:4000',
         public readonly catalystAxiosParams: CatalystAxiosParams = {},
+        /**
+         * DFSP ids (lowercase) whose blank G2P payer displayName is replaced with
+         * {@link golNationalPaymentSwitchName}. Empty disables the default.
+         */
+        public readonly golNationalPaymentSwitchFspIds: ReadonlySet<string> = new Set(),
+        /** Display name applied for configured G2P government payer DFSPs. */
+        public readonly golNationalPaymentSwitchName: string = 'GOL National Payment Switch',
     ) {
     }
 

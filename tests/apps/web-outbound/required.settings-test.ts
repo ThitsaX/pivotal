@@ -100,6 +100,30 @@ describe('WebOutboundSettings payer fee validation', () => {
         ]);
     });
 
+    it('defaults GOL National Payment Switch FSP ids to empty and keeps the display name', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.deepEqual([...outboundSettings.golNationalPaymentSwitchFspIds], []);
+        assert.equal(
+            outboundSettings.golNationalPaymentSwitchName,
+            'GOL National Payment Switch',
+        );
+    });
+
+    it('reads GOL National Payment Switch FSP ids and display name from env', () => {
+        const outboundSettings = settings({
+            GOL_NATIONAL_PAYMENT_SWITCH_FSP_IDS: 'mofdp, CBL ,',
+            GOL_NATIONAL_PAYMENT_SWITCH_NAME: 'Custom Switch Name',
+        }).outboundSettings();
+
+        assert.deepEqual(
+            [...outboundSettings.golNationalPaymentSwitchFspIds].sort(),
+            ['cbl', 'mofdp'],
+        );
+        assert.equal(outboundSettings.golNationalPaymentSwitchName, 'Custom Switch Name');
+    });
+
+
     it('rejects invalid suspicious transaction matching fields', () => {
         assert.throws(
             () => settings({
