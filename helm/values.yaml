@@ -16,7 +16,6 @@ global:
   revisionHistoryLimit: 3
   terminationGracePeriodSeconds: 30
 
-
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
     FSPIOP_QUOTES_URL: http://web-inbound:3201

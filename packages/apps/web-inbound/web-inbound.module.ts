@@ -83,7 +83,7 @@ export class WebInboundModule {
                         ),
                     );
                 },
-                inject: [FspiopSettings, ParticipantSigningKeysCache],
+                inject: [REQUIRED_SETTINGS, ParticipantSigningKeysCache],
             }
         ];
     }

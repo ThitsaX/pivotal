@@ -5,7 +5,6 @@ import { OutboundSettings, SuspiciousTransactionMonitor } from '@core/outbound/d
 import { CentralLedgerAxiosParams } from '@shared/central-ledger';
 import { TypeOrmSettings } from '@shared/typeorm/component/typeorm-settings';
 import {ApiType} from '@shared/iso20022/api-type';
-
 import { KeyProvider, VaultAuthMethod, VaultSettings } from '@shared/vault';
 import { Pkcs11Settings } from '@shared/pkcs11';
 import { FspiopAccessTokenProvider, FspiopAxiosParams, FspiopSettings } from '@shared/fspiop';

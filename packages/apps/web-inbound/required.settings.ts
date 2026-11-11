@@ -219,5 +219,4 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
         return normalized as VaultAuthMethod;
     }
-
 }
