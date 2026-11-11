@@ -104,13 +104,23 @@ export const auditDashboardStore = {
 
     state: readonly(state),
 
-    async load(params: {from: string; to: string; timeZone: string}): Promise<void> {
+    async load(params: {from: string; to: string; timeZone: string, payerFsp?: string, payeeFsp?: string}): Promise<void> {
 
         state.loading = true;
         state.loadError = null;
 
         try {
-            const query = new URLSearchParams(params);
+            const query = new URLSearchParams({
+                from: params.from,
+                to: params.to,
+                timeZone: params.timeZone,
+            });
+            if (params.payerFsp) {
+                query.set('payerFsp', params.payerFsp);
+            }
+            if (params.payeeFsp) {
+                query.set('payeeFsp', params.payeeFsp);
+            }
             state.data = await apiClient.get<DashboardData>(`/audit/dashboard?${query.toString()}`);
         } catch (error) {
             state.loadError = describeError(error);

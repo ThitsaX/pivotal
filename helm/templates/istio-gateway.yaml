@@ -1,0 +1,25 @@
+{{- if .Values.istio.gateways.enabled }}
+{{- range $gw := .Values.istio.gateways.items }}
+{{- if ne $gw.enabled false }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ required "istio.gateways.items[].name is required" $gw.name }}
+  {{- with $gw.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  {{- with $gw.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  selector:
+    {{- toYaml (required (printf "istio.gateways.items[%s].selector is required" $gw.name) $gw.selector) | nindent 4 }}
+  servers:
+    {{- toYaml (required (printf "istio.gateways.items[%s].servers is required" $gw.name) $gw.servers) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

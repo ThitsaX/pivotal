@@ -22,6 +22,13 @@ import {
     TransactionScenario,
 } from '../../../../../packages/shared/fspiop';
 
+function allowSuspiciousMonitor(): {assertNotSuspicious(): Promise<void>} {
+    return {
+        async assertNotSuspicious(): Promise<void> {
+        },
+    };
+}
+
 function money(amount: string): Money {
     const value = new Money();
     value.amount = amount;
@@ -135,6 +142,7 @@ describe('PutAcceptPartyHandler', () => {
                     },
                 } as never,
                 new PayerProvidedFeesValidator(true, new AmountDecimalValidator(2)),
+                allowSuspiciousMonitor() as never,
             );
 
             const output = await handler.execute(
@@ -192,6 +200,7 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             new PayerProvidedFeesValidator(false, new AmountDecimalValidator(2)),
+            allowSuspiciousMonitor() as never,
         );
 
         await assert.rejects(
@@ -202,5 +211,85 @@ describe('PutAcceptPartyHandler', () => {
                 && error.errorDefinition.errorType.code === FspiopErrors.PAYER_PERMISSION_ERROR.errorType.code,
         );
         assert.equal(postQuotesCalled, false);
+    });
+
+    it('rejects acceptParty before Hub quote when the pattern is suspicious', async () => {
+        const cachedRequest = transferRequest();
+        let postQuotesCalled = false;
+        let monitoredPattern: {
+            payerFsp: string;
+            payerId: string;
+            payeeFsp: string;
+            payeeId: string;
+            currency: string;
+            amount: string;
+        } | undefined;
+
+        const handler = new PutAcceptPartyHandler(
+            {
+                settings: {quotesUrl: 'http://quotes'},
+                async postQuotes(): Promise<void> {
+                    postQuotesCalled = true;
+                },
+            } as never,
+            {
+                async waitFor(): Promise<QuoteSuccessPayload> {
+                    return {response: new QuotesIDPutResponse()};
+                },
+                cancel(): void {
+                },
+            } as never,
+            {
+                async acquireLock(): Promise<string> {
+                    return 'lock-token';
+                },
+                async releaseLock(): Promise<void> {
+                },
+                async get(): Promise<TransferRequest> {
+                    return cachedRequest;
+                },
+                async set(): Promise<void> {
+                },
+                async delete(): Promise<void> {
+                },
+            } as never,
+            {
+                async publish(message: TransactionMessage): Promise<void> {
+                    assert.ok(message);
+                },
+            } as never,
+            {
+                validate(): void {
+                },
+            } as never,
+            new PayerProvidedFeesValidator(false, new AmountDecimalValidator(2)),
+            {
+                async assertNotSuspicious(pattern: typeof monitoredPattern): Promise<void> {
+                    monitoredPattern = pattern;
+                    throw new FspiopException(
+                        FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN,
+                        'Suspicious repetitive transaction pattern detected within the monitoring window.',
+                    );
+                },
+            } as never,
+        );
+
+        await assert.rejects(
+            () => handler.execute(
+                new PutAcceptPartyCommand(new PutAcceptPartyCommand.Input('transfer-1', true, '10.00', undefined, 'wallet1')),
+            ),
+            (error: unknown) => error instanceof FspiopException
+                && error.errorDefinition.errorType.code === FspiopErrors.SUSPICIOUS_TRANSACTION_PATTERN.errorType.code,
+        );
+
+        assert.equal(postQuotesCalled, false);
+        assert.deepEqual(monitoredPattern, {
+            payerFsp: 'wallet1',
+            payerId: '2769100001',
+            payeeFsp: 'wallet2',
+            payeeId: '2769200001',
+            currency: Currency.Usd,
+            amount: '10',
+        });
     });
 });

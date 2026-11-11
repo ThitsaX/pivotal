@@ -135,15 +135,15 @@ describe('RbacSeeder', () => {
         state = freshState();
     });
 
-    it('cold-boot seeds 3 roles / 15 permissions / 22 role_permissions / 11 menus / 12 menu_permissions', async () => {
+    it('cold-boot seeds 3 roles / 18 permissions / 25 role_permissions / 12 menus / 13 menu_permissions', async () => {
 
         const result = await makeSeeder(state).seed();
 
         assert.equal(result.roles.inserted, 3);
-        assert.equal(result.permissions.inserted, 15);
-        assert.equal(result.rolePermissions.inserted, 22);
-        assert.equal(result.menus.inserted, 11);
-        assert.equal(result.menuPermissions.inserted, 12);
+        assert.equal(result.permissions.inserted, 18);
+        assert.equal(result.rolePermissions.inserted, 25);
+        assert.equal(result.menus.inserted, 12);
+        assert.equal(result.menuPermissions.inserted, 13);
 
         for (const step of Object.values(result)) {
             assert.equal(step.skipped, false);
@@ -173,6 +173,23 @@ describe('RbacSeeder', () => {
         assert.equal(state.permissions.get('hub.currency.add')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.list')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.access-key.update')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.certificate.enroll')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.certificate.view')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.certificate.revoke')!.scope, 'HUB');
+    });
+
+    it('gives no DFSP-scoped role a certificate permission', async () => {
+
+        await makeSeeder(state).seed();
+
+        // Enrollment is operator-mediated on purpose: self-service would make a portal login the
+        // root of trust for a cryptographic identity.
+        const dfspRoleId = state.roles.get(DFSP_USER_ROLE_CODE)!.id;
+        const granted = state.rolePermissions
+            .filter((rp) => rp.roleId === dfspRoleId)
+            .map((rp) => [...state.permissions.values()].find((p) => p.id === rp.permissionId)!.keyName);
+
+        assert.ok(granted.every((key) => !key.startsWith('participant.certificate.')));
     });
 
     it('grants ADMIN all permissions, DFSP_ADMIN delegated user management, and DFSP_USER audit only', async () => {
@@ -187,7 +204,7 @@ describe('RbacSeeder', () => {
         const dfspAdminGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspAdminRoleId);
         const dfspGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspRoleId);
 
-        assert.equal(adminGrants.length, 15);
+        assert.equal(adminGrants.length, 18);
         assert.equal(dfspAdminGrants.length, 4);
         assert.equal(dfspGrants.length, 3);
     });

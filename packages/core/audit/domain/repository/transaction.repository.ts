@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {BadRequestException, Injectable} from '@nestjs/common';
+import {BadRequestException, Injectable, Logger} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario, TransferState} from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
 import {DbTarget} from '@shared/typeorm';
 import {Repository, SelectQueryBuilder} from 'typeorm';
 import {Transaction} from '../model';
@@ -14,7 +13,8 @@ import {PIVOTAL_DB_READ_CONNECTION_NAME, PIVOTAL_DB_WRITE_CONNECTION_NAME} from 
 @Injectable()
 export class TransactionRepository {
 
-    private static readonly SNOWFLAKE = Snowflake.get();
+    private readonly logger = new Logger(TransactionRepository.name);
+
     private static readonly DEFAULT_SIZE = 20;
     private static readonly MAX_SIZE = 200;
     private static readonly JSON_REPLACER = (_key: string, value: unknown): unknown => {
@@ -46,7 +46,9 @@ export class TransactionRepository {
         'transaction.transactionType',
         'transaction.subScenario',
         'transaction.transferState',
+        `transaction.amountType`,
         'transaction.error',
+        'transaction.disputeResolvedAt',
         'transaction.possibleDispute',
         'transaction.flow',
         'transaction.transactionStartedAt',
@@ -73,6 +75,8 @@ export class TransactionRepository {
         'transaction.payeeFee',
         'transaction.payerFee',
         'transaction.schemeFee',
+        'transaction.subScenario',
+        'transaction.amountType',
         'transaction.transferState',
         'transaction.possibleDispute',
         'transaction.partiesError',
@@ -92,13 +96,14 @@ export class TransactionRepository {
     }
 
     async save(entity: Transaction): Promise<Transaction> {
-        return this.writeRepository.save(entity);
+        // Use the correlation-keyed write path and read BIGINT IDs without JS number conversion.
+        entity.id = await this.upsert(entity);
+        return entity;
     }
 
     async upsert(input: TransactionRepository.UpsertInput): Promise<string> {
         const now = new Date();
         const values = [
-            TransactionRepository.SNOWFLAKE.nextId().toString(),
             input.correlationId,
             input.payerFsp,
             input.payeeFsp,
@@ -122,6 +127,7 @@ export class TransactionRepository {
             input.transactionType ?? null,
             input.subScenario ?? null,
             input.transferState ?? null,
+            input.amountType ?? null,
             input.possibleDispute ?? false,
             input.error,
             input.flow ?? null,
@@ -169,10 +175,10 @@ export class TransactionRepository {
         ];
         const placeholders = values.map(() => '?').join(', ');
 
-        // Use a single statement upsert so concurrent JetStream consumers do not race on read-before-write.
+        // Let the database allocate id: correlation_id must be the only supplied unique key.
+        // Keep the merge atomic for concurrent JetStream consumers.
         await this.writeRepository.query(
             `INSERT INTO transactions (
-                id,
                 correlation_id,
                 payer_fsp,
                 payee_fsp,
@@ -196,6 +202,7 @@ export class TransactionRepository {
                 transaction_type,
                 sub_scenario,
                 transfer_state,
+                amount_type,
                 possible_dispute,
                 error,
                 flow,
@@ -279,6 +286,7 @@ export class TransactionRepository {
                 transaction_type = COALESCE(VALUES(transaction_type), transactions.transaction_type),
                 sub_scenario = COALESCE(VALUES(sub_scenario), transactions.sub_scenario),
                 transfer_state = COALESCE(VALUES(transfer_state), transactions.transfer_state),
+                amount_type = COALESCE(VALUES(amount_type), transactions.amount_type),
                 possible_dispute = transactions.possible_dispute OR COALESCE(VALUES(possible_dispute), FALSE),
                 error = transactions.error OR VALUES(error),
                 flow = CASE
@@ -446,7 +454,11 @@ export class TransactionRepository {
             [input.correlationId],
         );
 
-        return rows[0]?.id ?? values[0];
+        if (rows[0]?.id == null) {
+            throw new Error(`Audit transaction missing after upsert: ${input.correlationId}`);
+        }
+
+        return String(rows[0].id);
     }
 
     private static toJsonValue(value: unknown | null | undefined): string | null {
@@ -480,10 +492,33 @@ export class TransactionRepository {
         return this.writeRepository.save(existing);
     }
 
+    async resolveDispute(correlationId: string, occurredAt: Date): Promise<boolean> {
+        this.logger.log(
+            `Updating transaction dispute resolution transferId='${correlationId}' occurredAt='${occurredAt.toISOString()}'.`,
+        );
+
+        const result = await this.writeRepository.query(
+            `UPDATE transactions
+             SET possible_dispute = 0,
+                 dispute_resolved_at = ?,
+                 updated_at = NOW()
+             WHERE correlation_id = ?`,
+            [occurredAt, correlationId],
+        );
+        const queryResult = Array.isArray(result) ? result[0] : result;
+        const affectedRows = Number((queryResult as {affectedRows?: number} | undefined)?.affectedRows ?? 0);
+
+        this.logger.log(
+            `Transaction dispute resolution update finished transferId='${correlationId}' affectedRows=${affectedRows}.`,
+        );
+
+        return affectedRows > 0;
+    }
+
     /**
      * Keyset (cursor) pagination. Replaces offset + getManyAndCount + select-*.
      *
-     * - Sorts on `(sortColumn, id)`; the Snowflake `id` is the unique tiebreaker.
+     * - Sorts on `(sortColumn, id)`; the numeric `id` is the unique tiebreaker.
      * - Fetches `size + 1` rows to derive `hasNext`/`hasPrev` with no `COUNT(*)`.
      * - DFSP access scope `(payer OR payee = :fspId)` is run as two index-seekable legs
      *   and merged in memory (UNION semantics) instead of an OR that defeats the index.
@@ -1117,8 +1152,10 @@ export class TransactionRepository {
             transferType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
+            amountType: record.amountType,
             error: record.error,
             dispute: record.possibleDispute,
+            disputeResolvedAt: record.disputeResolvedAt,
             flow: record.flow,
             transactionStartAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
@@ -1150,6 +1187,7 @@ export class TransactionRepository {
             transactionType: record.transactionType,
             subScenario: record.subScenario,
             transferState: record.transferState,
+            amountType: record.amountType,
             transactionStartedAt: record.transactionStartedAt,
             transactionCompletedAt: record.transactionCompletedAt,
             possibleDispute: record.possibleDispute,
@@ -1192,6 +1230,7 @@ export class TransactionRepository {
             patchRespondedAt: record.patchRespondedAt,
             patchRequest: record.patchRequest,
             patchError: record.patchError,
+            disputeResolvedAt: record.disputeResolvedAt,
             payerHomeTransactionId: record.payerHomeTransactionId,
             payeeHomeTransactionId: record.payeeHomeTransactionId,
             createdAt: record.createdAt,
@@ -1221,6 +1260,8 @@ export class TransactionRepository {
             payeeReceiveAmount: record.payeeReceiveAmount,
             transferAmount:  record.transferAmount,
             transferState:   record.transferState,
+            useCase:         record.subScenario,
+            amountType:      record.amountType,
             dispute:         record.possibleDispute,
             partiesError:    TransactionRepository.toRawJson(record.partiesError),
             quotesError:     TransactionRepository.toRawJson(record.quotesError),
@@ -1285,6 +1326,7 @@ export namespace TransactionRepository {
         transactionType?: TransactionScenario | null;
         subScenario?: string | null;
         transferState?: TransferState | null;
+        amountType?: string | null;
         possibleDispute?: boolean | null;
         error: boolean;
         flow?: number | null;

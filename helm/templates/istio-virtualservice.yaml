@@ -1,0 +1,23 @@
+{{- if .Values.istio.virtualServices.enabled }}
+{{- range $vs := .Values.istio.virtualServices.items }}
+{{- if ne $vs.enabled false }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ required "istio.virtualServices.items[].name is required" $vs.name }}
+  {{- with $vs.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  gateways:
+    {{- toYaml (required (printf "istio.virtualServices.items[%s].gateways is required" $vs.name) $vs.gateways) | nindent 4 }}
+  hosts:
+    {{- toYaml (required (printf "istio.virtualServices.items[%s].hosts is required" $vs.name) $vs.hosts) | nindent 4 }}
+  http:
+    {{- toYaml (required (printf "istio.virtualServices.items[%s].http is required" $vs.name) $vs.http) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -2,18 +2,20 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {CanActivate, ExecutionContext} from '@nestjs/common';
 import {Reflector} from '@nestjs/core';
-import {RedisClient} from '@core/outbound/domain';
+import {RedisClient} from '@core/outbound/domain/component/redis-client';
 import {FspiopErrors, FspiopException, FspiopHeaders} from '@shared/fspiop';
 import {AccessKeyStore, PublicKey} from '@shared/security';
 import {Jwt} from '@shared/security/component/jwt';
 import {Request} from 'express';
 import {JwtPolicy} from './jwt-policy';
 import {IS_PUBLIC_KEY} from './public.decorator';
-import {IS_SIGNED_TRANSFER_STATUS_KEY} from './signed-transfer-status.decorator';
+import {IS_SIGNED_GET_KEY} from './signed-transfer-status.decorator';
 
 export class AccessGuard implements CanActivate {
 
     private static readonly AUTHORIZATION_HEADER_NAME = 'authorization';
+
+    private static readonly BEARER_PREFIX = /^Bearer[ \t]+/i;
 
     private static readonly SIGNED_LOOKUP_FRESHNESS_MS = 5 * 60 * 1000;
 
@@ -39,13 +41,13 @@ export class AccessGuard implements CanActivate {
             return true;
         }
 
-        const isSignedTransferStatus = this.reflector.getAllAndOverride<boolean>(
-            IS_SIGNED_TRANSFER_STATUS_KEY,
+        const isSignedGet = this.reflector.getAllAndOverride<boolean>(
+            IS_SIGNED_GET_KEY,
             [context.getHandler(), context.getClass()],
         );
 
-        if (isSignedTransferStatus) {
-            await this.verifySignedTransferStatus(context.switchToHttp().getRequest<Request>());
+        if (isSignedGet) {
+            await this.verifySignedGet(context.switchToHttp().getRequest<Request>());
             return true;
         }
 
@@ -83,7 +85,7 @@ export class AccessGuard implements CanActivate {
         }
     }
 
-    private async verifySignedTransferStatus(request: Request): Promise<void> {
+    private async verifySignedGet(request: Request): Promise<void> {
         const {source, publicKey} = this.resolveSourceAndKey(request);
         const date = AccessGuard.requireHeader(request, FspiopHeaders.Names.DATE);
         const authorization = AccessGuard.requireAuthorization(request);
@@ -153,7 +155,9 @@ export class AccessGuard implements CanActivate {
     }
 
     private static requireAuthorization(request: Request): string {
-        return AccessGuard.requireHeader(request, AccessGuard.AUTHORIZATION_HEADER_NAME);
+        const authorization = AccessGuard.requireHeader(request, AccessGuard.AUTHORIZATION_HEADER_NAME);
+
+        return authorization.replace(AccessGuard.BEARER_PREFIX, '').trim();
     }
 
     private static requireHeader(request: Request, name: string): string {

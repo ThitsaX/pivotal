@@ -49,6 +49,10 @@ export class FspiopErrorType {
     static readonly PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE = new FspiopErrorType('4102', 'Payer FSP unsupported transaction type');
     static readonly PAYER_UNSUPPORTED_CURRENCY = new FspiopErrorType('4103', 'Payer unsupported currency');
     static readonly PAYER_LIMIT_ERROR = new FspiopErrorType('4200', 'Payer limit error');
+    static readonly SUSPICIOUS_TRANSACTION_PATTERN = new FspiopErrorType(
+        '4240',
+        'Suspicious transaction pattern',
+    );
     static readonly PAYER_PERMISSION_ERROR = new FspiopErrorType('4300', 'Payer permission error');
     static readonly GENERIC_PAYER_BLOCKED_ERROR = new FspiopErrorType('4400', 'Generic Payer blocked error');
 

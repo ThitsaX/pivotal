@@ -11,7 +11,8 @@ export namespace AddSigningKeysCommand {
         constructor(
             public readonly name: string,
             public readonly jwsPublicKey: string,
-            public readonly jwsPrivateKey: string,
+            /** Absent for a peer: a participant Pivotal verifies but never signs as. */
+            public readonly jwsPrivateKey: string | undefined,
         ) {
         }
     }

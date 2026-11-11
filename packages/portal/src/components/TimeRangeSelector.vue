@@ -16,8 +16,14 @@ const props = withDefaults(defineProps<{
     disabled?: boolean;
     compactModeSelector?: boolean;
     showLast24?: boolean;
+    /** When false, only the header row (label + headerExtra) is shown. Default true. */
+    controlsVisible?: boolean;
+    /** Hide the title row (clock icon + label + headerExtra). */
+    hideHeader?: boolean;
 }>(), {
     showLast24: true,
+    controlsVisible: true,
+    hideHeader: false,
 });
 
 const emit = defineEmits<{
@@ -150,6 +156,11 @@ const formatPartsInZone = (date: Date, timeZone: string): {year: number; month: 
 
     return {year, month, day};
 };
+
+const todayDateValue = computed((): string => {
+    const today = formatPartsInZone(new Date(), props.selectedTimeZone);
+    return `${today.year}-${padTwo(today.month)}-${padTwo(today.day)}`;
+});
 
 const shiftDateByDays = (year: number, month: number, day: number, days: number): {year: number; month: number; day: number} => {
     const shifted = new Date(Date.UTC(year, month - 1, day + days));
@@ -387,7 +398,8 @@ const updateDatePart = (target: 'start' | 'end', value: string): void => {
 };
 
 // Validation: a custom range is invalid when the resolved start is not strictly
-// before the end. Presets always produce a valid range, so they never error.
+// before the end, or when the From date is after today in the selected timezone.
+// Presets always produce a valid range, so they never error.
 const rangeError = computed((): string => {
     if (selectedMode.value !== 'custom' || !props.startValue || !props.endValue) {
         return '';
@@ -400,7 +412,22 @@ const rangeError = computed((): string => {
         return '';
     }
 
-    return start >= end ? 'Start date & time must be before the end date & time.' : '';
+    if (start >= end) {
+        return 'Start date & time must be before the end date & time.';
+    }
+
+    const today = formatPartsInZone(new Date(), props.selectedTimeZone);
+    const tomorrow = shiftDateByDays(today.year, today.month, today.day, 1);
+    const tomorrowIso = zonedLocalToUtcIso(
+        localMidnight(tomorrow.year, tomorrow.month, tomorrow.day),
+        props.selectedTimeZone,
+    );
+
+    if (start >= new Date(tomorrowIso).getTime()) {
+        return 'From date must not be later than today.';
+    }
+
+    return '';
 });
 
 watch(
@@ -413,6 +440,9 @@ watch(
 
 onMounted((): void => {
     selectedMode.value = (props.mode as RangeMode | '') || detectPresetMode(props.startValue, props.endValue);
+    if (selectedMode.value === 'custom') {
+        syncCustomInputsFromProps();
+    }
 });
 
 watch(
@@ -420,6 +450,9 @@ watch(
     (mode): void => {
         if (mode != null) {
             selectedMode.value = mode as RangeMode | '';
+            if (mode === 'custom') {
+                syncCustomInputsFromProps();
+            }
         }
     },
 );
@@ -458,14 +491,23 @@ watch(
         class="time-range-selector"
         :class="props.disabled === true ? 'opacity-60' : ''"
     >
-        <div class="flex items-center gap-2 mb-3">
-            <svg class="h-4 w-4 text-accent" viewBox="0 0 20 20" fill="currentColor">
+        <div
+            v-if="props.hideHeader !== true"
+            class="mb-3 flex w-full items-center gap-2"
+        >
+            <svg class="h-4 w-4 shrink-0 text-accent" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
             </svg>
-            <span class="text-sm font-semibold text-ink">{{ label }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ label }}</span>
+            <div v-if="$slots.headerExtra" class="ml-auto shrink-0">
+                <slot name="headerExtra" />
+            </div>
         </div>
 
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div
+            v-show="props.controlsVisible !== false"
+            class="flex flex-col gap-2 sm:flex-row sm:items-center"
+        >
             <div :class="props.compactModeSelector === true ? 'w-full sm:w-48' : 'w-full'">
                 <CustomDropdown
                     :model-value="selectedMode"
@@ -489,7 +531,7 @@ watch(
             leave-from-class="opacity-100 translate-y-0 max-h-96"
             leave-to-class="opacity-0 -translate-y-1 max-h-0"
         >
-            <div v-if="selectedMode === 'custom'" class="mt-3">
+            <div v-if="props.controlsVisible !== false && selectedMode === 'custom'" class="mt-3">
                 <div class="datetime-cards-grid">
                     <!-- From -->
                     <div class="datetime-card">
@@ -519,6 +561,7 @@ watch(
                                         ref="startDateInputRef"
                                         :value="customStartDate"
                                         type="date"
+                                        :max="todayDateValue"
                                         :disabled="props.disabled === true"
                                         class="date-hidden-input"
                                         @input="updateDatePart('start', ($event.target as HTMLInputElement).value)"

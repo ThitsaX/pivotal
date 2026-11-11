@@ -1,20 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { DynamicModule, MiddlewareConsumer, Module, NestModule, Provider, RequestMethod } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import {OutboundDomainModule, RedisClient} from '@core/outbound/domain';
-import { ParticipantAccessKeyStore, ParticipantDomainModule, ParticipantJwsPrivateKeyStore, } from '@core/participant/domain';
-import { AccessGuard, JwtPolicy, SendMoneyLogInterceptor } from './component';
-import { CentralRegistryController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
+import { OutboundDomainModule, RedisClient } from '@core/outbound/domain';
+import {
+    ParticipantAccessKeyStore,
+    ParticipantCertRepository,
+    ParticipantDomainModule,
+    ParticipantJwsPrivateKeyStore,
+} from '@core/participant/domain';
+import { AccessGuard, DfspCertificateGuard, JwtPolicy, RequestLogMiddleware } from './component';
+import { CentralRegistryController, CurrentFxRateController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
-import { AccessKeyStore, CaStore, ClientCertStore, PrivateKeyStore } from '@shared/security';
+import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
 import { ParticipantSigningKeysCache } from "@core/participant/domain/component/store/participant-signing-keys-cache";
-import { FspiopMtlsCaStore, FspiopMtlsClientCertStore } from "@shared/fspiop";
 
 const REQUIRED_SETTINGS = Symbol('WebOutboundRequiredSettings');
 
 @Module({})
-export class WebOutboundModule {
+export class WebOutboundModule implements NestModule {
+
+    configure(consumer: MiddlewareConsumer): void {
+        consumer.apply(RequestLogMiddleware).forRoutes({
+            path: '*',
+            method: RequestMethod.ALL,
+        });
+    }
 
     static forRoot(): DynamicModule {
         return WebOutboundModule.forRootAsync({
@@ -48,7 +59,13 @@ export class WebOutboundModule {
                 outboundDomainModule,
                 ...(asyncOptions.imports ?? []),
             ],
-            controllers: [SendMoneyController, DfspListController, CentralRegistryController, TransferStatusController],
+            controllers: [
+                SendMoneyController,
+                DfspListController,
+                CentralRegistryController,
+                TransferStatusController,
+                CurrentFxRateController,
+            ],
             providers: [
                 ...WebOutboundModule.createProviders(asyncOptions),
             ],
@@ -81,7 +98,19 @@ export class WebOutboundModule {
                 },
                 inject: [AccessKeyStore, REQUIRED_SETTINGS, Reflector, RedisClient],
             },
-            SendMoneyLogInterceptor,
+            {
+                provide: DfspCertificateGuard,
+                useFactory: (
+                    certificates: ParticipantCertRepository,
+                    settings: WebOutboundModule.RequiredSettings,
+                    reflector: Reflector,
+                ): DfspCertificateGuard => {
+                    return new DfspCertificateGuard(
+                        certificates, settings.dfspFacingMutualTlsMandatory(), reflector);
+                },
+                inject: [ParticipantCertRepository, REQUIRED_SETTINGS, Reflector],
+            },
+            RequestLogMiddleware,
         ];
     }
 
@@ -94,20 +123,6 @@ export class WebOutboundModule {
                 },
                 inject: [ParticipantSigningKeysCache],
             },
-            {
-                provide: CaStore,
-                useFactory: (): CaStore => {
-                    return new FspiopMtlsCaStore().load();
-                },
-                inject: [],
-            },
-            {
-                provide: ClientCertStore,
-                useFactory: (): ClientCertStore => {
-                    return new FspiopMtlsClientCertStore().load();
-                },
-                inject: [],
-            },
         ];
     }
 }
@@ -118,6 +133,9 @@ export namespace WebOutboundModule {
         extends ParticipantDomainModule.RequiredSettings,
             OutboundDomainModule.RequiredSettings {
         jwtPolicy(): JwtPolicy;
+
+        /** Whether a caller may reach the DFSP-facing leg without a client certificate. */
+        dfspFacingMutualTlsMandatory(): boolean;
     }
 
     export type AsyncOptions = {

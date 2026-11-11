@@ -51,6 +51,16 @@ function freshCapture(): CapturedResponse {
 }
 
 describe('PivotalExceptionFilter', () => {
+    it('preserves the session expiry reason without exposing arbitrary error fields', () => {
+        for (const reason of ['idle', 'absolute']) {
+            const captured = freshCapture();
+            new PivotalExceptionFilter().catch(new UnauthorizedException({
+                code: 'AUTH_SESSION_EXPIRED', message: 'Session expired.', reason, token: 'must-not-leak',
+            }), makeHost(captured));
+            assert.deepEqual(captured.body, {code: 'AUTH_SESSION_EXPIRED', message: 'Session expired.', reason});
+            assert.equal(captured.status, 401);
+        }
+    });
 
     it('passes UnauthorizedException through as 401 with its structured {code, message} body', () => {
 

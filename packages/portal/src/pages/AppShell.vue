@@ -10,7 +10,6 @@ import SidebarMenuIcon from '../components/SidebarMenuIcon.vue';
 import thitsaworksLogo from '../assets/thitsaworks_logo.jpg';
 import {DESKTOP_BREAKPOINT} from '../modules/audit/helpers';
 import type {ViewKey} from '../modules/audit/types';
-import {SIGNING_KEYS_UI_ENABLED} from '../configs/pivotal-runtime-config';
 import {menuStore, type MenuGroup, type MenuItem} from '../stores/menu.store';
 import PermissionsAdminPage from './admin/PermissionsPage.vue';
 import RolesAdminPage from './admin/RolesPage.vue';
@@ -24,6 +23,7 @@ import ParticipantAddNewCurrencyPage from './participant/ParticipantAddNewCurren
 import ParticipantUpdateSigningKeysPage from './participant/ParticipantUpdateSigningKeysPage.vue';
 import ParticipantOnboardingPage from './participant/ParticipantOnboardingPage.vue';
 import ParticipantRegisterEndpointPage from './participant/ParticipantRegisterEndpointPage.vue';
+import ParticipantCertificatesPage from './participant/ParticipantCertificatesPage.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -72,6 +72,7 @@ const pageComponentByKey: Record<ViewKey, Component> = {
     'participant-add-signing-keys': ParticipantUpdateSigningKeysPage,
     'participant-add-new-currency': ParticipantAddNewCurrencyPage,
     'participant-register-endpoint': ParticipantRegisterEndpointPage,
+    'participant-certificates': ParticipantCertificatesPage,
     transactions: TransactionsPage,
     'admin-users': UsersAdminPage,
     'admin-roles': RolesAdminPage,
@@ -80,22 +81,8 @@ const pageComponentByKey: Record<ViewKey, Component> = {
 
 const warnedMenuKeys = new Set<string>();
 
-// Menus gated behind the signing-keys UI feature flag. Hidden while the flag is off.
-const SIGNING_KEYS_MENU_KEYS: ReadonlySet<ViewKey> = new Set<ViewKey>([
-    'hub-add-signing-keys',
-    'participant-add-signing-keys',
-]);
-
 const isKnownViewKey = (key: string): key is ViewKey => {
     return Object.prototype.hasOwnProperty.call(pageComponentByKey, key);
-};
-
-const isMenuKeyEnabled = (key: ViewKey): boolean => {
-    if (!SIGNING_KEYS_UI_ENABLED && SIGNING_KEYS_MENU_KEYS.has(key)) {
-        return false;
-    }
-
-    return true;
 };
 
 const visibleGroups = computed((): MenuGroup[] => {
@@ -113,10 +100,6 @@ const visibleGroups = computed((): MenuGroup[] => {
                     console.warn(`[menu] Unknown menu key '${menu.key}' returned from /auth/me/menu — item hidden.`);
                 }
 
-                continue;
-            }
-
-            if (!isMenuKeyEnabled(menu.key)) {
                 continue;
             }
 

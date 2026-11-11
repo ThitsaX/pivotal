@@ -3,9 +3,14 @@
 
 <script setup lang="ts">
 import {computed, reactive, ref} from 'vue';
-import StatusDialog from '../../components/StatusDialog.vue';
 import {VIEW_BY_KEY} from '../../modules/audit/view-definitions';
-import {executeParticipantAction} from '../../modules/participant/api';
+import {executeParticipantAction, fetchParticipantResource} from '../../modules/participant/api';
+import {
+    canEnableSigning,
+    jwsPolicyChanges,
+    type JwsPolicy,
+    type JwsVerifyMode,
+} from '../../modules/participant/jws-policy';
 import ActionPage from '../shared/ActionPage.vue';
 
 defineProps<{
@@ -18,104 +23,68 @@ const emit = defineEmits<{
 
 const viewDefinition = VIEW_BY_KEY['participant-add-signing-keys'];
 
+// This page used to accept a pasted key pair. It no longer does, and no page does: signing keys
+// are provisioned during onboarding into whatever custody the deployment uses, which under the
+// HSM profile means a key that cannot be exported and so could never be pasted anywhere. What is
+// left are the operational switches, which are decisions rather than secrets.
+//
+// The current switches are loaded before anything can be changed, and only the ones the operator
+// moves are sent. Submitting a form that starts from fixed defaults would write those defaults
+// over settings the operator never saw.
+const fspIdInput = ref('');
+const current = ref<JwsPolicy | null>(null);
 const form = reactive({
-    name: '',
-    jwsPublicKey: '',
-    jwsPrivateKey: '',
+    jwsSignEnabled: false,
+    jwsVerifyMode: 'off' as JwsVerifyMode,
 });
 
 const loading = ref(false);
-const keyGenerationLoading = ref(false);
-const keyGenerationMessage = ref<string | null>(null);
-const keyGenerationError = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
-const responsePayload = ref<unknown>({
-    status: 'idle',
-});
 const lastSubmittedAt = ref<string | null>(null);
 
-const requestPreview = computed(() => {
-    return {
-        name: form.name.trim(),
-        jwsPublicKey: form.jwsPublicKey.trim(),
-        jwsPrivateKey: form.jwsPrivateKey.trim(),
-    };
-});
+const loadedForInput = computed((): boolean =>
+    current.value != null && current.value.fspId === fspIdInput.value.trim());
 
-const canSubmit = computed((): boolean => {
-    return form.name.trim().length > 0
-        && form.jwsPublicKey.trim().length > 0
-        && form.jwsPrivateKey.trim().length > 0
-        && !keyGenerationLoading.value
-        && !loading.value;
-});
+const changes = computed(() =>
+    loadedForInput.value && current.value != null ? jwsPolicyChanges(current.value, form) : null);
 
-const resetForm = (): void => {
-    form.name = '';
-    form.jwsPublicKey = '';
-    form.jwsPrivateKey = '';
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
-    errorMessage.value = null;
-    successMessage.value = null;
-    responsePayload.value = {status: 'idle'};
+const signingLocked = computed((): boolean =>
+    current.value != null && !current.value.jwsSignEnabled && !canEnableSigning(current.value));
+
+const canLoad = computed((): boolean => fspIdInput.value.trim().length > 0 && !loading.value);
+const canSubmit = computed((): boolean => changes.value != null && !loading.value);
+
+const apply = (policy: JwsPolicy): void => {
+    current.value = policy;
+    form.jwsSignEnabled = policy.jwsSignEnabled;
+    form.jwsVerifyMode = policy.jwsVerifyMode;
 };
 
-const generateSigningKeys = async (modulusLength: number): Promise<void> => {
-    keyGenerationLoading.value = true;
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
+const load = async (): Promise<void> => {
+    if (!canLoad.value || loadedForInput.value) {
+        return;
+    }
+
+    const fspId = fspIdInput.value.trim();
+
+    loading.value = true;
+    errorMessage.value = null;
+    successMessage.value = null;
+    current.value = null;
 
     try {
-        const result = await executeParticipantAction('POST', '/participant/signing-key', {
-            size: modulusLength,
-        });
-        const generatedKeyPair = result.payload as {publicKey?: string; privateKey?: string};
-
-        if (generatedKeyPair.publicKey == null || generatedKeyPair.privateKey == null) {
-            throw new Error('Generated key pair payload is incomplete.');
-        }
-
-        form.jwsPublicKey = generatedKeyPair.publicKey;
-        form.jwsPrivateKey = generatedKeyPair.privateKey;
-        keyGenerationMessage.value = `Generated ${modulusLength}-bit PEM signing key pair.`;
+        apply(await fetchParticipantResource<JwsPolicy>(
+            `${viewDefinition.endpoint}?fspId=${encodeURIComponent(fspId)}`));
     } catch (error) {
-        keyGenerationError.value = error instanceof Error ? error.message : String(error);
+        errorMessage.value = error instanceof Error ? error.message : String(error);
     } finally {
-        keyGenerationLoading.value = false;
+        loading.value = false;
     }
 };
 
-const closeKeyGenerationDialog = (): void => {
-    keyGenerationMessage.value = null;
-    keyGenerationError.value = null;
-};
-
-const isKeyGenerationDialogOpen = computed((): boolean => {
-    return keyGenerationMessage.value != null || keyGenerationError.value != null;
-});
-
-const keyGenerationDialogTone = computed((): 'error' | 'success' => {
-    return keyGenerationError.value != null ? 'error' : 'success';
-});
-
-const keyGenerationDialogEyebrow = computed((): string => {
-    return keyGenerationError.value != null ? 'Key Generation Failed' : 'Key Generation Completed';
-});
-
-const keyGenerationDialogTitle = computed((): string => {
-    return keyGenerationError.value != null
-        ? 'Signing key generation could not be completed'
-        : 'Signing key pair generated';
-});
-
-const keyGenerationDialogMessage = computed((): string | null => {
-    return keyGenerationError.value ?? keyGenerationMessage.value;
-});
-
 const submit = async (): Promise<void> => {
-    if (!canSubmit.value) {
+    if (!canSubmit.value || changes.value == null) {
         return;
     }
 
@@ -125,16 +94,17 @@ const submit = async (): Promise<void> => {
     lastSubmittedAt.value = new Date().toISOString();
 
     try {
-        const result = await executeParticipantAction('POST', viewDefinition.endpoint, requestPreview.value);
+        const result = await executeParticipantAction(
+            'PUT', viewDefinition.endpoint, {...changes.value});
+        const saved = result.payload as {jwsSignEnabled: boolean; jwsVerifyMode: JwsVerifyMode};
 
-        responsePayload.value = result.payload;
-        successMessage.value = `Signing keys were saved for ${form.name.trim()}.`;
+        if (current.value != null) {
+            apply({...current.value, jwsSignEnabled: saved.jwsSignEnabled, jwsVerifyMode: saved.jwsVerifyMode});
+        }
+
+        successMessage.value = `JWS policy updated for ${fspIdInput.value.trim()}.`;
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error);
-        responsePayload.value = {
-            status: 'error',
-            message: errorMessage.value,
-        };
     } finally {
         loading.value = false;
     }
@@ -146,7 +116,7 @@ const submit = async (): Promise<void> => {
         eyebrow="Participant"
         :title="viewDefinition.title"
         :subtitle="viewDefinition.subtitle"
-        form-description="Enter the participant name and paste the JWS public and private keys to create or replace the signing key pair."
+        form-description="Load a participant to see its current settings, then change what you need. Only the settings you change are saved."
         :selected-time-zone="selectedTimeZone"
         :loading="loading"
         :error-message="errorMessage"
@@ -165,104 +135,99 @@ const submit = async (): Promise<void> => {
                         <label class="block">
                             <span class="field-label">Participant Name</span>
                             <input
-                                v-model="form.name"
+                                v-model="fspIdInput"
                                 class="field-input"
                                 type="text"
-                                placeholder="wallet1"
+                                placeholder="DemoDFSP1"
                                 autocomplete="off"
+                                @keydown.enter.prevent="load"
                             >
                         </label>
+                        <div class="flex items-end">
+                            <button
+                                type="button"
+                                class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                                :disabled="!canLoad || loadedForInput"
+                                @click="load"
+                            >
+                                Load current settings
+                            </button>
+                        </div>
                     </div>
+
+                    <p v-if="loadedForInput && current" class="text-sm text-slate-600">
+                        Current: signing <strong>{{ current.jwsSignEnabled ? 'on' : 'off' }}</strong>,
+                        verify mode <strong>{{ current.jwsVerifyMode }}</strong>
+                        <span v-if="current.role === 'peer'"> (peer: Pivotal only verifies this participant)</span>.
+                    </p>
+                </section>
+
+                <template v-if="loadedForInput">
+
+                <section class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                            Outbound Signing
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-600">
+                            Whether requests sent on this participant's behalf carry an FSPIOP
+                            signature. Turned on automatically once their public key has been
+                            registered with the switch, so this is for changing it afterwards.
+                        </p>
+                    </div>
+
+                    <label class="mt-2 flex items-center gap-2">
+                        <input
+                            v-model="form.jwsSignEnabled"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-accent/40 text-accent"
+                            :disabled="signingLocked"
+                        >
+                        <span class="text-sm text-slate-700">Sign outbound requests</span>
+                    </label>
+                    <p v-if="signingLocked" class="text-sm text-slate-500">
+                        Signing cannot be turned on: this participant is a peer, or has no signing key.
+                    </p>
                 </section>
 
                 <section class="space-y-2.5 rounded-xl border border-accent/20 bg-[#fafdff] px-3 py-2.5">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
-                                Signing Keys
-                            </h3>
-                            <p class="mt-1 max-w-2xl text-sm text-slate-600">
-                                Paste PEM-formatted values exactly as issued. Existing keys for the participant name will be replaced.
-                            </p>
-                        </div>
-
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                class="rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                                :disabled="keyGenerationLoading"
-                                @click="generateSigningKeys(2048)"
-                            >
-                                {{ keyGenerationLoading ? 'Generating...' : 'Generate 2048' }}
-                            </button>
-
-                            <button
-                                type="button"
-                                class="rounded-lg border border-accent/25 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accent transition hover:border-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                                :disabled="keyGenerationLoading"
-                                @click="generateSigningKeys(4096)"
-                            >
-                                {{ keyGenerationLoading ? 'Generating...' : 'Generate 4096' }}
-                            </button>
-                        </div>
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-[0.1em] text-[#147fc3]">
+                            Inbound Verification
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-slate-600">
+                            How strictly signatures on requests from this participant are checked.
+                        </p>
                     </div>
 
-                    <div class="grid gap-4 xl:grid-cols-2">
-                        <label class="block">
-                            <span class="field-label">JWS Public Key</span>
-                            <textarea
-                                v-model="form.jwsPublicKey"
-                                class="field-input min-h-[16rem] resize-y font-mono text-xs leading-5"
-                                placeholder="-----BEGIN PUBLIC KEY-----"
-                                spellcheck="false"
-                            />
-                        </label>
-
-                        <label class="block">
-                            <span class="field-label">JWS Private Key</span>
-                            <textarea
-                                v-model="form.jwsPrivateKey"
-                                class="field-input min-h-[16rem] resize-y font-mono text-xs leading-5"
-                                placeholder="-----BEGIN PRIVATE KEY-----"
-                                spellcheck="false"
-                            />
-                        </label>
-                    </div>
+                    <label class="block">
+                        <span class="field-label">Verify Mode</span>
+                        <select v-model="form.jwsVerifyMode" class="field-input">
+                            <option value="off">
+                                Off — signatures ignored
+                            </option>
+                            <option value="verify-if-present">
+                                Verify if present — a signature must verify, a missing one is accepted
+                            </option>
+                            <option value="require">
+                                Require — a missing or invalid signature is rejected
+                            </option>
+                        </select>
+                    </label>
                 </section>
 
-                <div class="flex flex-wrap gap-3">
+                </template>
+
+                <div class="flex justify-end">
                     <button
                         type="submit"
-                        class="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 font-display text-xs font-semibold text-white transition hover:bg-[#1289d8] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white"
+                        class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
                         :disabled="!canSubmit"
                     >
-                        <span
-                            class="inline-block h-2.5 w-2.5 rounded-full bg-accentWarm"
-                            :class="loading ? 'animate-pulseGlow' : ''"
-                        />
-                        {{ loading ? 'Submitting...' : 'Add Signing Keys' }}
-                    </button>
-
-                    <button
-                        type="button"
-                        class="rounded-lg border border-accent/25 bg-[#f8fbff] px-3.5 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                        :disabled="loading"
-                        @click="resetForm"
-                    >
-                        Reset
+                        {{ loading ? 'Saving...' : 'Save Changes' }}
                     </button>
                 </div>
             </form>
         </template>
-
     </ActionPage>
-
-    <StatusDialog
-        :open="isKeyGenerationDialogOpen"
-        :tone="keyGenerationDialogTone"
-        :eyebrow="keyGenerationDialogEyebrow"
-        :title="keyGenerationDialogTitle"
-        :message="keyGenerationDialogMessage"
-        @close="closeKeyGenerationDialog"
-    />
 </template>

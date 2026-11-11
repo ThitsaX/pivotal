@@ -7,8 +7,9 @@ import {
     PutSendMoneyRequest,
     SendMoneyController,
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
-import {SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
+import {MdcContext} from '../../../../packages/shared/foundation';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
 import { useContainer } from 'class-validator';
@@ -113,7 +114,18 @@ describe('PutSendMoneyRequest', () => {
         assert.equal(request.amount, '12');
     });
 
-    it('keeps extensionList when acceptParty is true', async () => {
+    it('keeps direct extensionList array when acceptParty is true', async () => {
+        const extensionList = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+        const {request, errors} = await validateRequest({acceptParty: true, amount: '12.34', extensionList});
+
+        assert.deepEqual(errors, []);
+        assert.deepEqual(request.extensionList, extensionList);
+    });
+
+    it('keeps legacy wrapped extensionList when acceptParty is true', async () => {
         const extensionList = {
             extension: [
                 {key: 'payerProvidedSchemeFee', value: '10'},
@@ -509,6 +521,90 @@ describe('SendMoneyRequest', () => {
 
 describe('SendMoneyController', () => {
 
+    // The wire accepts a bare array or the wrapped object; what reaches the command must always
+    // be the wrapped form, or nothing at all.
+    async function acceptPartyExtensionList(
+        extensionList: unknown,
+    ): Promise<unknown> {
+        let captured: PutAcceptPartyCommand | undefined;
+
+        const controller = new SendMoneyController({
+            async execute(command: PutAcceptPartyCommand): Promise<unknown> {
+                captured = command;
+                return {response: {}};
+            },
+        } as never);
+
+        await controller.put('wallet1', 'transfer-1', {
+            acceptParty: true,
+            amount: '12.34',
+            extensionList,
+        } as never);
+
+        return captured?.input.extensionList;
+    }
+
+    it('wraps a direct extensionList array before dispatching acceptParty', async () => {
+        const extension = [
+            {key: 'payerProvidedSchemeFee', value: '10'},
+            {key: 'payerProvidedPayerFee', value: '5'},
+        ];
+
+        assert.deepEqual(await acceptPartyExtensionList(extension), {extension});
+    });
+
+    it('passes a wrapped extensionList through unchanged on acceptParty', async () => {
+        const extension = [{key: 'payerProvidedSchemeFee', value: '10'}];
+
+        assert.deepEqual(await acceptPartyExtensionList({extension}), {extension});
+    });
+
+    // An empty list carries no extensions but is not a valid ExtensionList, so forwarding it
+    // would have the peer reject the whole quote.
+    it('drops an empty extensionList array on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList([]), undefined);
+    });
+
+    it('drops a wrapped extensionList holding no extensions on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList({extension: []}), undefined);
+    });
+
+    it('omits an absent extensionList on acceptParty', async () => {
+        assert.equal(await acceptPartyExtensionList(undefined), undefined);
+    });
+
+    const quoteExtension = [{key: 'audit', value: 'one'}];
+    for (const {name, input, expected} of [
+        {name: 'wraps an array', input: quoteExtension, expected: {extension: quoteExtension}},
+        {name: 'preserves a wrapped list', input: {extension: quoteExtension}, expected: {extension: quoteExtension}},
+        {name: 'drops an empty array', input: [], expected: undefined},
+        {name: 'drops a wrapped empty list', input: {extension: []}, expected: undefined},
+        {name: 'omits an absent list', input: undefined, expected: undefined},
+    ]) {
+        it(`${name} before dispatching acceptQuote`, async () => {
+            let captured: PutAcceptQuoteCommand | undefined;
+            const controller = new SendMoneyController({
+                async execute(command: PutAcceptQuoteCommand): Promise<unknown> {
+                    captured = command;
+                    return {response: {}};
+                },
+            } as never);
+            const before = structuredClone(input);
+            const request = plainToInstance(PutSendMoneyRequest, {
+                acceptQuote: true,
+                homeTransactionId: 'home-1',
+                extensionList: input,
+            });
+
+            await controller.put('wallet1', 'transfer-1', request);
+
+            assert.ok(captured instanceof PutAcceptQuoteCommand);
+            assert.deepEqual(captured.input.extensionList, expected);
+            assert.equal(captured.input.homeTransactionId, 'home-1');
+            assert.deepEqual(input, before);
+        });
+    }
+
     it('rejects POST sendmoney when fspiop-source differs from request payer FSP', async () => {
         const controller = new SendMoneyController({
             async execute(): Promise<never> {
@@ -540,5 +636,34 @@ describe('SendMoneyController', () => {
             (error: unknown) => error instanceof FspiopException
                 && error.errorDefinition.errorType.code === FspiopErrors.PAYER_PERMISSION_ERROR.errorType.code,
         );
+    });
+
+    it('uses idValue during POST processing and only transferId for the response log', async () => {
+        const observed: Array<{idValue?: string; transferId?: string}> = [];
+        const controller = new SendMoneyController({
+            async execute(command: PostSendMoneyCommand): Promise<unknown> {
+                observed.push({
+                    idValue: MdcContext.get(MdcContext.ID_VALUE),
+                    transferId: MdcContext.get(MdcContext.TRANSFER_ID),
+                });
+
+                return {response: {transferId: command.input.correlationId}};
+            },
+        } as never);
+        const logger = (controller as unknown as {logger: {log: () => void}}).logger;
+
+        logger.log = (): void => {
+            observed.push({
+                idValue: MdcContext.get(MdcContext.ID_VALUE),
+                transferId: MdcContext.get(MdcContext.TRANSFER_ID),
+            });
+        };
+
+        await controller.post('wallet1', sendMoneyBody('wallet1', 'wallet2') as never);
+
+        assert.equal(observed.length, 2);
+        assert.deepEqual(observed[0], {idValue: '2769100001', transferId: undefined});
+        assert.equal(observed[1]?.idValue, undefined);
+        assert.match(observed[1]?.transferId ?? '', /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
     });
 });

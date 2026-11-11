@@ -78,6 +78,10 @@ For AWS S3, leave `REPORT_S3_ENDPOINT` empty and set the real bucket, region, ac
 - The pasted key is validated as a structurally valid PEM public key before it is saved.
 - No restart is needed: `web-outbound` refreshes its participant key store from the DB every `PARTICIPANT_KEY_STORE_REFRESH_INTERVAL_SECONDS`, so the new key takes effect on the next refresh and the old key stops being accepted.
 
+## Portal session timeouts
+
+Set `PIVOTAL_IAM_SESSION_IDLE_TIMEOUT_MINUTES` (default `30`) and `PIVOTAL_IAM_SESSION_ABSOLUTE_TIMEOUT_HOURS` (default `12`) on web-pivotal. Both require positive integers; startup rejects idle limits at or below the access-token TTL and absolute limits below the idle limit.
+
 ## Debug Checklist
 
 - If login works but refresh fails in browser, check `PIVOTAL_IAM_CORS_ALLOWED_ORIGINS` and the portal API base URL.

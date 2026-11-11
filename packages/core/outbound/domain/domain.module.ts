@@ -6,14 +6,12 @@ import { TypeOrmModule as NestJsTypeOrmModule } from '@nestjs/typeorm';
 import { AuditProducerModule } from '@core/audit/producer';
 import { Transaction } from '@core/audit/domain/model';
 import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
-import { FspiopAxios, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, } from '@shared/fspiop';
+import { AmountTypeConstraint, FspiopAccessTokenProvider, FspiopAxios, FspiopBearerTokenInterceptor, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
-import { GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
-import { AmountDecimalValidator , HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, TransferStatusRepository } from './component';
-import { AmountTypeConstraint } from '@shared/fspiop';
-import * as https from "node:https";
-import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
+import { GetCurrentFxRateHandler, GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
+import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, SuspiciousTransactionMonitor, TransferStatusRepository } from './component';
 import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
+import { CatalystAxios } from '@shared/catalyst';
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [
@@ -26,6 +24,7 @@ const QueryHandlers = [
     GetDfspListByUsecaseHandler,
     GetDfspListHandler,
     GetTransferStatusHandler,
+    GetCurrentFxRateHandler,
 ];
 
 @Module({})
@@ -81,6 +80,21 @@ export class OutboundDomainModule {
                 inject: [OutboundSettings],
             },
             {
+                provide: SuspiciousTransactionMonitor,
+                useFactory: (
+                    outboundSettings: OutboundSettings,
+                    redisClient: RedisClient,
+                ): SuspiciousTransactionMonitor =>
+                    new SuspiciousTransactionMonitor(
+                        redisClient,
+                        outboundSettings.suspiciousTxnWindowMs,
+                        outboundSettings.suspiciousTxnThreshold,
+                        outboundSettings.suspiciousTxnMonitoringEnabled,
+                        outboundSettings.suspiciousTxnMatchingFields,
+                    ),
+                inject: [OutboundSettings, RedisClient],
+            },
+            {
                 provide: AmountDecimalValidator,
                 useFactory: (outboundSettings: OutboundSettings): AmountDecimalValidator =>
                     new AmountDecimalValidator(outboundSettings.amountDecimalPlaces),
@@ -133,6 +147,15 @@ export class OutboundDomainModule {
                 },
                 inject: [OutboundSettings],
             },
+            {
+                provide: CatalystAxios,
+                useFactory: (outboundSettings: OutboundSettings): CatalystAxios =>
+                    new CatalystAxios(
+                        outboundSettings.catalystUrl,
+                        outboundSettings.catalystAxiosParams,
+                    ),
+                inject: [OutboundSettings],
+            },
             ...(asyncOptions.providers ?? []),
             {
                 provide: Iso20022Transformer,
@@ -145,37 +168,57 @@ export class OutboundDomainModule {
                 provide: FspiopAxios,
                 useFactory: (
                     outboundSettings: OutboundSettings,
-                    privateKeyStore: PrivateKeyStore,
-                    caStore: CaStore,
-                    clientCertStore: ClientCertStore,
+                    jwsSigner: JwsSigner,
                     iso20022Transformer: Iso20022Transformer,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
                     const params = outboundSettings.fspiopAxiosParams;
 
-                    const interceptors =
-                        fspiopSettings.useJws ? [new FspiopSigningInterceptor(privateKeyStore).build()]
-                            : [];
+                    const interceptors = [
+                        ...(outboundSettings.hubAccessToken != null
+                            ? [new FspiopBearerTokenInterceptor(
+                                new FspiopAccessTokenProvider(outboundSettings.hubAccessToken)).build()]
+                            : []),
+                        ...(fspiopSettings.useJws
+                            ? [new FspiopSigningInterceptor(jwsSigner).build()]
+                            : []),
+                    ];
 
-                    const httpsAgent =
-                        fspiopSettings.useMutualTls ?
-                            new https.Agent(
-                                {
-                                    ca: caStore.get()?.toBuffer(),
-                                    cert: clientCertStore.get()?.certBuffer(),
-                                    key: clientCertStore.get()?.keyBuffer(),
-                                    rejectUnauthorized: params.verifyServerCertificate,
-                                    timeout: params.connectionTimeoutMs,
-                                    ...(params.verifyDomain === false
-                                        ? { checkServerIdentity: () => undefined }
-                                        : {}),
-                                })
-                            : undefined;
+                    // Built through MutualTlsAgent so a renewed certificate takes effect
+                    // without a restart. cert-manager rewrites the mounted Secret every
+                    // few weeks; an agent constructed once would keep presenting the
+                    // certificate it started with until the pod was recycled.
+                    let mutualTls: MutualTlsAgent | null = null;
 
-                    return new FspiopAxios(fspiopSettings, iso20022Transformer, params, interceptors, {}, httpsAgent);
+                    if (fspiopSettings.useMutualTls) {
+                        mutualTls = MutualTlsAgent.create({
+                            rejectUnauthorized: params.verifyServerCertificate ?? true,
+                            connectionTimeoutMs: params.connectionTimeoutMs,
+                            verifyDomain: params.verifyDomain,
+                        });
+
+                        // Refusing to start beats starting without a client certificate:
+                        // the request would otherwise leave unauthenticated and fail at
+                        // the peer as an opaque handshake error, far from the cause.
+                        if (mutualTls == null) {
+                            throw new Error(
+                                'Mutual TLS is enabled but no certificate or trust anchor is configured.');
+                        }
+
+                        mutualTls.start();
+                    }
+
+                    return new FspiopAxios(
+                        fspiopSettings,
+                        iso20022Transformer,
+                        params,
+                        interceptors,
+                        {},
+                        mutualTls?.httpsAgent(),
+                    );
                 },
-                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore, Iso20022Transformer],
+                inject: [OutboundSettings, JwsSigner, Iso20022Transformer],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];

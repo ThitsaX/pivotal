@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Currency, PartyIdType, TransactionInitiatorType, TransactionScenario} from '@shared/fspiop';
+import {AmountType, Currency, PartyIdType, TransactionInitiatorType, TransactionScenario} from '@shared/fspiop';
 
 export class TransactionMessage<TContent = TransactionMessage.Content> {
 
@@ -50,6 +50,19 @@ export class TransactionMessage<TContent = TransactionMessage.Content> {
             content,
         );
     }
+
+    static resolved<TContent>(
+        phase: TransactionMessage.InvocationPhase,
+        gateway: TransactionMessage.InvocationGateway,
+        content: TContent,
+    ): TransactionMessage<TContent> {
+        return new TransactionMessage(
+            phase,
+            TransactionMessage.InvocationAction.Resolved,
+            gateway,
+            content,
+        );
+    }
 }
 
 export namespace TransactionMessage {
@@ -65,6 +78,7 @@ export namespace TransactionMessage {
         Request = 'REQUEST',
         Response = 'RESPONSE',
         Error = 'ERROR',
+        Resolved = 'RESOLVED',
     }
 
     export enum InvocationGateway {
@@ -90,6 +104,7 @@ export namespace TransactionMessage {
         transactionInitiatorType?: TransactionInitiatorType | null;
         transactionType?: TransactionScenario | null;
         subScenario?: string | null;
+        amountType?: AmountType | string | null;
         payerHomeTransactionId?: string | null;
         quotingCurrency?: Currency | null;
         quotingAmount?: string | null;
@@ -117,5 +132,10 @@ export namespace TransactionMessage {
         homeTransactionId?: string | null;
     }
 
-    export type Content = PartiesContent | QuotesContent | TransfersContent | PatchContent;
+    export interface PatchResolvedContent {
+        correlationId: string;
+        occurredAt?: Date | string | null;
+    }
+
+    export type Content = PartiesContent | QuotesContent | TransfersContent | PatchContent | PatchResolvedContent;
 }

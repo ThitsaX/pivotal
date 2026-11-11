@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Inject, Logger, Param, Post, Put } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { Transform } from 'class-transformer';
 import { PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest, SendMoneyResponse, } from '@core/outbound/domain';
 import { MdcContext } from '@shared/foundation';
-import { ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
+import { Extension, ExtensionList, FspiopErrors, FspiopException, FspiopHeaders, FspiopMoney, IsFspiopAmount, } from '@shared/fspiop';
 import { Ulid } from "@shared/ulid";
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { SendMoneyLogInterceptor } from '../component/send-money-log.interceptor';
 
 export class PutSendMoneyRequest {
     @IsOptional()
@@ -22,17 +21,8 @@ export class PutSendMoneyRequest {
     amount?: string;
 
     @IsOptional()
-    @Transform(({value}) => {
-        const extension = Array.isArray(value) ? value : value?.extension;
-        if (!Array.isArray(extension)) return value;
-        return extension.length === 0 ? undefined : {
-            extension: extension.map((item) => ({
-                ...item,
-                value: typeof item.value === 'number' ? String(item.value) : item.value,
-            })),
-        };
-    })
-    extensionList?: ExtensionList;
+    extensionList?: Array<Extension> | ExtensionList;
+
 
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
@@ -93,11 +83,28 @@ export class SendMoneyController {
         return payerFsp;
     }
 
-    // The request line is emitted by SendMoneyLogInterceptor, which runs before the
-    // ValidationPipe and therefore also covers payloads rejected during validation.
+    // Accepts the bare array clients send on POST and the wrapped object this leg has always
+    // taken, so one payload shape works across both. An empty list is dropped rather than
+    // forwarded: FSPIOP requires at least one extension, so an empty one would be rejected by
+    // the peer as a malformed quote instead of being ignored as the caller intended.
+    private static toExtensionList(
+        extensionList: Array<Extension> | ExtensionList | undefined,
+    ): ExtensionList | undefined {
+        if (extensionList == null) {
+            return undefined;
+        }
+
+        const extension = Array.isArray(extensionList) ? extensionList : extensionList.extension;
+
+        if (!Array.isArray(extension) || extension.length === 0) {
+            return undefined;
+        }
+
+        return {extension};
+    }
+
     @Post()
     @HttpCode(HttpStatus.OK)
-    @UseInterceptors(SendMoneyLogInterceptor)
     async post(
         @Headers(FspiopHeaders.Names.FSPIOP_SOURCE) source: string,
         @Body() request: SendMoneyRequest,
@@ -111,9 +118,14 @@ export class SendMoneyController {
                 new PostSendMoneyCommand(input),
             );
 
-            this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
+            return MdcContext.runIsolated(
+                {[MdcContext.TRANSFER_ID]: output.response.transferId},
+                () => {
+                    this.logger.log(`Post SendMoney Response for TransferId ${output.response.transferId} : ${JSON.stringify(output.response)}`);
 
-            return output.response;
+                    return output.response;
+                },
+            );
         });
     }
 
@@ -125,16 +137,13 @@ export class SendMoneyController {
     ): Promise<SendMoneyResponse> {
         return MdcContext.run({[MdcContext.TRANSFER_ID]: transferId}, async () => {
             if (request.acceptParty != null) {
-                this.logger.log(
-                    `Put SendMoney Accept Party Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
-                );
                 const output: PutAcceptPartyCommand.Output = await this.commandBus.execute(
                     new PutAcceptPartyCommand(
                         new PutAcceptPartyCommand.Input(
                             transferId,
                             request.acceptParty,
                             request.amount ?? '',
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                             SendMoneyController.toOptionalSource(source),
                         ),
                     ),
@@ -146,9 +155,6 @@ export class SendMoneyController {
             }
 
             if (request.acceptQuote != null) {
-                this.logger.log(
-                    `Put SendMoney Accept Quote Request for TransferId ${transferId} : ${JSON.stringify(request)}`,
-                );
                 const output: PutAcceptQuoteCommand.Output = await this.commandBus.execute(
                     new PutAcceptQuoteCommand(
                         new PutAcceptQuoteCommand.Input(
@@ -156,7 +162,7 @@ export class SendMoneyController {
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
                             request.homeTransactionId,
-                            request.extensionList,
+                            SendMoneyController.toExtensionList(request.extensionList),
                         ),
                     ),
                 );

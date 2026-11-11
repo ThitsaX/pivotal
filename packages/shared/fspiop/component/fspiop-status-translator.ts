@@ -85,6 +85,8 @@ export class FspiopStatusTranslator {
         [FspiopErrorType.PAYER_FSP_UNSUPPORTED_TRANSACTION_TYPE.code]: HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.PAYER_UNSUPPORTED_CURRENCY.code]: HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.PAYER_LIMIT_ERROR.code]: HttpStatus.EXPECTATION_FAILED,
+        [FspiopErrorType.SUSPICIOUS_TRANSACTION_PATTERN.code]:
+            HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.PAYER_PERMISSION_ERROR.code]: HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.GENERIC_PAYER_BLOCKED_ERROR.code]: HttpStatus.EXPECTATION_FAILED,
         [FspiopErrorType.ROUNDING_VALUE_ERROR.code]: HttpStatus.EXPECTATION_FAILED,

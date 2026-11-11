@@ -8,6 +8,7 @@ export type ViewKey =
     | 'participant-add-signing-keys'
     | 'participant-add-new-currency'
     | 'participant-register-endpoint'
+    | 'participant-certificates'
     | 'transactions'
     | 'admin-users'
     | 'admin-roles'

@@ -29,6 +29,8 @@ export namespace LoginCommand {
                 mustChangePassword: boolean;
             },
             public readonly permissions: string[],
+            public readonly sessionExpiresAt: Date,
+            public readonly sessionId: string,
         ) {
         }
     }

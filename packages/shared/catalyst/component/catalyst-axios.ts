@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
-import {AxiosClientBuilder} from '@shared/axios/component';
-import {CatalystException} from '../exception';
+import { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { AxiosClientBuilder } from '@shared/axios/component';
+import { CatalystException } from '../exception';
 import {
     CalculateFeeByFeePolicyIdInput,
     CalculateFeeByFeePolicyIdOutput,
@@ -10,6 +10,7 @@ import {
     CalculateFeeOutput,
     FeePolicy,
 } from '../dto';
+import { RawCurrentFxRate } from './raw-current-fx-rate';
 
 export type CatalystHeadersMap = Record<string, string>;
 
@@ -25,7 +26,8 @@ export type CatalystAxiosInterceptor = (
 ) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>;
 
 export class CatalystErrorResponse {
-    code: string;
+    code?: string;
+    errorCode?: string;
     message: string;
 }
 
@@ -98,20 +100,43 @@ export class CatalystAxios {
 
     private static toCatalystException(error: AxiosError): CatalystException {
         const status = error.response?.status ?? 503;
-        const data = error.response?.data;
+        const data = CatalystAxios.parseJsonIfPossible(error.response?.data);
 
-        const code = error.response != null
-            ? CatalystAxios.resolveResponseCode(status, data)
-            : 'CATALYST_COMMUNICATION_ERROR';
+        const code = CatalystAxios.resolveErrorCode(error, status, data);
         const message = CatalystAxios.resolveErrorMessage(status, data, error);
 
         return new CatalystException(code, `Catalyst (${code}) ${message}`);
     }
 
-    private static resolveResponseCode(status: number, data: unknown): string {
-        const bodyCode = CatalystAxios.readStringField(data, 'code');
+    private static parseJsonIfPossible(data: unknown): unknown {
+        if (typeof data !== 'string') {
+            return data;
+        }
 
-        if (bodyCode != null && bodyCode.trim().length > 0) {
+        try {
+            return JSON.parse(data) as unknown;
+        } catch {
+            return data;
+        }
+    }
+
+    private static resolveErrorCode(error: AxiosError, status: number, data: unknown): string {
+        if (error.response != null) {
+            return CatalystAxios.resolveResponseCode(status, data);
+        }
+
+        return error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+            ? 'CATALYST_TIMEOUT'
+            : 'CATALYST_COMMUNICATION_ERROR';
+    }
+
+    private static resolveResponseCode(status: number, data: unknown): string {
+        const bodyCode = CatalystAxios.firstNonBlank(
+            CatalystAxios.readStringField(data, 'code'),
+            CatalystAxios.readStringField(data, 'errorCode'),
+        );
+
+        if (bodyCode != null) {
             return bodyCode.trim();
         }
 
@@ -168,7 +193,7 @@ export class CatalystAxios {
             candidates.push(error.cause.message);
         }
 
-        const aggregateCause = error.cause as {errors?: unknown[]} | undefined;
+        const aggregateCause = error.cause as { errors?: unknown[] } | undefined;
         if (Array.isArray(aggregateCause?.errors)) {
             for (const item of aggregateCause.errors) {
                 if (item instanceof Error) {
@@ -232,6 +257,26 @@ export class CatalystAxios {
 
     async getFeePolicy(id: string): Promise<FeePolicy> {
         return this.get(`/fee-policies/${id}`);
+    }
+
+    async getCurrentFxRate(
+        baseCurrency: string,
+        quoteCurrency: string,
+    ): Promise<RawCurrentFxRate> {
+        const response = await this.client.get<string>(
+            this.resolveUrl('/rates'),
+            {
+                headers: this.defaultHeaders,
+                params: {
+                    baseCurrency,
+                    quoteCurrency,
+                },
+                responseType: 'text',
+                transformResponse: [(data: string): string => data],
+            },
+        );
+
+        return new RawCurrentFxRate(response.data);
     }
 
     async calculateFee(

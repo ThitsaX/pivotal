@@ -1,0 +1,42 @@
+{{- if .Values.istio.destinationRules.enabled }}
+{{- range .Values.istio.destinationRules.items }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+spec:
+  host: {{ .host }}
+
+  {{- if .trafficPolicy }}
+  trafficPolicy:
+    {{- if .trafficPolicy.tls }}
+    tls:
+      mode: {{ .trafficPolicy.tls.mode }}
+      insecureSkipVerify: {{ .trafficPolicy.tls.insecureSkipVerify }}
+    {{- end }}
+    {{- if .trafficPolicy.connectionPool }}
+    connectionPool:
+      {{- if .trafficPolicy.connectionPool.tcp }}
+      tcp:
+        {{- if .trafficPolicy.connectionPool.tcp.tcpKeepalive }}
+        tcpKeepalive:
+          time: {{ .trafficPolicy.connectionPool.tcp.tcpKeepalive.time }}
+          interval: {{ .trafficPolicy.connectionPool.tcp.tcpKeepalive.interval }}
+        {{- end }}
+      {{- end }}
+      {{- if .trafficPolicy.connectionPool.http }}
+      http:
+        {{- if .trafficPolicy.connectionPool.http.idleTimeout }}
+        idleTimeout: {{ .trafficPolicy.connectionPool.http.idleTimeout }}
+        {{- end }}
+        {{- if .trafficPolicy.connectionPool.http.maxRequestsPerConnection }}
+        maxRequestsPerConnection: {{ .trafficPolicy.connectionPool.http.maxRequestsPerConnection }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+{{- end }}
+{{- end }}

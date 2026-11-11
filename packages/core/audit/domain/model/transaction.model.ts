@@ -7,8 +7,7 @@ import {
     TransactionScenario,
     TransferState,
 } from '@shared/fspiop';
-import {Snowflake} from '@shared/snowflake';
-import {BeforeInsert, Column, Entity, Index, PrimaryColumn} from 'typeorm';
+import {Column, Entity, Index, PrimaryGeneratedColumn} from 'typeorm';
 
 const DECIMAL_TRANSFORMER = {
     to(value: number | null): number | null {
@@ -45,9 +44,7 @@ const DECIMAL_TRANSFORMER = {
 @Index('transactions_23_idx', ['payeeHomeTransactionId'])
 export class Transaction {
 
-    private static readonly SNOWFLAKE = Snowflake.get();
-
-    @PrimaryColumn({type: 'bigint', name: 'id'})
+    @PrimaryGeneratedColumn({type: 'bigint', name: 'id'})
     public id!: string;
 
     @Column({type: 'varchar', length: 128, name: 'correlation_id'})
@@ -151,6 +148,9 @@ export class Transaction {
 
     @Column({type: 'varchar', length: 128, name: 'sub_scenario', nullable: true})
     public subScenario!: string | null;
+
+    @Column({type:'varchar', length : 128 , name:'amount_type' , nullable:true})
+    public amountType!: string | null;
 
     @Column({type: 'varchar', length: 32, name: 'transfer_state', nullable: true})
     public transferState!: TransferState | null;
@@ -281,6 +281,9 @@ export class Transaction {
     @Column({type: 'text', name: 'patch_error', nullable: true})
     public patchError!: string | null;
 
+    @Column({type: 'datetime', precision: 6, name: 'dispute_resolved_at', nullable: true})
+    public disputeResolvedAt!: Date | null;
+
     @Column({type: 'varchar', length: 128, name: 'payer_home_transaction_id', nullable: true})
     public payerHomeTransactionId!: string | null;
 
@@ -293,10 +296,4 @@ export class Transaction {
     @Column({type: 'datetime', name: 'updated_at'})
     public updatedAt!: Date;
 
-    @BeforeInsert()
-    private assignId(): void {
-        if (this.id == null) {
-            this.id = Transaction.SNOWFLAKE.nextId().toString();
-        }
-    }
 }

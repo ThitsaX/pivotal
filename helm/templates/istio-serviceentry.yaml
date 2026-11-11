@@ -1,0 +1,25 @@
+{{- if .Values.istio.serviceEntries.enabled }}
+{{- range $se := .Values.istio.serviceEntries.items }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: {{ required "istio.serviceEntries.items[].name is required" $se.name }}
+  {{- with $se.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "pivotal-stack.labels" $ | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml (required (printf "istio.serviceEntries.items[%s].hosts is required" $se.name) $se.hosts) | nindent 4 }}
+  location: {{ $se.location | default "MESH_INTERNAL" }}
+  resolution: {{ $se.resolution | default "DNS" }}
+  ports:
+    {{- toYaml (required (printf "istio.serviceEntries.items[%s].ports is required" $se.name) $se.ports) | nindent 4 }}
+  {{- with $se.endpoints }}
+  endpoints:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

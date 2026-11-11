@@ -4,7 +4,7 @@ import * as https from 'node:https';
 import {DynamicModule, Module, Provider} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {AuditProducerModule} from '@core/audit/producer';
-import {FspiopAxios, FspiopAxiosParams, FspiopSettings, FspiopSigningInterceptor,} from '@shared/fspiop';
+import {FspiopAxios, FspiopAxiosParams, FspiopSettings, FspiopSigningInterceptor, JwsSigner, PrivateKeyJwsSigner,} from '@shared/fspiop';
 import {CaStore, ClientCertStore, PrivateKeyStore} from '@shared/security';
 import {
     PerformGetPartiesHandler,
@@ -78,6 +78,7 @@ export class ConnectorDomainModule {
                 inject: [REQUIRED_SETTINGS],
             },
             {
+
                 provide: Iso20022Transformer,
                 useFactory: (settings: FspiopSettings): Iso20022Transformer => {
                     return new Iso20022Transformer(settings);
@@ -85,10 +86,19 @@ export class ConnectorDomainModule {
                 inject: [FspiopSettings],
             },
             {
+                // Supplied by the host where the connector signs through a device, and built over
+                // its key store otherwise. A connector reaches exactly one tenant either way: that
+                // is the isolation this module exists to keep, and it is unchanged by custody.
+                provide: JwsSigner,
+                useFactory: (settings: ConnectorDomainModule.RequiredSettings): JwsSigner =>
+                    settings.jwsSigner?.() ?? new PrivateKeyJwsSigner(settings.privateKeyStore()),
+                inject: [REQUIRED_SETTINGS],
+            },
+            {
                 provide: FspiopAxios,
                 useFactory: (
                     settings: ConnectorDomainModule.RequiredSettings,
-                    privateKeyStore: PrivateKeyStore,
+                    jwsSigner: JwsSigner,
                     caStore: CaStore,
                     clientCertStore: ClientCertStore,
                     iso20022Transformer: Iso20022Transformer,
@@ -97,7 +107,7 @@ export class ConnectorDomainModule {
                     const fspiopAxiosParams = settings.fspiopAxiosParams();
 
                     const interceptors = fspiopSettings.useJws
-                        ? [new FspiopSigningInterceptor(privateKeyStore).build()]
+                        ? [new FspiopSigningInterceptor(jwsSigner).build()]
                         : [];
 
                     const httpsAgent = fspiopSettings.useMutualTls
@@ -115,7 +125,7 @@ export class ConnectorDomainModule {
 
                     return new FspiopAxios(fspiopSettings, iso20022Transformer, fspiopAxiosParams, interceptors, {}, httpsAgent);
                 },
-                inject: [REQUIRED_SETTINGS, PrivateKeyStore, CaStore, ClientCertStore, Iso20022Transformer],
+                inject: [REQUIRED_SETTINGS, JwsSigner, CaStore, ClientCertStore, Iso20022Transformer],
             },
             {
                 provide: ConnectorSettings,
@@ -144,6 +154,12 @@ export namespace ConnectorDomainModule {
         fspiopSettings(): FspiopSettings;
         fspiopAxiosParams(): FspiopAxiosParams;
         privateKeyStore(): PrivateKeyStore;
+
+        /**
+         * Where signatures are produced. Absent means in-process over {@link privateKeyStore};
+         * a host signing inside a device supplies one instead.
+         */
+        jwsSigner?(): JwsSigner;
         caStore(): CaStore;
         clientCertStore(): ClientCertStore;
         connectorId(): string;
