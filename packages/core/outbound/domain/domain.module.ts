@@ -13,6 +13,7 @@ import { AmountDecimalValidator , HasPayeeFspIdConstraint, OracleCentralRegistry
 import { AmountTypeConstraint } from '@shared/fspiop';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
 const CommandHandlers = [
@@ -134,12 +135,20 @@ export class OutboundDomainModule {
             },
             ...(asyncOptions.providers ?? []),
             {
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
+            },
+            {
                 provide: FspiopAxios,
                 useFactory: (
                     outboundSettings: OutboundSettings,
                     privateKeyStore: PrivateKeyStore,
                     caStore: CaStore,
                     clientCertStore: ClientCertStore,
+                    iso20022Transformer: Iso20022Transformer,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
@@ -164,9 +173,9 @@ export class OutboundDomainModule {
                                 })
                             : undefined;
 
-                    return new FspiopAxios(fspiopSettings, params, interceptors, {}, httpsAgent);
+                    return new FspiopAxios(fspiopSettings, iso20022Transformer, params, interceptors, {}, httpsAgent);
                 },
-                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore],
+                inject: [OutboundSettings, PrivateKeyStore, CaStore, ClientCertStore, Iso20022Transformer],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];

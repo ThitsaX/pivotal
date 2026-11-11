@@ -17,6 +17,8 @@
  *     process.env['FSPIOP_TRANSFERS_URL']   ?? '',
  *     process.env['FSPIOP_USE_JWS']         === 'true',
  *     process.env['FSPIOP_USE_MUTUAL_TLS']  === 'true',
+ *     ApiType.FSPIOP,
+ *     false,
  *   ),
  * }
  */
@@ -31,7 +33,8 @@ export class FspiopSettings {
         public readonly transfersUrl: string,
         public readonly useJws: boolean,
         public readonly useMutualTls: boolean,
-        public readonly apiType: ApiType = ApiType.FSPIOP,
+        public readonly apiType: ApiType,
+        public readonly validateTarget: boolean,
     ) {
     }
 }

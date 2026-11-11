@@ -1,10 +1,31 @@
 import * as assert from 'node:assert/strict';
 import {AxiosInstance, AxiosRequestConfig} from 'axios';
 import {describe, it} from 'node:test';
-import {FspiopAxios, FspiopAxiosError, FspiopHeaders, FspiopSettings, PartyIdType} from '../../../../packages/shared/fspiop';
+import {FspiopAxios, FspiopAxiosError, FspiopHeaders, FspiopSettings, PartyIdType, QuotesPostRequest} from '../../../../packages/shared/fspiop';
+import {Iso20022Transformer} from '../../../../packages/shared/iso20022/iso20022-transformer';
 import {ApiType} from '../../../../packages/shared/iso20022/api-type';
 
 describe('FspiopAxios', () => {
+
+    it('uses the injected transformer only for ISO requests', async (t) => {
+        for (const apiType of [ApiType.ISO20022, ApiType.FSPIOP]) {
+            const settings = new FspiopSettings('hub', '', '', '', false, false, apiType, false);
+            const transformer = new Iso20022Transformer(settings);
+            const convertedBody = {converted: true};
+            const convert = t.mock.method(transformer, 'fspiopPostQuotesToIso', async () => convertedBody);
+            let sentBody: unknown;
+            const client = {
+                post: async (_url: string, body: unknown) => { sentBody = body; },
+            } as AxiosInstance;
+            const fspiopAxios = new FspiopAxios(settings, transformer, {}, [], {}, undefined, client);
+            const body = new QuotesPostRequest();
+
+            await fspiopAxios.postQuotes('http://quotes', {}, body);
+
+            assert.equal(convert.mock.callCount(), apiType === ApiType.ISO20022 ? 1 : 0);
+            assert.equal(sentBody, apiType === ApiType.ISO20022 ? convertedBody : body);
+        }
+    });
 
     it('should map transport failure to destination communication error with non-empty description', async () => {
         const settings = new FspiopSettings(
@@ -14,8 +35,10 @@ describe('FspiopAxios', () => {
             'http://127.0.0.1:59999',
             false,
             false,
+            ApiType.FSPIOP,
+            false,
         );
-        const fspiopAxios = new FspiopAxios(settings, {
+        const fspiopAxios = new FspiopAxios(settings, new Iso20022Transformer(settings), {
             connectionTimeoutMs: 200,
             socketTimeoutMs: 200,
         });
@@ -45,6 +68,7 @@ describe('FspiopAxios', () => {
             false,
             false,
             ApiType.ISO20022,
+            false,
         );
         const headers = FspiopHeaders.Values.Parties.forRequest('trace-id', 'payerfsp', 'payeefsp');
         let capturedConfig: AxiosRequestConfig | undefined;
@@ -55,6 +79,7 @@ describe('FspiopAxios', () => {
         } as AxiosInstance;
         const fspiopAxios = new FspiopAxios(
             settings,
+            new Iso20022Transformer(settings),
             {},
             [],
             {'Content-Type': 'application/json'},
@@ -84,11 +109,13 @@ describe('FspiopAxios', () => {
             false,
             false,
             ApiType.ISO20022,
+            false,
         );
         let lowerContentType: unknown;
         let upperContentType: unknown;
         const fspiopAxios = new FspiopAxios(
             settings,
+            new Iso20022Transformer(settings),
             {
                 connectionTimeoutMs: 200,
                 socketTimeoutMs: 200,
@@ -127,11 +154,14 @@ describe('FspiopAxios', () => {
             'http://127.0.0.1:59999',
             false,
             false,
+            ApiType.FSPIOP,
+            false,
         );
         let lowerContentType: unknown;
         let upperContentType: unknown;
         const fspiopAxios = new FspiopAxios(
             settings,
+            new Iso20022Transformer(settings),
             {
                 connectionTimeoutMs: 200,
                 socketTimeoutMs: 200,

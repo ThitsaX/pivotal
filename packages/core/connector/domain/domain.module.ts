@@ -13,6 +13,7 @@ import {
     PerformPostTransfersHandler,
 } from './command';
 import {ConnectorSettings, FspClient, FspConnector} from './component';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 
 const REQUIRED_SETTINGS = Symbol('ConnectorDomainRequiredSettings');
 const CommandHandlers = [
@@ -77,12 +78,20 @@ export class ConnectorDomainModule {
                 inject: [REQUIRED_SETTINGS],
             },
             {
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
+            },
+            {
                 provide: FspiopAxios,
                 useFactory: (
                     settings: ConnectorDomainModule.RequiredSettings,
                     privateKeyStore: PrivateKeyStore,
                     caStore: CaStore,
                     clientCertStore: ClientCertStore,
+                    iso20022Transformer: Iso20022Transformer,
                 ): FspiopAxios => {
                     const fspiopSettings = settings.fspiopSettings();
                     const fspiopAxiosParams = settings.fspiopAxiosParams();
@@ -104,9 +113,9 @@ export class ConnectorDomainModule {
                         })
                         : undefined;
 
-                    return new FspiopAxios(fspiopSettings, fspiopAxiosParams, interceptors, {}, httpsAgent);
+                    return new FspiopAxios(fspiopSettings, iso20022Transformer, fspiopAxiosParams, interceptors, {}, httpsAgent);
                 },
-                inject: [REQUIRED_SETTINGS, PrivateKeyStore, CaStore, ClientCertStore],
+                inject: [REQUIRED_SETTINGS, PrivateKeyStore, CaStore, ClientCertStore, Iso20022Transformer],
             },
             {
                 provide: ConnectorSettings,

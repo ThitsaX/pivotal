@@ -64,6 +64,7 @@ export class Wallet2ConnectorSettings implements ConnectorConsumerModule.Require
             this.readBoolean('FSPIOP_USE_JWS', Wallet2ConnectorSettings.DEFAULT_USE_JWS),
             this.readBoolean('FSPIOP_USE_MUTUAL_TLS', Wallet2ConnectorSettings.DEFAULT_USE_MUTUAL_TLS),
             apiType,
+            false,
         );
     }
 

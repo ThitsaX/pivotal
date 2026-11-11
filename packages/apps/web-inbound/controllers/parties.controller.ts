@@ -28,6 +28,7 @@ import {
     PartyIdType,
 } from '@shared/fspiop';
 import { MdcContext } from '@shared/foundation';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 import {InboundRepresentation} from './representation';
 import {InboundRequestLogger} from './inbound-request-logger';
 
@@ -37,15 +38,13 @@ export class PartiesController {
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
     private readonly logger = new Logger(PartiesController.name);
 
-    private static async iso20022Transformer(): Promise<typeof import('../../../shared/iso20022/iso20022-transformer').Iso20022Transformer> {
-        return (await import('../../../shared/iso20022/iso20022-transformer')).Iso20022Transformer;
-    }
-
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(FspiopSettings)
         private readonly settings: FspiopSettings,
+        @Inject(Iso20022Transformer)
+        private readonly iso20022Transformer: Iso20022Transformer,
     ) {
     }
 
@@ -164,7 +163,7 @@ export class PartiesController {
         request: PartiesTypeIDPutResponse,
     ): Promise<PartiesTypeIDPutResponse> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await PartiesController.iso20022Transformer()).isoPutPartiesToFspiop(request) as PartiesTypeIDPutResponse
+            ? await this.iso20022Transformer.isoPutPartiesToFspiop(request) as PartiesTypeIDPutResponse
             : request;
     }
 
@@ -173,7 +172,7 @@ export class PartiesController {
         request: ErrorInformationResponse | undefined,
     ): Promise<ErrorInformationResponse | undefined> {
         return request != null && InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await PartiesController.iso20022Transformer()).isoPutPartiesErrorToFspiop(request) as ErrorInformationResponse
+            ? await this.iso20022Transformer.isoPutPartiesErrorToFspiop(request) as ErrorInformationResponse
             : request;
     }
 

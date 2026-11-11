@@ -6,6 +6,7 @@ import { HandlePostQuotesCommand, HandlePutQuotesCommand, HandlePutQuotesErrorCo
 import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, FspiopSettings, QuotesIDPutResponse, QuotesPostRequest, } from '@shared/fspiop';
 import { MdcContext } from '@shared/foundation';
 import type {OriginalIso20022PostQuotePayload, OriginalIso20022QuoteResponsePayload} from '@shared/iso20022';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 import {InboundRepresentation} from './representation';
 import {InboundRequestLogger} from './inbound-request-logger';
 
@@ -15,15 +16,13 @@ export class QuotesController {
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
     private readonly logger = new Logger(QuotesController.name);
 
-    private static async iso20022Transformer(): Promise<typeof import('../../../shared/iso20022/iso20022-transformer').Iso20022Transformer> {
-        return (await import('../../../shared/iso20022/iso20022-transformer')).Iso20022Transformer;
-    }
-
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(FspiopSettings)
         private readonly settings: FspiopSettings,
+        @Inject(Iso20022Transformer)
+        private readonly iso20022Transformer: Iso20022Transformer,
     ) {
     }
 
@@ -163,7 +162,7 @@ export class QuotesController {
 
     private async mapPostQuotes(contentType: string | string[] | undefined, request: QuotesPostRequest): Promise<QuotesPostRequest> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await QuotesController.iso20022Transformer()).isoPostQuotesToFspiop(request) as QuotesPostRequest
+            ? await this.iso20022Transformer.isoPostQuotesToFspiop(request) as QuotesPostRequest
             : request;
     }
 
@@ -178,7 +177,7 @@ export class QuotesController {
 
     private async mapPutQuotes(contentType: string | string[] | undefined, request: QuotesIDPutResponse): Promise<QuotesIDPutResponse> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await QuotesController.iso20022Transformer()).isoPutQuotesToFspiop(request) as QuotesIDPutResponse
+            ? await this.iso20022Transformer.isoPutQuotesToFspiop(request) as QuotesIDPutResponse
             : request;
     }
 
@@ -187,7 +186,7 @@ export class QuotesController {
         request: ErrorInformationResponse | undefined,
     ): Promise<ErrorInformationResponse | undefined> {
         return request != null && InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await QuotesController.iso20022Transformer()).isoPutQuotesErrorToFspiop(request) as ErrorInformationResponse
+            ? await this.iso20022Transformer.isoPutQuotesErrorToFspiop(request) as ErrorInformationResponse
             : request;
     }
 

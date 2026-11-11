@@ -6,6 +6,7 @@ import {AxiosError, AxiosInstance, InternalAxiosRequestConfig} from 'axios';
 import {AxiosClientBuilder} from '@shared/axios/component';
 import {ApiType} from '@shared/iso20022/api-type';
 import {Iso20022ContentType, Iso20022Resource} from '@shared/iso20022/iso20022-content-type';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 import type {Iso20022PostTransfersContext, Iso20022PutQuotesContext} from '@shared/iso20022/iso20022-transformer';
 import {FspiopHeaders, FspiopHeadersMap} from '../fspiop-headers';
 import {FspiopSettings} from '../fspiop-settings';
@@ -74,6 +75,7 @@ export class FspiopAxios {
 
     readonly settings: FspiopSettings;
 
+    private readonly iso20022Transformer: Iso20022Transformer;
     private readonly client: AxiosInstance;
     private readonly params: FspiopAxiosParams;
     private readonly interceptors: FspiopAxiosInterceptor[];
@@ -81,6 +83,7 @@ export class FspiopAxios {
 
     constructor(
         settings: FspiopSettings,
+        iso20022Transformer: Iso20022Transformer,
         params: FspiopAxiosParams = {},
         interceptors: FspiopAxiosInterceptor[] = [],
         headers: FspiopHeadersMap = {},
@@ -88,14 +91,11 @@ export class FspiopAxios {
         client?: AxiosInstance,
     ) {
         this.settings = settings;
+        this.iso20022Transformer = iso20022Transformer;
         this.params = params;
         this.interceptors = interceptors;
         this.defaultHeaders = headers;
         this.client = client ?? FspiopAxios.buildClient(params, interceptors, httpsAgent);
-    }
-
-    private static async iso20022Transformer(): Promise<typeof import('../../../iso20022/iso20022-transformer').Iso20022Transformer> {
-        return (await import('../../../iso20022/iso20022-transformer')).Iso20022Transformer;
     }
 
     private static buildClient(
@@ -190,7 +190,7 @@ export class FspiopAxios {
             : `${baseUrl}/parties/${type}/${id}`;
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Parties);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutPartiesToIso(type, id, subId, body, resolvedHeaders)
+            ? await this.iso20022Transformer.fspiopPutPartiesToIso(type, id, subId, body, resolvedHeaders)
             : body;
         await this.put(url, resolvedBody, resolvedHeaders);
     }
@@ -201,7 +201,7 @@ export class FspiopAxios {
             : `${baseUrl}/parties/${type}/${id}/error`;
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Parties);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutPartiesErrorToIso(type, id, subId, response, resolvedHeaders)
+            ? await this.iso20022Transformer.fspiopPutPartiesErrorToIso(type, id, subId, response, resolvedHeaders)
             : response;
         await this.put(url, resolvedBody, resolvedHeaders);
     }
@@ -211,7 +211,7 @@ export class FspiopAxios {
     async postQuotes(baseUrl: string, headers: FspiopHeadersMap, body: QuotesPostRequest): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Quotes);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPostQuotesToIso(body)
+            ? await this.iso20022Transformer.fspiopPostQuotesToIso(body)
             : body;
         await this.post(`${baseUrl}/quotes`, resolvedBody, resolvedHeaders);
     }
@@ -225,7 +225,7 @@ export class FspiopAxios {
     ): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Quotes);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutQuotesToIso(id, body, resolvedHeaders, iso20022Context)
+            ? await this.iso20022Transformer.fspiopPutQuotesToIso(id, body, resolvedHeaders, iso20022Context)
             : body;
         await this.put(`${baseUrl}/quotes/${id}`, resolvedBody, resolvedHeaders);
     }
@@ -233,7 +233,7 @@ export class FspiopAxios {
     async putQuotesError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Quotes);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutQuotesErrorToIso(response)
+            ? await this.iso20022Transformer.fspiopPutQuotesErrorToIso(response)
             : response;
         await this.put(`${baseUrl}/quotes/${id}/error`, resolvedBody, resolvedHeaders);
     }
@@ -248,7 +248,7 @@ export class FspiopAxios {
     ): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Transfers);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPostTransfersToIso(body, resolvedHeaders, iso20022Context)
+            ? await this.iso20022Transformer.fspiopPostTransfersToIso(body, resolvedHeaders, iso20022Context)
             : body;
         await this.post(`${baseUrl}/transfers`, resolvedBody, resolvedHeaders);
     }
@@ -256,7 +256,7 @@ export class FspiopAxios {
     async putTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: TransfersIDPutResponse): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Transfers);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutTransfersToIso(body)
+            ? await this.iso20022Transformer.fspiopPutTransfersToIso(body)
             : body;
         await this.put(`${baseUrl}/transfers/${id}`, resolvedBody, resolvedHeaders);
     }
@@ -264,7 +264,7 @@ export class FspiopAxios {
     async patchTransfers(baseUrl: string, headers: FspiopHeadersMap, id: string, body: TransfersIDPatchResponse): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Transfers);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPatchTransfersToIso(body)
+            ? await this.iso20022Transformer.fspiopPatchTransfersToIso(body)
             : body;
         await this.patch(`${baseUrl}/transfers/${id}`, resolvedBody, resolvedHeaders);
     }
@@ -274,7 +274,7 @@ export class FspiopAxios {
     async putTransfersError(baseUrl: string, headers: FspiopHeadersMap, id: string, response: ErrorInformationResponse): Promise<void> {
         const resolvedHeaders = this.resolveApiHeaders(headers, Iso20022Resource.Transfers);
         const resolvedBody = this.settings.apiType === ApiType.ISO20022
-            ? await (await FspiopAxios.iso20022Transformer()).fspiopPutTransfersErrorToIso(response)
+            ? await this.iso20022Transformer.fspiopPutTransfersErrorToIso(response)
             : response;
         await this.put(`${baseUrl}/transfers/${id}/error`, resolvedBody, resolvedHeaders);
     }

@@ -5,6 +5,7 @@ import { CommandBus, ICommand } from '@nestjs/cqrs';
 import { HandlePatchTransfersCommand, HandlePostTransfersCommand, HandlePutTransfersCommand, HandlePutTransfersErrorCommand, } from '@core/inbound/domain';
 import { ErrorInformationObject, ErrorInformationResponse, FspiopErrors, FspiopHeaders, FspiopSettings, TransfersIDPatchResponse, TransfersIDPutResponse, TransfersPostRequest, } from '@shared/fspiop';
 import { MdcContext } from '@shared/foundation';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 import {InboundRepresentation} from './representation';
 import {InboundRequestLogger} from './inbound-request-logger';
 
@@ -14,15 +15,13 @@ export class TransfersController {
     private static readonly FALLBACK_ERROR = FspiopErrors.INTERNAL_SERVER_ERROR.toErrorObject();
     private readonly logger = new Logger(TransfersController.name);
 
-    private static async iso20022Transformer(): Promise<typeof import('../../../shared/iso20022/iso20022-transformer').Iso20022Transformer> {
-        return (await import('../../../shared/iso20022/iso20022-transformer')).Iso20022Transformer;
-    }
-
     constructor(
         @Inject(CommandBus)
         private readonly commandBus: CommandBus,
         @Inject(FspiopSettings)
         private readonly settings: FspiopSettings,
+        @Inject(Iso20022Transformer)
+        private readonly iso20022Transformer: Iso20022Transformer,
     ) {
     }
 
@@ -174,19 +173,19 @@ export class TransfersController {
 
     private async mapPostTransfers(contentType: string | string[] | undefined, request: TransfersPostRequest): Promise<TransfersPostRequest> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await TransfersController.iso20022Transformer()).isoPostTransfersToFspiop(request) as TransfersPostRequest
+            ? await this.iso20022Transformer.isoPostTransfersToFspiop(request) as TransfersPostRequest
             : request;
     }
 
     private async mapPatchTransfers(contentType: string | string[] | undefined, response: TransfersIDPatchResponse): Promise<TransfersIDPatchResponse> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await TransfersController.iso20022Transformer()).isoPatchTransfersToFspiop(response) as TransfersIDPatchResponse
+            ? await this.iso20022Transformer.isoPatchTransfersToFspiop(response) as TransfersIDPatchResponse
             : response;
     }
 
     private async mapPutTransfers(contentType: string | string[] | undefined, request: TransfersIDPutResponse): Promise<TransfersIDPutResponse> {
         return InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await TransfersController.iso20022Transformer()).isoPutTransfersToFspiop(request) as TransfersIDPutResponse
+            ? await this.iso20022Transformer.isoPutTransfersToFspiop(request) as TransfersIDPutResponse
             : request;
     }
 
@@ -195,7 +194,7 @@ export class TransfersController {
         request: ErrorInformationResponse | undefined,
     ): Promise<ErrorInformationResponse | undefined> {
         return request != null && InboundRepresentation.isIso20022(this.settings, contentType)
-            ? await (await TransfersController.iso20022Transformer()).isoPutTransfersErrorToFspiop(request) as ErrorInformationResponse
+            ? await this.iso20022Transformer.isoPutTransfersErrorToFspiop(request) as ErrorInformationResponse
             : request;
     }
 

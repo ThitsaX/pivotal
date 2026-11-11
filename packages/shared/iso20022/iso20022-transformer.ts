@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {TransformFacades} from '@mojaloop/ml-schema-transformer-lib';
-import {FspiopHeadersMap} from '@shared/fspiop';
+import {Injectable} from '@nestjs/common';
+import type {FspiopHeadersMap} from '@shared/fspiop';
+import {FspiopSettings} from '@shared/fspiop/component/fspiop-settings';
 
 type Params = Record<string, string | undefined>;
 const FSPIOP = TransformFacades.FSPIOP;
@@ -29,75 +31,78 @@ export type Iso20022PostTransfersContext = {
     isoPostQuoteResponse: OriginalIso20022QuoteResponsePayload;
 };
 
+@Injectable()
 export class Iso20022Transformer {
-    static async fspiopPostQuotesToIso(body: FspiopBody): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.quotes.post({body}));
+    constructor(private readonly settings: FspiopSettings) {}
+
+    async fspiopPostQuotesToIso(body: FspiopBody): Promise<unknown> {
+        return this.bodyOf(await FSPIOP.quotes.post({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPostQuotesToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.quotes.post({body}));
+    async isoPostQuotesToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.quotes.post({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPutQuotesToIso(
+    async fspiopPutQuotesToIso(
         id: string,
         body: FspiopBody,
         headers: FspiopHeadersMap,
         context?: Iso20022PutQuotesContext,
     ): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(
-            await FSPIOP.quotes.put({body, headers: headers as TransformerHeaders, params: {ID: id}, $context: context}),
+        return this.bodyOf(
+            await FSPIOP.quotes.put({body, headers: headers as TransformerHeaders, params: {ID: id}, $context: context}, {validateTarget: this.settings.validateTarget}),
         );
     }
 
-    static async isoPutQuotesToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.quotes.put({body}));
+    async isoPutQuotesToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.quotes.put({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPutQuotesErrorToIso(body: FspiopBody): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.quotes.putError({body}));
+    async fspiopPutQuotesErrorToIso(body: FspiopBody): Promise<unknown> {
+        return this.bodyOf(await FSPIOP.quotes.putError({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPutQuotesErrorToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.quotes.putError({body}));
+    async isoPutQuotesErrorToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.quotes.putError({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPostTransfersToIso(
+    async fspiopPostTransfersToIso(
         body: FspiopBody,
         headers: FspiopHeadersMap,
         context?: Iso20022PostTransfersContext,
     ): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.transfers.post({body, headers: headers as TransformerHeaders, $context: context}));
+        return this.bodyOf(await FSPIOP.transfers.post({body, headers: headers as TransformerHeaders, $context: context}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPostTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.transfers.post({body}));
+    async isoPostTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.transfers.post({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPutTransfersToIso(body: FspiopBody): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.transfers.put({body}));
+    async fspiopPutTransfersToIso(body: FspiopBody): Promise<unknown> {
+        return this.bodyOf(await FSPIOP.transfers.put({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPutTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.transfers.put({body}));
+    async isoPutTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.transfers.put({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPatchTransfersToIso(body: FspiopBody): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.transfers.patch({body}));
+    async fspiopPatchTransfersToIso(body: FspiopBody): Promise<unknown> {
+        return this.bodyOf(await FSPIOP.transfers.patch({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPatchTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.transfers.patch({body}));
+    async isoPatchTransfersToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.transfers.patch({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPutTransfersErrorToIso(body: FspiopBody): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOP.transfers.putError({body}));
+    async fspiopPutTransfersErrorToIso(body: FspiopBody): Promise<unknown> {
+        return this.bodyOf(await FSPIOP.transfers.putError({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPutTransfersErrorToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.transfers.putError({body}));
+    async isoPutTransfersErrorToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.transfers.putError({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async fspiopPutPartiesToIso(
+    async fspiopPutPartiesToIso(
         type: string,
         id: string,
         subId: string | undefined,
@@ -114,18 +119,18 @@ export class Iso20022Transformer {
             },
         };
 
-        return Iso20022Transformer.bodyOf(await FSPIOP.parties.put(source));
+        return this.bodyOf(await FSPIOP.parties.put(source, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPutPartiesToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(
-            await FSPIOPISO20022.parties.put({body}),
+    async isoPutPartiesToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(
+            await FSPIOPISO20022.parties.put({body}, {validateTarget: this.settings.validateTarget}),
             'FSPIOPISO20022.parties.put',
             body,
         );
     }
 
-    static async fspiopPutPartiesErrorToIso(
+    async fspiopPutPartiesErrorToIso(
         type: string,
         id: string,
         subId: string | undefined,
@@ -142,14 +147,14 @@ export class Iso20022Transformer {
             },
         };
 
-        return Iso20022Transformer.bodyOf(await FSPIOP.parties.putError(source));
+        return this.bodyOf(await FSPIOP.parties.putError(source, {validateTarget: this.settings.validateTarget}));
     }
 
-    static async isoPutPartiesErrorToFspiop(body: Iso20022Body): Promise<unknown> {
-        return Iso20022Transformer.bodyOf(await FSPIOPISO20022.parties.putError({body}));
+    async isoPutPartiesErrorToFspiop(body: Iso20022Body): Promise<unknown> {
+        return this.bodyOf(await FSPIOPISO20022.parties.putError({body}, {validateTarget: this.settings.validateTarget}));
     }
 
-    private static bodyOf<TBody>(target: TransformTarget<TBody> | undefined, operation = 'unknown', source?: unknown): TBody {
+    private bodyOf<TBody>(target: TransformTarget<TBody> | undefined, operation = 'unknown', source?: unknown): TBody {
         if (target == null) {
             throw new Error(
                 `ISO20022 transform ${operation} returned no target body.`,

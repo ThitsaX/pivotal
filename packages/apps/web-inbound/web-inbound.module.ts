@@ -7,6 +7,7 @@ import {FspInboundGuard, FspiopSettings} from '@shared/fspiop';
 import {PartiesController, QuotesController, TransfersController,} from './controllers';
 import {WebInboundSettings} from './required.settings';
 import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 
 const REQUIRED_SETTINGS = Symbol('WebInboundRequiredSettings');
 
@@ -57,6 +58,13 @@ export class WebInboundModule {
                 provide: FspiopSettings,
                 useFactory: (settings: WebInboundModule.RequiredSettings): FspiopSettings => settings.fspiopSettings(),
                 inject: [REQUIRED_SETTINGS],
+            },
+            {
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
             },
             {
                 provide: FspInboundGuard,
