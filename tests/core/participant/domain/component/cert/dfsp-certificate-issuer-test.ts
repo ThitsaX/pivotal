@@ -15,32 +15,40 @@ const ISSUER_SETTINGS: DfspCertificateIssuer.Settings = {
     ttl: '8760h',
 };
 
-/** Stands in for the DFSP-facing intermediate, so the test signs what Vault would sign. */
+/**
+ * Stands in for the DFSP-facing intermediate signing verbatim, the way Vault does: the subject comes
+ * from the request, usage comes from the call, and every requested extension except basic
+ * constraints is copied across on top.
+ */
 class FakeCa {
 
-    private readonly key = forge.pki.rsa.generateKeyPair(2048);
+    protected readonly key = forge.pki.rsa.generateKeyPair(2048);
 
     /** Every request the issuer made, so the test can assert on what was sent. */
     readonly requests: any[] = [];
 
-    signCertificate(request: any): Promise<any> {
+    signCertificateVerbatim(request: any): Promise<any> {
 
         this.requests.push(request);
 
         const csr = forge.pki.certificationRequestFromPem(request.csrPem);
         const certificate = forge.pki.createCertificate();
 
-        certificate.publicKey = csr.publicKey!;
+        certificate.publicKey = this.publicKeyFor(csr);
         certificate.serialNumber = '0a1b2c3d';
         certificate.validity.notBefore = new Date(Date.now() - 60_000);
         certificate.validity.notAfter = new Date(Date.now() + 31_536_000_000);
-
-        // Vault sets the subject from common_name; anything in the CSR's own subject is discarded.
-        certificate.setSubject([
-            {name: 'commonName', value: request.commonName},
-            {name: 'organizationName', value: 'ThitsaWorks'},
-        ]);
+        certificate.setSubject(csr.subject.attributes);
         certificate.setIssuer([{name: 'commonName', value: 'Pivotal DFSP-Facing CA'}]);
+
+        const requested = (csr.getAttribute({name: 'extensionRequest'}) as any)?.extensions ?? [];
+        const copied = requested.filter((extension: any) => extension.name !== 'basicConstraints');
+        const copiedNames = new Set(copied.map((extension: any) => extension.name));
+
+        certificate.setExtensions([
+            ...this.usageExtensions(request).filter(extension => !copiedNames.has(extension.name)),
+            ...copied,
+        ]);
         certificate.sign(this.key.privateKey, forge.md.sha256.create());
 
         return Promise.resolve({
@@ -50,20 +58,41 @@ class FakeCa {
             expiration: certificate.validity.notAfter,
         });
     }
+
+    protected publicKeyFor(csr: forge.pki.CertificateSigningRequest): forge.pki.PublicKey {
+        return csr.publicKey!;
+    }
+
+    protected usageExtensions(request: any): any[] {
+        return [
+            {name: 'basicConstraints', cA: false},
+            {
+                name: 'extKeyUsage',
+                clientAuth: request.extKeyUsage.includes('ClientAuth'),
+                serverAuth: request.extKeyUsage.includes('ServerAuth'),
+            },
+        ];
+    }
 }
 
-/**
- * A CA that takes the subject from the request, which is what Vault's PKI role does by default
- * (`use_csr_common_name=true`). The original FakeCa encoded the intended behaviour rather than the
- * real one, and so could never have caught it.
- */
-class SubjectHonouringCa extends FakeCa {
+/** A CA that ignores the usage it was asked for, as a role or version change could. */
+class ServerUsageCa extends FakeCa {
+    protected usageExtensions(): any[] {
+        return [{name: 'basicConstraints', cA: false}, {name: 'extKeyUsage', serverAuth: true}];
+    }
+}
 
-    signCertificate(request: any): Promise<any> {
-        const csr = forge.pki.certificationRequestFromPem(request.csrPem);
-        const claimed = csr.subject.getField('CN')?.value as string;
+/** A CA that signs something other than the submitted key. */
+class SwappedKeyCa extends FakeCa {
+    protected publicKeyFor(): forge.pki.PublicKey {
+        return this.key.publicKey;
+    }
+}
 
-        return super.signCertificate({...request, commonName: claimed});
+/** A CA that marks the leaf as an authority. */
+class AuthorityCa extends FakeCa {
+    protected usageExtensions(): any[] {
+        return [{name: 'basicConstraints', cA: true}, {name: 'extKeyUsage', clientAuth: true}];
     }
 }
 
@@ -88,17 +117,32 @@ class FakeCertRepository {
     }
 }
 
-/** A request whose subject deliberately claims a different tenant. */
-function csrClaiming(commonName: string, bits = 2048): string {
+/** A request with the given subject and, optionally, requested extensions. */
+function csrWith(
+    subject: forge.pki.CertificateField[],
+    options: {bits?: number; extensions?: any[]} = {},
+): string {
 
-    const pair = forge.pki.rsa.generateKeyPair(bits);
+    const pair = forge.pki.rsa.generateKeyPair(options.bits ?? 2048);
     const csr = forge.pki.createCertificationRequest();
 
     csr.publicKey = pair.publicKey;
-    csr.setSubject([{name: 'commonName', value: commonName}]);
+    csr.setSubject(subject);
+
+    if (options.extensions != null) {
+        csr.setAttributes([{name: 'extensionRequest', extensions: options.extensions}]);
+    }
+
     csr.sign(pair.privateKey, forge.md.sha256.create());
 
     return forge.pki.certificationRequestToPem(csr);
+}
+
+/** The shape of the request that started this: a country and a hostname, nothing else. */
+function hostnameCsr(options: {bits?: number; extensions?: any[]} = {}): string {
+    return csrWith(
+        [{name: 'countryName', value: 'LR'}, {name: 'commonName', value: 'ecw.dfsp-a.example'}],
+        options);
 }
 
 function issuerWith(ca: FakeCa, repository: FakeCertRepository): DfspCertificateIssuer {
@@ -107,42 +151,37 @@ function issuerWith(ca: FakeCa, repository: FakeCertRepository): DfspCertificate
 
 describe('DfspCertificateIssuer', () => {
 
-    it('should force the common name to the enrolled tenant, ignoring the one in the request', async () => {
-        const ca = new FakeCa();
+    it('should keep the subject the DFSP requested', async () => {
         const repository = new FakeCertRepository();
 
-        const issued = await issuerWith(ca, repository).issue({
+        const issued = await issuerWith(new FakeCa(), repository).issue({
             fspId: 'dfsp-a',
-            csrPem: csrClaiming('dfsp-b'),
+            csrPem: hostnameCsr(),
         });
 
-        assert.equal(ca.requests[0].commonName, 'dfsp-a');
-        assert.ok(issued.subject.includes('CN=dfsp-a'));
-        assert.ok(!issued.subject.includes('dfsp-b'));
+        assert.equal(issued.subject, 'C=LR, CN=ecw.dfsp-a.example');
+        // The tenant comes from the enrolment, not from the subject: this is what the runtime
+        // guard compares with FSPIOP-Source.
+        assert.equal(issued.fspId, 'dfsp-a');
     });
 
-    it('should ask Vault to sign rather than to issue, so no private key is generated', async () => {
+    it('should sign verbatim for client authentication only', async () => {
         const ca = new FakeCa();
 
-        await issuerWith(ca, new FakeCertRepository()).issue({
-            fspId: 'dfsp-a',
-            csrPem: csrClaiming('dfsp-a'),
-        });
+        await issuerWith(ca, new FakeCertRepository()).issue({fspId: 'dfsp-a', csrPem: hostnameCsr()});
 
-        // The endpoint is chosen inside VaultClient from this shape; what the issuer must get right
-        // is that it hands over a CSR and never asks for key generation.
+        // Vault takes no usage from the role on this path, so it must be sent on every call.
         assert.equal(ca.requests[0].mount, 'pki_dfsp');
         assert.equal(ca.requests[0].role, 'dfsp-client');
+        assert.deepEqual(ca.requests[0].extKeyUsage, ['ClientAuth']);
+        assert.deepEqual(ca.requests[0].keyUsage, ['DigitalSignature', 'KeyEncipherment']);
         assert.ok(ca.requests[0].csrPem.includes('CERTIFICATE REQUEST'));
     });
 
     it('should record the fingerprint a TLS peer would present', async () => {
-        const ca = new FakeCa();
-        const repository = new FakeCertRepository();
-
-        const issued = await issuerWith(ca, repository).issue({
+        const issued = await issuerWith(new FakeCa(), new FakeCertRepository()).issue({
             fspId: 'dfsp-a',
-            csrPem: csrClaiming('dfsp-a'),
+            csrPem: hostnameCsr(),
         });
 
         // Recomputed independently from the stored PEM: this value is the runtime lookup key, so a
@@ -158,12 +197,11 @@ describe('DfspCertificateIssuer', () => {
     });
 
     it('should record what was issued, active and with its chain', async () => {
-        const ca = new FakeCa();
         const repository = new FakeCertRepository();
 
-        const issued = await issuerWith(ca, repository).issue({
+        const issued = await issuerWith(new FakeCa(), repository).issue({
             fspId: 'dfsp-a',
-            csrPem: csrClaiming('dfsp-a'),
+            csrPem: hostnameCsr(),
             note: 'ticket 4711',
         });
 
@@ -184,10 +222,7 @@ describe('DfspCertificateIssuer', () => {
 
         const repository = new FakeCertRepository().withUsable([previous]);
 
-        await issuerWith(new FakeCa(), repository).issue({
-            fspId: 'dfsp-a',
-            csrPem: csrClaiming('dfsp-a'),
-        });
+        await issuerWith(new FakeCa(), repository).issue({fspId: 'dfsp-a', csrPem: hostnameCsr()});
 
         // Retiring rather than revoking is what lets a DFSP install the new certificate on its own
         // schedule: the old one keeps working until it expires.
@@ -195,18 +230,71 @@ describe('DfspCertificateIssuer', () => {
         assert.ok(repository.saved.includes(previous));
     });
 
-    it('should refuse a certificate the authority named after the request, not the tenant', async () => {
-        const ca = new SubjectHonouringCa();
-        const repository = new FakeCertRepository();
+    it('should accept the subject key identifier keytool adds to every request', async () => {
+        const issued = await issuerWith(new FakeCa(), new FakeCertRepository()).issue({
+            fspId: 'dfsp-a',
+            // node-forge only derives this value for certificates, so the encoded value is given.
+            csrPem: hostnameCsr({extensions: [{
+                name: 'subjectKeyIdentifier',
+                value: forge.asn1.create(
+                    forge.asn1.Class.UNIVERSAL, forge.asn1.Type.OCTETSTRING, false,
+                    forge.util.hexToBytes('0123456789abcdef0123456789abcdef01234567')),
+            }]}),
+        });
 
-        // Exactly the live failure: a Vault role left at use_csr_common_name=true issues a
-        // certificate the DFSP has named itself, which defeats the binding rule silently.
-        await assert.rejects(
-            issuerWith(ca, repository).issue({fspId: 'dfsp-a', csrPem: csrClaiming('dfsp-b')}),
-            /issued a certificate for 'dfsp-b' when 'dfsp-a' was requested/);
-
-        assert.equal(repository.saved.length, 0, 'a mis-bound certificate must not be recorded');
+        assert.equal(issued.status, ParticipantCertStatusCode.ACTIVE);
     });
+
+    for (const [label, extension] of [
+        ['subject alternative names', {name: 'subjectAltName', altNames: [{type: 2, value: 'dfsp-b'}]}],
+        ['server authentication', {name: 'extKeyUsage', serverAuth: true}],
+        ['certificate authority status', {name: 'basicConstraints', cA: true}],
+        ['key usages', {name: 'keyUsage', keyCertSign: true}],
+    ] as const) {
+        it(`should refuse a request asking for ${label}`, async () => {
+            const ca = new FakeCa();
+
+            // Vault copies requested extensions into a verbatim signature, so the request must be
+            // stopped before it reaches the CA rather than checked afterwards.
+            await assert.rejects(
+                issuerWith(ca, new FakeCertRepository()).issue({
+                    fspId: 'dfsp-a',
+                    csrPem: hostnameCsr({extensions: [extension]}),
+                }),
+                /asks for extensions this CA does not grant/);
+
+            assert.equal(ca.requests.length, 0);
+        });
+    }
+
+    it('should refuse a request that names nothing', async () => {
+        const ca = new FakeCa();
+
+        await assert.rejects(
+            issuerWith(ca, new FakeCertRepository()).issue({
+                fspId: 'dfsp-a',
+                csrPem: csrWith([{name: 'countryName', value: 'LR'}]),
+            }),
+            /no common name/);
+
+        assert.equal(ca.requests.length, 0);
+    });
+
+    for (const [label, ca, reason] of [
+        ['usable for more than client authentication', new ServerUsageCa(), /rather than client authentication only/],
+        ['for a different key', new SwappedKeyCa(), /does not carry the key from the request/],
+        ['as a certificate authority', new AuthorityCa(), /is a certificate authority/],
+    ] as const) {
+        it(`should not record a certificate issued ${label}`, async () => {
+            const repository = new FakeCertRepository();
+
+            await assert.rejects(
+                issuerWith(ca, repository).issue({fspId: 'dfsp-a', csrPem: hostnameCsr()}),
+                reason);
+
+            assert.equal(repository.saved.length, 0, 'an unrecorded certificate cannot be presented');
+        });
+    }
 
     it('should refuse a request that is not a certificate signing request', async () => {
         const ca = new FakeCa();
@@ -224,7 +312,7 @@ describe('DfspCertificateIssuer', () => {
         await assert.rejects(
             issuerWith(ca, new FakeCertRepository()).issue({
                 fspId: 'dfsp-a',
-                csrPem: csrClaiming('dfsp-a', 1024),
+                csrPem: hostnameCsr({bits: 1024}),
             }),
             /too small/);
 
@@ -234,13 +322,13 @@ describe('DfspCertificateIssuer', () => {
     it('should not leak Vault detail when signing fails', async () => {
         const failing = {
             requests: [],
-            signCertificate: () => Promise.reject(
-                new Error('permission denied on pki_dfsp/sign/dfsp-client for role foo')),
+            signCertificateVerbatim: () => Promise.reject(
+                new Error('permission denied on pki_dfsp/sign-verbatim/dfsp-client for role foo')),
         };
 
         await assert.rejects(
             new DfspCertificateIssuer(failing as any, new FakeCertRepository() as any, ISSUER_SETTINGS)
-                .issue({fspId: 'dfsp-a', csrPem: csrClaiming('dfsp-a')}),
+                .issue({fspId: 'dfsp-a', csrPem: hostnameCsr()}),
             (error: Error) => {
                 assert.ok(!error.message.includes('pki_dfsp'), 'must not name the Vault path');
                 assert.ok(!error.message.includes('permission denied'));

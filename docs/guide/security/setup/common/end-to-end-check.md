@@ -102,7 +102,7 @@ Prove, with one transfer, that all four legs use mTLS and JWS as configured.
 
 - [ ] The two CA roots are different keys, held in KMS, Vault or offline (`vault-kv`), or the HSM (`pkcs11`).
 - [ ] Vault roles `dfsp-client`, `web-inbound-server` and `hub-callback-client` exist, and
-      `dfsp-client` ignores names in requests.
+      web-pivotal's policy allows `pki_dfsp/sign-verbatim/dfsp-client`.
 - [ ] Secret `pivotal-hub-client-ca` holds the Pivotal Hub-client CA root.
 - [ ] Each service has its own Vault role; no connector can read another DFSP's key.
 - [ ] `KEY_PROVIDER` is set explicitly, to the same profile, on web-outbound, web-pivotal and every
