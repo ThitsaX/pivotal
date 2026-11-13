@@ -26,14 +26,18 @@ import {
     TransactionType,
 } from '@shared/fspiop';
 import { TransferRequest } from '../cache';
-import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient, SuspiciousTransactionMonitor } from '../component';
+import {
+    AmountDecimalValidator,
+    PayerProvidedFeesValidator,
+    RedisClient,
+    SuspiciousTransactionMonitor,
+} from '../component';
 import { SendMoneyResponse } from '../dto';
 import { PutAcceptPartyCommand } from './put-accept-party.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptPartyCommand)
-export class PutAcceptPartyHandler
-    implements ICommandHandler<PutAcceptPartyCommand, PutAcceptPartyCommand.Output> {
+export class PutAcceptPartyHandler implements ICommandHandler<PutAcceptPartyCommand, PutAcceptPartyCommand.Output> {
     private static readonly SCHEME_FEE_AMOUNT_KEY = 'scheme_fee_amount';
     private static readonly FEE_CURRENCY_KEY = 'scheme_fee_currency';
 
@@ -60,15 +64,11 @@ export class PutAcceptPartyHandler
         private readonly payerProvidedFeesValidator: PayerProvidedFeesValidator,
         @Inject(SuspiciousTransactionMonitor)
         private readonly suspiciousTransactionMonitor: SuspiciousTransactionMonitor,
-    ) {
-    }
+    ) {}
 
     async execute(command: PutAcceptPartyCommand): Promise<PutAcceptPartyCommand.Output> {
         const { transferId } = command.input;
-        const lockToken = await this.redisClient.acquireLock(
-            transferId,
-            PutAcceptPartyHandler.IN_FLIGHT_LOCK_TTL_MS,
-        );
+        const lockToken = await this.redisClient.acquireLock(transferId, PutAcceptPartyHandler.IN_FLIGHT_LOCK_TTL_MS);
 
         // Another replica is already driving this transferId (typically a gateway
         // retry after a per-try timeout). Fail fast WITHOUT re-dispatching the quote
@@ -109,10 +109,7 @@ export class PutAcceptPartyHandler
 
         const source = PutAcceptPartyHandler.getFspId(transferRequest.payer, 'payer');
         PutAcceptPartyHandler.assertSourceCanActForPayer(requestSource, source);
-        this.payerProvidedFeesValidator.validate(
-            acceptParty,
-            extensionList,
-        );
+        this.payerProvidedFeesValidator.validate(acceptParty, extensionList);
         // Payer's confirmed amount is authoritative; intentionally overrides the POST amount.
         transferRequest.amount = FspiopMoney.normalizeAmount(amount);
         this.amountDecimalValidator.validate(transferRequest.amount);
@@ -161,10 +158,7 @@ export class PutAcceptPartyHandler
             const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
             const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 
-            const waitPromise = this.subscriber.waitFor<QuotesIDPutResponse>(
-                successSubject,
-                errorSubject,
-            );
+            const waiter = this.subscriber.waitFor<QuotesIDPutResponse>(successSubject, errorSubject);
 
             try {
                 await this.fspiopAxios.postQuotes(quotesUrl, headers, quoteRequest);
@@ -173,11 +167,11 @@ export class PutAcceptPartyHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`postQuotes failed for transferId=${transferId}`, stack ?? message);
-                this.subscriber.cancel(successSubject);
+                waiter.cancel();
                 throw PutAcceptPartyHandler.toFspiopException(error, transferId);
             }
 
-            const callback = await waitPromise;
+            const callback = await waiter.promise;
             transferRequest.quotes = callback;
             transferRequest.transfer = undefined;
 
@@ -201,7 +195,9 @@ export class PutAcceptPartyHandler
 
             return new PutAcceptPartyCommand.Output(response, callback);
         } catch (error) {
-            this.logger.error(`Put SendMoney acceptParty Error Response for transferId=${transferId} : ${JSON.stringify(error)}`);
+            this.logger.error(
+                `Put SendMoney acceptParty Error Response for transferId=${transferId} : ${JSON.stringify(error)}`,
+            );
             const fspiopException = PutAcceptPartyHandler.toFspiopException(error, transferId);
 
             try {
@@ -233,10 +229,7 @@ export class PutAcceptPartyHandler
         const transferRequest = await this.redisClient.get<TransferRequest>(transferId);
 
         if (transferRequest == null) {
-            throw new FspiopException(
-                FspiopErrors.TRANSFER_ID_NOT_FOUND,
-                `Transfer ${transferId} was not found.`,
-            );
+            throw new FspiopException(FspiopErrors.TRANSFER_ID_NOT_FOUND, `Transfer ${transferId} was not found.`);
         }
 
         return transferRequest;
@@ -306,10 +299,7 @@ export class PutAcceptPartyHandler
         return transactionType;
     }
 
-    private static toResponse(
-        transferRequest: TransferRequest,
-        callback: QuotesIDPutResponse,
-    ): SendMoneyResponse {
+    private static toResponse(transferRequest: TransferRequest, callback: QuotesIDPutResponse): SendMoneyResponse {
         const payeeFspFeeAmount = PutAcceptPartyHandler.toPayeeFspFeeAmount(callback, transferRequest.currency);
 
         return SendMoneyResponseMapper.toWaitingForQuoteAcceptance(
@@ -341,30 +331,19 @@ export class PutAcceptPartyHandler
         }
 
         const extensionList = PutAcceptPartyHandler.toExtensionList(callback.extensionList);
-        const schemeFeeAmount = PutAcceptPartyHandler.findExtensionValue(
-            extensionList,
-            PutAcceptPartyHandler.SCHEME_FEE_AMOUNT_KEY,
-        ) ?? '0';
+        const schemeFeeAmount =
+            PutAcceptPartyHandler.findExtensionValue(extensionList, PutAcceptPartyHandler.SCHEME_FEE_AMOUNT_KEY) ?? '0';
         const feeCurrencyValue = PutAcceptPartyHandler.findExtensionValue(
             extensionList,
             PutAcceptPartyHandler.FEE_CURRENCY_KEY,
         );
         const feeCurrency = feeCurrencyValue as Currency | undefined;
-        const feeCurrencyScale = feeCurrency == null
-            ? undefined
-            : FspiopCurrencies.get(feeCurrency)?.scale;
-        const currency = feeCurrencyScale == null || feeCurrency == null
-            ? transferAmountCurrency
-            : feeCurrency;
-        const scale = feeCurrencyScale == null
-            ? transferAmountScale
-            : feeCurrencyScale;
+        const feeCurrencyScale = feeCurrency == null ? undefined : FspiopCurrencies.get(feeCurrency)?.scale;
+        const currency = feeCurrencyScale == null || feeCurrency == null ? transferAmountCurrency : feeCurrency;
+        const scale = feeCurrencyScale == null ? transferAmountScale : feeCurrencyScale;
         const serializedSchemeFeeAmount = FspiopMoney.serialize(schemeFeeAmount, scale);
 
-        return PutAcceptPartyHandler.toMoney(
-            currency,
-            FspiopMoney.deserialize(serializedSchemeFeeAmount, scale),
-        );
+        return PutAcceptPartyHandler.toMoney(currency, FspiopMoney.deserialize(serializedSchemeFeeAmount, scale));
     }
 
     private static toExtensionList(extensionList: ExtensionList | undefined): ExtensionList {
@@ -393,18 +372,14 @@ export class PutAcceptPartyHandler
     private static toOptionalValue(value: string | undefined): string | undefined {
         const normalizedValue = value?.trim();
 
-        return normalizedValue == null || normalizedValue.length === 0
-            ? undefined
-            : normalizedValue;
+        return normalizedValue == null || normalizedValue.length === 0 ? undefined : normalizedValue;
     }
 
     private static toFspiopException(error: unknown, transferId: string): FspiopException {
         if (FspiopAxiosError.is(error)) {
             const info = error.errorInformationResponse?.errorInformation;
             const code = info?.errorCode ?? '';
-            const desc = info?.errorDescription?.trim().length
-                ? info.errorDescription
-                : 'Communication error';
+            const desc = info?.errorDescription?.trim().length ? info.errorDescription : 'Communication error';
             const extensionList = info?.extensionList;
             const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
 

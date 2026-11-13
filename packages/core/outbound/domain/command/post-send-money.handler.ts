@@ -27,9 +27,7 @@ import { PostSendMoneyCommand } from './post-send-money.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PostSendMoneyCommand)
-export class PostSendMoneyHandler
-    implements ICommandHandler<PostSendMoneyCommand, PostSendMoneyCommand.Output> {
-
+export class PostSendMoneyHandler implements ICommandHandler<PostSendMoneyCommand, PostSendMoneyCommand.Output> {
     private readonly logger = new Logger(PostSendMoneyHandler.name);
 
     constructor(
@@ -43,8 +41,7 @@ export class PostSendMoneyHandler
         private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(AmountDecimalValidator)
         private readonly amountDecimalValidator: AmountDecimalValidator,
-    ) {
-    }
+    ) {}
 
     private static toSubId(idSubValue: string | undefined): string | undefined {
         const subId = idSubValue?.trim();
@@ -139,9 +136,9 @@ export class PostSendMoneyHandler
         partyComplexName.lastName = fspParty.lastName;
 
         if (
-            partyComplexName.firstName == null
-            && partyComplexName.middleName == null
-            && partyComplexName.lastName == null
+            partyComplexName.firstName == null &&
+            partyComplexName.middleName == null &&
+            partyComplexName.lastName == null
         ) {
             return undefined;
         }
@@ -163,17 +160,15 @@ export class PostSendMoneyHandler
     private static toOptionalValue(value: string | undefined): string | undefined {
         const normalizedValue = value?.trim();
 
-        return normalizedValue == null || normalizedValue.length === 0
-            ? undefined
-            : normalizedValue;
+        return normalizedValue == null || normalizedValue.length === 0 ? undefined : normalizedValue;
     }
 
     private static resolveDestination(
         callback: PartiesTypeIDPutResponse,
         requestedDestination: string | undefined,
     ): string {
-        const resolvedDestination = PostSendMoneyHandler.toOptionalValue(callback.party.partyIdInfo.fspId)
-            ?? requestedDestination;
+        const resolvedDestination =
+            PostSendMoneyHandler.toOptionalValue(callback.party.partyIdInfo.fspId) ?? requestedDestination;
 
         if (resolvedDestination == null) {
             throw new FspiopException(
@@ -187,7 +182,6 @@ export class PostSendMoneyHandler
     }
 
     async execute(command: PostSendMoneyCommand): Promise<PostSendMoneyCommand.Output> {
-
         const { correlationId, source, request } = command.input;
         const transferId = correlationId;
         const destination = PostSendMoneyHandler.toOptionalValue(request.to.fspId);
@@ -237,7 +231,7 @@ export class PostSendMoneyHandler
             const errorSubject = FspiopPubSubSubjects.Parties.forError(source, destination, type, id, subId);
             const hubErrorSubject = FspiopPubSubSubjects.Parties.forError(source, switchId, type, id, subId);
 
-            const waitPromise = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
+            const waiter = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
                 successSubject,
                 errorSubject,
                 hubErrorSubject,
@@ -250,11 +244,11 @@ export class PostSendMoneyHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`getParties failed for payeeId=${id}`, stack ?? message);
-                this.subscriber.cancel(successSubject);
+                waiter.cancel();
                 throw error;
             }
 
-            const callback = await waitPromise;
+            const callback = await waiter.promise;
             const resolvedDestination = PostSendMoneyHandler.resolveDestination(callback, destination);
             const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
                 request,
@@ -285,12 +279,11 @@ export class PostSendMoneyHandler
                 ),
             );
 
-            return new PostSendMoneyCommand.Output(
-                response,
-                callback,
-            );
+            return new PostSendMoneyCommand.Output(response, callback);
         } catch (error) {
-            this.logger.error(`Post SendMoney Error Response for FromIdValue ${request.from.idValue} toIdValue ${request.to.idValue} : ${JSON.stringify(error)}`);
+            this.logger.error(
+                `Post SendMoney Error Response for FromIdValue ${request.from.idValue} toIdValue ${request.to.idValue} : ${JSON.stringify(error)}`,
+            );
             const fspiopException = PostSendMoneyHandler.toFspiopException(error);
             try {
                 await this.auditPublisher.publish(
@@ -326,9 +319,7 @@ export class PostSendMoneyHandler
         if (FspiopAxiosError.is(error)) {
             const info = error.errorInformationResponse?.errorInformation;
             const code = info?.errorCode ?? '';
-            const desc = info?.errorDescription?.trim().length
-                ? info.errorDescription
-                : 'Communication error';
+            const desc = info?.errorDescription?.trim().length ? info.errorDescription : 'Communication error';
             const extensionList = info?.extensionList;
             const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
 
