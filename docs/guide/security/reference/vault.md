@@ -39,21 +39,24 @@ runs.
 
 | Mount / role | Signs | Used by | Key settings |
 |---|---|---|---|
-| `pki_dfsp/roles/dfsp-client` | DFSP client certificates | web-pivotal (`DFSP_CERT_PKI_ROLE`) | `client_flag=true`, `server_flag=false`, `ttl=max_ttl=8760h`, `require_cn=true`, `use_csr_common_name=false`, `use_csr_sans=false`, `ou=DFSP` |
+| `pki_dfsp/roles/dfsp-client` | DFSP client certificates | web-pivotal (`DFSP_CERT_PKI_ROLE`), through `sign-verbatim` | `ttl=max_ttl=8760h` and `no_store=true` are the settings `sign-verbatim` uses. The others (`client_flag`, `server_flag`, `use_csr_common_name`, `use_csr_sans`, `organization`, `ou`) apply only to `sign` and do not affect DFSP certificates. |
 | `pki_hub_client/roles/pivotal-client` | Client certificates from Pivotal's own CA | cert-manager, only in deployments that issue workload client certificates from Pivotal's CA | `client_flag=true`, `server_flag=false`, `ttl=max_ttl=2160h`, `require_cn=false`. The `pkcs11` ceremony also sets `use_csr_common_name=false`, `use_csr_sans=false`; the `vault-kv` ceremony leaves Vault's defaults (`true`). |
 | `pki_hub_client/roles/web-inbound-server` | The web-inbound server certificate | cert-manager | `allowed_domains=<PIVOTAL_CALLBACK_HOST>`, `allow_bare_domains=true`, `allow_subdomains=false`, `server_flag=true`, `client_flag=false`, `ttl=max_ttl=2160h`, `use_csr_common_name=false`, `use_csr_sans=false` |
 | `pki_hub_client/roles/hub-callback-client` | The Hub callback certificate | trust-manager (`HUB_CALLBACK_CERT_PKI_ROLE`) | `allowed_domains=<PIVOTAL_CALLBACK_HOST>`, `allow_bare_domains=true`, `allow_subdomains=false`, `server_flag=false`, `client_flag=true`, `ttl=max_ttl=8760h`, `organization=Mojaloop`, `key_type=rsa`, `use_csr_common_name=false`, `use_csr_sans=false` |
 
-All roles sign a submitted request (`sign`). None is used with `issue`, so Vault never generates a
-leaf private key.
+All roles sign a submitted request (`sign` or `sign-verbatim`). None is used with `issue`, so Vault
+never generates a leaf private key.
 
-`use_csr_common_name=false` and `use_csr_sans=false` make the name on the certificate come from
-the caller's request, never from the CSR. On `dfsp-client` this stops a DFSP from requesting a
-certificate that names another participant. Check it after every ceremony:
+On `pki_hub_client` roles, `use_csr_common_name=false` and `use_csr_sans=false` make the name on the
+certificate come from the caller's request, never from the CSR.
 
-| Command | Expected |
-|---|---|
-| `vault read pki_dfsp/roles/dfsp-client` | `use_csr_common_name false` and `use_csr_sans false` |
+DFSP client certificates are signed with `sign-verbatim`, so the subject is the one in the DFSP's
+CSR. DFSPs import the certificate against the request they generated, and some tools and internal
+policies refuse a certificate whose subject differs from it. The subject is not the DFSP's identity
+in Pivotal: web-outbound finds the certificate by its fingerprint and uses the FSP ID recorded at
+enrolment. web-pivotal sends client-auth usage on every request, refuses a CSR that asks for any
+extension other than a subject key identifier, and refuses to record a certificate that is not a
+client-only leaf for the CSR's key.
 
 ---
 
@@ -101,7 +104,8 @@ means that one compromised connector can read every tenant's key.
 | connector for `<FSP_ID>` | `<KV_MOUNT>/data/pivotal/hsmcred/<FSP_ID>` | `read` | `pkcs11` |
 | connector for `<FSP_ID>` | `<KV_MOUNT>/data/pivotal/keyref/<FSP_ID>` | `read` | `pkcs11` |
 | connector for `<FSP_ID>` | `sys/internal/ui/mounts/<KV_MOUNT>` | `read` | both (optional: the Java connector does not read it) |
-| web-pivotal | `pki_dfsp/sign/dfsp-client` | `create`, `update` | both |
+| web-pivotal | `pki_dfsp/sign-verbatim/dfsp-client` | `create`, `update` | both |
+| web-pivotal | `pki_dfsp/sign/dfsp-client` | `create`, `update` | both (no longer called; kept for deployments not yet upgraded) |
 | web-pivotal | `<KV_MOUNT>/data/pivotal/jwskey/*` | `create`, `read`, `update` | `vault-kv` |
 | web-pivotal | `<KV_MOUNT>/data/pivotal/keyref/*` | `read` | `pkcs11` |
 | web-pivotal | `sys/internal/ui/mounts/<KV_MOUNT>` | `read` | both |

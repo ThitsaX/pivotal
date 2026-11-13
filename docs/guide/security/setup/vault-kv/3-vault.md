@@ -108,6 +108,7 @@ The connector roles are created per DFSP during onboarding, not on this page.
   path "pivotal-kv/data/pivotal/jwskey/*"  { capabilities = ["create", "read", "update"] }
   path "sys/internal/ui/mounts/pivotal-kv" { capabilities = ["read"] }
   path "pki_dfsp/sign/dfsp-client"         { capabilities = ["create", "update"] }
+  path "pki_dfsp/sign-verbatim/dfsp-client" { capabilities = ["create", "update"] }
   EOF
 
   vault policy write pivotal-trust-manager - <<'EOF'
@@ -175,6 +176,7 @@ The connector roles are created per DFSP during onboarding, not on this page.
 T=$(vault token create -policy=pivotal-web-outbound -ttl=5m -field=token)
 vault token capabilities "$T" pivotal-kv/data/pivotal/jwskey/ANY      # expect: read
 vault token capabilities "$T" pki_dfsp/sign/dfsp-client               # expect: deny
+vault token capabilities "$T" pki_dfsp/sign-verbatim/dfsp-client      # expect: deny
 vault token revoke "$T"
 
 T=$(vault token create -policy=pivotal-trust-manager -ttl=5m -field=token)

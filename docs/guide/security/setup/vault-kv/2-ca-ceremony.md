@@ -311,7 +311,7 @@ Run checks 5 and 6 as the Vault administrator: the ceremony token cannot list or
 | 3 | The two roots are different keys | `openssl x509 -noout -fingerprint -sha256 -in pki_dfsp/root.pem` and for `pki_hub_client/root.pem` | Different fingerprints |
 | 4 | Each CRL is signed by its root | `openssl crl -in pki_dfsp/root.crl -CAfile pki_dfsp/root.pem -noout` | `verify OK` |
 | 5 | Vault roles exist | `vault list pki_hub_client/roles` and `vault list pki_dfsp/roles` | `hub-callback-client`, `pivotal-client`, `web-inbound-server`; and `dfsp-client` |
-| 6 | The DFSP CA ignores names in a request | `vault read pki_dfsp/roles/dfsp-client` | `use_csr_common_name false` and `use_csr_sans false` |
+| 6 | The DFSP CA role keeps certificates to one year | `vault read pki_dfsp/roles/dfsp-client` | `ttl 8760h` and `no_store true` |
 | 7 | The published root is the right one | `kubectl -n pivotal get secret pivotal-hub-client-ca -o jsonpath='{.data.ca\.pem}' \| base64 -d \| openssl x509 -noout -subject -fingerprint -sha256` | Subject `CN = Pivotal Hub Client CA Root`; fingerprint equals check 3's `pki_hub_client` value |
 
 **Negative tests** (run as the Vault administrator, with `VAULT_ADDR` set):

@@ -8,6 +8,10 @@ export class ParticipantErrorCode {
 
     static readonly CSR_KEY_TOO_SMALL            = 'PARTICIPANT_CERT_CSR_KEY_TOO_SMALL';
 
+    static readonly CSR_MISSING_COMMON_NAME      = 'PARTICIPANT_CERT_CSR_MISSING_COMMON_NAME';
+
+    static readonly CSR_EXTENSION_NOT_ALLOWED    = 'PARTICIPANT_CERT_CSR_EXTENSION_NOT_ALLOWED';
+
     static readonly CERT_ISSUANCE_FAILED         = 'PARTICIPANT_CERT_ISSUANCE_FAILED';
 
     static readonly CERT_NOT_FOUND               = 'PARTICIPANT_CERT_NOT_FOUND';
@@ -27,6 +31,8 @@ export const PARTICIPANT_ERROR_MESSAGES: Record<string, string> = {
     [ParticipantErrorCode.UNKNOWN_PARTICIPANT]:  'No participant is registered with that identifier.',
     [ParticipantErrorCode.CSR_MALFORMED]:        'The certificate signing request could not be read. It must be a PEM-encoded PKCS#10 request.',
     [ParticipantErrorCode.CSR_KEY_TOO_SMALL]:    'The certificate signing request uses a key that is too small. RSA keys must be at least 2048 bits.',
+    [ParticipantErrorCode.CSR_MISSING_COMMON_NAME]: 'The certificate signing request has no common name (CN). Add one and submit the request again.',
+    [ParticipantErrorCode.CSR_EXTENSION_NOT_ALLOWED]: 'The certificate signing request asks for extensions this CA does not grant, such as subject alternative names or key usages. Submit a request without them.',
     [ParticipantErrorCode.CERT_ISSUANCE_FAILED]: 'The certificate could not be issued. Please try again, and contact an administrator if the problem persists.',
     [ParticipantErrorCode.CERT_NOT_FOUND]:       'No certificate was found.',
     [ParticipantErrorCode.CERT_ALREADY_REVOKED]: 'That certificate has already been revoked.',

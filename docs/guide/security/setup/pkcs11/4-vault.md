@@ -102,6 +102,7 @@ None.
 
   vault policy write pivotal-web-pivotal - <<'EOF'
   path "pki_dfsp/sign/dfsp-client"         { capabilities = ["create", "update"] }
+  path "pki_dfsp/sign-verbatim/dfsp-client" { capabilities = ["create", "update"] }
   path "pivotal-kv/data/pivotal/keyref/*"  { capabilities = ["read"] }
   path "sys/internal/ui/mounts/pivotal-kv" { capabilities = ["read"] }
   EOF
