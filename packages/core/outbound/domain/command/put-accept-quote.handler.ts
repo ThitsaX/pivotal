@@ -25,7 +25,9 @@ import { PutAcceptQuoteCommand } from './put-accept-quote.command';
 import { SendMoneyResponseMapper } from './send-money-response.mapper';
 
 @CommandHandler(PutAcceptQuoteCommand)
-export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteCommand, PutAcceptQuoteCommand.Output> {
+export class PutAcceptQuoteHandler
+    implements ICommandHandler<PutAcceptQuoteCommand, PutAcceptQuoteCommand.Output> {
+
     // The lock must outlive the longest in-flight wait (the FSPIOP response
     // timeout) so a gateway/client retry landing on another replica is rejected
     // for the whole window the winning replica is still talking to the Hub.
@@ -46,7 +48,8 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
         private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(AmountDecimalValidator)
         private readonly amountDecimalValidator: AmountDecimalValidator,
-    ) {}
+    ) {
+    }
 
     private static getFspId(party: Party | undefined, label: string): string {
         const fspId = party?.partyIdInfo?.fspId?.trim();
@@ -61,7 +64,10 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
         return fspId;
     }
 
-    private static toTransfersPostRequest(transferId: string, transferRequest: TransferRequest): TransfersPostRequest {
+    private static toTransfersPostRequest(
+        transferId: string,
+        transferRequest: TransferRequest,
+    ): TransfersPostRequest {
         const quotes = transferRequest.quotes;
 
         if (quotes == null) {
@@ -94,12 +100,9 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
         homeTransactionId: string | undefined,
     ): QuotesIDPutResponse['extensionList'] {
         const extension = (quotes.extensionList?.extension ?? [])
-            .filter(
-                (item) =>
-                    item.key?.trim().toLowerCase() !==
-                    PutAcceptQuoteHandler.HOME_TRANSACTION_ID_EXTENSION_KEY.toLowerCase(),
-            )
-            .map((item) => ({ ...item }));
+            .filter((item) => item.key?.trim().toLowerCase()
+                !== PutAcceptQuoteHandler.HOME_TRANSACTION_ID_EXTENSION_KEY.toLowerCase())
+            .map((item) => ({...item}));
 
         if (homeTransactionId != null && homeTransactionId.length > 0) {
             extension.push({
@@ -108,18 +111,27 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
             });
         }
 
-        return extension.length > 0 ? { extension } : undefined;
+        return extension.length > 0 ? {extension} : undefined;
     }
 
-    private static toResponse(transferRequest: TransferRequest, callback: TransfersIDPutResponse): SendMoneyResponse {
-        return SendMoneyResponseMapper.toFinalState(transferRequest, callback.transferState, callback.extensionList);
+    private static toResponse(
+        transferRequest: TransferRequest,
+        callback: TransfersIDPutResponse,
+    ): SendMoneyResponse {
+        return SendMoneyResponseMapper.toFinalState(
+            transferRequest,
+            callback.transferState,
+            callback.extensionList,
+        );
     }
 
     private static toFspiopException(error: unknown, transferId: string): FspiopException {
         if (FspiopAxiosError.is(error)) {
             const info = error.errorInformationResponse?.errorInformation;
             const code = info?.errorCode ?? '';
-            const desc = info?.errorDescription?.trim().length ? info.errorDescription : 'Communication error';
+            const desc = info?.errorDescription?.trim().length
+                ? info.errorDescription
+                : 'Communication error';
             const extensionList = info?.extensionList;
             const errorDef = FspiopErrors.find(code) ?? FspiopErrors.COMMUNICATION_ERROR;
 
@@ -131,7 +143,10 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
 
     async execute(command: PutAcceptQuoteCommand): Promise<PutAcceptQuoteCommand.Output> {
         const { transferId } = command.input;
-        const lockToken = await this.redisClient.acquireLock(transferId, PutAcceptQuoteHandler.IN_FLIGHT_LOCK_TTL_MS);
+        const lockToken = await this.redisClient.acquireLock(
+            transferId,
+            PutAcceptQuoteHandler.IN_FLIGHT_LOCK_TTL_MS,
+        );
 
         // Another replica is already driving this transferId (typically a gateway
         // retry after a per-try timeout). Fail fast WITHOUT re-dispatching the
@@ -199,14 +214,20 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
 
         try {
             if (!acceptQuote) {
-                throw new FspiopException(FspiopErrors.GENERIC_PAYER_REJECTION, 'Payer rejected quote confirmation.');
+                throw new FspiopException(
+                    FspiopErrors.GENERIC_PAYER_REJECTION,
+                    'Payer rejected quote confirmation.',
+                );
             }
 
             const headers = FspiopHeaders.Values.Transfers.forRequest(transferId, source, destination);
             const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, transferId);
             const errorSubject = FspiopPubSubSubjects.Transfers.forError(source, transferId);
 
-            const waiter = this.subscriber.waitFor<TransfersIDPutResponse>(successSubject, errorSubject);
+            const waiter = this.subscriber.waitFor<TransfersIDPutResponse>(
+                successSubject,
+                errorSubject,
+            );
 
             try {
                 await this.fspiopAxios.postTransfers(transfersUrl, headers, transfersPostRequest);
@@ -241,9 +262,7 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
 
             return new PutAcceptQuoteCommand.Output(response, callback);
         } catch (error) {
-            this.logger.error(
-                `Put SendMoney acceptQuote Error Response for transferId=${transferId} : ${JSON.stringify(error)}`,
-            );
+            this.logger.error(`Put SendMoney acceptQuote Error Response for transferId=${transferId} : ${JSON.stringify(error)}`);
             const fspiopException = PutAcceptQuoteHandler.toFspiopException(error, transferId);
 
             try {
@@ -275,7 +294,10 @@ export class PutAcceptQuoteHandler implements ICommandHandler<PutAcceptQuoteComm
         const transferRequest = await this.redisClient.get<TransferRequest>(transferId);
 
         if (transferRequest == null) {
-            throw new FspiopException(FspiopErrors.TRANSFER_ID_NOT_FOUND, `Transfer ${transferId} was not found.`);
+            throw new FspiopException(
+                FspiopErrors.TRANSFER_ID_NOT_FOUND,
+                `Transfer ${transferId} was not found.`,
+            );
         }
 
         return transferRequest;
