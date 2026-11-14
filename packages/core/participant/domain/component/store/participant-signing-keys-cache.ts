@@ -30,6 +30,12 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
 
     private accessPublicKeysByFspId = new Map<string, string>();
 
+    /**
+     * Name shown as the payer on a government-to-person transfer when the sender left it blank.
+     * Absent means that DFSP has no name configured, so the transfer is sent unchanged.
+     */
+    private governmentPayerDisplayNamesByFspId = new Map<string, string>();
+
     private signEnabledByFspId = new Map<string, boolean>();
 
     private verifyModeByFspId = new Map<string, FspiopVerifyMode>();
@@ -64,6 +70,16 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
         }
 
         return pem.replace(/\\n/g, '\n');
+    }
+
+    private static normalizeDisplayName(displayName: string | null | undefined): string | undefined {
+        if (displayName == null) {
+            return undefined;
+        }
+
+        const trimmed = displayName.trim();
+
+        return trimmed.length === 0 ? undefined : trimmed;
     }
 
     private static resolveRefreshIntervalMs(): number {
@@ -125,6 +141,10 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
         return this.accessPublicKeysByFspId.get(fspId);
     }
 
+    getGovernmentPayerDisplayName(fspId: string): string | undefined {
+        return this.governmentPayerDisplayNamesByFspId.get(fspId);
+    }
+
     isSignEnabled(fspId: string): boolean {
         return this.signEnabledByFspId.get(fspId) === true;
     }
@@ -159,6 +179,7 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
 
             const nextPublicKeysByFspId = new Map<string, string>();
             const nextAccessPublicKeysByFspId = new Map<string, string>();
+            const nextGovernmentPayerDisplayNamesByFspId = new Map<string, string>();
             const nextSignEnabledByFspId = new Map<string, boolean>();
             const nextVerifyModeByFspId = new Map<string, FspiopVerifyMode>();
 
@@ -175,6 +196,14 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
 
                 if (accessPublicKeyPem != null) {
                     nextAccessPublicKeysByFspId.set(fspId, accessPublicKeyPem);
+                }
+
+                const displayName = ParticipantSigningKeysCache.normalizeDisplayName(
+                    participant.governmentPayerDisplayName,
+                );
+
+                if (displayName != null) {
+                    nextGovernmentPayerDisplayNamesByFspId.set(fspId, displayName);
                 }
             }
 
@@ -220,6 +249,7 @@ export class ParticipantSigningKeysCache implements OnModuleInit, OnModuleDestro
             this.privateKeysByFspId = nextPrivateKeysByFspId;
             this.keyRefsByFspId = nextKeyRefsByFspId;
             this.accessPublicKeysByFspId = nextAccessPublicKeysByFspId;
+            this.governmentPayerDisplayNamesByFspId = nextGovernmentPayerDisplayNamesByFspId;
             this.signEnabledByFspId = nextSignEnabledByFspId;
             this.verifyModeByFspId = nextVerifyModeByFspId;
         } finally {

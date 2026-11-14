@@ -8,3 +8,5 @@ export * from './get-dfsp-certificate.query';
 export * from './get-dfsp-certificate.handler';
 export * from './get-jws-policy.query';
 export * from './get-jws-policy.handler';
+export * from './get-government-payer-display-name.query';
+export * from './get-government-payer-display-name.handler';

@@ -135,13 +135,13 @@ describe('RbacSeeder', () => {
         state = freshState();
     });
 
-    it('cold-boot seeds 3 roles / 18 permissions / 25 role_permissions / 12 menus / 13 menu_permissions', async () => {
+    it('cold-boot seeds 3 roles / 19 permissions / 26 role_permissions / 12 menus / 13 menu_permissions', async () => {
 
         const result = await makeSeeder(state).seed();
 
         assert.equal(result.roles.inserted, 3);
-        assert.equal(result.permissions.inserted, 18);
-        assert.equal(result.rolePermissions.inserted, 25);
+        assert.equal(result.permissions.inserted, 19);
+        assert.equal(result.rolePermissions.inserted, 26);
         assert.equal(result.menus.inserted, 12);
         assert.equal(result.menuPermissions.inserted, 13);
 
@@ -173,6 +173,7 @@ describe('RbacSeeder', () => {
         assert.equal(state.permissions.get('hub.currency.add')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.list')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.access-key.update')!.scope, 'HUB');
+        assert.equal(state.permissions.get('participant.payer-display-name.update')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.certificate.enroll')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.certificate.view')!.scope, 'HUB');
         assert.equal(state.permissions.get('participant.certificate.revoke')!.scope, 'HUB');
@@ -204,7 +205,7 @@ describe('RbacSeeder', () => {
         const dfspAdminGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspAdminRoleId);
         const dfspGrants = state.rolePermissions.filter((rp) => rp.roleId === dfspRoleId);
 
-        assert.equal(adminGrants.length, 18);
+        assert.equal(adminGrants.length, 19);
         assert.equal(dfspAdminGrants.length, 4);
         assert.equal(dfspGrants.length, 3);
     });
