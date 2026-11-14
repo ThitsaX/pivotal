@@ -1,8 +1,11 @@
 import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import {TransactionMessage} from '../../../../../packages/core/audit/common';
+import {TransferRequest} from '../../../../../packages/core/outbound/domain/cache';
 import {PostSendMoneyCommand} from '../../../../../packages/core/outbound/domain/command/post-send-money.command';
 import {PostSendMoneyHandler} from '../../../../../packages/core/outbound/domain/command/post-send-money.handler';
+import {GovernmentPayerDisplayNameStore} from '../../../../../packages/core/outbound/domain/component/government-payer-display-name-store';
+import {GovernmentPayerNameResolver} from '../../../../../packages/core/outbound/domain/component/government-payer-name-resolver';
 import {FspParty, SendMoneyRequest} from '../../../../../packages/core/outbound/domain/dto';
 import {
     AmountType,
@@ -49,14 +52,14 @@ function callback(): PartiesTypeIDPutResponse {
     } as PartiesTypeIDPutResponse;
 }
 
-function golSwitchSettings(
-    fspIds: readonly string[] = ['mofdp', 'cbl'],
-    name = 'GOL National Payment Switch',
-) {
-    return {
-        golNationalPaymentSwitchFspIds: new Set(fspIds),
-        golNationalPaymentSwitchName: name,
-    } as never;
+class MapGovernmentPayerDisplayNameStore extends GovernmentPayerDisplayNameStore {
+    constructor(private readonly names: ReadonlyMap<string, string>) {
+        super();
+    }
+
+    get(fspId: string): string | undefined {
+        return this.names.get(fspId);
+    }
 }
 
 function createHandler(
@@ -65,8 +68,8 @@ function createHandler(
         waitFor?: <T>(successSubject: string, errorSubject: string) => Promise<T>;
         set?: (key: string, value: unknown) => Promise<void>;
         publish?: (message: TransactionMessage) => Promise<void>;
-        settings?: never;
     } = {},
+    names: ReadonlyMap<string, string> = new Map(),
 ): PostSendMoneyHandler {
     return new PostSendMoneyHandler(
         {
@@ -102,7 +105,7 @@ function createHandler(
             },
         } as never,
         {validate(): void {}} as never,
-        deps.settings ?? golSwitchSettings(),
+        new GovernmentPayerNameResolver(new MapGovernmentPayerDisplayNameStore(names)),
     );
 }
 
@@ -159,101 +162,50 @@ describe('PostSendMoneyHandler optional payee FSP', () => {
         assert.equal((auditMessages[0]?.content as {amountType?: string}).amountType, AmountType.Send);
         assert.equal((auditMessages[1]?.content as {payeeFsp?: string}).payeeFsp, 'resolvedfsp');
     });
-});
 
-describe('PostSendMoneyHandler GOL National Payment Switch GOVERNMENT_TO_PERSON payer name', () => {
-    function executeWith(
-        sendMoneyRequest: SendMoneyRequest,
-        source = 'mofdp',
-        settings: never = golSwitchSettings(),
-    ): Promise<{cachedRequest: unknown}> {
-        let cachedRequest: unknown;
+    it('fills a blank government payer name on the cached payer, the cached from and the response', async () => {
+        let cachedRequest: TransferRequest | undefined;
+        const sendMoneyRequest = request();
+        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
 
         const handler = createHandler({
             async set(_key: string, value: unknown): Promise<void> {
-                cachedRequest = value;
+                cachedRequest = value as TransferRequest;
             },
-            settings,
-        });
+        }, new Map([['payerfsp', 'Treasury']]));
 
-        return handler.execute(new PostSendMoneyCommand(
-            new PostSendMoneyCommand.Input(`transfer-${source}-1`, source, sendMoneyRequest),
-        )).then(() => ({cachedRequest}));
-    }
+        const output = await handler.execute(new PostSendMoneyCommand(
+            new PostSendMoneyCommand.Input('transfer-1', 'payerfsp', sendMoneyRequest),
+        ));
 
-    it('defaults blank MOFDP G2P payer displayName to GOL National Payment Switch', async () => {
-        const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Business, 'mofdp', 'mofdp');
-        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
-
-        const {cachedRequest} = await executeWith(sendMoneyRequest);
-
-        assert.equal(
-            (cachedRequest as {payer: {name?: string}}).payer.name,
-            'GOL National Payment Switch',
-        );
-        assert.equal(sendMoneyRequest.from.displayName, 'GOL National Payment Switch');
+        assert.equal(sendMoneyRequest.from.displayName, undefined);
+        assert.notEqual(cachedRequest?.from, sendMoneyRequest.from);
+        assert.equal(cachedRequest?.from.displayName, 'Treasury');
+        assert.equal(cachedRequest?.payer.name, 'Treasury');
+        assert.equal(output.response.from?.displayName, 'Treasury');
+        assert.equal(cachedRequest?.from.idValue, '2769100001');
     });
 
-    it('defaults blank CBL G2P payer displayName to GOL National Payment Switch', async () => {
+    it('leaves the payer name blank when the source has none, even if the body names a configured DFSP', async () => {
+        let cachedRequest: TransferRequest | undefined;
         const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Business, 'cbl', 'cbl');
         sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
+        sendMoneyRequest.from.fspId = 'configuredfsp';
+        sendMoneyRequest.from.idValue = 'configuredfsp';
 
-        const {cachedRequest} = await executeWith(sendMoneyRequest, 'cbl');
+        const handler = createHandler({
+            async set(_key: string, value: unknown): Promise<void> {
+                cachedRequest = value as TransferRequest;
+            },
+        }, new Map([['configuredfsp', 'Treasury']]));
 
-        assert.equal(
-            (cachedRequest as {payer: {name?: string}}).payer.name,
-            'GOL National Payment Switch',
-        );
-        assert.equal(sendMoneyRequest.from.displayName, 'GOL National Payment Switch');
-    });
+        const output = await handler.execute(new PostSendMoneyCommand(
+            new PostSendMoneyCommand.Input('transfer-1', 'payerfsp', sendMoneyRequest),
+        ));
 
-    it('defaults blank MOFDP G2P refund payer displayName to GOL National Payment Switch', async () => {
-        const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Business, 'mofdp', 'mofdp');
-        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON_REFUND';
-
-        const {cachedRequest} = await executeWith(sendMoneyRequest);
-
-        assert.equal(
-            (cachedRequest as {payer: {name?: string}}).payer.name,
-            'GOL National Payment Switch',
-        );
-    });
-
-    it('does not override an explicit MOFDP G2P payer displayName', async () => {
-        const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Business, 'mofdp', 'mofdp');
-        sendMoneyRequest.from.displayName = 'Custom MOFDP Name';
-        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
-
-        const {cachedRequest} = await executeWith(sendMoneyRequest);
-
-        assert.equal((cachedRequest as {payer: {name?: string}}).payer.name, 'Custom MOFDP Name');
-    });
-
-    it('does not default payer name for non-configured or non-G2P transfers', async () => {
-        const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Msisdn, '2769100001', 'payerfsp');
-        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
-
-        const {cachedRequest} = await executeWith(sendMoneyRequest);
-
-        assert.equal((cachedRequest as {payer: {name?: string}}).payer.name, undefined);
-    });
-
-    it('does not default when no FSP ids are configured', async () => {
-        const sendMoneyRequest = request();
-        sendMoneyRequest.from = party(PartyIdType.Business, 'mofdp', 'mofdp');
-        sendMoneyRequest.subScenario = 'GOVERNMENT_TO_PERSON';
-
-        const {cachedRequest} = await executeWith(
-            sendMoneyRequest,
-            'mofdp',
-            golSwitchSettings([]),
-        );
-
-        assert.equal((cachedRequest as {payer: {name?: string}}).payer.name, undefined);
+        assert.equal(cachedRequest?.from, sendMoneyRequest.from);
+        assert.equal(cachedRequest?.from.displayName, undefined);
+        assert.equal(cachedRequest?.payer.name, undefined);
+        assert.equal(output.response.from?.displayName, undefined);
     });
 });

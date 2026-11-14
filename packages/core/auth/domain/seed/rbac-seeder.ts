@@ -73,6 +73,7 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     {keyName: PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,   scope: 'HUB',  description: 'Register or replace a participant\'s callback endpoint.'},
     {keyName: PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE, scope: 'HUB',  description: 'View and change a participant\'s JWS policy: whether Pivotal signs as them, and how strictly their signatures are verified.'},
     {keyName: PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,   scope: 'HUB',  description: 'Update the access public key used to verify a participant\'s signed requests.'},
+    {keyName: PermissionKey.PARTICIPANT_PAYER_DISPLAY_NAME_UPDATE, scope: 'HUB', description: 'View and set the payer display name used on government-to-person transfers when the sender leaves it blank.'},
     {keyName: PermissionKey.PARTICIPANT_CERT_ENROLL,          scope: 'HUB',  description: 'Sign a participant\'s certificate request and issue a client certificate.'},
     {keyName: PermissionKey.PARTICIPANT_CERT_VIEW,            scope: 'HUB',  description: 'View and download participant client certificates and their status.'},
     {keyName: PermissionKey.PARTICIPANT_CERT_REVOKE,          scope: 'HUB',  description: 'Revoke a participant client certificate before it expires.'},

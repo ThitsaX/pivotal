@@ -21,6 +21,8 @@ export class ParticipantErrorCode {
     static readonly HSM_KEY_NOT_FOUND            = 'PARTICIPANT_HSM_KEY_NOT_FOUND';
 
     static readonly HSM_KEY_RECORD_INVALID       = 'PARTICIPANT_HSM_KEY_RECORD_INVALID';
+
+    static readonly GOVERNMENT_PAYER_DISPLAY_NAME_TOO_LONG = 'PARTICIPANT_GOVERNMENT_PAYER_DISPLAY_NAME_TOO_LONG';
 }
 
 export const PARTICIPANT_ERROR_MESSAGES: Record<string, string> = {
@@ -34,6 +36,7 @@ export const PARTICIPANT_ERROR_MESSAGES: Record<string, string> = {
     [ParticipantErrorCode.KEY_NOT_FOUND]:        'No JWS key record exists for that participant.',
     [ParticipantErrorCode.HSM_KEY_NOT_FOUND]:    'This DFSP has no signing key in the HSM yet. A custodian must provision it before the DFSP can be onboarded.',
     [ParticipantErrorCode.HSM_KEY_RECORD_INVALID]: 'This DFSP\'s signing key record in Vault does not hold a valid public key. A custodian must check the provisioning run.',
+    [ParticipantErrorCode.GOVERNMENT_PAYER_DISPLAY_NAME_TOO_LONG]: 'A government payer display name must be at most 128 characters.',
 };
 
 export function participantError(code: string): { code: string; message: string } {

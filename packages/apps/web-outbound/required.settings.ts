@@ -94,8 +94,6 @@ export class WebOutboundSettings
                 socketTimeoutMs: this.readPositiveInteger('CATALYST_SOCKET_TIMEOUT_MS'),
                 connectionTimeoutMs: this.readPositiveInteger('CATALYST_CONNECTION_TIMEOUT_MS'),
             },
-            this.readGolNationalPaymentSwitchFspIds(),
-            this.readGolNationalPaymentSwitchName(),
         );
     }
 
@@ -229,25 +227,6 @@ export class WebOutboundSettings
             return [...SuspiciousTransactionMonitor.DEFAULT_MATCHING_FIELDS];
         }
         return SuspiciousTransactionMonitor.parseMatchingFields(raw);
-    }
-
-    private readGolNationalPaymentSwitchFspIds(): ReadonlySet<string> {
-        const raw = this.configService.get<string>('GOL_NATIONAL_PAYMENT_SWITCH_FSP_IDS');
-        if (raw == null || raw.trim().length === 0) {
-            return new Set();
-        }
-
-        return new Set(
-            raw
-                .split(',')
-                .map((value) => value.trim().toLowerCase())
-                .filter((value) => value.length > 0),
-        );
-    }
-
-    private readGolNationalPaymentSwitchName(): string {
-        return this.readOptionalString('GOL_NATIONAL_PAYMENT_SWITCH_NAME')
-            ?? 'GOL National Payment Switch';
     }
 
     private readOptionalString(name: string): string | undefined {
