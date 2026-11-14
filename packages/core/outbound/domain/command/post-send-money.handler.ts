@@ -237,7 +237,7 @@ export class PostSendMoneyHandler
             const errorSubject = FspiopPubSubSubjects.Parties.forError(source, destination, type, id, subId);
             const hubErrorSubject = FspiopPubSubSubjects.Parties.forError(source, switchId, type, id, subId);
 
-            const waitPromise = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
+            const waiter = this.subscriber.waitFor<PartiesTypeIDPutResponse>(
                 successSubject,
                 errorSubject,
                 hubErrorSubject,
@@ -250,11 +250,11 @@ export class PostSendMoneyHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`getParties failed for payeeId=${id}`, stack ?? message);
-                this.subscriber.cancel(successSubject);
+                waiter.cancel();
                 throw error;
             }
 
-            const callback = await waitPromise;
+            const callback = await waiter.promise;
             const resolvedDestination = PostSendMoneyHandler.resolveDestination(callback, destination);
             const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
                 request,
