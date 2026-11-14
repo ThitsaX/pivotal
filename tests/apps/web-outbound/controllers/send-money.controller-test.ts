@@ -7,7 +7,7 @@ import {
     PutSendMoneyRequest,
     SendMoneyController,
 } from '../../../../packages/apps/web-outbound/controllers/send-money.controller';
-import {PostSendMoneyCommand, PutAcceptPartyCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
+import {PostSendMoneyCommand, PutAcceptPartyCommand, PutAcceptQuoteCommand, SendMoneyRequest} from '../../../../packages/core/outbound/domain';
 import {FspiopErrors, FspiopException} from '../../../../packages/shared/fspiop';
 import {MdcContext} from '../../../../packages/shared/foundation';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -572,6 +572,38 @@ describe('SendMoneyController', () => {
     it('omits an absent extensionList on acceptParty', async () => {
         assert.equal(await acceptPartyExtensionList(undefined), undefined);
     });
+
+    const quoteExtension = [{key: 'audit', value: 'one'}];
+    for (const {name, input, expected} of [
+        {name: 'wraps an array', input: quoteExtension, expected: {extension: quoteExtension}},
+        {name: 'preserves a wrapped list', input: {extension: quoteExtension}, expected: {extension: quoteExtension}},
+        {name: 'drops an empty array', input: [], expected: undefined},
+        {name: 'drops a wrapped empty list', input: {extension: []}, expected: undefined},
+        {name: 'omits an absent list', input: undefined, expected: undefined},
+    ]) {
+        it(`${name} before dispatching acceptQuote`, async () => {
+            let captured: PutAcceptQuoteCommand | undefined;
+            const controller = new SendMoneyController({
+                async execute(command: PutAcceptQuoteCommand): Promise<unknown> {
+                    captured = command;
+                    return {response: {}};
+                },
+            } as never);
+            const before = structuredClone(input);
+            const request = plainToInstance(PutSendMoneyRequest, {
+                acceptQuote: true,
+                homeTransactionId: 'home-1',
+                extensionList: input,
+            });
+
+            await controller.put('wallet1', 'transfer-1', request);
+
+            assert.ok(captured instanceof PutAcceptQuoteCommand);
+            assert.deepEqual(captured.input.extensionList, expected);
+            assert.equal(captured.input.homeTransactionId, 'home-1');
+            assert.deepEqual(input, before);
+        });
+    }
 
     it('rejects POST sendmoney when fspiop-source differs from request payer FSP', async () => {
         const controller = new SendMoneyController({

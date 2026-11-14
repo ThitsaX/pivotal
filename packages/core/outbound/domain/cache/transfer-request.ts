@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {AmountType, Currency, Party, QuotesIDPutResponse, TransactionScenario, TransfersIDPutResponse} from '@shared/fspiop';
+import type {OriginalIso20022QuoteResponsePayload} from '@shared/iso20022';
 import {FspParty} from '../dto';
 
 export class TransferRequest {
@@ -10,6 +11,8 @@ export class TransferRequest {
     payee!: Party;
 
     quotes?: QuotesIDPutResponse;
+
+    iso20022QuoteResponse?: OriginalIso20022QuoteResponsePayload;
 
     transfer?: TransfersIDPutResponse;
 

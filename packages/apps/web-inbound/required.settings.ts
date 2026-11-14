@@ -13,6 +13,7 @@ import {
     PublicKeyStore,
 } from '@shared/security';
 import {TypeOrmSettings} from '@shared/typeorm';
+import {ApiType} from '@shared/iso20022/api-type';
 import {KeyProvider, VaultAuthMethod, VaultSettings} from '@shared/vault';
 import type {WebInboundModule} from './web-inbound.module';
 
@@ -72,7 +73,9 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
             this.readRequiredString('FSPIOP_TRANSFERS_URL'),
             this.readRequiredBoolean('FSPIOP_USE_JWS'),
             this.readRequiredBoolean('FSPIOP_USE_MUTUAL_TLS'),
-            this.readVerifyMode('FSPIOP_JWS_VERIFY_MODE'),
+            ApiType.parse(this.readRequiredString('API_TYPE')),
+            this.readRequiredBoolean('FSPIOP_TRANSFORM_VALIDATE_TARGET'),
+            this.readVerifyMode('FSPIOP_JWS_VERIFY_MODE')
         );
     }
 
@@ -216,5 +219,4 @@ export class WebInboundSettings implements WebInboundModule.RequiredSettings {
 
         return normalized as VaultAuthMethod;
     }
-
 }

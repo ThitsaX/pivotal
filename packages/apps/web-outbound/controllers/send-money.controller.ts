@@ -23,6 +23,7 @@ export class PutSendMoneyRequest {
     @IsOptional()
     extensionList?: Array<Extension> | ExtensionList;
 
+
     @IsOptional()
     @Transform(({ value }) => value === true || value === 'true')
     @IsBoolean()
@@ -161,6 +162,7 @@ export class SendMoneyController {
                             request.acceptQuote,
                             SendMoneyController.toOptionalSource(source),
                             request.homeTransactionId,
+                            SendMoneyController.toExtensionList(request.extensionList),
                         ),
                     ),
                 );

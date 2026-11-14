@@ -4,8 +4,11 @@ import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import {ConfigService} from '@nestjs/config';
 import {WebOutboundSettings} from '../../../packages/apps/web-outbound/required.settings';
+import {ApiType} from '../../../packages/shared/iso20022/api-type';
 
 const BASE_ENV: Record<string, string> = {
+    API_TYPE: 'fspiop',
+    FSPIOP_TRANSFORM_VALIDATE_TARGET: 'false',
     REDIS_URL: 'redis://localhost:6379',
     REDIS_CACHE_ITEM_TIMEOUT_MS: '900000',
     FSPIOP_SWITCH_ID: 'hub',
@@ -20,7 +23,7 @@ const BASE_ENV: Record<string, string> = {
     PREFIX_ORACLE_CACHE_TTL_MS: '180000',
 };
 
-function settings(overrides: Record<string, string> = {}): WebOutboundSettings {
+function settings(overrides: Record<string, string | undefined> = {}): WebOutboundSettings {
     return new WebOutboundSettings(new ConfigService({...BASE_ENV, ...overrides}));
 }
 
@@ -62,6 +65,45 @@ describe('WebOutboundSettings payer fee validation', () => {
         assert.throws(
             () => settings({POST_SENDMONEY_PAYEE_FSPID_REQUIRED: 'ture'}).outboundSettings(),
             /Invalid environment variable POST_SENDMONEY_PAYEE_FSPID_REQUIRED/,
+        );
+    });
+
+    it('reads an explicit FSPIOP Hub API type', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.equal(outboundSettings.fspiopSettings.apiType, ApiType.FSPIOP);
+    });
+
+    it('reads ISO 20022 Hub API type from env', () => {
+        const outboundSettings = settings({API_TYPE: 'iso20022'}).outboundSettings();
+
+        assert.equal(outboundSettings.fspiopSettings.apiType, ApiType.ISO20022);
+    });
+
+    for (const name of ['API_TYPE', 'FSPIOP_TRANSFORM_VALIDATE_TARGET']) {
+        it(`requires ${name} instead of using a default`, () => {
+            for (const value of [undefined, '', '   ']) {
+                assert.throws(
+                    () => settings({[name]: value}).outboundSettings(),
+                    new RegExp(`Missing required environment variable: ${name}`),
+                );
+            }
+        });
+    }
+
+    it('rejects an unsupported Hub API type', () => {
+        assert.throws(
+            () => settings({API_TYPE: 'xml'}).outboundSettings(),
+            /Invalid API_TYPE/,
+        );
+    });
+
+    it('passes the ISO target validation flag into runtime settings', () => {
+        assert.equal(settings().outboundSettings().fspiopSettings.validateTarget, false);
+        assert.equal(settings({FSPIOP_TRANSFORM_VALIDATE_TARGET: 'true'}).outboundSettings().fspiopSettings.validateTarget, true);
+        assert.throws(
+            () => settings({FSPIOP_TRANSFORM_VALIDATE_TARGET: 'ture'}).outboundSettings(),
+            /FSPIOP_TRANSFORM_VALIDATE_TARGET.*boolean/,
         );
     });
 

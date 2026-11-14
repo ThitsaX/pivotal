@@ -19,10 +19,14 @@ import { FspiopVerifyMode } from './fspiop-verify-mode';
  *     process.env['FSPIOP_TRANSFERS_URL']   ?? '',
  *     process.env['FSPIOP_USE_JWS']         === 'true',
  *     process.env['FSPIOP_USE_MUTUAL_TLS']  === 'true',
+ *     ApiType.FSPIOP,
+ *     false,
  *     FspiopVerifyMode.parse(process.env['FSPIOP_JWS_VERIFY_MODE']),
  *   ),
  * }
  */
+
+import {ApiType} from '@shared/iso20022/api-type';
 
 export class FspiopSettings {
     constructor(
@@ -32,6 +36,8 @@ export class FspiopSettings {
         public readonly transfersUrl: string,
         public readonly useJws: boolean,
         public readonly useMutualTls: boolean,
+        public readonly apiType: ApiType,
+        public readonly validateTarget: boolean,
 
         /**
          * Verification mode for sources with no `participant_key` row of their own.

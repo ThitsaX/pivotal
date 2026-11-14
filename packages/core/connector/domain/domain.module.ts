@@ -13,6 +13,7 @@ import {
     PerformPostTransfersHandler,
 } from './command';
 import {ConnectorSettings, FspClient, FspConnector} from './component';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 
 const REQUIRED_SETTINGS = Symbol('ConnectorDomainRequiredSettings');
 const CommandHandlers = [
@@ -77,6 +78,14 @@ export class ConnectorDomainModule {
                 inject: [REQUIRED_SETTINGS],
             },
             {
+
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
+            },
+            {
                 // Supplied by the host where the connector signs through a device, and built over
                 // its key store otherwise. A connector reaches exactly one tenant either way: that
                 // is the isolation this module exists to keep, and it is unchanged by custody.
@@ -92,6 +101,7 @@ export class ConnectorDomainModule {
                     jwsSigner: JwsSigner,
                     caStore: CaStore,
                     clientCertStore: ClientCertStore,
+                    iso20022Transformer: Iso20022Transformer,
                 ): FspiopAxios => {
                     const fspiopSettings = settings.fspiopSettings();
                     const fspiopAxiosParams = settings.fspiopAxiosParams();
@@ -113,9 +123,9 @@ export class ConnectorDomainModule {
                         })
                         : undefined;
 
-                    return new FspiopAxios(fspiopSettings, fspiopAxiosParams, interceptors, {}, httpsAgent);
+                    return new FspiopAxios(fspiopSettings, iso20022Transformer, fspiopAxiosParams, interceptors, {}, httpsAgent);
                 },
-                inject: [REQUIRED_SETTINGS, JwsSigner, CaStore, ClientCertStore],
+                inject: [REQUIRED_SETTINGS, JwsSigner, CaStore, ClientCertStore, Iso20022Transformer],
             },
             {
                 provide: ConnectorSettings,
