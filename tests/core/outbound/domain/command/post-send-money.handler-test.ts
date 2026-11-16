@@ -81,13 +81,12 @@ function createHandler(
             },
         } as never,
         {
-            waitFor<T>(successSubject: string, errorSubject: string): Promise<T> {
-                if (deps.waitFor != null) {
-                    return deps.waitFor(successSubject, errorSubject);
-                }
-                return Promise.resolve(callback() as T);
+            waitFor<T>(successSubject: string, errorSubject: string): {promise: Promise<T>; cancel(): void} {
+                const promise = deps.waitFor != null
+                    ? deps.waitFor<T>(successSubject, errorSubject)
+                    : Promise.resolve(callback() as T);
+                return {promise, cancel(): void {}};
             },
-            cancel(): void {},
         } as never,
         {
             async set(key: string, value: unknown): Promise<void> {

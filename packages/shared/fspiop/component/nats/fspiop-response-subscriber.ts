@@ -1,35 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Logger, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
-import {AckPolicy, ConsumerMessages, DeliverPolicy, JsMsg, ReplayPolicy} from 'nats';
-import {NatsClientService} from '@shared/nats';
-import {ErrorInformationObject} from '../../dto';
-import {FspiopErrors} from '../../exception/fspiop-errors';
-import {FspiopException} from '../../exception/fspiop-exception';
-import {FspiopPubSubSubjects} from '../fspiop-pub-sub-subjects';
-import {
-    FSPIOP_RESPONSE_STREAM_SUBJECT,
-    resolveFspiopResponseStream,
-} from './fspiop-response-stream.resolver';
+import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { AckPolicy, ConsumerMessages, DeliverPolicy, JsMsg, ReplayPolicy } from 'nats';
+import { NatsClientService } from '@shared/nats';
+import { ErrorInformationObject } from '../../dto';
+import { FspiopErrors } from '../../exception/fspiop-errors';
+import { FspiopException } from '../../exception/fspiop-exception';
+import { FspiopPubSubSubjects } from '../fspiop-pub-sub-subjects';
+import { FSPIOP_RESPONSE_STREAM_SUBJECT, resolveFspiopResponseStream } from './fspiop-response-stream.resolver';
 
 type PendingEntry = {
     readonly successSubject: string;
-    readonly errorSubject: string;
-    readonly hubErrorSubject: string | null;
+    readonly subjects: readonly string[];
     readonly resolve: (payload: unknown) => void;
     readonly reject: (error: unknown) => void;
     timer: ReturnType<typeof setTimeout> | null;
 };
 
-type RecentEntry = {
-    readonly subject: string;
-    readonly payload: unknown;
-    readonly expiresAt: number;
-};
-
-type RecentMatch = {
-    readonly entry: RecentEntry;
-    readonly matchedSubject: string;
+export type Waiter<T> = {
+    readonly promise: Promise<T>;
+    cancel(): void;
 };
 
 /**
@@ -46,30 +36,20 @@ type RecentMatch = {
  *   - Parties callbacks are addressed by FSPIOP resource path, not by a unique transaction
  *     id. Concurrent waiters on the same tuple across replicas must each receive the
  *     callback. WorkQueuePolicy would deliver to only one replica.
- *
- * Race protection:
- *   - The waitFor()/publish() ordering in handlers already registers pending before the
- *     downstream HTTP request goes out. The recent-message cache is a defensive
- *     belt-and-braces for startup and cluster failover edge cases.
  */
 export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
-
     static readonly DEFAULT_TIMEOUT_MS = 30_000;
-    private static readonly RECENT_CACHE_TTL_MS = 60_000;
-    private static readonly RECENT_CACHE_MAX_ENTRIES = 2_000;
     private static readonly CONSUMER_NAME_PREFIX = 'fspiop-response';
 
     private readonly logger = new Logger(FspiopResponseSubscriber.name);
-    private readonly pending = new Map<string, PendingEntry>();
-    private readonly recent = new Map<string, RecentEntry>();
+    private readonly pending = new Map<string, Set<PendingEntry>>();
 
     private consumerMessages: ConsumerMessages | null = null;
     private stream: string | null = null;
     private consumerName: string | null = null;
     private running = false;
 
-    constructor(private readonly nats: NatsClientService) {
-    }
+    constructor(private readonly nats: NatsClientService) {}
 
     private static toFspiopException(body: ErrorInformationObject): FspiopException {
         const code = body.errorInformation?.errorCode ?? '';
@@ -109,13 +89,16 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
     async onModuleDestroy(): Promise<void> {
         this.running = false;
         this.consumerMessages?.stop();
-
-        for (const subject of Array.from(this.pending.keys())) {
-            this.cancel(subject);
+        const allEntries = new Set<PendingEntry>();
+        for (const set of this.pending.values()) {
+            for (const entry of set) {
+                allEntries.add(entry);
+            }
+        }
+        for (const entry of allEntries) {
+            this.remove(entry);
         }
         this.pending.clear();
-        this.recent.clear();
-
         if (this.stream != null && this.consumerName != null) {
             try {
                 const jsm = await this.nats.nc.jetstream().jetstreamManager();
@@ -133,51 +116,65 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
         errorSubject: string,
         hubErrorSubject?: string,
         timeoutMs = FspiopResponseSubscriber.DEFAULT_TIMEOUT_MS,
-    ): Promise<T> {
-        const cached = this.takeFromRecent(successSubject, errorSubject, hubErrorSubject);
+    ): Waiter<T> {
+        let entry!: PendingEntry;
 
-        if (cached != null) {
-            return FspiopResponseSubscriber.guard(
-                cached.matchedSubject === successSubject
-                    ? Promise.resolve(cached.entry.payload as T)
-                    : Promise.reject(FspiopResponseSubscriber.toFspiopException(
-                        cached.entry.payload as ErrorInformationObject,
-                    )),
-            );
-        }
+        const promise = FspiopResponseSubscriber.guard(
+            new Promise<T>((resolve, reject) => {
+                entry = {
+                    successSubject,
+                    subjects: [successSubject, errorSubject, ...(hubErrorSubject ? [hubErrorSubject] : [])],
+                    resolve: (payload) => resolve(payload as T),
+                    reject,
+                    timer: null,
+                };
 
-        return FspiopResponseSubscriber.guard(new Promise<T>((resolve, reject) => {
-            const entry: PendingEntry = {
-                successSubject,
-                errorSubject,
-                hubErrorSubject: hubErrorSubject ?? null,
-                resolve: payload => resolve(payload as T),
-                reject,
-                timer: null,
-            };
+                entry.timer = setTimeout(() => {
+                    this.remove(entry);
+                    reject(
+                        new FspiopException(
+                            FspiopErrors.SERVER_TIMED_OUT,
+                            `No FSPIOP callback received on '${successSubject}' within ${timeoutMs}ms.`,
+                        ),
+                    );
+                }, timeoutMs);
 
-            entry.timer = setTimeout(() => {
-                this.cancel(successSubject);
-                reject(new FspiopException(
-                    FspiopErrors.SERVER_TIMED_OUT,
-                    `No FSPIOP callback received on '${successSubject}' within ${timeoutMs}ms.`,
-                ));
-            }, timeoutMs);
+                for (const subject of entry.subjects) {
+                    let set = this.pending.get(subject);
+                    if (set == null) {
+                        set = new Set();
+                        this.pending.set(subject, set);
+                    }
+                    set.add(entry);
+                }
+            }),
+        );
 
-            this.pending.set(successSubject, entry);
-            this.pending.set(errorSubject, entry);
+        return {
+            promise,
+            cancel: () => this.remove(entry),
+        };
+    }
 
-            if (hubErrorSubject != null) {
-                this.pending.set(hubErrorSubject, entry);
+    private remove(entry: PendingEntry): void {
+        for (const subject of entry.subjects) {
+            const set = this.pending.get(subject);
+            set?.delete(entry);
+            if (set?.size === 0) {
+                this.pending.delete(subject);
             }
-        }));
+        }
+        if (entry.timer != null) {
+            clearTimeout(entry.timer);
+            entry.timer = null;
+        }
     }
 
     /**
      * Callers register the waiter, then `await` a downstream HTTP request, and only
      * `await` this promise afterwards. The promise can therefore settle (reject) before
-     * that final `await` attaches a handler — via the recent-cache fast path, or via
-     * dispatch() delivering a callback while the HTTP request is still in flight. With no
+     * that final `await` attaches a handler — via dispatch() delivering a callback
+     * while the HTTP request is still in flight. With no
      * handler attached, that rejection floats and Node's unhandledRejection guard crashes
      * the process. Attaching a no-op catch marks it handled; the discarded derived promise
      * leaves the original untouched, so the caller's later `await` still observes the result.
@@ -185,26 +182,6 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
     private static guard<T>(promise: Promise<T>): Promise<T> {
         promise.catch(() => undefined);
         return promise;
-    }
-
-    cancel(successSubject: string): void {
-        const entry = this.pending.get(successSubject);
-
-        if (entry == null) {
-            return;
-        }
-
-        this.pending.delete(entry.successSubject);
-        this.pending.delete(entry.errorSubject);
-
-        if (entry.hubErrorSubject != null) {
-            this.pending.delete(entry.hubErrorSubject);
-        }
-
-        if (entry.timer != null) {
-            clearTimeout(entry.timer);
-            entry.timer = null;
-        }
     }
 
     private async consumeLoop(messages: ConsumerMessages): Promise<void> {
@@ -235,84 +212,31 @@ export class FspiopResponseSubscriber implements OnModuleInit, OnModuleDestroy {
         const subject = msg.subject;
         const payload = this.nats.codec.decode(msg.data);
         let matchedSubject = subject;
-        let entry = this.pending.get(matchedSubject);
+        let waiters = this.pending.get(matchedSubject);
 
-        if (entry == null) {
+        if (waiters == null) {
             const anyPayeeSubject = FspiopPubSubSubjects.Parties.toAnyPayeeSubject(subject);
             if (anyPayeeSubject != null) {
                 matchedSubject = anyPayeeSubject;
-                entry = this.pending.get(matchedSubject);
+                waiters = this.pending.get(matchedSubject);
             }
         }
 
-        if (entry == null) {
-            this.addToRecent(subject, payload);
+        if (waiters == null || waiters.size === 0) {
             return;
         }
 
-        const isSuccess = matchedSubject === entry.successSubject;
-        this.cancel(entry.successSubject);
+        const first = waiters.values().next().value!;
+        const isSuccess = matchedSubject === first.successSubject;
 
         if (isSuccess) {
-            entry.resolve(payload);
+            for (const entry of Array.from(waiters)) {
+                this.remove(entry);
+                entry.resolve(payload);
+            }
         } else {
-            entry.reject(FspiopResponseSubscriber.toFspiopException(payload as ErrorInformationObject));
-        }
-    }
-
-    private addToRecent(subject: string, payload: unknown): void {
-        this.evictExpiredRecent();
-
-        if (this.recent.size >= FspiopResponseSubscriber.RECENT_CACHE_MAX_ENTRIES) {
-            const oldestKey = this.recent.keys().next().value;
-            if (oldestKey != null) {
-                this.recent.delete(oldestKey);
-            }
-        }
-
-        this.recent.set(subject, {
-            subject,
-            payload,
-            expiresAt: Date.now() + FspiopResponseSubscriber.RECENT_CACHE_TTL_MS,
-        });
-    }
-
-    private takeFromRecent(
-        successSubject: string,
-        errorSubject: string,
-        hubErrorSubject: string | undefined,
-    ): RecentMatch | null {
-        this.evictExpiredRecent();
-
-        const candidates = hubErrorSubject != null
-            ? [successSubject, errorSubject, hubErrorSubject]
-            : [successSubject, errorSubject];
-
-        for (const subject of candidates) {
-            const entry = this.recent.get(subject);
-            if (entry != null) {
-                this.recent.delete(subject);
-                return {entry, matchedSubject: subject};
-            }
-        }
-
-        for (const [subject, entry] of this.recent) {
-            const anyPayeeSubject = FspiopPubSubSubjects.Parties.toAnyPayeeSubject(subject);
-            if (anyPayeeSubject != null && candidates.includes(anyPayeeSubject)) {
-                this.recent.delete(subject);
-                return {entry, matchedSubject: anyPayeeSubject};
-            }
-        }
-
-        return null;
-    }
-
-    private evictExpiredRecent(): void {
-        const now = Date.now();
-        for (const [key, entry] of this.recent) {
-            if (entry.expiresAt <= now) {
-                this.recent.delete(key);
-            }
+            this.remove(first);
+            first.reject(FspiopResponseSubscriber.toFspiopException(payload as ErrorInformationObject));
         }
     }
 
