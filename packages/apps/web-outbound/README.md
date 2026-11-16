@@ -12,6 +12,7 @@
 - Subscribes to the FSPIOP response stream published by `web-inbound`.
 - Uses Redis for in-flight transfer state and callback timeout tracking.
 - Validates optional payer JWT access tokens when `ACCESS_JWT_ENABLED=true`.
+- On a government-to-person transfer, fills a blank payer name from the sending DFSP's government payer display name. That name is read and set through web-pivotal `GET` and `PUT /participant/government-payer-display-name`.
 
 ## Run Locally
 

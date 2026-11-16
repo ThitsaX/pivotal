@@ -9,6 +9,7 @@ export * from './participant/add-signing-keys.controller';
 export * from './participant/upsert-endpoint.controller';
 export * from './participant/update-access-key.controller';
 export * from './participant/update-jws-policy.controller';
+export * from './participant/government-payer-display-name.controller';
 export * from './participant/dfsp-certificate.controller';
 export * from './participant/generate-signing-key.controller';
 export * from './hub/add-currency.controller';

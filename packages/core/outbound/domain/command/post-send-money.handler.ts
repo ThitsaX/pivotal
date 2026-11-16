@@ -20,7 +20,7 @@ import {
     PartyIdInfo,
     PartyPersonalInfo,
 } from '@shared/fspiop';
-import { AmountDecimalValidator, RedisClient } from '../component';
+import { AmountDecimalValidator, GovernmentPayerNameResolver, RedisClient } from '../component';
 import { TransferRequest } from '../cache';
 import { FspParty, SendMoneyRequest } from '../dto';
 import { PostSendMoneyCommand } from './post-send-money.command';
@@ -43,6 +43,8 @@ export class PostSendMoneyHandler
         private readonly auditPublisher: AuditTransactionPublisher,
         @Inject(AmountDecimalValidator)
         private readonly amountDecimalValidator: AmountDecimalValidator,
+        @Inject(GovernmentPayerNameResolver)
+        private readonly governmentPayerNameResolver: GovernmentPayerNameResolver,
     ) {
     }
 
@@ -77,16 +79,17 @@ export class PostSendMoneyHandler
         callback: PartiesTypeIDPutResponse,
         transferId: string,
         initiatedTimestamp: string,
+        from: FspParty,
     ): TransferRequest {
         const transferRequest = new TransferRequest();
-        transferRequest.payer = PostSendMoneyHandler.toParty(request.from);
+        transferRequest.payer = PostSendMoneyHandler.toParty(from);
         transferRequest.payee = callback.party;
         transferRequest.quotes = undefined;
         transferRequest.transfer = undefined;
         transferRequest.transferId = transferId;
         transferRequest.homeTransactionId = request.homeTransactionId;
         transferRequest.initiatedTimestamp = initiatedTimestamp;
-        transferRequest.from = request.from;
+        transferRequest.from = from;
         transferRequest.to = PostSendMoneyHandler.toFspParty(callback);
         transferRequest.amountType = request.amountType;
         transferRequest.currency = request.currency;
@@ -256,11 +259,13 @@ export class PostSendMoneyHandler
 
             const callback = await waitPromise;
             const resolvedDestination = PostSendMoneyHandler.resolveDestination(callback, destination);
+            const from = this.governmentPayerNameResolver.resolve(source, request.from, request.subScenario);
             const cachedTransaction = PostSendMoneyHandler.toTransferRequest(
                 request,
                 callback,
                 transferId,
                 createdAt.toISOString(),
+                from,
             );
             const response = SendMoneyResponseMapper.toWaitingForPartyAcceptance(cachedTransaction);
 
