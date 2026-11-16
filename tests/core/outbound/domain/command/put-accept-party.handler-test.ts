@@ -108,10 +108,8 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
-                async waitFor(): Promise<QuotesIDPutResponse> {
-                    return callback;
-                },
-                cancel(): void {
+                waitFor(): {promise: Promise<QuotesIDPutResponse>; cancel(): void} {
+                    return {promise: Promise.resolve(callback), cancel(): void {}};
                 },
             } as never,
             {
@@ -164,10 +162,8 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
-                async waitFor(): Promise<QuotesIDPutResponse> {
-                    return new QuotesIDPutResponse();
-                },
-                cancel(): void {
+                waitFor(): {promise: Promise<QuotesIDPutResponse>; cancel(): void} {
+                    return {promise: Promise.resolve(new QuotesIDPutResponse()), cancel(): void {}};
                 },
             } as never,
             {
@@ -227,10 +223,8 @@ describe('PutAcceptPartyHandler', () => {
                 },
             } as never,
             {
-                async waitFor(): Promise<QuotesIDPutResponse> {
-                    return new QuotesIDPutResponse();
-                },
-                cancel(): void {
+                waitFor(): {promise: Promise<QuotesIDPutResponse>; cancel(): void} {
+                    return {promise: Promise.resolve(new QuotesIDPutResponse()), cancel(): void {}};
                 },
             } as never,
             {

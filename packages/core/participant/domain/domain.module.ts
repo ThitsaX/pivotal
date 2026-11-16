@@ -16,12 +16,14 @@ import {
     OnboardFspHandler,
     RevokeDfspCertificateHandler,
     UpdateAccessKeyHandler,
+    UpdateGovernmentPayerDisplayNameHandler,
     UpdateJwsPolicyHandler,
     UpsertEndpointHandler,
 } from './command';
 import {Participant, ParticipantCert, ParticipantCertStatus, ParticipantKey} from './model';
 import {
     GetDfspCertificateHandler,
+    GetGovernmentPayerDisplayNameHandler,
     GetJwsPolicyHandler,
     ListCentralLedgerParticipantsHandler,
     ListDfspCertificatesHandler,
@@ -168,6 +170,7 @@ const CommandHandlers = [
     AddSigningKeysHandler,
     UpsertEndpointHandler,
     UpdateAccessKeyHandler,
+    UpdateGovernmentPayerDisplayNameHandler,
     UpdateJwsPolicyHandler,
     EnrollDfspCertificateHandler,
     RevokeDfspCertificateHandler,
@@ -177,6 +180,7 @@ const QueryHandlers = [
     ListCentralLedgerParticipantsHandler,
     ListDfspCertificatesHandler,
     GetDfspCertificateHandler,
+    GetGovernmentPayerDisplayNameHandler,
     GetJwsPolicyHandler,
 ];
 

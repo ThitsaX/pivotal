@@ -18,3 +18,5 @@ export * from './enroll-dfsp-certificate.command';
 export * from './enroll-dfsp-certificate.handler';
 export * from './revoke-dfsp-certificate.command';
 export * from './revoke-dfsp-certificate.handler';
+export * from './update-government-payer-display-name.command';
+export * from './update-government-payer-display-name.handler';

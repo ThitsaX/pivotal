@@ -345,7 +345,7 @@ Run the certificate checks before Step 9 deletes the folders, or against your sa
 | 3 | The two roots use different keys | `openssl x509 -in pki_dfsp/root.pem -pubkey -noout \| openssl pkey -pubin -outform DER \| openssl dgst -sha256`, and the same for `pki_hub_client/root.pem` | Different hashes. (Certificate fingerprints can differ even for one key, so they do not prove this.) |
 | 4 | Each CRL is signed by its root (offline roots) | `openssl crl -in pki_dfsp/root.crl -CAfile pki_dfsp/root.pem -noout` | `verify OK` |
 | 5 | Vault roles exist | `vault list pki_hub_client/roles` and `vault list pki_dfsp/roles` | `hub-callback-client`, `web-inbound-server`; and `dfsp-client` |
-| 6 | The DFSP CA ignores names in a request | `vault read pki_dfsp/roles/dfsp-client` | `use_csr_common_name false` and `use_csr_sans false` |
+| 6 | The DFSP CA role keeps certificates to one year | `vault read pki_dfsp/roles/dfsp-client` | `ttl 8760h` and `no_store true` |
 | 7 | The published root is the right one | `kubectl -n pivotal get secret pivotal-hub-client-ca -o jsonpath='{.data.ca\.pem}' \| base64 -d \| openssl x509 -noout -fingerprint -sha256` | Equals `openssl x509 -noout -fingerprint -sha256 -in pki_hub_client/root.pem` |
 
 **Negative tests:** run the two negative tests in [2. CA ceremony](./2-ca-ceremony.md#verification)

@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 import {OnboardFspCommand, OnboardFspHandler} from '../../../../../packages/core/participant/domain/command';
 import {JwsKeyProvisioner} from '../../../../../packages/core/participant/domain/component/store/jws-key-provisioner';
-import {ParticipantKey} from '../../../../../packages/core/participant/domain/model';
+import {Participant, ParticipantKey} from '../../../../../packages/core/participant/domain/model';
 
 const PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----\nkey\n-----END PUBLIC KEY-----\n';
 
@@ -112,5 +112,28 @@ describe('OnboardFspHandler', () => {
 
         assert.deepEqual(ledger.onboarded, ['DemoDFSP3']);
         assert.equal(provisioner.provisioned, 0);
+    });
+
+    it('does not clear a stored government payer display name when onboarding again', async () => {
+        const existing = new Participant('DemoDFSP3', null, null, PUBLIC_KEY, 'id-1');
+        existing.governmentPayerDisplayName = 'Already stored';
+
+        let saved: Participant | undefined;
+        const repository = {
+            findByName: () => Promise.resolve(existing),
+            save: (participant: Participant) => {
+                saved = participant;
+                return Promise.resolve(participant);
+            },
+        };
+
+        await new OnboardFspHandler(
+            new FakeLedger() as any,
+            repository as any,
+            new FakeKeys() as any,
+            new FakeProvisioner(true, PUBLIC_KEY),
+        ).execute(command);
+
+        assert.equal(saved?.governmentPayerDisplayName, undefined);
     });
 });

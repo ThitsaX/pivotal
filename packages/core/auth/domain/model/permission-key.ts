@@ -9,6 +9,7 @@ export const PermissionKey = {
     PARTICIPANT_ENDPOINT_REGISTER:   'participant.endpoint.register',
     PARTICIPANT_SIGNING_KEYS_UPDATE: 'participant.signing-keys.update',
     PARTICIPANT_ACCESS_KEY_UPDATE:   'participant.access-key.update',
+    PARTICIPANT_PAYER_DISPLAY_NAME_UPDATE: 'participant.payer-display-name.update',
     PARTICIPANT_CERT_ENROLL:         'participant.certificate.enroll',
     PARTICIPANT_CERT_VIEW:           'participant.certificate.view',
     PARTICIPANT_CERT_REVOKE:         'participant.certificate.revoke',

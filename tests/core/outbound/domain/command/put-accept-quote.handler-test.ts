@@ -104,10 +104,8 @@ function createHandler(cachedRequest: TransferRequest) {
             },
         } as never,
         {
-            async waitFor(): Promise<TransfersIDPutResponse> {
-                return successfulCallback();
-            },
-            cancel(): void {
+            waitFor(): {promise: Promise<TransfersIDPutResponse>; cancel(): void} {
+                return {promise: Promise.resolve(successfulCallback()), cancel(): void {}};
             },
         } as never,
         {
@@ -226,10 +224,8 @@ describe('PutAcceptQuoteHandler', () => {
                 },
             } as never,
             {
-                async waitFor(): Promise<TransfersIDPutResponse> {
-                    return new TransfersIDPutResponse();
-                },
-                cancel(): void {
+                waitFor(): {promise: Promise<TransfersIDPutResponse>; cancel(): void} {
+                    return {promise: Promise.resolve(new TransfersIDPutResponse()), cancel(): void {}};
                 },
             } as never,
             {
