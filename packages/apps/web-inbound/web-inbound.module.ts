@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {DynamicModule, Module, Provider} from '@nestjs/common';
+import {APP_GUARD} from '@nestjs/core';
 import {
     ParticipantDomainModule,
     ParticipantJwsPolicyStore,
@@ -13,6 +14,7 @@ import {PartiesController, QuotesController, TransfersController,} from './contr
 import {WebInboundSettings} from './required.settings';
 import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
 import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
+import {RepresentationHeaderGuard} from './representation-header.guard';
 
 const REQUIRED_SETTINGS = Symbol('WebInboundRequiredSettings');
 
@@ -48,6 +50,7 @@ export class WebInboundModule {
             ],
             providers: [
                 ...WebInboundModule.createProviders(asyncOptions),
+                {provide: APP_GUARD, useClass: RepresentationHeaderGuard},
             ],
         };
     }
@@ -83,7 +86,7 @@ export class WebInboundModule {
                         ),
                     );
                 },
-                inject: [REQUIRED_SETTINGS, ParticipantSigningKeysCache],
+                inject: [FspiopSettings, ParticipantSigningKeysCache],
             }
         ];
     }

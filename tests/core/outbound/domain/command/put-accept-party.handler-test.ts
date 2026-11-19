@@ -107,7 +107,7 @@ describe('PutAcceptPartyHandler', () => {
                     ): Promise<void> {
                         postedQuoteAmount = body.amount?.amount;
                         postedQuoteExtensionList = body.extensionList;
-                        assert.equal(body.transactionRequestId, undefined);
+                        assert.equal(body.transactionRequestId, 'transfer-1');
                     },
                 } as never,
                 {

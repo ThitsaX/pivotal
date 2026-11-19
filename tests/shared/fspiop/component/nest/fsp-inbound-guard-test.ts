@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { FspInboundGuard } from '../../../../../packages/shared/fspiop/component/nest/guard/fsp-inbound.guard';
 import { FspiopSettings } from '../../../../../packages/shared/fspiop/component/fspiop-settings';
+import { ApiType } from '../../../../../packages/shared/iso20022/api-type';
 import { FspiopSignature } from '../../../../../packages/shared/fspiop/component/fspiop-signature';
 import { FspiopVerifyMode } from '../../../../../packages/shared/fspiop/component/fspiop-verify-mode';
 import {
@@ -31,7 +32,7 @@ class FakePublicKeyStore extends PublicKeyStore {
 }
 
 function settings(useJws = true): FspiopSettings {
-    return new FspiopSettings('hub', '', '', '', useJws, false);
+    return new FspiopSettings('hub', '', '', '', useJws, false, ApiType.FSPIOP, false);
 }
 
 function contextFor(headers: Record<string, string>, body: unknown = BODY, method = 'PUT'): any {

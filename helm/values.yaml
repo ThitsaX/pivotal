@@ -16,12 +16,17 @@ global:
   revisionHistoryLimit: 3
   terminationGracePeriodSeconds: 30
 
+  # Rendered into web-outbound, web-inbound and every connector. A service's own env wins over
+  # this block. Keep per-service settings (Hub URLs, FSPIOP_USE_JWS, FSPIOP_USE_MUTUAL_TLS, the TLS
+  # verify flags) on the service: FSPIOP_USE_MUTUAL_TLS, for one, means "present a certificate" on
+  # web-outbound and "serve TLS" on web-inbound.
   commonFspiopEnv:
     FSPIOP_PARTIES_URL: http://web-inbound:3201
     FSPIOP_QUOTES_URL: http://web-inbound:3201
     FSPIOP_TRANSFERS_URL: http://web-inbound:3201
     FSPIOP_SWITCH_ID: hub
-    API_TYPE: iso20022
+    API_TYPE: fspiop
+    FSPIOP_TRANSFORM_VALIDATE_TARGET: "false"
     FSPIOP_USE_JWS: "false"
     FSPIOP_USE_MUTUAL_TLS: "false"
     FSPIOP_SIGN_JWS: "false"
@@ -90,15 +95,6 @@ global:
     port: "3306"
     username: pivotal
     name: pivotal
-
-  # Rendered into web-outbound, web-inbound and every connector. A service's own env wins over
-  # this block. Keep per-service settings (Hub URLs, FSPIOP_USE_JWS, FSPIOP_USE_MUTUAL_TLS, the TLS
-  # verify flags) on the service: FSPIOP_USE_MUTUAL_TLS, for one, means "present a certificate" on
-  # web-outbound and "serve TLS" on web-inbound.
-  commonFspiopEnv: {}
-    # FSPIOP_SWITCH_ID: hub
-    # FSPIOP_SOCKET_TIMEOUT_MS: "30000"
-    # FSPIOP_CONNECTION_TIMEOUT_MS: "5000"
 
 # OpenTelemetry auto-instrumentation for the Java connectors. Needs the OpenTelemetry Operator and
 # a trace backend. A connector opts out with `tracing.enabled: false` on its own entry.

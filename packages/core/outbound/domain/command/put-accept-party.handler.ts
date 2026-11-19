@@ -279,8 +279,7 @@ export class PutAcceptPartyHandler
         const quoteRequest = new QuotesPostRequest();
         quoteRequest.quoteId = transferId;
         quoteRequest.transactionId = transferId;
-        // This flow is payer-initiated and has no originating payee transaction request.
-        // Reusing transferId here makes the ISO mapper infer a PAYEE-initiated flow.
+        quoteRequest.transactionRequestId = transferId;
         quoteRequest.payee = transferRequest.payee;
         quoteRequest.payer = transferRequest.payer;
         quoteRequest.amountType = transferRequest.amountType;

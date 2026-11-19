@@ -174,18 +174,64 @@ describe('Iso20022Transformer target validation', () => {
         }
     });
 
-    for (const [direction, convert] of [
-        ['FSPIOP to ISO 20022', (transformer: Iso20022Transformer) => transformer.fspiopPostQuotesToIso({})],
-        ['ISO 20022 to FSPIOP', (transformer: Iso20022Transformer) => transformer.isoPostQuotesToFspiop({
-            CdtTrfTxInf: {PmtId: {TxId: 'invalid'}},
-        })],
-    ] as const) {
-        it(`rejects an invalid ${direction} output only when enabled`, async () => {
-            const disabled = new Iso20022Transformer(transformerSettings(false));
-            const enabled = new Iso20022Transformer(transformerSettings(true));
-            await assert.doesNotReject(() => convert(disabled));
-            await assert.rejects(() => convert(enabled), /Validation errors/);
-            await assert.doesNotReject(() => convert(disabled));
-        });
+    // Exercise supported payload conversion with the installed library, without mocks
+    // or assuming that it rejects every possible malformed ISO output.
+    for (const amountType of ['SEND', 'RECEIVE'] as const) {
+        for (const validateTarget of [false, true]) {
+            it(`preserves a payer-initiated ${amountType} quote with transactionRequestId and validateTarget=${validateTarget}`, async () => {
+                const request = {
+                    quoteId: '01KAA000000000000000000001',
+                    transactionId: '01KAA000000000000000000002',
+                    transactionRequestId: '01KAA000000000000000000002',
+                    payer: {partyIdInfo: {partyIdType: 'MSISDN', partyIdentifier: '959250000001', fspId: 'payerfsp'}},
+                    payee: {partyIdInfo: {partyIdType: 'MSISDN', partyIdentifier: '959250000002', fspId: 'payeefsp'}},
+                    amountType,
+                    amount: {amount: '1000', currency: 'MMK'},
+                    transactionType: {scenario: 'TRANSFER', initiator: 'PAYER', initiatorType: 'CONSUMER'},
+                    expiration: '2099-01-01T00:00:00.000Z',
+                };
+                const before = structuredClone(request);
+                const transformer = new Iso20022Transformer(transformerSettings(validateTarget));
+                const iso = await transformer.fspiopPostQuotesToIso(request) as {
+                    GrpHdr: {MsgId: string; CreDtTm: string; PmtInstrXpryDtTm: string};
+                    CdtTrfTxInf: {
+                        PmtId: {TxId: string; EndToEndId: string; InstrId: string};
+                        IntrBkSttlmAmt: {Ccy: string; ActiveCurrencyAndAmount: string};
+                        DbtrAgt: {FinInstnId: {Othr: {Id: string}}};
+                        CdtrAgt: {FinInstnId: {Othr: {Id: string}}};
+                        ChrgBr: string;
+                    };
+                };
+
+                assert.equal(typeof iso.GrpHdr.MsgId, 'string');
+                assert.ok(iso.GrpHdr.MsgId.length > 0);
+                assert.equal(typeof iso.GrpHdr.CreDtTm, 'string');
+                assert.equal(iso.GrpHdr.PmtInstrXpryDtTm, request.expiration);
+                assert.equal(iso.CdtTrfTxInf.PmtId.TxId, request.quoteId);
+                assert.equal(iso.CdtTrfTxInf.PmtId.EndToEndId, request.transactionId);
+                assert.equal(iso.CdtTrfTxInf.PmtId.InstrId, request.transactionRequestId);
+                assert.deepEqual(iso.CdtTrfTxInf.IntrBkSttlmAmt, {Ccy: 'MMK', ActiveCurrencyAndAmount: '1000'});
+                assert.equal(iso.CdtTrfTxInf.DbtrAgt.FinInstnId.Othr.Id, 'payerfsp');
+                assert.equal(iso.CdtTrfTxInf.CdtrAgt.FinInstnId.Othr.Id, 'payeefsp');
+                assert.equal(iso.CdtTrfTxInf.ChrgBr, amountType === 'SEND' ? 'CRED' : 'DEBT');
+
+                const isoBefore = structuredClone(iso);
+                const restored = await transformer.isoPostQuotesToFspiop(iso) as Record<string, unknown>;
+                for (const field of ['quoteId', 'transactionId', 'transactionRequestId', 'payer', 'payee', 'amountType', 'amount', 'transactionType', 'expiration'] as const) {
+                    assert.deepEqual(restored[field], request[field], field);
+                }
+                assert.deepEqual(request, before);
+                assert.deepEqual(iso, isoBefore);
+            });
+        }
     }
+
+    it('rejects an invalid ISO 20022 to FSPIOP output only when enabled', async () => {
+        const invalid = {CdtTrfTxInf: {PmtId: {TxId: 'invalid'}}};
+        const disabled = new Iso20022Transformer(transformerSettings(false));
+        const enabled = new Iso20022Transformer(transformerSettings(true));
+        await assert.doesNotReject(() => disabled.isoPostQuotesToFspiop(invalid));
+        await assert.rejects(() => enabled.isoPostQuotesToFspiop(invalid), /Validation errors/);
+        await assert.doesNotReject(() => disabled.isoPostQuotesToFspiop(invalid));
+    });
 });
