@@ -476,6 +476,121 @@ describe('SendMoneyRequest', () => {
         assert.ok(messages(errors).includes('lastName must not exceed 128 characters'));
     });
 
+    it('accepts a missing payer displayName', async () => {
+        const {errors} = await validateSendMoneyRequest(sendMoneyBody('wallet1', 'wallet2'));
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('accepts a null payer displayName', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = null;
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('accepts an empty-string payer displayName', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = '';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('trims and accepts a valid payer displayName', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = '  José García  ';
+
+        const {request, errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+        assert.equal(request.from.displayName, 'José García');
+    });
+
+    it('accepts payer displayNames with letters, digits, and common punctuation', async () => {
+        for (const displayName of [
+            'John Doe',
+            "O'Brien",
+            'A&B Trading (Pvt) Ltd',
+            'Shop #5',
+            'Mary/Jane Store',
+        ]) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.from as Record<string, unknown>).displayName = displayName;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.deepEqual(errors, [], displayName);
+        }
+    });
+
+    it('rejects a whitespace-only payer displayName', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = '   ';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).some((message) => message.startsWith('from.displayName must be')));
+    });
+
+    it('rejects a symbols-only payer displayName', async () => {
+        for (const displayName of ['---', '...', '@#$!', '()', '&&']) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.from as Record<string, unknown>).displayName = displayName;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.ok(
+                messages(errors).some((message) => message.startsWith('from.displayName must be')),
+                displayName,
+            );
+        }
+    });
+
+    it('rejects a payer displayName with a newline or tab', async () => {
+        for (const displayName of ['John\nDoe', 'John\tDoe']) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            (body.from as Record<string, unknown>).displayName = displayName;
+
+            const {errors} = await validateSendMoneyRequest(body);
+
+            assert.ok(
+                messages(errors).some((message) => message.startsWith('from.displayName must be')),
+                displayName,
+            );
+        }
+    });
+
+    it('rejects a payer displayName with a zero-width space', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = 'John\u200BDoe';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).some((message) => message.startsWith('from.displayName must be')));
+    });
+
+    it('rejects a payer displayName longer than 128 characters after trimming', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.from as Record<string, unknown>).displayName = `  ${'a'.repeat(129)}  `;
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.ok(messages(errors).some((message) => message.startsWith('from.displayName must be')));
+    });
+
+    it('does not validate a whitespace-only payee displayName', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        (body.to as Record<string, unknown>).displayName = '   ';
+
+        const {errors} = await validateSendMoneyRequest(body);
+
+        assert.deepEqual(errors, []);
+    });
+
     it('rejects an over-length merchantClassificationCode', async () => {
         const body = sendMoneyBody('wallet1', 'wallet2');
         (body.to as Record<string, unknown>).merchantClassificationCode = '12345';

@@ -823,6 +823,24 @@ components:
       maxLength: 128
       minLength: 1
       type: string
+      description: Generic party name field (for example first/middle/last name, or payee displayName).
+    payerDisplayName:
+      type: string
+      nullable: true
+      maxLength: 128
+      example: John Doe
+      description: |
+        Optional payer display name on `POST /secured/sendmoney` (`from.displayName`).
+
+        Missing, `null`, and empty-string values are accepted and left unchanged.
+        When any other value is supplied, Pivotal trims leading/trailing whitespace and then requires:
+        - length 1 to 128 after trimming
+        - at least one Unicode letter or digit
+        - no Unicode control or invisible formatting characters (Cc/Cf/Cs), except Join_Control
+
+        Whitespace-only and symbols-only values are rejected with HTTP 400.
+        On success, the trimmed value replaces the submitted value for later processing.
+        Payee `to.displayName` is not subject to this validation.
     type:
       type: string
       description: |
@@ -976,6 +994,21 @@ Allowed values:
         properties:
           fspId:
             $ref: '#/components/schemas/fspId'
+    PayerFspPartyRequest:
+      description: |
+        The payer party on `POST /secured/sendmoney`. `fspId` is required and must match
+        the `fspiop-source` header. `displayName` is optional; when provided as a non-empty
+        value it must satisfy `payerDisplayName` rules.
+      allOf:
+      - $ref: '#/components/schemas/FspPartyBase'
+      - type: object
+        required:
+        - fspId
+        properties:
+          fspId:
+            $ref: '#/components/schemas/fspId'
+          displayName:
+            $ref: '#/components/schemas/payerDisplayName'
     PayeeFspPartyRequest:
       description: |
         The payee party to look up. `fspId` may be omitted or blank when the
@@ -1008,7 +1041,7 @@ Allowed values:
         homeTransactionId:
           $ref: '#/components/schemas/homeTransactionId'
         from:
-          $ref: '#/components/schemas/FspParty'
+          $ref: '#/components/schemas/PayerFspPartyRequest'
         to:
           $ref: '#/components/schemas/PayeeFspPartyRequest'
         amountType:
