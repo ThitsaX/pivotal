@@ -18,7 +18,7 @@ import SearchCriteriaForm from '../../components/SearchCriteriaForm.vue';
 import StatusDialog from '../../components/StatusDialog.vue';
 import TimeZoneSelector from '../../components/TimeZoneSelector.vue';
 import { useReportDownloadState } from '../../composables/useDownloadReportState';
-import {fetchAuditFspOptions} from '../../modules/audit/fsp-options-api';
+import {fetchAuditFspOptions, type AuditFspOption} from '../../modules/audit/fsp-options-api';
 import {authStore} from '../../stores/auth.store';
 import {
     getCriteriaSections,
@@ -138,7 +138,7 @@ const activeDetailsTab = ref<'parties' | 'quotes' | 'transfers'>('parties');
 const isPageSizeDialogOpen = ref(false);
 const copiedCellKey = ref<string | null>(null);
 const lastSubmittedCriteria = ref<Record<string, string>>({});
-const fetchedFspOptions = ref<SelectOption[]>([]);
+const fetchedFspOptions = ref<AuditFspOption[]>([]);
 const fspOptionsLoading = ref(false);
 const fspOptionsError = ref<string | null>(null);
 
@@ -1235,14 +1235,36 @@ const toDisplayDateTime = (value: unknown): {dateTime: string; zone: string; has
     };
 };
 
+const fspDescriptionMap = computed((): Map<string, string> => {
+    const map = new Map<string, string>();
+    for (const opt of fetchedFspOptions.value) {
+        const value = opt.value?.trim();
+        const desc = opt.description?.trim();
+        if (value && desc) {
+            map.set(value, desc);
+        }
+    }
+    return map;
+});
+
+const getFspDescription = (fspId: string): string | undefined => {
+    if (!fspId || fspId === '-') {
+        return undefined;
+    }
+    return fspDescriptionMap.value.get(fspId);
+};
+
 const getPartyDisplay = (record: Record<string, unknown>, prefix: 'payer' | 'payee'): {
     fsp: string;
+    fspName?: string;
     idType: string;
     id: string;
     subId: string;
 } => {
+    const rawFsp = formatOptionalValue(record[`${prefix}Fsp`]);
     return {
-        fsp: formatOptionalValue(record[`${prefix}Fsp`]),
+        fsp: rawFsp,
+        fspName: getFspDescription(rawFsp),
         idType: formatOptionalValue(record[`${prefix}IdType`]),
         id: formatOptionalValue(record[`${prefix}Id`]),
         subId: formatOptionalValue(record[`${prefix}SubId`]),
@@ -2119,7 +2141,10 @@ const goToLastPage = (): void => {
                                                 </button>
                                             </div>
                                             <div v-else-if="column.key === 'payer'" class="space-y-1.5">
-                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-1 font-semibold leading-4 text-accent">
+                                                <p v-if="getPartyDisplay(record, 'payer').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                                    {{ getPartyDisplay(record, 'payer').fspName }}
+                                                </p>
+                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payer').fsp }}
                                                 </p>
                                                 <div class="space-y-1 text-[11px] leading-4 text-slate-600">
@@ -2151,7 +2176,10 @@ const goToLastPage = (): void => {
                                                 </p>
                                             </div>
                                             <div v-else-if="column.key === 'payee'" class="space-y-1.5">
-                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-1 font-semibold leading-4 text-accent">
+                                                <p v-if="getPartyDisplay(record, 'payee').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                                    {{ getPartyDisplay(record, 'payee').fspName }}
+                                                </p>
+                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payee').fsp }}
                                                 </p>
                                                 <div class="space-y-1 text-[11px] leading-4 text-slate-600">
@@ -2348,7 +2376,10 @@ const goToLastPage = (): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payer
                                         </p>
-                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accent">
+                                        <p v-if="getPartyDisplay(record, 'payer').fspName" class="text-sm font-semibold text-ink">
+                                            {{ getPartyDisplay(record, 'payer').fspName }}
+                                        </p>
+                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payer').fsp }}
                                         </p>
                                         <div class="space-y-1 text-sm text-slate-600">
@@ -2384,7 +2415,10 @@ const goToLastPage = (): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payee
                                         </p>
-                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accent">
+                                        <p v-if="getPartyDisplay(record, 'payee').fspName" class="text-sm font-semibold text-ink">
+                                            {{ getPartyDisplay(record, 'payee').fspName }}
+                                        </p>
+                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payee').fsp }}
                                         </p>
                                         <div class="space-y-1 text-sm text-slate-600">
@@ -2807,7 +2841,10 @@ const goToLastPage = (): void => {
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                     Payer
                                 </p>
-                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-sm font-semibold text-accent">
+                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payer').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                    {{ getPartyDisplay(selectedTransaction.record, 'payer').fspName }}
+                                </p>
+                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payer').fsp }}
                                 </p>
                                 <div class="space-y-0.5 text-[12px] text-slate-600">
@@ -2869,7 +2906,10 @@ const goToLastPage = (): void => {
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                     Payee
                                 </p>
-                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-sm font-semibold text-accent">
+                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payee').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                    {{ getPartyDisplay(selectedTransaction.record, 'payee').fspName }}
+                                </p>
+                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payee').fsp }}
                                 </p>
                                 <div class="space-y-0.5 text-[12px] text-slate-600">
