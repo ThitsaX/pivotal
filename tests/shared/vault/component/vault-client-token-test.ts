@@ -182,11 +182,12 @@ describe('VaultClient token lifecycle', () => {
         await vault.readKvField('pivotal/jwskey/DemoDFSP1', 'privateKey');
         (vault as any).tokenExpiresAt = Date.now() - 1;
 
-        await vault.signCertificate({
+        await vault.signCertificateVerbatim({
             mount: 'pki_dfsp',
             role: 'dfsp-client',
             csrPem: '-----BEGIN CERTIFICATE REQUEST-----',
-            commonName: 'DemoDFSP2',
+            keyUsage: ['DigitalSignature'],
+            extKeyUsage: ['ClientAuth'],
         }).catch(() => undefined);
 
         assert.equal(http.logins.length, 2,

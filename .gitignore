@@ -97,3 +97,5 @@ docs/plans/
 # Public material, but environment-specific rather than source -- it belongs wherever that
 # environment's material is kept, not here.
 ceremony-out/
+
+.vscode/

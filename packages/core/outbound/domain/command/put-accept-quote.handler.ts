@@ -236,7 +236,7 @@ export class PutAcceptQuoteHandler
             const successSubject = FspiopPubSubSubjects.Transfers.forSuccess(source, transferId);
             const errorSubject = FspiopPubSubSubjects.Transfers.forError(source, transferId);
 
-            const waitPromise = this.subscriber.waitFor<TransfersIDPutResponse>(
+            const waiter = this.subscriber.waitFor<TransfersIDPutResponse>(
                 successSubject,
                 errorSubject,
             );
@@ -253,11 +253,11 @@ export class PutAcceptQuoteHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`postTransfers failed for transferId=${transferId}`, stack ?? message);
-                this.subscriber.cancel(successSubject);
+                waiter.cancel();
                 throw PutAcceptQuoteHandler.toFspiopException(error, transferId);
             }
 
-            const callback = await waitPromise;
+            const callback = await waiter.promise;
             transferRequest.transfer = callback;
             const response = PutAcceptQuoteHandler.toResponse(transferRequest, callback);
 

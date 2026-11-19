@@ -8,3 +8,4 @@ export * from './dfsp-certificate.guard';
 export * from './request-log';
 export * from './request-log.middleware';
 export * from './signed-transfer-status.decorator';
+export * from './participant-government-payer-display-name-store';

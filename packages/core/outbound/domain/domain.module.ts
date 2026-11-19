@@ -9,8 +9,10 @@ import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
 import { AmountTypeConstraint, FspiopAccessTokenProvider, FspiopAxios, FspiopBearerTokenInterceptor, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetCurrentFxRateHandler, GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
-import { AmountDecimalValidator, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, SuspiciousTransactionMonitor, TransferStatusRepository } from './component';
 import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
+import { AmountDecimalValidator, GovernmentPayerNameResolver, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, SuspiciousTransactionMonitor, TransferStatusRepository } from './component';
+import * as https from "node:https";
+import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
 import { CatalystAxios } from '@shared/catalyst';
 
 const REQUIRED_SETTINGS = Symbol('OutboundDomainRequiredSettings');
@@ -157,6 +159,7 @@ export class OutboundDomainModule {
                 inject: [OutboundSettings],
             },
             ...(asyncOptions.providers ?? []),
+            GovernmentPayerNameResolver,
             {
                 provide: Iso20022Transformer,
                 useFactory: (settings: FspiopSettings): Iso20022Transformer => {

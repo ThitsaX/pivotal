@@ -21,6 +21,9 @@ export class Participant {
     @Column({type: 'text', name: 'access_public_key'})
     public accessPublicKey: string;
 
+    @Column({type: 'varchar', length: 128, name: 'government_payer_display_name', nullable: true})
+    public governmentPayerDisplayName?: string | null;
+
     constructor(
         name: string,
         jwsPublicKey: string | null,

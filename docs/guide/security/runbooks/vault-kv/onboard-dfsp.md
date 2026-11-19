@@ -26,7 +26,7 @@ messages to the Hub.
 - The DFSP is in the Hub and in MCM.
 - The DFSP's Hub JWS signing key is in Vault, and its public key is in MCM.
 - Signing is enabled for the DFSP.
-- The DFSP has a client certificate whose subject is `CN=<DFSP_ID>`.
+- The DFSP has a client certificate for the key in its CSR, recorded against `<DFSP_ID>`.
 - A first request from the DFSP is accepted.
 
 ## Prerequisites
@@ -84,8 +84,9 @@ messages to the Hub.
 
 - **Expected Result:** The key is an RSA public key. The CSR verifies and shows
   `Public-Key: (2048 bit)` or more.
-- **If It Fails:** Ask the DFSP for new files. The subject of the CSR does not matter: Pivotal sets the
-  certificate's subject to the FSP ID.
+- **If It Fails:** Ask the DFSP for new files. The certificate keeps the CSR's subject, so the CSR
+  must have a common name (CN). It must not request extensions (subject alternative names, key
+  usages and so on); a subject key identifier, which `keytool` adds, is fine.
 
 For a test DFSP only, you can create both yourself:
 
@@ -206,12 +207,16 @@ Step 5, issues each test DFSP's certificate. Issuing one here as well would move
   - `The certificate signing request could not be read. …`: the CSR is not a PEM PKCS#10 request.
   - `The certificate signing request uses a key that is too small. …`: the DFSP must use RSA 2048 or
     larger.
+  - `The certificate signing request has no common name (CN). …`: ask the DFSP for a CSR with a CN.
+  - `The certificate signing request asks for extensions this CA does not grant, …`: ask the DFSP for
+    a CSR without subject alternative names or key usages.
   - `This deployment does not issue DFSP certificates. Configure the DFSP-facing CA first.`: web-pivotal
     has no DFSP CA settings. See [Environment variables](../../reference/environment-variables.md).
-  - `The certificate could not be issued. …`: check web-pivotal's log. A message that the CA
-    `issued a certificate for '<NAME>' when '<DFSP_ID>' was requested` means the `dfsp-client` role
-    does not set `use_csr_common_name=false`. Fix the role (see your CA ceremony page). The
-    certificate was not recorded.
+  - `The certificate could not be issued. …`: check web-pivotal's log. `permission denied` on
+    `pki_dfsp/sign-verbatim/dfsp-client` means web-pivotal's Vault policy lacks that path (see your
+    Vault page). A message that the CA `issued a certificate for '<DFSP_ID>' that …` means Vault
+    returned a certificate that is not a client-only leaf for the CSR's key. The certificate was not
+    recorded.
 
 Send the downloaded file to the DFSP. If the DFSP already had a certificate, the old one moves to
 `retiring` and stays accepted until it expires.

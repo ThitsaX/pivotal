@@ -8,5 +8,8 @@ export * from './prefix-oracle-client';
 export * from './oracle-central-registry-client';
 export * from './payer-provided-fees-validator';
 export * from './has-payee-fsp-id.constraint';
+export * from './payer-display-name.constraint';
 export * from './suspicious-transaction-monitor';
+export * from './government-payer-display-name-store';
+export * from './government-payer-name-resolver';
 

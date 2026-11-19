@@ -26,6 +26,7 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
             PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
+            PermissionKey.PARTICIPANT_PAYER_DISPLAY_NAME_UPDATE,
             PermissionKey.PARTICIPANT_CERT_ENROLL,
             PermissionKey.PARTICIPANT_CERT_VIEW,
             PermissionKey.PARTICIPANT_CERT_REVOKE,
@@ -49,6 +50,7 @@ export const ROLE_PRESETS: readonly RolePreset[] = [
             PermissionKey.PARTICIPANT_ENDPOINT_REGISTER,
             PermissionKey.PARTICIPANT_SIGNING_KEYS_UPDATE,
             PermissionKey.PARTICIPANT_ACCESS_KEY_UPDATE,
+            PermissionKey.PARTICIPANT_PAYER_DISPLAY_NAME_UPDATE,
             // Enrolls and inspects, but cannot revoke. Withdrawing a certificate cuts a DFSP off
             // mid-operation, which is a different decision from onboarding one.
             PermissionKey.PARTICIPANT_CERT_ENROLL,

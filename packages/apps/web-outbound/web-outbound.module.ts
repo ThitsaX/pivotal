@@ -2,14 +2,14 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import { DynamicModule, MiddlewareConsumer, Module, NestModule, Provider, RequestMethod } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { OutboundDomainModule, RedisClient } from '@core/outbound/domain';
+import { GovernmentPayerDisplayNameStore, OutboundDomainModule, RedisClient } from '@core/outbound/domain';
 import {
     ParticipantAccessKeyStore,
     ParticipantCertRepository,
     ParticipantDomainModule,
     ParticipantJwsPrivateKeyStore,
 } from '@core/participant/domain';
-import { AccessGuard, DfspCertificateGuard, JwtPolicy, RequestLogMiddleware } from './component';
+import { AccessGuard, DfspCertificateGuard, JwtPolicy, ParticipantGovernmentPayerDisplayNameStore, RequestLogMiddleware } from './component';
 import { CentralRegistryController, CurrentFxRateController, DfspListController, SendMoneyController, TransferStatusController } from './controllers';
 import { WebOutboundSettings } from './required.settings';
 import { AccessKeyStore, PrivateKeyStore } from '@shared/security';
@@ -120,6 +120,13 @@ export class WebOutboundModule implements NestModule {
                 provide: PrivateKeyStore,
                 useFactory: (cache: ParticipantSigningKeysCache): PrivateKeyStore => {
                     return new ParticipantJwsPrivateKeyStore(cache);
+                },
+                inject: [ParticipantSigningKeysCache],
+            },
+            {
+                provide: GovernmentPayerDisplayNameStore,
+                useFactory: (cache: ParticipantSigningKeysCache): GovernmentPayerDisplayNameStore => {
+                    return new ParticipantGovernmentPayerDisplayNameStore(cache);
                 },
                 inject: [ParticipantSigningKeysCache],
             },

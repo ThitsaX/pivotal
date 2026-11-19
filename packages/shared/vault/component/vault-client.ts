@@ -327,9 +327,51 @@ export class VaultClient {
             ),
         );
 
+        return VaultClient.toSignedCertificate(response, request.mount, request.role);
+    }
+
+    /**
+     * Signs an externally supplied CSR, keeping the subject the submitter put in it.
+     *
+     * For a CA that lets the requester name itself, where the certificate's identity is bound some
+     * other way (the DFSP-facing leg binds by fingerprint in Pivotal's own records, not by subject).
+     *
+     * **Vault applies almost nothing from the role on this path.** Only TTL, `no_store` and the
+     * issuer come from it; `client_flag`, `server_flag` and the role's key usages do not. Usage is
+     * therefore sent with every request, never inherited. Vault also copies every extension the CSR
+     * requests except basic constraints, and a copied extension overrides the value sent here, so
+     * the caller must refuse a CSR that requests any extension it does not intend to grant.
+     */
+    async signCertificateVerbatim(
+        request: VaultClient.VerbatimSignRequest,
+    ): Promise<VaultClient.SignedCertificate> {
+
+        const response = await this.authenticated(
+            `Signing a certificate verbatim on '${request.mount}/sign-verbatim/${request.role}'`,
+            (token) => this.http.post(
+                `/v1/${request.mount}/sign-verbatim/${request.role}`,
+                {
+                    csr: request.csrPem,
+                    key_usage: request.keyUsage,
+                    ext_key_usage: request.extKeyUsage,
+                    ...(request.ttl == null ? {} : {ttl: request.ttl}),
+                    exclude_cn_from_sans: true,
+                },
+                {headers: {[VaultClient.VAULT_TOKEN_HEADER]: token}},
+            ),
+        );
+
+        return VaultClient.toSignedCertificate(response, request.mount, request.role);
+    }
+
+    private static toSignedCertificate(
+        response: AxiosResponse,
+        mount: string,
+        role: string,
+    ): VaultClient.SignedCertificate {
+
         if (response.status === 404) {
-            throw new Error(
-                `Vault has no PKI role '${request.role}' on mount '${request.mount}'.`);
+            throw new Error(`Vault has no PKI role '${role}' on mount '${mount}'.`);
         }
 
         const data = response.data?.data;
@@ -433,6 +475,20 @@ export namespace VaultClient {
         csrPem: string;
         /** Enforced by the caller; the CSR's own subject is not honoured. */
         commonName: string;
+        /** Vault's role default applies when omitted. */
+        ttl?: string;
+    }
+
+    export interface VerbatimSignRequest {
+        /** The PKI mount, for example `pki_dfsp`. */
+        mount: string;
+        /** Supplies TTL and storage only; see `signCertificateVerbatim`. */
+        role: string;
+        csrPem: string;
+        /** Vault key-usage names, for example `DigitalSignature`. */
+        keyUsage: string[];
+        /** Vault extended-key-usage names, for example `ClientAuth`. */
+        extKeyUsage: string[];
         /** Vault's role default applies when omitted. */
         ttl?: string;
     }

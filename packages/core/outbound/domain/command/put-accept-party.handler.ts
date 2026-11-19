@@ -162,7 +162,9 @@ export class PutAcceptPartyHandler
             const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
             const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 
+
             const waitPromise = this.subscriber.waitFor<QuoteSuccessPayload>(
+
                 successSubject,
                 errorSubject,
             );
@@ -174,12 +176,14 @@ export class PutAcceptPartyHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`postQuotes failed for transferId=${transferId}`, stack ?? message);
-                this.subscriber.cancel(successSubject);
+                waitPromise.cancel();
                 throw PutAcceptPartyHandler.toFspiopException(error, transferId);
             }
 
-            const callbackPayload = await waitPromise;
+
+            const callbackPayload = await waitPromise.promise;
             const callback = callbackPayload.response;
+
             transferRequest.quotes = callback;
             transferRequest.iso20022QuoteResponse = callbackPayload.iso20022QuoteResponse;
             transferRequest.transfer = undefined;
