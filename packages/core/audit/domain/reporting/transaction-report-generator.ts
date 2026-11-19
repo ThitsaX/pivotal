@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
-import {Inject, Injectable, Logger} from '@nestjs/common';
+import {Inject, Injectable, Logger, Optional} from '@nestjs/common';
 import AdmZip = require('adm-zip');
+import {CentralLedgerFacade} from '@shared/central-ledger';
 import {TransactionRepository} from '../repository';
 import {ReportDownloadRequest} from '../model';
 import {REPORT_DOWNLOAD_SETTINGS} from './tokens';
@@ -28,7 +29,9 @@ export class TransactionReportGenerator {
         {header: 'Transfer ID', key: 'transferId'},
         {header: 'Initiated Timestamp', key: 'initiatedTimestamp'},
         {header: 'Payer FSP ID', key: 'payerFsp'},
+        {header: 'Payer FSP Name', key: 'payerFspName'},
         {header: 'Payee FSP ID', key: 'payeeFsp'},
+        {header: 'Payee FSP Name', key: 'payeeFspName'},
         {header: 'Payer ID Type', key: 'payerIdType'},
         {header: 'Payer ID', key: 'payerId'},
         {header: 'Payer Sub ID', key: 'payerSubId'},
@@ -55,6 +58,8 @@ export class TransactionReportGenerator {
     ];
 
     private static readonly NULL_TEXT_COLUMN_KEYS = new Set([
+        'payerFspName',
+        'payeeFspName',
         'payeeFee',
         'payerFee',
         'schemeFee',
@@ -66,6 +71,9 @@ export class TransactionReportGenerator {
         private readonly transactionRepository: TransactionRepository,
         @Inject(REPORT_DOWNLOAD_SETTINGS)
         private readonly settings: ReportDownloadSettings,
+        @Optional()
+        @Inject(CentralLedgerFacade)
+        private readonly centralLedgerFacade?: CentralLedgerFacade | null,
     ) {
     }
 
@@ -90,11 +98,13 @@ export class TransactionReportGenerator {
             `Generating transaction report requestId=${request.id} totalRows=${totalRows}`,
         );
 
+        const fspNameMap = await this.resolveFspNameMap();
+
         if (fileType === 'xlsx') {
-            return this.generateXlsxZip(request, criteria, order, accessScope, totalRows, maxRowsPerFile);
+            return this.generateXlsxZip(request, criteria, order, accessScope, totalRows, maxRowsPerFile, fspNameMap);
         }
 
-        return this.generateCsvReport(request, criteria, order, accessScope, totalRows, maxRowsPerFile);
+        return this.generateCsvReport(request, criteria, order, accessScope, totalRows, maxRowsPerFile, fspNameMap);
     }
 
     private async generateCsvReport(
@@ -104,9 +114,10 @@ export class TransactionReportGenerator {
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
         totalRows: number,
         maxRowsPerFile: number,
+        fspNameMap: ReadonlyMap<string, string>,
     ): Promise<ReportFile> {
         if (totalRows <= maxRowsPerFile) {
-            const part = await this.generateCsvPart(criteria, order, accessScope, undefined, totalRows);
+            const part = await this.generateCsvPart(criteria, order, accessScope, undefined, totalRows, fspNameMap);
 
             return new ReportFile(Buffer.from(part.content, 'utf8'), 'csv', 'text/csv');
         }
@@ -118,7 +129,7 @@ export class TransactionReportGenerator {
 
         while (writtenRows < totalRows) {
             const rowsInPart = Math.min(maxRowsPerFile, totalRows - writtenRows);
-            const part = await this.generateCsvPart(criteria, order, accessScope, cursor, rowsInPart);
+            const part = await this.generateCsvPart(criteria, order, accessScope, cursor, rowsInPart, fspNameMap);
 
             zip.addFile(
                 `TransactionReport-${request.id}-Part${partNumber}.csv`,
@@ -144,6 +155,7 @@ export class TransactionReportGenerator {
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
         totalRows: number,
         maxRowsPerFile: number,
+        fspNameMap: ReadonlyMap<string, string>,
     ): Promise<ReportFile> {
         const zip = new AdmZip();
         let cursor: string | undefined;
@@ -152,7 +164,7 @@ export class TransactionReportGenerator {
 
         do {
             const rowsInPart = Math.min(maxRowsPerFile, Math.max(totalRows - writtenRows, 0));
-            const part = await this.generateXlsxPart(criteria, order, accessScope, cursor, rowsInPart);
+            const part = await this.generateXlsxPart(criteria, order, accessScope, cursor, rowsInPart, fspNameMap);
 
             zip.addFile(
                 `TransactionReport-${request.id}-Part${partNumber}.xlsx`,
@@ -177,8 +189,9 @@ export class TransactionReportGenerator {
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
         cursor: string | undefined,
         rowCount: number,
+        fspNameMap: ReadonlyMap<string, string>,
     ): Promise<{content: string; rowCount: number; nextCursor?: string}> {
-        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
+        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount, fspNameMap);
         const lines = [TransactionReportGenerator.csvRow(
             TransactionReportGenerator.COLUMNS.map((column) => column.header),
         )];
@@ -205,8 +218,9 @@ export class TransactionReportGenerator {
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
         cursor: string | undefined,
         rowCount: number,
+        fspNameMap: ReadonlyMap<string, string>,
     ): Promise<{bytes: Buffer; rowCount: number; nextCursor?: string}> {
-        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount);
+        const result = await this.readRows(criteria, order, accessScope, cursor, rowCount, fspNameMap);
         const sheetRows = [
             TransactionReportGenerator.xlsxRow(
                 1,
@@ -248,6 +262,7 @@ export class TransactionReportGenerator {
         accessScope: Parameters<TransactionRepository['findForReport']>[4],
         initialCursor: string | undefined,
         rowCount: number,
+        fspNameMap: ReadonlyMap<string, string>,
     ): Promise<{rows: Record<string, unknown>[]; nextCursor?: string}> {
         const rows: Record<string, unknown>[] = [];
         let cursor = initialCursor;
@@ -256,7 +271,13 @@ export class TransactionReportGenerator {
             const limit = Math.min(this.settings.pageSize, rowCount - rows.length);
             const page = await this.transactionRepository.findForReport(criteria, order, cursor, limit, accessScope);
 
-            rows.push(...page.records);
+            for (const record of page.records) {
+                const payerFsp = typeof record.payerFsp === 'string' ? record.payerFsp : '';
+                const payeeFsp = typeof record.payeeFsp === 'string' ? record.payeeFsp : '';
+                record.payerFspName = fspNameMap.get(payerFsp) ?? null;
+                record.payeeFspName = fspNameMap.get(payeeFsp) ?? null;
+                rows.push(record);
+            }
             cursor = page.nextCursor;
 
             if (page.records.length === 0 || cursor == null) {
@@ -265,6 +286,33 @@ export class TransactionReportGenerator {
         }
 
         return {rows, nextCursor: cursor};
+    }
+
+    private async resolveFspNameMap(): Promise<Map<string, string>> {
+        const map = new Map<string, string>();
+
+        if (this.centralLedgerFacade == null) {
+            return map;
+        }
+
+        try {
+            const participants = await this.centralLedgerFacade.listAllParticipants();
+
+            for (const p of participants) {
+                const name = p.name?.trim();
+                const desc = p.description?.trim();
+
+                if (name && desc) {
+                    map.set(name, desc);
+                }
+            }
+        } catch (error) {
+            TransactionReportGenerator.LOGGER.warn(
+                `Failed to fetch participant descriptions from Central Ledger: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+
+        return map;
     }
 
     private maxRowsPerGeneratedFile(fileType: ReportFileType): number {

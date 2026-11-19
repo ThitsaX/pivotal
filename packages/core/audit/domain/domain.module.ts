@@ -3,6 +3,7 @@
 import {DynamicModule, Module} from '@nestjs/common';
 import {CqrsModule} from '@nestjs/cqrs';
 import {TypeOrmModule as NestJsTypeOrmModule} from '@nestjs/typeorm';
+import {CentralLedgerAxios, CentralLedgerAxiosParams, CentralLedgerFacade} from '@shared/central-ledger';
 import {DbTarget, TypeOrmModule} from '@shared/typeorm';
 import {
     AuditPartiesErrorHandler,
@@ -117,6 +118,22 @@ export class AuditDomainModule {
                     useFactory: async (...args: any[]): Promise<ReportDownloadSettings> => {
                         const settings = await asyncOptions.useFactory(...args);
                         return settings.reportDownloadSettings?.() ?? ReportDownloadSettings.DEFAULTS;
+                    },
+                    inject: asyncOptions.inject ?? [],
+                },
+                {
+                    provide: CentralLedgerFacade,
+                    useFactory: async (...args: any[]): Promise<CentralLedgerFacade | null> => {
+                        const settings = await asyncOptions.useFactory(...args) as {
+                            centralLedgerUrl?: () => string;
+                            centralLedgerAxiosParams?: () => CentralLedgerAxiosParams;
+                        };
+                        const url = settings.centralLedgerUrl?.();
+                        if (!url) {
+                            return null;
+                        }
+                        const params = settings.centralLedgerAxiosParams?.() ?? {};
+                        return new CentralLedgerFacade(new CentralLedgerAxios(url, params));
                     },
                     inject: asyncOptions.inject ?? [],
                 },
