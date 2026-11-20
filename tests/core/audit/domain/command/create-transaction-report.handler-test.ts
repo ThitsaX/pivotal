@@ -284,8 +284,8 @@ describe('CreateTransactionReportHandler', () => {
         );
 
         const sheet = xlsxSheet(await generator.generate(reportRequest('xlsx'), {}));
-        const asciiValue = /<c r="F2"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
-        const unicodeValue = /<c r="F3"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
+        const asciiValue = /<c r="H2"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
+        const unicodeValue = /<c r="H3"[^>]*><is><t>([\s\S]*?)<\/t><\/is><\/c>/.exec(sheet)?.[1];
 
         assert.equal(asciiValue?.length, 32_767);
         assert.equal(unicodeValue?.length, 32_766);
@@ -332,6 +332,93 @@ describe('CreateTransactionReportHandler', () => {
             values[headers.indexOf('Initiated Timestamp')],
             '2026-07-20T03:15:30.000Z',
         );
+    });
+
+    it('includes DFSP names alongside FSP IDs in CSV and XLSX reports', async () => {
+        const fakeCentralLedger = {
+            async listAllParticipants() {
+                return [
+                    {name: 'thitsawallet', description: 'ThisaWorks Wallet'},
+                ];
+            },
+        } as unknown as import('@shared/central-ledger').CentralLedgerFacade;
+
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                 '1',
+                    transferId:         'transfer-dfsp-names',
+                    payerFsp:           'testpayer',
+                    payeeFsp:           'thitsawallet',
+                    initiatedTimestamp: new Date('2026-07-20T03:15:30.000Z'),
+                },
+            ]),
+            new ReportDownloadSettings(),
+            fakeCentralLedger,
+        );
+
+        // 1. Verify CSV
+        const csvReport = await generator.generate(reportRequest('csv'), {});
+        const [csvHeaderLine, csvRowLine] = csvReport.bytes.toString('utf8').trimEnd().split('\n');
+        const csvHeaders = parseCsvRecord(csvHeaderLine);
+        const csvValues = parseCsvRecord(csvRowLine);
+
+        const payerFspIndex = csvHeaders.indexOf('Payer FSP ID');
+        const payerFspNameIndex = csvHeaders.indexOf('Payer FSP Name');
+        const payeeFspIndex = csvHeaders.indexOf('Payee FSP ID');
+        const payeeFspNameIndex = csvHeaders.indexOf('Payee FSP Name');
+
+        assert.equal(payerFspNameIndex, payerFspIndex + 1);
+        assert.equal(payeeFspNameIndex, payeeFspIndex + 1);
+        assert.equal(csvValues[payerFspIndex], 'testpayer');
+        assert.equal(csvValues[payerFspNameIndex], '-');
+        assert.equal(csvValues[payeeFspIndex], 'thitsawallet');
+        assert.equal(csvValues[payeeFspNameIndex], 'ThisaWorks Wallet');
+
+        // 2. Verify XLSX with exact cell coordinates
+        const xlsxReport = await generator.generate(reportRequest('xlsx'), {});
+        const sheet = xlsxSheet(xlsxReport);
+
+        // Header cells (Row 1)
+        assert.match(sheet, /<c r="C1"[^>]*><is><t>Payer FSP ID<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="D1"[^>]*><is><t>Payer FSP Name<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="E1"[^>]*><is><t>Payee FSP ID<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="F1"[^>]*><is><t>Payee FSP Name<\/t><\/is><\/c>/);
+
+        // Data cells (Row 2)
+        assert.match(sheet, /<c r="C2"[^>]*><is><t>testpayer<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="D2"[^>]*><is><t>-<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="E2"[^>]*><is><t>thitsawallet<\/t><\/is><\/c>/);
+        assert.match(sheet, /<c r="F2"[^>]*><is><t>ThisaWorks Wallet<\/t><\/is><\/c>/);
+    });
+
+    it('falls back to hyphens when Central Ledger fails during report generation', async () => {
+        const failingCentralLedger = {
+            async listAllParticipants() {
+                throw new Error('Central Ledger unreachable');
+            },
+        } as unknown as import('@shared/central-ledger').CentralLedgerFacade;
+
+        const generator = new TransactionReportGenerator(
+            reportTransactionRepository([
+                {
+                    id:                 '1',
+                    transferId:         'transfer-cl-fallback',
+                    payerFsp:           'thitsawallet',
+                    payeeFsp:           'wallet2',
+                },
+            ]),
+            new ReportDownloadSettings(),
+            failingCentralLedger,
+        );
+
+        const report = await generator.generate(reportRequest('csv'), {});
+        const [headerLine, rowLine] = report.bytes.toString('utf8').trimEnd().split('\n');
+        const headers = parseCsvRecord(headerLine);
+        const values = parseCsvRecord(rowLine);
+
+        assert.equal(values[headers.indexOf('Payer FSP Name')], '-');
+        assert.equal(values[headers.indexOf('Payee FSP Name')], '-');
     });
 
     it('includes serialized error JSON in CSV reports', async () => {
