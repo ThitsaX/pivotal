@@ -47,7 +47,6 @@
     "start:apps-report-worker:prod": "node dist/packages/apps/report-worker/main.js",
     "dev:portal": "npm --prefix packages/portal run dev",
     "build:ports-fspiop": "nest build ports-fspiop",
-    "build:ports-iso20022": "nest build ports-iso20022",
     "build:shared-axios": "nest build shared-axios",
     "build:shared-catalyst": "nest build shared-catalyst",
     "build:shared-central-ledger": "nest build shared-central-ledger",
@@ -84,6 +83,7 @@
     "test:shared-security:jwt": "node --test -r ts-node/register tests/shared/security/component/jwt/jwt-test.ts",
     "test:shared-security": "node --test -r ts-node/register \"tests/shared/security/**/*-test.ts\"",
     "test:shared-fspiop": "node --test -r ts-node/register -r tsconfig-paths/register tests/shared/fspiop/component/*-test.ts tests/shared/fspiop/component/*/*-test.ts",
+    "test:shared-iso20022": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/shared/iso20022/*-test.ts\"",
     "test:core-trust-domain": "node --test -r ts-node/register -r tsconfig-paths/register tests/core/trust/domain/component/*-test.ts",
     "test:apps-web-outbound": "node --test -r ts-node/register -r tsconfig-paths/register tests/apps/web-outbound/component/*-test.ts",
     "test:shared-nats": "node --test -r ts-node/register -r tsconfig-paths/register \"tests/shared/nats/**/*-test.ts\"",
@@ -99,6 +99,7 @@
     "generate:catalyst-dto": "npm run prepare:catalyst-dto-spec && openapi-generator-cli generate --generator-key catalyst-dto && npm run fix:catalyst-dto && npm run generate:catalyst-dto:index",
     "regenerate:fspiop-dto": "npm run clean:fspiop-dto && npm run generate:fspiop-dto",
     "regenerate:catalyst-dto": "npm run clean:catalyst-dto && npm run generate:catalyst-dto",
+    "build:shared-iso20022": "nest build shared-iso20022",
     "test:shared-vault": "node --test -r ts-node/register -r tsconfig-paths/register tests/shared/vault/component/*-test.ts",
     "test:core-participant": "node --test -r ts-node/register -r tsconfig-paths/register tests/core/participant/domain/component/store/*-test.ts tests/core/participant/domain/component/cert/*-test.ts tests/core/participant/domain/command/*-test.ts tests/core/participant/domain/query/*-test.ts",
     "test:integration": "node --test -r ts-node/register -r tsconfig-paths/register tests/integration/*-test.ts"
@@ -106,6 +107,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
     "@aws-sdk/s3-request-presigner": "^3.1056.0",
+    "@mojaloop/ml-schema-transformer-lib": "npm:@kyawsoeks/thitsa-schema-transformer-lib@0.2.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.0",

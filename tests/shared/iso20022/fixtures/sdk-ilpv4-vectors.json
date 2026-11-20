@@ -1,0 +1,120 @@
+{
+  "reference": {
+    "package": "@mojaloop/sdk-standard-components",
+    "version": "19.19.1",
+    "generator": "ilpFactory(ILP_VERSIONS.v4).getQuoteResponseIlp(quoteRequest, quoteResponse)",
+    "note": "Generated offline from the SDK reference implementation. Synthetic test-only secret and parties; not a live Hub conformance result.",
+    "sourceSha256": {
+      "src/lib/ilp/IlpV4.js": "a050772e9fd1db98d37104b62009549a1e8a46a33b503d05bbc7af7d134f477b",
+      "src/lib/ilp/IlpBase.js": "8ae227ec26dac6e3ab1b5616c28f336c9434dd1a27ff7af8cb7e7df169b19e0d",
+      "src/lib/dto.js": "c12534320197381257eaeaa89939f2b7cac7b6695fd0789ad9eb3774976fad99"
+    }
+  },
+  "secret": "pivotal-iso20022-conformance-test-only",
+  "vectors": [
+    {
+      "name": "send-usd",
+      "quoteRequest": {
+        "quoteId": "01KAA000000000000000000001",
+        "transactionId": "01KAA000000000000000000011",
+        "payer": {
+          "partyIdInfo": {
+            "partyIdType": "MSISDN",
+            "partyIdentifier": "959250000001",
+            "fspId": "wallet1"
+          }
+        },
+        "payee": {
+          "partyIdInfo": {
+            "partyIdType": "MSISDN",
+            "partyIdentifier": "959250000002",
+            "fspId": "wallet2"
+          }
+        },
+        "amountType": "SEND",
+        "amount": {
+          "currency": "USD",
+          "amount": "123.45"
+        },
+        "transactionType": {
+          "scenario": "TRANSFER",
+          "initiator": "PAYER",
+          "initiatorType": "CONSUMER"
+        }
+      },
+      "quoteResponse": {
+        "transferAmount": {
+          "currency": "USD",
+          "amount": "125.34"
+        },
+        "payeeReceiveAmount": {
+          "currency": "USD",
+          "amount": "123.45"
+        },
+        "expiration": "2099-01-01T00:00:00.000Z",
+        "ilpPacket": "DIICrQAAAAAAADD2MjA5OTAxMDEwMDAwMDAwMDCKeU26Q206J6Yf7WNkpIaOkEDFnGMjOH5YWmo6GJos3gpnLm1vamFsb29wggJmZXlKaGJXOTFiblFpT25zaVlXMXZkVzUwSWpvaU1USTFMak0wSWl3aVkzVnljbVZ1WTNraU9pSlZVMFFpZlN3aVpYaHdhWEpoZEdsdmJpSTZJakl3T1RrdE1ERXRNREZVTURBNk1EQTZNREF1TURBd1dpSXNJbkJoZVdWbElqcDdJbkJoY25SNVNXUkpibVp2SWpwN0ltWnpjRWxrSWpvaWQyRnNiR1YwTWlJc0luQmhjblI1U1dSVWVYQmxJam9pVFZOSlUwUk9JaXdpY0dGeWRIbEpaR1Z1ZEdsbWFXVnlJam9pT1RVNU1qVXdNREF3TURBeUluMTlMQ0p3WVhsbGNpSTZleUp3WVhKMGVVbGtTVzVtYnlJNmV5Sm1jM0JKWkNJNkluZGhiR3hsZERFaUxDSndZWEowZVVsa1ZIbHdaU0k2SWsxVFNWTkVUaUlzSW5CaGNuUjVTV1JsYm5ScFptbGxjaUk2SWprMU9USTFNREF3TURBd01TSjlmU3dpY1hWdmRHVkpaQ0k2SWpBeFMwRkJNREF3TURBd01EQXdNREF3TURBd01EQXdNREF4SWl3aWRISmhibk5oWTNScGIyNUpaQ0k2SWpBeFMwRkJNREF3TURBd01EQXdNREF3TURBd01EQXdNREV4SWl3aWRISmhibk5oWTNScGIyNVVlWEJsSWpwN0ltbHVhWFJwWVhSdmNpSTZJbEJCV1VWU0lpd2lhVzVwZEdsaGRHOXlWSGx3WlNJNklrTlBUbE5WVFVWU0lpd2ljMk5sYm1GeWFXOGlPaUpVVWtGT1UwWkZVaUo5ZlE",
+        "condition": "inlNukNtOiemH-1jZKSGjpBAxZxjIzh-WFpqOhiaLN4"
+      },
+      "expected": {
+        "fulfilment": "CLcpT5YNMa3FyjkW-F1i46dZu1yFIiEnUd-rcI3rGXY",
+        "condition": "inlNukNtOiemH-1jZKSGjpBAxZxjIzh-WFpqOhiaLN4",
+        "ilpPacket": "DIICrQAAAAAAADD2MjA5OTAxMDEwMDAwMDAwMDCKeU26Q206J6Yf7WNkpIaOkEDFnGMjOH5YWmo6GJos3gpnLm1vamFsb29wggJmZXlKaGJXOTFiblFpT25zaVlXMXZkVzUwSWpvaU1USTFMak0wSWl3aVkzVnljbVZ1WTNraU9pSlZVMFFpZlN3aVpYaHdhWEpoZEdsdmJpSTZJakl3T1RrdE1ERXRNREZVTURBNk1EQTZNREF1TURBd1dpSXNJbkJoZVdWbElqcDdJbkJoY25SNVNXUkpibVp2SWpwN0ltWnpjRWxrSWpvaWQyRnNiR1YwTWlJc0luQmhjblI1U1dSVWVYQmxJam9pVFZOSlUwUk9JaXdpY0dGeWRIbEpaR1Z1ZEdsbWFXVnlJam9pT1RVNU1qVXdNREF3TURBeUluMTlMQ0p3WVhsbGNpSTZleUp3WVhKMGVVbGtTVzVtYnlJNmV5Sm1jM0JKWkNJNkluZGhiR3hsZERFaUxDSndZWEowZVVsa1ZIbHdaU0k2SWsxVFNWTkVUaUlzSW5CaGNuUjVTV1JsYm5ScFptbGxjaUk2SWprMU9USTFNREF3TURBd01TSjlmU3dpY1hWdmRHVkpaQ0k2SWpBeFMwRkJNREF3TURBd01EQXdNREF3TURBd01EQXdNREF4SWl3aWRISmhibk5oWTNScGIyNUpaQ0k2SWpBeFMwRkJNREF3TURBd01EQXdNREF3TURBd01EQXdNREV4SWl3aWRISmhibk5oWTNScGIyNVVlWEJsSWpwN0ltbHVhWFJwWVhSdmNpSTZJbEJCV1VWU0lpd2lhVzVwZEdsaGRHOXlWSGx3WlNJNklrTlBUbE5WVFVWU0lpd2ljMk5sYm1GeWFXOGlPaUpVVWtGT1UwWkZVaUo5ZlE",
+        "packetAmount": "12534",
+        "destination": "g.mojaloop",
+        "transactionJson": "{\"amount\":{\"amount\":\"125.34\",\"currency\":\"USD\"},\"expiration\":\"2099-01-01T00:00:00.000Z\",\"payee\":{\"partyIdInfo\":{\"fspId\":\"wallet2\",\"partyIdType\":\"MSISDN\",\"partyIdentifier\":\"959250000002\"}},\"payer\":{\"partyIdInfo\":{\"fspId\":\"wallet1\",\"partyIdType\":\"MSISDN\",\"partyIdentifier\":\"959250000001\"}},\"quoteId\":\"01KAA000000000000000000001\",\"transactionId\":\"01KAA000000000000000000011\",\"transactionType\":{\"initiator\":\"PAYER\",\"initiatorType\":\"CONSUMER\",\"scenario\":\"TRANSFER\"}}"
+      }
+    },
+    {
+      "name": "receive-mmk",
+      "quoteRequest": {
+        "quoteId": "01KAA000000000000000000002",
+        "transactionId": "01KAA000000000000000000012",
+        "payer": {
+          "partyIdInfo": {
+            "partyIdType": "MSISDN",
+            "partyIdentifier": "959250000001",
+            "fspId": "wallet1"
+          }
+        },
+        "payee": {
+          "partyIdInfo": {
+            "partyIdType": "MSISDN",
+            "partyIdentifier": "959250000002",
+            "fspId": "wallet2"
+          }
+        },
+        "amountType": "RECEIVE",
+        "amount": {
+          "currency": "MMK",
+          "amount": "1000.25"
+        },
+        "transactionType": {
+          "scenario": "TRANSFER",
+          "initiator": "PAYER",
+          "initiatorType": "CONSUMER"
+        }
+      },
+      "quoteResponse": {
+        "transferAmount": {
+          "currency": "MMK",
+          "amount": "1000.25"
+        },
+        "payeeReceiveAmount": {
+          "currency": "MMK",
+          "amount": "1000.25"
+        },
+        "expiration": "2099-01-01T00:00:00.000Z",
+        "ilpPacket": "DIICrgAAAAAAAYa5MjA5OTAxMDEwMDAwMDAwMDAJ-_xNZgUzxvUeG09bGcJzsuJPmuMVrXMzQ6tFMQC3mQpnLm1vamFsb29wggJnZXlKaGJXOTFiblFpT25zaVlXMXZkVzUwSWpvaU1UQXdNQzR5TlNJc0ltTjFjbkpsYm1ONUlqb2lUVTFMSW4wc0ltVjRjR2x5WVhScGIyNGlPaUl5TURrNUxUQXhMVEF4VkRBd09qQXdPakF3TGpBd01Gb2lMQ0p3WVhsbFpTSTZleUp3WVhKMGVVbGtTVzVtYnlJNmV5Sm1jM0JKWkNJNkluZGhiR3hsZERJaUxDSndZWEowZVVsa1ZIbHdaU0k2SWsxVFNWTkVUaUlzSW5CaGNuUjVTV1JsYm5ScFptbGxjaUk2SWprMU9USTFNREF3TURBd01pSjlmU3dpY0dGNVpYSWlPbnNpY0dGeWRIbEpaRWx1Wm04aU9uc2labk53U1dRaU9pSjNZV3hzWlhReElpd2ljR0Z5ZEhsSlpGUjVjR1VpT2lKTlUwbFRSRTRpTENKd1lYSjBlVWxrWlc1MGFXWnBaWElpT2lJNU5Ua3lOVEF3TURBd01ERWlmWDBzSW5GMWIzUmxTV1FpT2lJd01VdEJRVEF3TURBd01EQXdNREF3TURBd01EQXdNREF3TWlJc0luUnlZVzV6WVdOMGFXOXVTV1FpT2lJd01VdEJRVEF3TURBd01EQXdNREF3TURBd01EQXdNREF4TWlJc0luUnlZVzV6WVdOMGFXOXVWSGx3WlNJNmV5SnBibWwwYVdGMGIzSWlPaUpRUVZsRlVpSXNJbWx1YVhScFlYUnZjbFI1Y0dVaU9pSkRUMDVUVlUxRlVpSXNJbk5qWlc1aGNtbHZJam9pVkZKQlRsTkdSVklpZlgw",
+        "condition": "Cfv8TWYFM8b1HhtPWxnCc7LiT5rjFa1zM0OrRTEAt5k"
+      },
+      "expected": {
+        "fulfilment": "FMF9Slev8Yq8e3O7Qf9HybtvAOf_mI6HwKfLUeBpyw0",
+        "condition": "Cfv8TWYFM8b1HhtPWxnCc7LiT5rjFa1zM0OrRTEAt5k",
+        "ilpPacket": "DIICrgAAAAAAAYa5MjA5OTAxMDEwMDAwMDAwMDAJ-_xNZgUzxvUeG09bGcJzsuJPmuMVrXMzQ6tFMQC3mQpnLm1vamFsb29wggJnZXlKaGJXOTFiblFpT25zaVlXMXZkVzUwSWpvaU1UQXdNQzR5TlNJc0ltTjFjbkpsYm1ONUlqb2lUVTFMSW4wc0ltVjRjR2x5WVhScGIyNGlPaUl5TURrNUxUQXhMVEF4VkRBd09qQXdPakF3TGpBd01Gb2lMQ0p3WVhsbFpTSTZleUp3WVhKMGVVbGtTVzVtYnlJNmV5Sm1jM0JKWkNJNkluZGhiR3hsZERJaUxDSndZWEowZVVsa1ZIbHdaU0k2SWsxVFNWTkVUaUlzSW5CaGNuUjVTV1JsYm5ScFptbGxjaUk2SWprMU9USTFNREF3TURBd01pSjlmU3dpY0dGNVpYSWlPbnNpY0dGeWRIbEpaRWx1Wm04aU9uc2labk53U1dRaU9pSjNZV3hzWlhReElpd2ljR0Z5ZEhsSlpGUjVjR1VpT2lKTlUwbFRSRTRpTENKd1lYSjBlVWxrWlc1MGFXWnBaWElpT2lJNU5Ua3lOVEF3TURBd01ERWlmWDBzSW5GMWIzUmxTV1FpT2lJd01VdEJRVEF3TURBd01EQXdNREF3TURBd01EQXdNREF3TWlJc0luUnlZVzV6WVdOMGFXOXVTV1FpT2lJd01VdEJRVEF3TURBd01EQXdNREF3TURBd01EQXdNREF4TWlJc0luUnlZVzV6WVdOMGFXOXVWSGx3WlNJNmV5SnBibWwwYVdGMGIzSWlPaUpRUVZsRlVpSXNJbWx1YVhScFlYUnZjbFI1Y0dVaU9pSkRUMDVUVlUxRlVpSXNJbk5qWlc1aGNtbHZJam9pVkZKQlRsTkdSVklpZlgw",
+        "packetAmount": "100025",
+        "destination": "g.mojaloop",
+        "transactionJson": "{\"amount\":{\"amount\":\"1000.25\",\"currency\":\"MMK\"},\"expiration\":\"2099-01-01T00:00:00.000Z\",\"payee\":{\"partyIdInfo\":{\"fspId\":\"wallet2\",\"partyIdType\":\"MSISDN\",\"partyIdentifier\":\"959250000002\"}},\"payer\":{\"partyIdInfo\":{\"fspId\":\"wallet1\",\"partyIdType\":\"MSISDN\",\"partyIdentifier\":\"959250000001\"}},\"quoteId\":\"01KAA000000000000000000002\",\"transactionId\":\"01KAA000000000000000000012\",\"transactionType\":{\"initiator\":\"PAYER\",\"initiatorType\":\"CONSUMER\",\"scenario\":\"TRANSFER\"}}"
+      }
+    }
+  ]
+}

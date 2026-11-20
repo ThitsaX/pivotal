@@ -25,6 +25,7 @@ import {
     TransactionInitiatorType,
     TransactionType,
 } from '@shared/fspiop';
+import type {QuoteSuccessPayload} from '@shared/fspiop';
 import { TransferRequest } from '../cache';
 import { AmountDecimalValidator, PayerProvidedFeesValidator, RedisClient, SuspiciousTransactionMonitor } from '../component';
 import { SendMoneyResponse } from '../dto';
@@ -161,7 +162,9 @@ export class PutAcceptPartyHandler
             const successSubject = FspiopPubSubSubjects.Quotes.forSuccess(source, quoteId);
             const errorSubject = FspiopPubSubSubjects.Quotes.forError(source, quoteId);
 
-            const waiter = this.subscriber.waitFor<QuotesIDPutResponse>(
+
+            const waitPromise = this.subscriber.waitFor<QuoteSuccessPayload>(
+
                 successSubject,
                 errorSubject,
             );
@@ -173,12 +176,16 @@ export class PutAcceptPartyHandler
                 const stack = error instanceof Error ? error.stack : undefined;
 
                 this.logger.error(`postQuotes failed for transferId=${transferId}`, stack ?? message);
-                waiter.cancel();
+                waitPromise.cancel();
                 throw PutAcceptPartyHandler.toFspiopException(error, transferId);
             }
 
-            const callback = await waiter.promise;
+
+            const callbackPayload = await waitPromise.promise;
+            const callback = callbackPayload.response;
+
             transferRequest.quotes = callback;
+            transferRequest.iso20022QuoteResponse = callbackPayload.iso20022QuoteResponse;
             transferRequest.transfer = undefined;
 
             const response = PutAcceptPartyHandler.toResponse(transferRequest, callback);

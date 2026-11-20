@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {DynamicModule, Module, Provider} from '@nestjs/common';
+import {APP_GUARD} from '@nestjs/core';
 import {
     ParticipantDomainModule,
     ParticipantJwsPolicyStore,
@@ -12,6 +13,8 @@ import {FspInboundGuard, FspiopSettings} from '@shared/fspiop';
 import {PartiesController, QuotesController, TransfersController,} from './controllers';
 import {WebInboundSettings} from './required.settings';
 import {ParticipantSigningKeysCache} from "@core/participant/domain/component/store/participant-signing-keys-cache";
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
+import {RepresentationHeaderGuard} from './representation-header.guard';
 
 const REQUIRED_SETTINGS = Symbol('WebInboundRequiredSettings');
 
@@ -47,6 +50,7 @@ export class WebInboundModule {
             ],
             providers: [
                 ...WebInboundModule.createProviders(asyncOptions),
+                {provide: APP_GUARD, useClass: RepresentationHeaderGuard},
             ],
         };
     }
@@ -59,10 +63,20 @@ export class WebInboundModule {
                 inject: asyncOptions.inject ?? [],
             },
             {
+                provide: FspiopSettings,
+                useFactory: (settings: WebInboundModule.RequiredSettings): FspiopSettings => settings.fspiopSettings(),
+                inject: [REQUIRED_SETTINGS],
+            },
+            {
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
+            },
+            {
                 provide: FspInboundGuard,
-                useFactory: (settings: WebInboundModule.RequiredSettings, participantSigningKeysCache: ParticipantSigningKeysCache): FspInboundGuard => {
-                    const fspiopSettings = settings.fspiopSettings();
-
+                useFactory: (fspiopSettings: FspiopSettings, participantSigningKeysCache: ParticipantSigningKeysCache): FspInboundGuard => {
                     return new FspInboundGuard(
                         new ParticipantJwsPublicKeyStore(participantSigningKeysCache),
                         fspiopSettings,
@@ -72,7 +86,7 @@ export class WebInboundModule {
                         ),
                     );
                 },
-                inject: [REQUIRED_SETTINGS, ParticipantSigningKeysCache],
+                inject: [FspiopSettings, ParticipantSigningKeysCache],
             }
         ];
     }

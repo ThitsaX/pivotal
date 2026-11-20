@@ -149,15 +149,6 @@
         "tsConfigPath": "packages/ports/fspiop/tsconfig.app.json"
       }
     },
-    "ports-iso20022": {
-      "type": "application",
-      "root": "packages/ports/iso20022",
-      "entryFile": "ports/iso20022/main",
-      "sourceRoot": "packages/ports/iso20022",
-      "compilerOptions": {
-        "tsConfigPath": "packages/ports/iso20022/tsconfig.app.json"
-      }
-    },
     "shared-axios": {
       "type": "library",
       "root": "packages/shared/axios",
@@ -282,6 +273,15 @@
       "sourceRoot": "packages/samples/wallet3-connector",
       "compilerOptions": {
         "tsConfigPath": "packages/samples/wallet3-connector/tsconfig.app.json"
+      }
+    },
+    "shared-iso20022": {
+      "type": "library",
+      "root": "packages/shared/iso20022",
+      "entryFile": "index",
+      "sourceRoot": "packages/shared/iso20022",
+      "compilerOptions": {
+        "tsConfigPath": "packages/shared/iso20022/tsconfig.app.json"
       }
     },
     "shared-mcm-client": {

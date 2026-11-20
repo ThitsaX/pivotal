@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import { FspInboundGuard } from '../../packages/shared/fspiop/component/nest/guard/fsp-inbound.guard';
 import { FspiopSettings } from '../../packages/shared/fspiop/component/fspiop-settings';
+import { ApiType } from '../../packages/shared/iso20022/api-type';
 import { FspiopSignature } from '../../packages/shared/fspiop/component/fspiop-signature';
 import { FspiopSigningInterceptor } from '../../packages/shared/fspiop/component/axios/interceptor/fspiop-signing.interceptor';
 import { PrivateKeyJwsSigner } from '../../packages/shared/fspiop/component/jws-signer';
@@ -160,7 +161,7 @@ describe('JWS over a real Vault (integration)', () => {
         // Now the receiving side, with the guard in its strictest mode.
         const guard = new FspInboundGuard(
             new SingleKeyPublicStore(publicKey),
-            new FspiopSettings('hub', '', '', '', true, false),
+            new FspiopSettings('hub', '', '', '', true, false, ApiType.FSPIOP, false),
             new StaticJwsPolicyStore(true, FspiopVerifyMode.Require),
         );
 
@@ -205,7 +206,7 @@ describe('JWS over a real Vault (integration)', () => {
 
         const guard = new FspInboundGuard(
             new SingleKeyPublicStore(publicKey),
-            new FspiopSettings('hub', '', '', '', true, false),
+            new FspiopSettings('hub', '', '', '', true, false, ApiType.FSPIOP, false),
             new StaticJwsPolicyStore(true, FspiopVerifyMode.Require),
         );
 

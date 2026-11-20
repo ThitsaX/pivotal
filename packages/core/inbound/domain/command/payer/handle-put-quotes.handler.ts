@@ -5,6 +5,7 @@ import {CommandHandler, ICommandHandler} from '@nestjs/cqrs';
 import {TransactionMessage} from '@core/audit/common';
 import {AuditTransactionPublisher} from '@core/audit/producer';
 import {FspiopPubSubSubjects, FspiopResponsePublisher} from '@shared/fspiop';
+import type {QuoteSuccessPayload} from '@shared/fspiop';
 import {HandlePutQuotesCommand} from './handle-put-quotes.command';
 import {resolveGatewayCorrelationId} from '../gateway-audit';
 
@@ -21,7 +22,7 @@ export class HandlePutQuotesHandler
     }
 
     async execute(command: HandlePutQuotesCommand): Promise<HandlePutQuotesCommand.Output> {
-        const {correlationId, payerFsp, payeeFsp, quoteId, response} = command.input;
+        const {correlationId, payerFsp, payeeFsp, quoteId, response, iso20022QuoteResponse} = command.input;
 
         if (response == null) {
             return new HandlePutQuotesCommand.Output();
@@ -49,7 +50,10 @@ export class HandlePutQuotesHandler
             quoteId,
         );
 
-        await this.publisher.publishSuccess(subject, response);
+        await this.publisher.publishSuccess<QuoteSuccessPayload>(subject, {
+            response,
+            iso20022QuoteResponse,
+        });
 
         return new HandlePutQuotesCommand.Output();
     }

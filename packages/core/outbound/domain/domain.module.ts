@@ -9,6 +9,7 @@ import { PIVOTAL_DB_READ_CONNECTION_NAME } from '@core/audit/domain/repository';
 import { AmountTypeConstraint, FspiopAccessTokenProvider, FspiopAxios, FspiopBearerTokenInterceptor, FspiopPubSubModule, FspiopSettings, FspiopSigningInterceptor, JwsSigner, MutualTlsAgent } from '@shared/fspiop';
 import { PostSendMoneyHandler, PutAcceptPartyHandler, PutAcceptQuoteHandler, RegisterMsisdnHandler } from './command';
 import { GetCurrentFxRateHandler, GetDfspListByUsecaseHandler, GetDfspListHandler, GetTransferStatusHandler } from './query';
+import {Iso20022Transformer} from '@shared/iso20022/iso20022-transformer';
 import { AmountDecimalValidator, GovernmentPayerNameResolver, HasPayeeFspIdConstraint, OracleCentralRegistryClient, OutboundSettings, PayerProvidedFeesValidator, PrefixOracleClient, RedisClient, SuspiciousTransactionMonitor, TransferStatusRepository } from './component';
 import * as https from "node:https";
 import { CaStore, ClientCertStore, PrivateKeyStore } from "@shared/security";
@@ -160,10 +161,18 @@ export class OutboundDomainModule {
             ...(asyncOptions.providers ?? []),
             GovernmentPayerNameResolver,
             {
+                provide: Iso20022Transformer,
+                useFactory: (settings: FspiopSettings): Iso20022Transformer => {
+                    return new Iso20022Transformer(settings);
+                },
+                inject: [FspiopSettings],
+            },
+            {
                 provide: FspiopAxios,
                 useFactory: (
                     outboundSettings: OutboundSettings,
                     jwsSigner: JwsSigner,
+                    iso20022Transformer: Iso20022Transformer,
                 ): FspiopAxios => {
 
                     const fspiopSettings = outboundSettings.fspiopSettings;
@@ -204,9 +213,15 @@ export class OutboundDomainModule {
                     }
 
                     return new FspiopAxios(
-                        fspiopSettings, params, interceptors, {}, mutualTls?.httpsAgent());
+                        fspiopSettings,
+                        iso20022Transformer,
+                        params,
+                        interceptors,
+                        {},
+                        mutualTls?.httpsAgent(),
+                    );
                 },
-                inject: [OutboundSettings, JwsSigner],
+                inject: [OutboundSettings, JwsSigner, Iso20022Transformer],
             },
             ...CommandHandlers, ...QueryHandlers,
         ];
