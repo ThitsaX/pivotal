@@ -6,6 +6,7 @@ import {ListCentralLedgerParticipantsQuery} from '@core/participant/domain';
 export interface AuditFspOption {
     label: string;
     value: string;
+    description?: string;
 }
 
 @Controller('audit/fsp-options')
@@ -24,21 +25,13 @@ export class AuditFspOptionsController {
             new ListCentralLedgerParticipantsQuery(),
         );
 
-        const names = new Set<string>();
-
-        for (const participant of participants) {
-            const name = participant.name?.trim();
-
-            if (name != null && name.length > 0 && name.toLowerCase() !== 'hub') {
-                names.add(name);
-            }
-        }
-
-        return Array.from(names)
-            .sort((left: string, right: string): number => left.localeCompare(right))
-            .map((name: string): AuditFspOption => ({
-                label: name,
-                value: name,
-            }));
+        return participants
+            .filter(p => p.name && p.name.toLowerCase() !== 'hub')
+            .map(p => ({
+                label: p.description ? `${p.description} (${p.name})` : p.name,
+                value: p.name,
+                description: p.description,
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
     }
 }

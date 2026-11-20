@@ -15,6 +15,9 @@ export class CentralLedgerParticipant {
     name!: string;
 
     @ApiProperty({type: String, required: false})
+    description?: string;
+
+    @ApiProperty({type: String, required: false})
     id?: string;
 
     @ApiProperty({type: String, required: false})
