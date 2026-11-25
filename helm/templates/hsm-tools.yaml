@@ -66,6 +66,8 @@ spec:
               value: {{ required "hsmTools.cloudhsmIp is required" $hsm.cloudhsmIp | quote }}
             - name: VAULT_ADDR
               value: {{ required "hsmTools.vaultAddress is required" $hsm.vaultAddress | quote }}
+            - name: CU_PREFIX
+              value: {{ $hsm.cryptoUserPrefix | default "cu_" | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

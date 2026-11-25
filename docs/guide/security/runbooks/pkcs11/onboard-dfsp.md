@@ -166,6 +166,11 @@ Run the script with the FSP ID:
 provision-hsm-tenant.sh MyGreenBank
 ```
 
+The script first prints the crypto user it will create and the user it will share the key with,
+for example `cu_MyGreenBank` and `cu_web_outbound`. Both names come from the pod's `CU_PREFIX`.
+On an HSM cluster shared with another environment, they must carry this environment's prefix,
+for example `cu_prod_MyGreenBank` and `cu_prod_web_outbound`. If they do not, press Ctrl-C.
+
 When prompted, enter the Vault token, then the Crypto Officer username (press Enter for `admin`)
 and password.
 
@@ -206,6 +211,8 @@ The script is safe to run again. A DFSP that is already provisioned is reported 
 | `REFUSING: VAULT_ADDR is not set.` | Export `VAULT_ADDR` in the pod, as shown above. |
 | `REFUSING: 'MyGreenBank' is not a safe fspId …` | Use only letters, digits, `-` and `_`, starting with a letter or digit. |
 | `REFUSING: this Vault token is not valid, or Vault is not reachable …` | Get a new custodian token and run again. Nothing was changed. |
+| `REFUSING: crypto user 'cu_…web_outbound' does not exist …` | The HSM admin pod's `CU_PREFIX` (Helm `hsmTools.cryptoUserPrefix`) does not match this environment's web-outbound crypto user. Fix the prefix on the pod and run again. Nothing was changed. |
+| `REFUSING: CU_PREFIX '…' is not a valid crypto-user prefix` | Use letters, digits and `_` only, starting with a letter, for example `cu_prod_`. |
 | `REFUSING: 'MyGreenBank' already has key '…' but no public key …` | The DFSP was keyed before this script recorded public keys. Do not provision it again. Nothing was changed. |
 | `REFUSING: … already holds a credential, but no crypto user 'cu_MyGreenBank' exists.` | The DFSP's crypto user has another name, for example `cu_mygreenbank_old`. Run again with `CRYPTO_USER=cu_mygreenbank_old provision-hsm-tenant.sh MyGreenBank`. |
 | `'MyGreenBank' is already provisioned with key '…'. Nothing to do.` | Not an error. Go to Step 2. |

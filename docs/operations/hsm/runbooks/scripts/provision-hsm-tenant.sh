@@ -30,8 +30,12 @@ if [ -z "$FSP" ] || [ $# -ne 1 ]; then
   echo >&2
   echo "  VAULT_ADDR    Vault's address from inside the cluster (required)" >&2
   echo "  VAULT_TOKEN   a custodian's Vault token (prompted when unset)" >&2
+  echo "  CU_PREFIX     crypto-user name prefix for this environment (default cu_). The" >&2
+  echo "                tenant becomes <prefix><fspId> and the key is shared with" >&2
+  echo "                <prefix>web_outbound. Set on the HSM admin pod, not by hand" >&2
   echo "  CRYPTO_USER   override the derived crypto-user name, for a tenant whose" >&2
   echo "                user was created before this script existed" >&2
+  echo "  WEB_OUTBOUND_CU  override the crypto user the key is shared with" >&2
   exit 1
 fi
 
@@ -49,8 +53,19 @@ fi
 # existed will have named them by some other convention -- lower case, say. Creating a
 # second user for a tenant is worse than a mismatched name: ownership is conferred at
 # creation, so whichever user generated the key is the only one that can ever manage it.
-CU=${CRYPTO_USER:-cu_$(printf '%s' "$FSP" | tr -c 'A-Za-z0-9' '_')}
-WEB_OUTBOUND_CU=${WEB_OUTBOUND_CU:-cu_web_outbound}
+#
+# CU_PREFIX exists for environments that share one HSM cluster. Users are global on the
+# cluster, so a second environment reusing the default names would find the first one's
+# users and, worse, share its tenants' keys with the first environment's web-outbound --
+# letting that environment sign as these tenants. The prefix comes from the HSM admin pod's
+# environment so whoever runs this does not have to remember it.
+CU_PREFIX=${CU_PREFIX:-cu_}
+if ! printf '%s' "$CU_PREFIX" | grep -qE '^[A-Za-z][A-Za-z0-9_]{0,15}$'; then
+  echo "REFUSING: CU_PREFIX '$CU_PREFIX' is not a valid crypto-user prefix (letters, digits, _)." >&2
+  exit 1
+fi
+CU=${CRYPTO_USER:-${CU_PREFIX}$(printf '%s' "$FSP" | tr -c 'A-Za-z0-9' '_')}
+WEB_OUTBOUND_CU=${WEB_OUTBOUND_CU:-${CU_PREFIX}web_outbound}
 
 KV_MOUNT=${KV_MOUNT:-pivotal-kv}
 CRED_PATH="${KV_MOUNT}/pivotal/hsmcred/${FSP}"
@@ -88,7 +103,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Provisioning '$FSP' (crypto user '$CU')"
+echo "Provisioning '$FSP'"
+echo "  crypto user:        $CU"
+echo "  key shared with:    $WEB_OUTBOUND_CU"
 echo
 
 # ---------------------------------------------------------------------------
@@ -146,6 +163,17 @@ echo
 # pipefail the writer's broken pipe would stop the script. Case-insensitive, because the
 # device stores usernames in lower case whatever case they were created with.
 users=$(hsm admin "$CO_PIN" user list)
+
+# The key is shared with this user and nobody else. If it does not exist, the share fails
+# only after the tenant's user and key have been created; if the name belongs to another
+# environment's web-outbound, the share succeeds and hands that environment this tenant's
+# signing key. Neither is caught later, so check before anything is created.
+if ! printf '%s\n' "$users" | grep -iE "(^|[^A-Za-z0-9_-])${WEB_OUTBOUND_CU}([^A-Za-z0-9_-]|$)" >/dev/null; then
+  echo "REFUSING: crypto user '$WEB_OUTBOUND_CU' does not exist, so the key could not be shared" >&2
+  echo "with web-outbound. Check CU_PREFIX on the HSM admin pod. Nothing was changed." >&2
+  exit 1
+fi
+
 if printf '%s\n' "$users" | grep -iE "(^|[^A-Za-z0-9_-])${CU}([^A-Za-z0-9_-]|$)" >/dev/null; then
   echo "  crypto user '$CU' already exists; using its credential from Vault"
 else
