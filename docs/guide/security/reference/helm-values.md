@@ -81,6 +81,7 @@ Source: `helm/values.yaml` (`hsmTools`), `helm/templates/hsm-tools.yaml`.
 | `hsmTools.cloudhsmIp` | `""` | Required when enabled. IP address of one HSM; becomes `CLOUDHSM_IP`. |
 | `hsmTools.vaultAddress` | `""` | Required when enabled. Vault's in-cluster address; becomes `VAULT_ADDR`. |
 | `hsmTools.customerCaConfigMap` | `cloudhsm-customer-ca` | ConfigMap with the key `customerCA.crt`, mounted at `/opt/cloudhsm/etc/customerCA.crt`. |
+| `hsmTools.cryptoUserPrefix` | `cu_` | Becomes `CU_PREFIX`. `provision-hsm-tenant.sh` names each tenant's crypto user `<prefix><fspId>` and shares its key with `<prefix>web_outbound`. When two environments share one HSM cluster, give each its own prefix, for example `cu_prod_`. With the same prefix, one environment's tenant keys are shared with the other environment's web-outbound. |
 | `hsmTools.resources` | `global.defaultResources` | |
 
 Fixed in the template: no ServiceAccount token, Istio sidecar off, runs as user 10001, `/tmp` is an

@@ -553,6 +553,11 @@ hsmTools:
   vaultAddress: ""
   # ConfigMap holding the cluster's certificate under the key customerCA.crt.
   customerCaConfigMap: cloudhsm-customer-ca
+  # Prefix for the crypto users provision-hsm-tenant.sh creates and shares with. Tenants become
+  # <prefix><fspId> and keys are shared with <prefix>web_outbound. Give each environment on a
+  # shared HSM cluster its own prefix, for example cu_prod_, or one environment's tenant keys
+  # are shared with another environment's web-outbound.
+  cryptoUserPrefix: cu_
   resources: {}
 
 connectors: []
