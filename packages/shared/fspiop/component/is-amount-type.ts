@@ -19,12 +19,16 @@ export class AmountTypeConstraint implements ValidatorConstraintInterface {
         if (!this.strictAmountType) {
             return true;
         }
-        
         const reqBody = args.object as { subScenario: string };
-        // PERSON_TO_PERSON > RECEIVE
-        // PERSON_TO_BUSINESS > SEND
-        return (reqBody.subScenario === SubScenario.personToPerson && value === AmountType.Receive) || 
-            (reqBody.subScenario === SubScenario.personToBusiness && value === AmountType.Send);
+        if (reqBody.subScenario === SubScenario.personToPerson) {
+            return value === AmountType.Receive;
+        }
+
+        if (reqBody.subScenario === SubScenario.personToBusiness) {
+            return value === AmountType.Send;
+        }
+
+        return true;
     }
 
     defaultMessage(args: ValidationArguments): string {
