@@ -600,6 +600,72 @@ describe('SendMoneyRequest', () => {
         assert.ok(messages(errors).includes('merchantClassificationCode must not exceed 4 characters'));
     });
 
+    for (const subScenario of ['GOVERNMENT_TO_PERSON', 'BUSINESS_TO_GOVERNMENT', 'SOME_NEW_SCENARIO']) {
+        for (const amountType of ['SEND', 'RECEIVE']) {
+            it(`accepts ${amountType} for ${subScenario} without an explicit amountType rule`, async () => {
+                const body = sendMoneyBody('wallet1', 'wallet2');
+                body.subScenario = subScenario;
+                body.amountType = amountType;
+
+                const {errors} = await validateSendMoneyRequest(body, true);
+
+                assert.deepEqual(errors, []);
+            });
+        }
+    }
+
+    for (const [subScenario, amountType] of [
+        ['PERSON_TO_PERSON', 'RECEIVE'],
+        ['PERSON_TO_BUSINESS', 'SEND'],
+    ]) {
+        it(`preserves the explicit ${subScenario} rule allowing ${amountType}`, async () => {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            body.subScenario = subScenario;
+            body.amountType = amountType;
+
+            const {errors} = await validateSendMoneyRequest(body, true);
+
+            assert.deepEqual(errors, []);
+        });
+    }
+
+    it('still rejects invalid or missing amountType when no scenario-specific rule exists', async () => {
+        for (const subScenario of ['GOVERNMENT_TO_PERSON', 'BUSINESS_TO_GOVERNMENT', 'SOME_NEW_SCENARIO']) {
+            for (const amountType of ['INVALID', 'send', '', undefined]) {
+                const body = sendMoneyBody('wallet1', 'wallet2');
+                body.subScenario = subScenario;
+                if (amountType === undefined) {
+                    delete body.amountType;
+                } else {
+                    body.amountType = amountType;
+                }
+
+                const {errors} = await validateSendMoneyRequest(body, true);
+                const constraints = errors.find(error => error.property === 'amountType')?.constraints;
+
+                assert.ok(constraints?.isEnum, `${subScenario}: ${amountType}`);
+                if (amountType === undefined) {
+                    assert.ok(constraints?.isDefined);
+                }
+            }
+        }
+    });
+
+    it('still requires a non-empty subScenario', async () => {
+        for (const subScenario of ['', undefined]) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            if (subScenario === undefined) {
+                delete body.subScenario;
+            } else {
+                body.subScenario = subScenario;
+            }
+
+            const {errors} = await validateSendMoneyRequest(body, true);
+
+            assert.ok(errors.find(error => error.property === 'subScenario')?.constraints?.isNotEmpty);
+        }
+    });
+
     it('rejects SEND amountType if subScenario is PERSON_TO_PERSON', async () => {
         process.env["STRICT_AMOUNT_TYPE"] = 'true';
         const body = sendMoneyBody('wallet1', 'wallet2');
