@@ -2,6 +2,7 @@
 // Copyright 2024-2026 ThitsaWorks Pte. Ltd.
 import {ConfigService} from '@nestjs/config';
 import {AuditDomainModule, ReportDownloadSettings} from '@core/audit/domain';
+import {CentralLedgerAxiosParams} from '@shared/central-ledger';
 import {TypeOrmSettings} from '@shared/typeorm';
 
 export class ReportWorkerSettings implements AuditDomainModule.RequiredSettings {
@@ -47,6 +48,17 @@ export class ReportWorkerSettings implements AuditDomainModule.RequiredSettings 
             this.readOptionalValue('REPORT_S3_PREFIX') ?? 'reports/',
             this.readOptionalPositiveInteger('REPORT_S3_PRESIGNED_URL_TTL_SECONDS') ?? 900,
         );
+    }
+
+    centralLedgerUrl(): string {
+        return this.configService.get<string>('CENTRAL_LEDGER_URL') || 'http://localhost:3001';
+    }
+
+    centralLedgerAxiosParams(): CentralLedgerAxiosParams {
+        return {
+            socketTimeoutMs: this.readOptionalPositiveInteger('CENTRAL_LEDGER_SOCKET_TIMEOUT_MS'),
+            connectionTimeoutMs: this.readOptionalPositiveInteger('CENTRAL_LEDGER_CONNECTION_TIMEOUT_MS'),
+        };
     }
 
     private readRequiredValue(name: string): string {

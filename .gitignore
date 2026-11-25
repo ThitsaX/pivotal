@@ -99,3 +99,4 @@ docs/plans/
 ceremony-out/
 
 .vscode/
+.pnpm-store/

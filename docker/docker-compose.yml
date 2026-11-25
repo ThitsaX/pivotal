@@ -309,6 +309,7 @@ services:
         condition: service_healthy
     environment:
       REPORT_DOWNLOAD_WORKER_ENABLED: ${REPORT_DOWNLOAD_WORKER_ENABLED:-true}
+      CENTRAL_LEDGER_URL: ${CENTRAL_LEDGER_URL:-http://localhost:3001}
       <<: [*common_db_env, *report_storage_env, *report_worker_env]
     restart: unless-stopped
 
