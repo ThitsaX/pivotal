@@ -68,6 +68,27 @@ describe('WebOutboundSettings payer fee validation', () => {
         );
     });
 
+    it('disables to.idType-by-subScenario validation by default', () => {
+        const outboundSettings = settings().outboundSettings();
+
+        assert.equal(outboundSettings.validateToIdTypeBySubScenario, false);
+    });
+
+    it('reads VALIDATE_TO_IDTYPE_BY_SUBSCENARIO', () => {
+        const outboundSettings = settings({
+            VALIDATE_TO_IDTYPE_BY_SUBSCENARIO: 'true',
+        }).outboundSettings();
+
+        assert.equal(outboundSettings.validateToIdTypeBySubScenario, true);
+    });
+
+    it('rejects an invalid VALIDATE_TO_IDTYPE_BY_SUBSCENARIO flag', () => {
+        assert.throws(
+            () => settings({VALIDATE_TO_IDTYPE_BY_SUBSCENARIO: 'ture'}).outboundSettings(),
+            /Invalid environment variable VALIDATE_TO_IDTYPE_BY_SUBSCENARIO/,
+        );
+    });
+
     it('reads an explicit FSPIOP Hub API type', () => {
         const outboundSettings = settings().outboundSettings();
 

@@ -20,6 +20,8 @@ export class OutboundSettings {
         public readonly strictAmountType: boolean,
         public readonly checkPayerFeeAsMandatory: boolean,
         public readonly postSendmoneyPayeeFspIdRequired: boolean,
+        /** When true, enforce to.idType allow-list per subScenario (GIN). */
+        public readonly validateToIdTypeBySubScenario: boolean,
         /** Master switch for suspicious-pattern monitoring. */
         public readonly suspiciousTxnMonitoringEnabled: boolean,
         /** Monitoring window in minutes (Redis TTL). 0 disables the check. */

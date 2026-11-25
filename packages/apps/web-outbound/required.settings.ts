@@ -87,6 +87,7 @@ export class WebOutboundSettings
             this.readOptionalBoolean('STRICT_AMOUNT_TYPE') ?? false,
             this.readBoolean('CHECK_PAYER_FEE_AS_MANDATORY', false),
             this.readBoolean('POST_SENDMONEY_PAYEE_FSPID_REQUIRED', true),
+            this.readBoolean('VALIDATE_TO_IDTYPE_BY_SUBSCENARIO', false),
             this.readBoolean('SUSPICIOUS_TRANSACTION_MONITORING_ENABLED', true),
             this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_MONITORING_DURATION_MINUTES', 3),
             this.readNonNegativeIntegerOrDefault('SUSPICIOUS_TRANSACTION_THRESHOLD', 10),

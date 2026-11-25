@@ -14,6 +14,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AmountTypeConstraint } from '../../../../packages/shared/fspiop';
 import { useContainer } from 'class-validator';
 import { HasPayeeFspIdConstraint } from '../../../../packages/core/outbound/domain/component/has-payee-fsp-id.constraint';
+import { ToIdTypeSubScenarioConstraint } from '../../../../packages/core/outbound/domain/component/to-id-type-subscenario.constraint';
 
 
 async function validateRequest(body: Record<string, unknown>): Promise<{
@@ -27,7 +28,12 @@ async function validateRequest(body: Record<string, unknown>): Promise<{
 }
 
 
-async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmountType: boolean = false , payeeFspIdRequired: boolean = true): Promise<{
+async function validateSendMoneyRequest(
+    body: Record<string, unknown>,
+    strictAmountType: boolean = false,
+    payeeFspIdRequired: boolean = true,
+    validateToIdTypeBySubScenario: boolean = false,
+): Promise<{
     request: SendMoneyRequest;
     errors:  ValidationError[];
 }> {
@@ -40,6 +46,10 @@ async function validateSendMoneyRequest(body: Record<string, unknown>, strictAmo
             {
                 provide: HasPayeeFspIdConstraint,
                 useValue: new HasPayeeFspIdConstraint(payeeFspIdRequired),
+            },
+            {
+                provide: ToIdTypeSubScenarioConstraint,
+                useValue: new ToIdTypeSubScenarioConstraint(validateToIdTypeBySubScenario),
             },
         ],
     }).compile();
@@ -632,6 +642,105 @@ describe('SendMoneyRequest', () => {
 
         assert.deepEqual(errors, []);
     })
+
+    it('rejects BUSINESS to.idType when subScenario is PERSON_TO_PERSON and validation is enabled', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_PERSON';
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'BUSINESS',
+            idValue: 'MERCHANT001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+        assert.ok(messages(errors).includes('to.idType does not match the specified subScenario'));
+    });
+
+    it('accepts MSISDN and ACCOUNT_ID to.idType for PERSON_TO_PERSON when validation is enabled', async () => {
+        for (const idType of ['MSISDN', 'ACCOUNT_ID']) {
+            const body = sendMoneyBody('wallet1', 'wallet2');
+            body.subScenario = 'PERSON_TO_PERSON';
+            Object.assign(body.to as Record<string, unknown>, {
+                idType,
+                idValue: idType === 'MSISDN' ? '2769200001' : 'account-1',
+            });
+
+            const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+            assert.deepEqual(errors, [], `expected ${idType} to be accepted for PERSON_TO_PERSON`);
+        }
+    });
+
+    it('rejects MSISDN to.idType when subScenario is PERSON_TO_BUSINESS and validation is enabled', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'SEND';
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'MSISDN',
+            idValue: '2769200001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+        assert.ok(messages(errors).includes('to.idType does not match the specified subScenario'));
+    });
+
+    it('accepts BUSINESS to.idType for PERSON_TO_BUSINESS when validation is enabled', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_BUSINESS';
+        body.amountType = 'SEND';
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'BUSINESS',
+            idValue: 'MERCHANT001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('skips to.idType rules for subScenarios without an explicit allow-list', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'GOVERNMENT_TO_PERSON';
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'BUSINESS',
+            idValue: 'MERCHANT001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('does not validate to.idType when VALIDATE_TO_IDTYPE_BY_SUBSCENARIO is false', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_PERSON';
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'BUSINESS',
+            idValue: 'MERCHANT001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, false);
+
+        assert.deepEqual(errors, []);
+    });
+
+    it('does not apply to.idType rules to from.idType', async () => {
+        const body = sendMoneyBody('wallet1', 'wallet2');
+        body.subScenario = 'PERSON_TO_PERSON';
+        Object.assign(body.from as Record<string, unknown>, {
+            idType: 'BUSINESS',
+            idValue: 'PAYER_BIZ',
+        });
+        Object.assign(body.to as Record<string, unknown>, {
+            idType: 'MSISDN',
+            idValue: '2769200001',
+        });
+
+        const {errors} = await validateSendMoneyRequest(body, false, true, true);
+
+        assert.deepEqual(errors, []);
+    });
 });
 
 describe('SendMoneyController', () => {
