@@ -2141,10 +2141,10 @@ const goToLastPage = (): void => {
                                                 </button>
                                             </div>
                                             <div v-else-if="column.key === 'payer'" class="space-y-1.5">
-                                                <p v-if="getPartyDisplay(record, 'payer').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                                <p v-if="getPartyDisplay(record, 'payer').fspName" class="break-words text-[12px] font-semibold leading-4 text-ink">
                                                     {{ getPartyDisplay(record, 'payer').fspName }}
                                                 </p>
-                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
+                                                <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payer').fsp }}
                                                 </p>
                                                 <div class="space-y-1 text-[11px] leading-4 text-slate-600">
@@ -2176,10 +2176,10 @@ const goToLastPage = (): void => {
                                                 </p>
                                             </div>
                                             <div v-else-if="column.key === 'payee'" class="space-y-1.5">
-                                                <p v-if="getPartyDisplay(record, 'payee').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                                <p v-if="getPartyDisplay(record, 'payee').fspName" class="break-words text-[12px] font-semibold leading-4 text-ink">
                                                     {{ getPartyDisplay(record, 'payee').fspName }}
                                                 </p>
-                                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
+                                                <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold leading-4 text-accent">
                                                     {{ getPartyDisplay(record, 'payee').fsp }}
                                                 </p>
                                                 <div class="space-y-1 text-[11px] leading-4 text-slate-600">
@@ -2376,10 +2376,10 @@ const goToLastPage = (): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payer
                                         </p>
-                                        <p v-if="getPartyDisplay(record, 'payer').fspName" class="text-sm font-semibold text-ink">
+                                        <p v-if="getPartyDisplay(record, 'payer').fspName" class="break-words text-sm font-semibold text-ink">
                                             {{ getPartyDisplay(record, 'payer').fspName }}
                                         </p>
-                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
+                                        <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payer').fsp }}
                                         </p>
                                         <div class="space-y-1 text-sm text-slate-600">
@@ -2415,10 +2415,10 @@ const goToLastPage = (): void => {
                                         <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                             Payee
                                         </p>
-                                        <p v-if="getPartyDisplay(record, 'payee').fspName" class="text-sm font-semibold text-ink">
+                                        <p v-if="getPartyDisplay(record, 'payee').fspName" class="break-words text-sm font-semibold text-ink">
                                             {{ getPartyDisplay(record, 'payee').fspName }}
                                         </p>
-                                        <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
+                                        <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2.5 py-0.5 text-xs font-semibold text-accent">
                                             {{ getPartyDisplay(record, 'payee').fsp }}
                                         </p>
                                         <div class="space-y-1 text-sm text-slate-600">
@@ -2841,10 +2841,10 @@ const goToLastPage = (): void => {
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                     Payer
                                 </p>
-                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payer').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payer').fspName" class="break-words text-[12px] font-semibold leading-4 text-ink">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payer').fspName }}
                                 </p>
-                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
+                                <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payer').fsp }}
                                 </p>
                                 <div class="space-y-0.5 text-[12px] text-slate-600">
@@ -2906,10 +2906,10 @@ const goToLastPage = (): void => {
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
                                     Payee
                                 </p>
-                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payee').fspName" class="text-[12px] font-semibold leading-4 text-ink">
+                                <p v-if="getPartyDisplay(selectedTransaction.record, 'payee').fspName" class="break-words text-[12px] font-semibold leading-4 text-ink">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payee').fspName }}
                                 </p>
-                                <p class="inline-flex rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
+                                <p class="inline-flex max-w-full break-all rounded-md border border-accent/20 bg-accentSoft px-2 py-0.5 text-xs font-semibold text-accent">
                                     {{ getPartyDisplay(selectedTransaction.record, 'payee').fsp }}
                                 </p>
                                 <div class="space-y-0.5 text-[12px] text-slate-600">
