@@ -2,8 +2,8 @@ openapi: 3.0.3
 info:
   title: Pivotal Connector API for Mojaloop - Developed by ThitsaWorks.
   description: |
-    Specification for the Pivotal Connector API. This API is exposed by Pivotal to DFSP backends to simplify the process of sending and receiving funds within a Mojaloop scheme. **Note on terminology:** The term "Switch" is equal to the term "Hub", and the term "FSP" is equal to the term "DFSP".
-  version: 1.0.0
+    Specification for the Pivotal Connector API. This API is exposed by Pivotal to DFSP backends to simplify the process of sending and receiving funds within a Mojaloop scheme. **Note on terminology:** The term "Switch" is equal to the term "Hub", and the term "FSP" is equal to the term "DFSP". **Note on mTLS:** When mTLS is enabled, the client certificate must belong to the `fspiop-source` DFSP. Failures return `3105 Invalid signature` (HTTP 401).
+  version: 1.0.3
 servers:
 - url: /
 paths:
@@ -871,6 +871,12 @@ Allowed values:
 
   - GOVERNMENT_TO_PERSON: Government disbursement (pensions, salaries, social payments)
 
+  - GOVERNMENT_TO_PERSON_REFUND: refund payments from the government to citizens
+ 
+  - GOVERNMENT_TO_PERSON_SALARY: salary payments from the government to citizens
+
+  - GOVERNMENT_TO_PERSON_DISBURSE: pension, social benefit and other payments from the government to citizens
+  
   - BUSINESS_TO_PERSON: Salary, refunds, or other business-to-person payments
 
   - CROSS_BORDER_REMITTANCE: International remittance between countries (inbound or outbound)"
