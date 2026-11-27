@@ -2115,11 +2115,11 @@ const goToLastPage = (): void => {
                                                 getDesktopBodyCellClass(column.key),
                                             ]"
                                         >
-                                            <div v-if="column.key === 'correlationId'" class="inline-flex items-start gap-1.5">
-                                                <span class="break-all font-mono text-[11px] tracking-tight">{{ formatValue(record.correlationId) }}</span>
+                                            <div v-if="column.key === 'correlationId'" class="flex max-w-full items-start gap-1.5">
+                                                <span class="min-w-0 break-all font-mono text-[11px] tracking-tight">{{ formatValue(record.correlationId) }}</span>
                                                 <button
                                                     type="button"
-                                                    class="inline-flex h-5 w-5 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
+                                                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-accent"
                                                     :title="copiedCellKey === `${recordKey(record, index)}-${column.key}` ? 'Copied' : `Copy ${column.label}`"
                                                     @click="copyText(`${recordKey(record, index)}-${column.key}`, record.correlationId)"
                                                 >
@@ -2153,9 +2153,9 @@ const goToLastPage = (): void => {
                                                             {{ getPartyDisplay(record, 'payer').idType }}
                                                         </span>
                                                     </p>
-                                                    <p class="flex items-center gap-1.5">
+                                                    <p class="flex items-start gap-1.5">
                                                         <svg
-                                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                                             viewBox="0 0 24 24"
                                                             fill="none"
                                                             stroke="currentColor"
@@ -2167,13 +2167,35 @@ const goToLastPage = (): void => {
                                                             <path d="M5 12h12" />
                                                             <path d="m13 6 6 6-6 6" />
                                                         </svg>
-                                                        <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
+                                                        <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
                                                     </p>
                                                 </div>
-                                                <p v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)" class="text-[11px] leading-4 text-slate-500">
-                                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                                    {{ ' ' }}{{ getPartyDisplay(record, 'payer').subId }}
-                                                </p>
+                                                <div
+                                                    v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)"
+                                                    class="space-y-0.5 text-[11px] leading-4 text-slate-500"
+                                                >
+                                                    <p>
+                                                        <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                            Sub-ID
+                                                        </span>
+                                                    </p>
+                                                    <p class="flex items-start gap-1.5 text-slate-500">
+                                                        <svg
+                                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path d="M5 12h12" />
+                                                            <path d="m13 6 6 6-6 6" />
+                                                        </svg>
+                                                        <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(record, 'payer').subId }}</span>
+                                                    </p>
+                                                </div>
                                             </div>
                                             <div v-else-if="column.key === 'payee'" class="space-y-1.5">
                                                 <p v-if="getPartyDisplay(record, 'payee').fspName" class="break-words text-[12px] font-semibold leading-4 text-ink">
@@ -2188,9 +2210,9 @@ const goToLastPage = (): void => {
                                                             {{ getPartyDisplay(record, 'payee').idType }}
                                                         </span>
                                                     </p>
-                                                    <p class="flex items-center gap-1.5">
+                                                    <p class="flex items-start gap-1.5">
                                                         <svg
-                                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                                             viewBox="0 0 24 24"
                                                             fill="none"
                                                             stroke="currentColor"
@@ -2202,13 +2224,35 @@ const goToLastPage = (): void => {
                                                             <path d="M5 12h12" />
                                                             <path d="m13 6 6 6-6 6" />
                                                         </svg>
-                                                        <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
+                                                        <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
                                                     </p>
                                                 </div>
-                                                <p v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)" class="text-[11px] leading-4 text-slate-500">
-                                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                                    {{ ' ' }}{{ getPartyDisplay(record, 'payee').subId }}
-                                                </p>
+                                                <div
+                                                    v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)"
+                                                    class="space-y-0.5 text-[11px] leading-4 text-slate-500"
+                                                >
+                                                    <p>
+                                                        <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                            Sub-ID
+                                                        </span>
+                                                    </p>
+                                                    <p class="flex items-start gap-1.5 text-slate-500">
+                                                        <svg
+                                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path d="M5 12h12" />
+                                                            <path d="m13 6 6 6-6 6" />
+                                                        </svg>
+                                                        <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(record, 'payee').subId }}</span>
+                                                    </p>
+                                                </div>
                                             </div>
                                             <div v-else-if="column.key === 'transferType'" class="space-y-1">
                                                 <p class="font-semibold leading-4 text-ink">
@@ -2388,9 +2432,9 @@ const goToLastPage = (): void => {
                                                     {{ getPartyDisplay(record, 'payer').idType }}
                                                 </span>
                                             </p>
-                                            <p class="flex items-center gap-2">
+                                            <p class="flex items-start gap-2">
                                                 <svg
-                                                    class="h-4 w-4 shrink-0 text-accent"
+                                                    class="mt-0.5 h-4 w-4 shrink-0 text-accent"
                                                     viewBox="0 0 24 24"
                                                     fill="none"
                                                     stroke="currentColor"
@@ -2402,13 +2446,35 @@ const goToLastPage = (): void => {
                                                     <path d="M5 12h12" />
                                                     <path d="m13 6 6 6-6 6" />
                                                 </svg>
-                                                <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
+                                                <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(record, 'payer').id }}</span>
                                             </p>
                                         </div>
-                                        <p v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)" class="text-sm text-slate-500">
-                                            <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                            {{ ' ' }}{{ getPartyDisplay(record, 'payer').subId }}
-                                        </p>
+                                        <div
+                                            v-if="hasVisibleValue(getPartyDisplay(record, 'payer').subId)"
+                                            class="space-y-0.5 text-sm text-slate-500"
+                                        >
+                                            <p>
+                                                <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                    Sub-ID
+                                                </span>
+                                            </p>
+                                            <p class="flex items-start gap-2 text-slate-500">
+                                                <svg
+                                                    class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M5 12h12" />
+                                                    <path d="m13 6 6 6-6 6" />
+                                                </svg>
+                                                <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(record, 'payer').subId }}</span>
+                                            </p>
+                                        </div>
                                     </section>
 
                                     <section class="space-y-1.5">
@@ -2427,9 +2493,9 @@ const goToLastPage = (): void => {
                                                     {{ getPartyDisplay(record, 'payee').idType }}
                                                 </span>
                                             </p>
-                                            <p class="flex items-center gap-2">
+                                            <p class="flex items-start gap-2">
                                                 <svg
-                                                    class="h-4 w-4 shrink-0 text-accent"
+                                                    class="mt-0.5 h-4 w-4 shrink-0 text-accent"
                                                     viewBox="0 0 24 24"
                                                     fill="none"
                                                     stroke="currentColor"
@@ -2441,13 +2507,35 @@ const goToLastPage = (): void => {
                                                     <path d="M5 12h12" />
                                                     <path d="m13 6 6 6-6 6" />
                                                 </svg>
-                                                <span class="font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
+                                                <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(record, 'payee').id }}</span>
                                             </p>
                                         </div>
-                                        <p v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)" class="text-sm text-slate-500">
-                                            <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                            {{ ' ' }}{{ getPartyDisplay(record, 'payee').subId }}
-                                        </p>
+                                        <div
+                                            v-if="hasVisibleValue(getPartyDisplay(record, 'payee').subId)"
+                                            class="space-y-0.5 text-sm text-slate-500"
+                                        >
+                                            <p>
+                                                <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                    Sub-ID
+                                                </span>
+                                            </p>
+                                            <p class="flex items-start gap-2 text-slate-500">
+                                                <svg
+                                                    class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    stroke-width="2"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M5 12h12" />
+                                                    <path d="m13 6 6 6-6 6" />
+                                                </svg>
+                                                <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(record, 'payee').subId }}</span>
+                                            </p>
+                                        </div>
                                     </section>
 
                                     <section class="space-y-1.5">
@@ -2853,9 +2941,9 @@ const goToLastPage = (): void => {
                                             {{ getPartyDisplay(selectedTransaction.record, 'payer').idType }}
                                         </span>
                                     </p>
-                                    <p class="flex items-center gap-1.5 leading-5">
+                                    <p class="flex items-start gap-1.5 leading-5">
                                         <svg
-                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
@@ -2867,13 +2955,35 @@ const goToLastPage = (): void => {
                                             <path d="M5 12h12" />
                                             <path d="m13 6 6 6-6 6" />
                                         </svg>
-                                        <span class="font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payer').id }}</span>
+                                        <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payer').id }}</span>
                                     </p>
                                 </div>
-                                <p v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payer').subId)" class="text-[12px] leading-5 text-slate-500">
-                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                    {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payer').subId }}
-                                </p>
+                                <div
+                                    v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payer').subId)"
+                                    class="space-y-0.5 text-[12px] text-slate-500"
+                                >
+                                    <p class="leading-5">
+                                        <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                            Sub-ID
+                                        </span>
+                                    </p>
+                                    <p class="flex items-start gap-1.5 leading-5 text-slate-500">
+                                        <svg
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(selectedTransaction.record, 'payer').subId }}</span>
+                                    </p>
+                                </div>
                                 <div
                                     v-if="hasVisibleValue(formatValue(selectedTransaction.record.payerHomeTransactionId))"
                                     class="space-y-0.5 text-[12px] text-slate-600"
@@ -2883,9 +2993,9 @@ const goToLastPage = (): void => {
                                             Home Transaction Id
                                         </span>
                                     </p>
-                                    <p class="flex items-center gap-1.5 leading-5">
+                                    <p class="flex items-start gap-1.5 leading-5">
                                         <svg
-                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
@@ -2897,7 +3007,7 @@ const goToLastPage = (): void => {
                                             <path d="M5 12h12" />
                                             <path d="m13 6 6 6-6 6" />
                                         </svg>
-                                        <span class="font-semibold text-ink">{{ formatValue(selectedTransaction.record.payerHomeTransactionId) }}</span>
+                                        <span class="min-w-0 break-all font-semibold text-ink">{{ formatValue(selectedTransaction.record.payerHomeTransactionId) }}</span>
                                     </p>
                                 </div>
                             </section>
@@ -2918,9 +3028,9 @@ const goToLastPage = (): void => {
                                             {{ getPartyDisplay(selectedTransaction.record, 'payee').idType }}
                                         </span>
                                     </p>
-                                    <p class="flex items-center gap-1.5 leading-5">
+                                    <p class="flex items-start gap-1.5 leading-5">
                                         <svg
-                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
@@ -2932,13 +3042,35 @@ const goToLastPage = (): void => {
                                             <path d="M5 12h12" />
                                             <path d="m13 6 6 6-6 6" />
                                         </svg>
-                                        <span class="font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payee').id }}</span>
+                                        <span class="min-w-0 break-all font-semibold text-ink">{{ getPartyDisplay(selectedTransaction.record, 'payee').id }}</span>
                                     </p>
                                 </div>
-                                <p v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payee').subId)" class="text-[12px] leading-5 text-slate-500">
-                                    <span class="font-semibold uppercase tracking-[0.08em]">Sub-ID</span>
-                                    {{ ' ' }}{{ getPartyDisplay(selectedTransaction.record, 'payee').subId }}
-                                </p>
+                                <div
+                                    v-if="hasVisibleValue(getPartyDisplay(selectedTransaction.record, 'payee').subId)"
+                                    class="space-y-0.5 text-[12px] text-slate-500"
+                                >
+                                    <p class="leading-5">
+                                        <span class="font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                            Sub-ID
+                                        </span>
+                                    </p>
+                                    <p class="flex items-start gap-1.5 leading-5 text-slate-500">
+                                        <svg
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            <path d="M5 12h12" />
+                                            <path d="m13 6 6 6-6 6" />
+                                        </svg>
+                                        <span class="min-w-0 break-all font-medium text-slate-500">{{ getPartyDisplay(selectedTransaction.record, 'payee').subId }}</span>
+                                    </p>
+                                </div>
                                 <div
                                     v-if="hasVisibleValue(formatValue(selectedTransaction.record.payeeHomeTransactionId))"
                                     class="space-y-0.5 text-[12px] text-slate-600"
@@ -2948,9 +3080,9 @@ const goToLastPage = (): void => {
                                             Home Transaction Id
                                         </span>
                                     </p>
-                                    <p class="flex items-center gap-1.5 leading-5">
+                                    <p class="flex items-start gap-1.5 leading-5">
                                         <svg
-                                            class="h-3.5 w-3.5 shrink-0 text-accent"
+                                            class="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
@@ -2962,7 +3094,7 @@ const goToLastPage = (): void => {
                                             <path d="M5 12h12" />
                                             <path d="m13 6 6 6-6 6" />
                                         </svg>
-                                        <span class="font-semibold text-ink">{{ formatValue(selectedTransaction.record.payeeHomeTransactionId) }}</span>
+                                        <span class="min-w-0 break-all font-semibold text-ink">{{ formatValue(selectedTransaction.record.payeeHomeTransactionId) }}</span>
                                     </p>
                                 </div>
                             </section>
